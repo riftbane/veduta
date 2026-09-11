@@ -1,0 +1,21 @@
+# Build and tool output
+/out/
+/bin/
+/dist/
+out/
+*.test
+*.prof
+*.cpuprofile
+*.memprofile
+
+# Cooked assets are always rebuilt from sources
+.cooked/
+
+# Local platform probes (see CLAUDE.md, "When stuck")
+/internal/probe/
+
+# Editors / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/

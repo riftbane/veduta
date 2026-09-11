@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.png binary
+*.vda binary
+*.vframe binary
+*.hash text eol=lf
