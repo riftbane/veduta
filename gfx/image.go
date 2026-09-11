@@ -167,8 +167,9 @@ func DecodePNG(r io.Reader) (*Image, error) {
 }
 
 // BuildMips returns the mip chain for base: base itself followed by successively halved
-// levels down to 1×1. Each texel of level n+1 is the rounded average of the 2×2 block of
-// level n (odd dimensions clamp the last row/column). Integer math: deterministic.
+// levels down to 1×1. Each texel of level n+1 averages the 2×2 block of level n (odd
+// dimensions clamp the last row/column) with premultiplied alpha, so the color hidden in
+// fully transparent texels never bleeds into visible ones. Integer math: deterministic.
 func BuildMips(base *Image) []*Image {
 	levels := []*Image{base}
 	cur := base
@@ -188,11 +189,24 @@ func BuildMips(base *Image) []*Image {
 	return levels
 }
 
+// avg4 averages four straight-alpha colors with premultiplied weights: alpha is the
+// plain average, color channels are Σ(c·a)/Σa (all texels weigh the same when opaque).
 func avg4(a, b, c, d uint32) uint32 {
-	var out uint32
-	for s := 0; s < 32; s += 8 {
-		sum := (a>>s)&0xff + (b>>s)&0xff + (c>>s)&0xff + (d>>s)&0xff
-		out |= ((sum + 2) / 4) << s
+	px := [4]uint32{a, b, c, d}
+	var sa uint32
+	for _, p := range px {
+		sa += p >> 24
+	}
+	out := ((sa + 2) / 4) << 24
+	if sa == 0 {
+		return out
+	}
+	for s := 0; s < 24; s += 8 {
+		var sum uint32
+		for _, p := range px {
+			sum += (p >> s & 0xff) * (p >> 24)
+		}
+		out |= ((sum + sa/2) / sa) << s
 	}
 	return out
 }
