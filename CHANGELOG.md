@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- `veduta upgrade` right after a release wrote its changelog entry directly above the
+  release heading, without a blank line.
+
 ## v0.1.0 — 2026-09-11
 
 ### Added

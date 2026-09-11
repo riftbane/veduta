@@ -155,7 +155,11 @@ func addChangelogEntry(path, line string) error {
 		for j < len(s) && s[j] == '\n' {
 			j++
 		}
-		s = s[:i] + "## Unreleased\n\n" + line + s[j:]
+		rest, sep := s[j:], ""
+		if strings.HasPrefix(rest, "## ") { // empty section right before a release
+			sep = "\n"
+		}
+		s = s[:i] + "## Unreleased\n\n" + line + sep + rest
 	} else if i := strings.Index(s, "\n## "); i >= 0 {
 		s = s[:i+1] + "## Unreleased\n\n" + line + "\n" + s[i+1:]
 	} else {

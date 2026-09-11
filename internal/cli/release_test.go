@@ -38,6 +38,16 @@ func TestAddChangelogEntry(t *testing.T) {
 	if string(data) != "# Changelog\n\n## Unreleased\n\n- two\n- one\n" {
 		t.Fatalf("changelog:\n%s", data)
 	}
+	// Right after a release the Unreleased section is empty and followed by the
+	// release's heading, which must stay a separate paragraph.
+	os.WriteFile(p, []byte("# Changelog\n\n## Unreleased\n\n## v0.1.0 — x\n\n- one\n"), 0o644)
+	if err := addChangelogEntry(p, "- two\n"); err != nil {
+		t.Fatal(err)
+	}
+	data, _ = os.ReadFile(p)
+	if string(data) != "# Changelog\n\n## Unreleased\n\n- two\n\n## v0.1.0 — x\n\n- one\n" {
+		t.Fatalf("changelog after a release:\n%s", data)
+	}
 }
 
 // TestReleaseProjectFlow runs the whole release of a game project against a local bare
