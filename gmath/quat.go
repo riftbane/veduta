@@ -30,6 +30,26 @@ func QuatEuler(x, y, z float32) Quat {
 // QuatEulerDeg is QuatEuler with angles in degrees.
 func QuatEulerDeg(d Vec3) Quat { return QuatEuler(Radians(d.X), Radians(d.Y), Radians(d.Z)) }
 
+// EulerDeg returns Euler angles in degrees [x, y, z] such that QuatEulerDeg of the
+// result is the same rotation (R = Ry·Rx·Rz). Pitch x is in [-90, 90]; at ±90 (gimbal
+// lock) roll z is 0 and the whole yaw goes to y. Deterministic.
+func (a Quat) EulerDeg() Vec3 {
+	m := a.Normalize().Mat4()
+	// With R = Ry·Rx·Rz: R12 = -sin x, R02 = sin y cos x, R22 = cos y cos x,
+	// R10 = cos x sin z, R11 = cos x cos z (element (r,c) is m[c*4+r]).
+	sx := Clamp(-m[9], -1, 1)
+	x := Asin64(float64(sx))
+	var y, z float64
+	if Abs(sx) < 0.9999999 {
+		y = Atan264(float64(m[8]), float64(m[10]))
+		z = Atan264(float64(m[1]), float64(m[5]))
+	} else {
+		// Gimbal lock: R00 = cos(y∓z), R20 = -sin(y∓z); put it all in y.
+		y = Atan264(-float64(m[2]), float64(m[0]))
+	}
+	return Vec3{float32(x * Rad2Deg), float32(y * Rad2Deg), float32(z * Rad2Deg)}
+}
+
 // Mul returns the composition a·b (apply b first, then a).
 func (a Quat) Mul(b Quat) Quat {
 	return Quat{

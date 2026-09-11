@@ -1,0 +1,8 @@
+{
+  "veduta": "model/1",
+  "name": "crate",
+  "pivot": "bottom-center",
+  "parts": [
+    { "shape": "box", "size": [1, 1, 1], "position": [0, 0.5, 0], "material": "crate" }
+  ]
+}

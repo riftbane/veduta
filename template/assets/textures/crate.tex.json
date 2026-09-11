@@ -1,0 +1,11 @@
+{
+  "veduta": "texture/1",
+  "size": [64, 64],
+  "tiling": true,
+  "layers": [
+    { "type": "solid", "color": "#a8743e" },
+    { "type": "stripes", "width": 8, "angle_deg": 90, "colors": ["#00000000", "#00000026"] },
+    { "type": "noise", "seed": 5, "scale": 4, "octaves": 2, "color": "#3a2410", "opacity": 0.3, "blend": "multiply" },
+    { "type": "rect", "xy": [0, 0], "size": [64, 64], "color": "#4a2e14", "outline": 5 }
+  ]
+}

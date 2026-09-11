@@ -1,0 +1,7 @@
+{
+  "veduta": "model/1",
+  "name": "ground",
+  "parts": [
+    { "shape": "box", "size": [20, 0.2, 20], "position": [0, -0.1, 0], "material": "grass" }
+  ]
+}

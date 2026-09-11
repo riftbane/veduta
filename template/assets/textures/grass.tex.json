@@ -1,0 +1,10 @@
+{
+  "veduta": "texture/1",
+  "size": [64, 64],
+  "tiling": true,
+  "layers": [
+    { "type": "solid", "color": "#4f8f3a" },
+    { "type": "noise", "seed": 3, "scale": 8, "octaves": 3, "color": "#1d3a14", "opacity": 0.55, "blend": "multiply" },
+    { "type": "noise", "seed": 11, "scale": 16, "octaves": 1, "color": "#a6d86a", "opacity": 0.25 }
+  ]
+}

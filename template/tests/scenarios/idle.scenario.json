@@ -1,0 +1,13 @@
+{
+  "veduta": "scenario/1",
+  "scene": "main",
+  "seed": 1,
+  "ticks": 120,
+  "expect": [
+    { "tick": 120, "entity": "player", "path": "position", "op": "==", "value": [0, 0, 0] },
+    { "tick": 120, "entity": "gem_1", "path": "visible", "op": "==", "value": true },
+    { "tick": 120, "trace": "gem_collected", "count_max": 0 }
+  ],
+  "invariants": ["finite_positions", "within_bounds", "score_non_negative", "entity_count_max:50"],
+  "screenshots": [0, 120]
+}

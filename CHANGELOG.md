@@ -34,6 +34,23 @@ All notable changes to this project are documented here. The format follows
   lathe and mirror parts with transforms, UV mapping in meters, angle-based smoothing,
   pivots; watertight closed shapes with outward winding.
 - Format references in `docs/` (model, material, scene, scenario, project, vda).
+- `asset/texture`: texture layer programs (solid, noise, stripes, rect, circle, gradient,
+  checker, image) with blend modes, opacity, seamless tiling noise and mip chains.
+- `asset/cook`: incremental cooking into `.vda` (input hash in `META`, stale-only
+  recompiles, pruning of orphans, dangling-reference warnings, dry run) and `Load`, which
+  gives the game every asset from fresh cooked files or compiles stale sources in memory.
+- `scene`: entities with hierarchical transforms, world AABBs, spawn/despawn with
+  deterministic ids, camera presets (`scene`, `top`, `front`, `back`, `left`, `right`, `iso`,
+  `orbit:<deg>`, camera entities) and drawing into a DrawList.
+- `sim`: xoshiro256** RNG, per-tick Input (W3C key codes) and input scripts, canonical
+  JSON trace with SHA-256 hash, AABB contact events, built-in and game invariants,
+  scenario expectations.
+- `veduta`: the public API (`Game`, `Behaviour`, `RegisterKind`, `Context`, `StateCodec`,
+  `Run`, `RunArgs`) and the headless subcommands `render`, `simulate`, `query`, `snapshot`
+  and `describe`; snapshots restore to an identical trace.
+- `template/`: the demo game (WASD, jump, gems, KeyR reset, HUD) with its assets and the
+  `idle`, `move` and `collect` scenarios, compiled inside the module so CI runs it; its
+  trace hashes and contact sheets are goldens (`testdata/golden/scenario_*`).
 
 ### Decisions
 
@@ -112,6 +129,54 @@ All notable changes to this project are documented here. The format follows
 - **Defaults.** Scene camera: perspective, fov 60°, near 0.1, far 200; light direction
   [-0.4,-1,-0.3], color #ffffff, ambient #404040; background #202830. Material: albedo
   #ffffff, opaque, cutoff 0.5, cull back, filter bilinear. Manifest defaults per §5.2.
+- **Texture compositing.** W3C source-over with blend modes: on an opaque canvas
+  `d + (B(d,s) − d)·a`; over transparent pixels a layer keeps its own color. Working
+  canvas float32, quantized once (×255, round half up, straight alpha). Coordinates: origin
+  top-left, y down; 0° points right, 90° down; multiples of 90° are exact.
+- **Texture noise** is value noise over SplitMix64 hashes of (seed, octave, cell),
+  smoothstep-interpolated, sampled at pixel centers; octaves double the cells and halve
+  the weight, normalized to [0, 1). `scale` counts cells across the width. With `tiling`,
+  S = max(1, round(scale)), Sy = max(1, round(h·S/w)) and octave o wraps with period
+  S·2^o × Sy·2^o. Only noise wraps: shapes, stripes, gradients, checkers and images are
+  drawn once (the docs explain how to keep them seamless).
+- **Texture shapes.** Rect corner radii clamp to half the smaller side; outlines are drawn
+  inside (an outline covering the whole shape fills it); 4×4 supersampling. Gradients run
+  from the first to the last pixel center. Checker: N×N cells over the whole texture.
+  Image layers: PNG only, paths confined to the assets directory (also against symlinks,
+  through `os.Root`), premultiplied bilinear resampling with area averaging when
+  shrinking.
+- **Mip chains** average 2×2 blocks with premultiplied alpha, so colors hidden in fully
+  transparent texels never darken visible edges.
+- **Tick timeline.** Tick 0 is the loaded scene after `Init` (recorded with `scene_load`);
+  ticks 1…N each run `Game.Update`, then behaviours in entity id order, then despawns,
+  transforms, contacts, invariants and the trace record. Script events at tick t are in
+  the Input of tick t; events at tick 0 appear in tick 1. Entities spawned during a tick
+  first update on the next one. `LoadScene` restarts ids at 1.
+- **Trace.** One canonical JSON object per tick (sorted keys, no whitespace, float32
+  shortest round-trip formatting, non-finite numbers as `"NaN"`/`"+Inf"`/`"-Inf"`);
+  `TraceHash` is the SHA-256 of the file. Entity summaries carry id, name, kind, world
+  position, local `rotation_deg` (decomposed from the quaternion), scale, visible, tags,
+  model, material, parent name, world `aabb` and `state`.
+- **Collisions.** A `collision` event is emitted when two AABBs start overlapping
+  (touching is not overlapping; two `static` entities never collide; overlaps present at
+  load are not events).
+- **Invariants** are checked after every tick including tick 0; a violation is reported
+  when an invariant starts failing (not every tick while it keeps failing) and `simulate`
+  lists the first violation of each. A scenario's `invariants` list replaces the
+  project's. Unregistered entity kinds are a load error.
+- **Behaviours are stateless**; per-entity state lives in `Entity.State` (traced as
+  `state.*`, snapshotted with gob). The game's own state goes through `StateCodec`.
+- **Headless protocol.** Every subcommand prints one JSON line on stdout; exit codes are
+  0 (ok), 1 (error, `{"ok":false,"error":...,"errors":[{file,line,col,msg}]}`), 2 (usage),
+  3 (`simulate` ran and the verdict is `fail`). An `--input` file is a JSON array of input
+  events or a scenario file.
+- **§17 open questions.** Positions are float32 in `sim` (no precision issue seen in
+  the 300-tick scenarios; revisit for runs over 10 minutes). `simulate` always adds a
+  top-down trajectory tile to its single contact sheet. Font: see above.
+- **Project loading.** Games load assets from fresh cooked files and compile stale
+  sources in memory at startup, so a player archive only needs the binary, `veduta.json`
+  and `assets/`; when `veduta.json` is not in the working directory, the directory of the
+  executable is used.
 - **`.vda` hashes.** `META.source_hash` is the SHA-256 computed by `cook` over a version
   line, the compiler version, then the source and each dependency as
   `<tag> <path> <length>\n<bytes>`; a missing dependency hashes as `missing <path>`.
