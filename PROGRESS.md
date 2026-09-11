@@ -164,6 +164,16 @@ Factual log for the human reviewer. One section per phase of `SPEC-v0.1.0.md` §
   path, `%APPDATA%`), fresh projects had no `CHANGELOG.md` so `veduta release` refused
   them, a duplicated release step label.
 - §15 walk: see CHANGELOG → Acceptance, one exact command per criterion.
+- Tagged `v0.1.0` with `veduta release v0.1.0` (release commit d17245c); `release.yml`
+  published https://github.com/riftbane/veduta/releases/tag/v0.1.0 (linux/amd64,
+  linux/arm64, windows/amd64, `checksums.txt`), CI green on the tag. Re-checked against
+  the final release: `scripts/acceptance/fresh_vps.sh` in docker → PASS in 43 s total;
+  `veduta update` took a v0.0.9 build to v0.1.0 (checksum verified); the demo ran
+  `veduta upgrade && veduta release v0.1.0` and published
+  https://github.com/riftbane/veduta-demo/releases/tag/v0.1.0 with
+  `demo_v0.1.0_linux_amd64.tar.gz` and `demo_v0.1.0_windows_amd64.zip` (checksums OK,
+  the Linux binary simulates headless from the extracted folder). That upgrade exposed a
+  missing blank line in the changelog entry, fixed after the tag (Unreleased).
 - **For the human** (needs real desktops): download the demo's v0.1.0 archives from
   https://github.com/riftbane/veduta-demo/releases, run them on Windows 10/11 and on a
   Linux desktop and go through the phase 7 checklist (1280×720 window, 60 fps, WASD, gem
