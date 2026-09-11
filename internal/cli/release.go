@@ -186,7 +186,7 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 	if len(o.Trailers) > 0 {
 		msg += "\n\n" + strings.Join(o.Trailers, "\n")
 	}
-	if out, err := git("add", "CHANGELOG.md"); !step("commit", err == nil, "%s", okOr(out, err)) {
+	if out, err := git("add", "CHANGELOG.md"); !step("stage", err == nil, "%s", okOr(out, err)) {
 		return finish(r), nil
 	}
 	if out, err := git("commit", "-q", "-m", msg); !step("commit", err == nil, "%s", okOr(out, err)) {

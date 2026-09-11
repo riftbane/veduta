@@ -260,3 +260,62 @@ All notable changes to this project are documented here. The format follows
   facing), and only rendered in `color` mode (debug modes show the 3D scene alone).
 - **Wireframe mode** is a hidden-line wireframe (dark fill + one-pixel edges computed from
   the edge functions); edges created by clipping are not drawn.
+
+### Acceptance (§15)
+
+Every criterion of `SPEC-v0.1.0.md` §15 with the exact command that verified it. Items
+needing a published release ran against the rehearsal release `v0.1.0-rc.1`, whose code
+is this release's apart from the release step label.
+
+1. **Fresh VPS → `veduta test` in under 5 minutes, only GitHub after install.**
+   `docker run --rm -v "$PWD/scripts/acceptance/fresh_vps.sh:/fresh_vps.sh:ro" ubuntu:24.04 sh /fresh_vps.sh`
+   (Ubuntu 24.04.4 plus the curl, git and ca-certificates a server image has; as a normal
+   user: `curl -fsSL https://raw.githubusercontent.com/riftbane/veduta/main/install.sh | sh`,
+   then proxy.golang.org, sum.golang.org, go.dev, golang.org, dl.google.com and
+   storage.googleapis.com are blocked in `/etc/hosts`, then
+   `veduta init demo && cd demo && veduta test`). PASS: install 11 s (Go included),
+   init + test 31 s, 42 s in total.
+2. **`claude` in `demo/` lists every §11 tool; visual tools return images inline.** In
+   the demo project with the released tool: `claude mcp list` shows `veduta: veduta mcp`
+   (project scope, awaiting the one-time approval) and
+   `claude -p '<call render, simulate, inspect, query, diff>' --mcp-config .mcp.json --strict-mcp-config --allowedTools 'mcp__veduta__*'`
+   listed build, cook, diff, docs, fuzz, inspect, query, release, render, simulate, status,
+   test and trace, and received an image block from render, simulate, inspect, query and
+   diff. Every tool is also exercised by `go test ./internal/cli -run TestMCPEndToEnd`.
+3. **`veduta release` from the template project publishes the demo archives.**
+   `veduta init veduta-demo --name demo --module github.com/riftbane/veduta-demo`, pushed
+   to https://github.com/riftbane/veduta-demo, then `veduta release v0.1.0-rc.1`: every
+   checklist step ok, tag pushed, the project's `release.yml` published
+   `demo_v0.1.0-rc.1_linux_amd64.tar.gz`, `demo_v0.1.0-rc.1_windows_amd64.zip` and
+   `checksums.txt`; `gh release download -R riftbane/veduta-demo v0.1.0-rc.1 && sha256sum -c checksums.txt`
+   OK and the extracted Linux binary renders headless (`./demo -headless render --scene main`).
+   The window opens, presents and closes on both OSes in CI
+   (`VEDUTA_DISPLAY_TEST=1 go test ./platform -run TestDisplaySmoke` under Xvfb and on
+   windows-latest); 60 fps, WASD and gem collection on a real desktop are for the human
+   (checklist in `PROGRESS.md`, phase 7).
+4. **Identical trace hashes and PNGs across runs and across OSes.**
+   `go test . -run TestTemplateScenarios` runs every template scenario twice and compares
+   the trace hashes and contact sheets with the committed goldens
+   (`testdata/golden/scenario_*`); it passes in `ci.yml` on ubuntu-latest and
+   windows-latest with Go stable and oldstable (runs 34644648386, 34645104184).
+5. **Flipped normals are reported and visible.** In a demo copy with
+   `"flip_normals": true` on the hero's part 0:
+   `veduta --json inspect model hero --sheets normals` → 1 error `MESH_FLIPPED_NORMALS`
+   with `where: {part: 0, shape: cylinder, reason: inside_out}` (64 triangles), and
+   `out/hero.normals.png` hatches the cylinder magenta in all four views. Pinned by
+   `go test ./inspect -run TestModelFlippedNormals` (4229 hatched pixels, 0 when unmodified).
+6. **Fuzzing.** In the demo: `veduta fuzz --games 200 --ticks 600` → `0 violating` in
+   14.3 s. With `PlayerSpeed = 400.0` in `game/kinds.go`: 200/200 games violate
+   `within_bounds`; minimized repro `tests/scenarios/fuzz_77ab7408.scenario.json`
+   (16 ticks, one event: KeyS pressed at tick 1), byte-identical on a second run;
+   `veduta simulate --scenario tests/scenarios/fuzz_77ab7408.scenario.json` exits 3 (fail).
+7. **`veduta update` from an older version.**
+   `go build -ldflags "-X main.version=v0.0.9" -o old/veduta ./cmd/veduta`, then
+   `old/veduta update --check && old/veduta update && old/veduta version` →
+   `updated v0.0.9 → v0.1.0-rc.1 (veduta_v0.1.0-rc.1_linux_amd64.tar.gz verified, sha256 38b9c3b5…)`
+   and the replaced binary reports `v0.1.0-rc.1 (commit adcebd5…)`.
+8. **Rasterizer benchmark.** `go test ./gfx/soft -run '^$' -bench . -benchmem -count 3`
+   → 0 allocs/op (gate, also the CI step "rasterizer benchmark (0 allocs/op gate)");
+   13.5–15.1 ms/frame on this 4-core AMD EPYC VPS, so the 8 ms target is not met yet.
+9. **No third-party modules.** `test ! -s go.sum && go list -m all` → no `go.sum`, only
+   `github.com/riftbane/veduta` (CI step "go.sum has no third-party modules").

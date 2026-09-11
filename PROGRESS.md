@@ -144,3 +144,27 @@ Factual log for the human reviewer. One section per phase of `SPEC-v0.1.0.md` §
   - Event logging aid on either OS: `VEDUTA_DISPLAY_TEST=1 go test -count=1 -v -run
     TestDisplaySmoke ./platform/` (on Windows `VEDUTA_DISPLAY_TEST_SECONDS=60` keeps the
     window open and logs every event).
+- CI result (runs 34644648386, 34645104184): `TestDisplaySmoke` passes under Xvfb on
+  ubuntu-latest and on windows-latest (Go stable and oldstable).
+
+## Phase 8 — distribution and release (2026-09-11)
+
+- Built: `install.sh`, `veduta update`/`upgrade`/`release`, the tool and template release
+  workflows, the README, `.mcp.json` for this repository (`veduta --project template mcp`),
+  `scripts/acceptance/fresh_vps.sh`.
+- MCP on this repository: a headless Claude Code session with `.mcp.json` listed the 13
+  tools and called them all. It found that `simulate` refused a bare scenario name (fixed:
+  names resolve under `tests/scenarios`); `doctor` ignored `--project` (fixed).
+- Release rehearsal with `v0.1.0-rc.1`, tagged by hand: `release.yml` published the three
+  archives and `checksums.txt`; `install.sh` on a fresh Ubuntu 24.04 container took 42 s
+  from nothing to a passing `veduta test`; `veduta update` took a v0.0.9 build to the rc;
+  the demo project, pushed to https://github.com/riftbane/veduta-demo, released
+  `v0.1.0-rc.1` with `veduta release` and its workflow published the Linux and Windows
+  archives. Found and fixed on the way: two Windows-only test bugs (a JSON-escaped temp
+  path, `%APPDATA%`), fresh projects had no `CHANGELOG.md` so `veduta release` refused
+  them, a duplicated release step label.
+- §15 walk: see CHANGELOG → Acceptance, one exact command per criterion.
+- **For the human** (needs real desktops): download the demo's v0.1.0 archives from
+  https://github.com/riftbane/veduta-demo/releases, run them on Windows 10/11 and on a
+  Linux desktop and go through the phase 7 checklist (1280×720 window, 60 fps, WASD, gem
+  collection, clean close).
