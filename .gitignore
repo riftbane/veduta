@@ -1,6 +1,7 @@
 # Build and tool output
 /out/
 /bin/
+/template/bin/
 /dist/
 out/
 *.test

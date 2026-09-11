@@ -239,6 +239,17 @@ All notable changes to this project are documented here. The format follows
   in the engine repository (vet, tests, building and running `cmd/veduta`); it needs a
   clean tree on a branch with an `origin` remote, a version above every existing tag and
   a non-empty `## Unreleased` changelog section, which becomes `## vX.Y.Z — date`.
+- **Project changelog.** `veduta init` also writes `CHANGELOG.md` (not in the §12 list)
+  with an Unreleased entry, so `veduta release v0.1.0` works on a fresh project (§15.3)
+  and `veduta upgrade` has a file to record engine changes in (§13.3).
+- **Scenario names.** `simulate --scenario` (CLI and MCP) takes a scenario name
+  (`collect` = `tests/scenarios/collect.scenario.json`) as well as a path, like `render`
+  takes a scene name.
+- **Release rehearsal.** Acceptance items that need a published release (§15.1 install,
+  §15.3 demo release, §15.7 update) were first verified against `v0.1.0-rc.1`, tagged by
+  hand and published by the same `release.yml`, before `veduta release v0.1.0`.
+- **MCP on the engine repository.** `.mcp.json` here runs `veduta --project template mcp`,
+  so Claude Code working on the engine drives the demo game in `template/` (phase 6).
 - **Updates.** Tool self-update is Linux-only in v0.1.0 (Windows tool binaries are out of
   scope, §2); the new binary must run and report the expected version before the atomic
   rename. `auto` mode updates before `veduta mcp` serves and re-executes the new binary.

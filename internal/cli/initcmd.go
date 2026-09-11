@@ -67,12 +67,13 @@ func templateEngine() string {
 
 // projectFiles maps templated sources to their destination.
 var projectFiles = map[string]string{
-	"project/go.mod.tmpl":      "go.mod",
-	"project/CLAUDE.md.tmpl":   "CLAUDE.md",
-	"project/README.md.tmpl":   "README.md",
-	"project/gitignore.tmpl":   ".gitignore",
-	"project/mcp.json.tmpl":    ".mcp.json",
-	"project/release.yml.tmpl": ".github/workflows/release.yml",
+	"project/go.mod.tmpl":       "go.mod",
+	"project/CLAUDE.md.tmpl":    "CLAUDE.md",
+	"project/README.md.tmpl":    "README.md",
+	"project/CHANGELOG.md.tmpl": "CHANGELOG.md",
+	"project/gitignore.tmpl":    ".gitignore",
+	"project/mcp.json.tmpl":     ".mcp.json",
+	"project/release.yml.tmpl":  ".github/workflows/release.yml",
 }
 
 // Init creates a game project from the embedded template (spec §12).

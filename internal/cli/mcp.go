@@ -242,7 +242,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 			Name:        "simulate",
 			Description: "Run ticks through the game: a scenario file, or a scene with ticks/seed/inputs. Returns the verdict, the expectations table, invariant violations with their tick, trace event counts, the run_id (for trace) and exactly one contact sheet (screenshots + top-down trajectories).",
 			InputSchema: schema(map[string]any{
-				"scenario":    str("scenario file, e.g. tests/scenarios/move.scenario.json"),
+				"scenario":    str("scenario name (\"move\" = tests/scenarios/move.scenario.json) or file path"),
 				"scene":       str("scene (without scenario)"),
 				"ticks":       num("ticks to simulate (without scenario, default 600)"),
 				"seed":        num("RNG seed (without scenario)"),
@@ -264,6 +264,9 @@ func (m *mcpServer) tools() []mcp.Tool {
 					return nil, err
 				}
 				scenario := a.Scenario
+				if scenario != "" {
+					scenario = s.scenarioPath(scenario)
+				}
 				if scenario != "" && !filepath.IsAbs(scenario) {
 					scenario = filepath.Join(s.Root, filepath.FromSlash(scenario))
 				}

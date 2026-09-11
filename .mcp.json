@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "veduta": {
+      "type": "stdio",
+      "command": "veduta",
+      "args": ["--project", "template", "mcp"]
+    }
+  }
+}

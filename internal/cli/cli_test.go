@@ -38,7 +38,7 @@ func newProject(t *testing.T) (string, *Env) {
 
 func TestInitAndCommands(t *testing.T) {
 	dir, env := newProject(t)
-	for _, f := range []string{"go.mod", "go.sum", "CLAUDE.md", ".mcp.json", ".gitignore", ".github/workflows/release.yml", "cmd/game/main.go", "game/kinds.go", "assets/scenes/main.scene.json", "tests/scenarios/move.scenario.json"} {
+	for _, f := range []string{"go.mod", "go.sum", "CLAUDE.md", "CHANGELOG.md", ".mcp.json", ".gitignore", ".github/workflows/release.yml", "cmd/game/main.go", "game/kinds.go", "assets/scenes/main.scene.json", "tests/scenarios/move.scenario.json"} {
 		if _, err := os.Stat(filepath.Join(dir, f)); err != nil && f != "go.sum" {
 			t.Fatalf("missing %s: %v", f, err)
 		}
@@ -189,7 +189,7 @@ func TestMCPEndToEnd(t *testing.T) {
 	if isErr || imgs != 1 || d["changed_pixels"].(float64) != 0 {
 		t.Fatalf("diff: %v", d)
 	}
-	sim, imgs, isErr := c.tool("simulate", map[string]any{"scenario": "tests/scenarios/collect.scenario.json"})
+	sim, imgs, isErr := c.tool("simulate", map[string]any{"scenario": "collect"}) // a bare name resolves under tests/scenarios
 	if isErr || imgs != 1 || sim["verdict"] != "pass" {
 		t.Fatalf("simulate: %v images=%d", sim, imgs)
 	}

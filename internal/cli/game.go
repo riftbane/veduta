@@ -225,10 +225,19 @@ func (r SimResult) Human() string {
 	return b.String()
 }
 
+// scenarioPath accepts a scenario name ("collect") as well as a file path.
+func (s *Session) scenarioPath(p string) string {
+	if strings.ContainsAny(p, `/\`) || strings.HasSuffix(p, ".json") {
+		return p
+	}
+	return filepath.Join(s.Root, "tests", "scenarios", p+".scenario.json")
+}
+
 // Simulate runs ticks through the game binary; results are kept under out/runs/<id>/.
 func (s *Session) Simulate(o SimulateOptions) (SimResult, error) {
 	name := o.Scene
 	if o.Scenario != "" {
+		o.Scenario = s.scenarioPath(o.Scenario)
 		name = strings.TrimSuffix(filepath.Base(o.Scenario), ".scenario.json")
 	}
 	if name == "" {
@@ -413,7 +422,7 @@ func init() {
 			fs := newFlags("simulate", env.Stderr)
 			var o SimulateOptions
 			var shots, invs string
-			fs.StringVar(&o.Scenario, "scenario", "", "scenario file")
+			fs.StringVar(&o.Scenario, "scenario", "", "scenario name (tests/scenarios/<name>.scenario.json) or file")
 			fs.StringVar(&o.Scene, "scene", "", "scene")
 			fs.IntVar(&o.Ticks, "ticks", 600, "ticks")
 			fs.Uint64Var(&o.Seed, "seed", 0, "seed")
