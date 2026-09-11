@@ -141,6 +141,14 @@ Factual log for the human reviewer. One section per phase of `SPEC-v0.1.0.md` §
     Alt-Tab releases keys; dragging a button outside the window still delivers ButtonUp;
     resize/maximize/minimize/restore; moving between monitors of different DPI; with a
     Japanese IME active WASD still moves; works over Remote Desktop.
+  - First person (added after v0.1.0), on either OS: press `KeyF` in the demo. The camera
+    goes to the hero's eyes, the cursor disappears and the view turns with the mouse; it
+    keeps turning however far you push the mouse in one direction (the cursor is locked
+    inside the window), WASD moves relative to the view, `KeyF` gives the cursor back.
+    Check that no movement is lost or doubled when the view turns quickly, that Alt-Tab
+    away and back leaves the cursor and the view sane, and that resizing while locked
+    keeps the pointer centered. CI only opens, locks and closes a window; the feel of the
+    mouse is what needs a person.
   - Event logging aid on either OS: `VEDUTA_DISPLAY_TEST=1 go test -count=1 -v -run
     TestDisplaySmoke ./platform/` (on Windows `VEDUTA_DISPLAY_TEST_SECONDS=60` keeps the
     window open and logs every event).
