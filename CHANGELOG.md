@@ -56,8 +56,25 @@ All notable changes to this project are documented here. The format follows
   yaw), as in most engines.
 - **Mip selection.** Per triangle, from the ratio of texel area to pixel area
   (level = ⌊log₄ ratio⌋), as §6.2 asks; computed with exact comparisons, no logarithms.
-- **ID buffer.** A fragment writes the entity id (and normal) when it is "solid": opaque
-  blend, or alpha ≥ 0.5. HUD overlay views never write ids, so queries see the 3D scene.
+- **ID buffer.** A fragment writes the entity id (and normal) exactly when it writes
+  depth, and never from HUD overlay views — in every render mode. So `ID != 0` implies
+  `Depth < 1`, queries see the 3D scene, and alpha-blended materials (which do not write
+  depth) never own ID-buffer pixels; debug sheets agree with color-mode buffers.
+- **Normals mode flags wrong geometry.** In `normals` mode culling is off; fragments of
+  back-facing triangles are hatched magenta and fragments whose normal points away from
+  the viewer are hatched orange, so inside-out parts and flipped normals are visibly wrong
+  (§15.5).
+- **Depth mode** maps linear eye depth of the frame's covered pixels to gray, nearest
+  white, farthest dark gray (adaptive per frame for legibility; diff depth sheets only
+  from the same camera).
+- **Mirroring transforms.** A model matrix with a negative determinant flips the front-face
+  test (like `glFrontFace`), so mirrored entities are not drawn inside-out.
+- **Clipping precision.** Clip distances and intersections are computed in float64 and
+  clipped vertices are clamped to the screen, so kilometre-long triangles crossing the
+  near plane leave no holes; one mip level is chosen per source triangle (from the whole
+  clipped polygon).
+- **Rasterizer lifecycle.** Using a closed renderer returns an error; the worker-stopping
+  cleanup is attached to a handle shared by copies and kept alive during Draw.
 - **Sprites** are unlit, drawn with `gfx.State2D`, counter-clockwise on screen (front
   facing), and only rendered in `color` mode (debug modes show the 3D scene alone).
 - **Wireframe mode** is a hidden-line wireframe (dark fill + one-pixel edges computed from

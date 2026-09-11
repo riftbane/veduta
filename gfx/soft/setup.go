@@ -21,8 +21,10 @@ const (
 	nattr
 )
 
-// maxPoly bounds a triangle clipped by six planes (each plane adds at most one vertex).
-const maxPoly = 3 + 6
+// maxPoly bounds a clipped polygon. In exact arithmetic each of the six planes adds at
+// most one vertex (3 + 6 = 9); rounding can make a plane add two, so the scratch arrays
+// have room to spare and clipPoly never writes past them.
+const maxPoly = 16
 
 // cvert is a vertex in clip space with its attributes.
 type cvert struct {
@@ -31,6 +33,7 @@ type cvert struct {
 	// edge reports whether the polygon edge from this vertex to the next one lies on an
 	// original triangle edge (false for edges created by clipping); used by wireframe.
 	edge bool
+	oc   uint8 // outcode, cached by vertex (stale on clipped vertices, which never read it)
 }
 
 // cmdState is a draw command resolved for rasterization.
@@ -42,6 +45,11 @@ type cmdState struct {
 	filter  gfx.Filter
 	id      uint32
 	overlay bool
+	flip    bool       // the model matrix mirrors (negative determinant): front faces are clockwise
+	vz      gmath.Vec3 // world direction towards the viewer (row 2 of the view matrix)
+	// fast selects rasterTriOpaque in ModeColor: opaque, depth-tested, bilinear-filtered
+	// with a power-of-two repeat texture, not an overlay.
+	fast bool
 }
 
 // tri is a triangle after clipping, snapping and setup. Edge k is the edge opposite
@@ -51,6 +59,7 @@ type tri struct {
 	level                  int32
 	minX, minY, maxX, maxY int32
 	wire                   uint8 // bit k: edge k is an original triangle edge
+	back                   bool  // back-facing (drawn because culling is off)
 	// E_k(x, y) = ec[k] + edx[k]*x + edy[k]*y at the center of pixel (x, y), in 1/256 px²
 	// units, with the top-left bias already applied: a pixel is inside iff all E_k >= 0.
 	ec, edx, edy [3]int64
@@ -71,12 +80,38 @@ type xform struct {
 	ambient gmath.Vec3
 }
 
+// cmdSrc is the validated geometry of a command and the frame-wide index of its first
+// triangle.
+type cmdSrc struct {
+	verts []gfx.Vertex
+	idx   []uint32
+	first int
+}
+
+// setupCtx is one setup chunk: the triangles [lo, hi) of the frame, in submission order.
+// A chunk owns its triangles, bins, vertex cache, clip scratch and counters, so chunks
+// are set up concurrently. Tiles consume chunk 0's triangles, then chunk 1's, and so on,
+// which is submission order; a triangle's setup depends only on its own vertices, so the
+// number of chunks never changes the image.
+type setupCtx struct {
+	lo, hi int
+	tris   []tri
+	bins   [][]int32
+	xv     []cvert
+	stamp  []uint32
+	gen    uint32
+	poly   [2][maxPoly]cvert
+	stats  gfx.FrameStats // Culled, Clipped and Drawn
+}
+
+// minChunkTris is the smallest number of triangles per chunk worth a parallel phase.
+const minChunkTris = 256
+
 func (c *core) setup(dl *gfx.DrawList) error {
-	c.tris = c.tris[:0]
-	for i := range c.bins {
-		c.bins[i] = c.bins[i][:0]
-	}
 	c.cmds = c.cmds[:0]
+	c.xforms = c.xforms[:0]
+	c.srcs = c.srcs[:0]
+	total, maxVerts := 0, 0
 	for ci := range dl.Cmds {
 		cmd := &dl.Cmds[ci]
 		if cmd.View < 0 || cmd.View >= len(dl.Views) {
@@ -97,6 +132,8 @@ func (c *core) setup(dl *gfx.DrawList) error {
 			filter:  cmd.Filter,
 			id:      cmd.ID,
 			overlay: view.Overlay,
+			flip:    cmd.Model.Mat3().Det() < 0,
+			vz:      gmath.V3(view.View[2], view.View[6], view.View[10]),
 		}
 		if cmd.Texture != 0 {
 			if int(cmd.Texture) > len(c.textures) {
@@ -104,41 +141,88 @@ func (c *core) setup(dl *gfx.DrawList) error {
 			}
 			cs.tex = c.textures[cmd.Texture-1]
 		}
+		cs.fast = cs.tex != nil && cs.tex.fast && cs.filter != gfx.FilterNearest &&
+			cs.state.Blend == gfx.BlendOpaque && cs.state.DepthTest && !cs.overlay
+		nv := uint32(len(verts))
+		for _, i := range idx {
+			if i >= nv {
+				return fmt.Errorf("soft: command %d: index out of range (%d vertices)", ci, nv)
+			}
+		}
 		c.cmds = append(c.cmds, cs)
 		c.stats.Commands++
-
-		x := xform{
+		c.xforms = append(c.xforms, xform{
 			mvp:     view.Proj.Mul(view.View).Mul(cmd.Model),
 			nrm:     cmd.Model.NormalMatrix(),
 			color:   cmd.Color.XYZ(),
 			unlit:   cmd.Unlit || view.Overlay,
 			light:   dl.Light.Color,
 			ambient: dl.Light.Ambient,
+		})
+		c.srcs = append(c.srcs, cmdSrc{verts: verts, idx: idx, first: total})
+		total += len(idx) / 3
+		maxVerts = max(maxVerts, len(verts))
+	}
+	c.stats.Triangles = total
+
+	n := min(len(c.chunks), max(1, total/minChunkTris))
+	c.nchunks = n
+	tiles := c.tilesX * c.tilesY
+	for k := 0; k < n; k++ {
+		ch := &c.chunks[k]
+		ch.lo, ch.hi = total*k/n, total*(k+1)/n
+		ch.tris = ch.tris[:0]
+		// Keep per-tile capacity across target sizes: switching between two framebuffer
+		// sizes every frame must not reallocate the bins.
+		if cap(ch.bins) < tiles {
+			ch.bins = append(ch.bins[:cap(ch.bins)], make([][]int32, tiles-cap(ch.bins))...)
 		}
-		c.gen++
-		if c.gen == 0 {
-			clear(c.stamp)
-			c.gen = 1
+		ch.bins = ch.bins[:tiles]
+		for i := range ch.bins {
+			ch.bins[i] = ch.bins[i][:0]
 		}
-		if len(c.stamp) < len(verts) {
-			c.stamp = append(c.stamp, make([]uint32, len(verts)-len(c.stamp))...)
-			c.xv = append(c.xv, make([]cvert, len(verts)-len(c.xv))...)
+		if len(ch.stamp) < maxVerts {
+			ch.stamp = append(ch.stamp, make([]uint32, maxVerts-len(ch.stamp))...)
+			ch.xv = append(ch.xv, make([]cvert, maxVerts-len(ch.xv))...)
 		}
-		nv := uint32(len(verts))
-		csi := int32(len(c.cmds) - 1)
-		for t := 0; t+2 < len(idx); t += 3 {
-			i0, i1, i2 := idx[t], idx[t+1], idx[t+2]
-			if i0 >= nv || i1 >= nv || i2 >= nv {
-				return fmt.Errorf("soft: command %d: index out of range (%d vertices)", ci, nv)
-			}
-			c.stats.Triangles++
-			v0 := c.vertex(i0, verts, &x)
-			v1 := c.vertex(i1, verts, &x)
-			v2 := c.vertex(i2, verts, &x)
-			c.clipAndSetup(csi, v0, v1, v2)
-		}
+		ch.stats = gfx.FrameStats{}
+	}
+	if n == 1 {
+		c.setupChunk(&c.chunks[0])
+	} else {
+		c.run(phaseSetup)
+	}
+	for k := 0; k < n; k++ {
+		s := &c.chunks[k].stats
+		c.stats.Culled += s.Culled
+		c.stats.Clipped += s.Clipped
+		c.stats.Drawn += s.Drawn
 	}
 	return nil
+}
+
+// setupChunk transforms, clips, sets up and bins the triangles of chunk ch.
+func (c *core) setupChunk(ch *setupCtx) {
+	for si := range c.srcs {
+		s := &c.srcs[si]
+		lo, hi := max(ch.lo-s.first, 0), min(ch.hi-s.first, len(s.idx)/3)
+		if lo >= hi {
+			continue
+		}
+		ch.gen++
+		if ch.gen == 0 {
+			clear(ch.stamp)
+			ch.gen = 1
+		}
+		x := &c.xforms[si]
+		for t := lo; t < hi; t++ {
+			i0, i1, i2 := s.idx[3*t], s.idx[3*t+1], s.idx[3*t+2]
+			v0 := c.vertex(ch, i0, s.verts, x)
+			v1 := c.vertex(ch, i1, s.verts, x)
+			v2 := c.vertex(ch, i2, s.verts, x)
+			c.clipAndSetup(ch, int32(si), v0, v1, v2)
+		}
+	}
 }
 
 // source returns the vertices and the index range a command draws.
@@ -164,16 +248,17 @@ func (c *core) source(dl *gfx.DrawList, cmd *gfx.DrawCmd) ([]gfx.Vertex, []uint3
 	return verts, all[cmd.First : cmd.First+count], nil
 }
 
-// vertex transforms and lights vertex i once per command.
-func (c *core) vertex(i uint32, verts []gfx.Vertex, x *xform) *cvert {
-	v := &c.xv[i]
-	if c.stamp[i] == c.gen {
+// vertex transforms and lights vertex i once per command and chunk.
+func (c *core) vertex(ch *setupCtx, i uint32, verts []gfx.Vertex, x *xform) *cvert {
+	v := &ch.xv[i]
+	if ch.stamp[i] == ch.gen {
 		return v
 	}
-	c.stamp[i] = c.gen
+	ch.stamp[i] = ch.gen
 	src := &verts[i]
 	p := x.mvp.MulVec4(src.Pos.Vec4(1))
 	v.p = [4]float32{p.X, p.Y, p.Z, p.W}
+	v.oc = outcode(v)
 	n := x.nrm.MulVec3(src.Normal).Normalize()
 	col := x.color
 	if !x.unlit {
@@ -208,6 +293,25 @@ func planeDist(v *cvert, p int) float32 {
 	}
 }
 
+// planeDist64 is planeDist in float64, used for clipping precision.
+func planeDist64(v *cvert, p int) float64 {
+	w := float64(v.p[3])
+	switch p {
+	case 0:
+		return w + float64(v.p[0])
+	case 1:
+		return w - float64(v.p[0])
+	case 2:
+		return w + float64(v.p[1])
+	case 3:
+		return w - float64(v.p[1])
+	case 4:
+		return w + float64(v.p[2])
+	default:
+		return w - float64(v.p[2])
+	}
+}
+
 func outcode(v *cvert) uint8 {
 	var oc uint8
 	for p := 0; p < 6; p++ {
@@ -218,18 +322,22 @@ func outcode(v *cvert) uint8 {
 	return oc
 }
 
-func (c *core) clipAndSetup(cmd int32, v0, v1, v2 *cvert) {
-	oc0, oc1, oc2 := outcode(v0), outcode(v1), outcode(v2)
+// clipAndSetup clips a triangle against the frustum and sets up the resulting pieces.
+// Stats count submitted triangles: Culled when nothing of it is rasterized.
+func (c *core) clipAndSetup(ch *setupCtx, cmd int32, v0, v1, v2 *cvert) {
+	oc0, oc1, oc2 := v0.oc, v1.oc, v2.oc
 	if oc0&oc1&oc2 != 0 {
-		c.stats.Culled++
+		ch.stats.Culled++
 		return
 	}
 	if oc0|oc1|oc2 == 0 {
-		c.setupTri(cmd, v0, v1, v2, 7)
+		if !c.setupTri(ch, cmd, v0, v1, v2, 7, -1) {
+			ch.stats.Culled++
+		}
 		return
 	}
-	c.stats.Clipped++
-	in := &c.poly[0]
+	ch.stats.Clipped++
+	in := &ch.poly[0]
 	in[0], in[1], in[2] = *v0, *v1, *v2
 	in[0].edge, in[1].edge, in[2].edge = true, true, true
 	n := 3
@@ -239,14 +347,16 @@ func (c *core) clipAndSetup(cmd int32, v0, v1, v2 *cvert) {
 		if planes&(1<<p) == 0 {
 			continue
 		}
-		n = clipPoly(&c.poly[cur], n, &c.poly[1-cur], p)
+		n = clipPoly(&ch.poly[cur], n, &ch.poly[1-cur], p)
 		cur = 1 - cur
 		if n < 3 {
-			c.stats.Culled++
+			ch.stats.Culled++
 			return
 		}
 	}
-	poly := &c.poly[cur]
+	poly := &ch.poly[cur]
+	lv := c.polyLevel(cmd, poly, n)
+	drawn := false
 	for i := 1; i+1 < n; i++ {
 		var e uint8
 		if i == 1 && poly[0].edge {
@@ -258,23 +368,29 @@ func (c *core) clipAndSetup(cmd int32, v0, v1, v2 *cvert) {
 		if i+1 == n-1 && poly[n-1].edge {
 			e |= 4 // v2→v0
 		}
-		c.setupTri(cmd, &poly[0], &poly[i], &poly[i+1], e)
+		if c.setupTri(ch, cmd, &poly[0], &poly[i], &poly[i+1], e, lv) {
+			drawn = true
+		}
+	}
+	if !drawn {
+		ch.stats.Culled++
 	}
 }
 
 // clipPoly clips polygon in[:n] against plane p into out and returns the new vertex
-// count. Intersections are always computed from the inside vertex towards the outside
-// one, so an edge shared by two triangles yields bit-identical points (no cracks).
+// count. Distances and intersections are computed in float64 (clipped vertices must land
+// on the plane even for kilometre-long triangles) and always from the inside vertex
+// towards the outside one, so an edge shared by two triangles yields bit-identical points.
 func clipPoly(in *[maxPoly]cvert, n int, out *[maxPoly]cvert, p int) int {
 	m := 0
-	for i := 0; i < n; i++ {
+	for i := 0; i < n && m < maxPoly-1; i++ {
 		a := &in[i]
 		j := i + 1
 		if j == n {
 			j = 0
 		}
 		b := &in[j]
-		da, db := planeDist(a, p), planeDist(b, p)
+		da, db := planeDist64(a, p), planeDist64(b, p)
 		ain, bin := da >= 0, db >= 0
 		switch {
 		case ain && bin:
@@ -295,18 +411,67 @@ func clipPoly(in *[maxPoly]cvert, n int, out *[maxPoly]cvert, p int) int {
 	return m
 }
 
-func lerpVert(dst, a, b *cvert, t float32) {
+// lerpVert interpolates in float64 and rounds once to float32.
+func lerpVert(dst, a, b *cvert, t float64) {
 	for k := range dst.p {
-		dst.p[k] = a.p[k] + t*(b.p[k]-a.p[k])
+		x := float64(a.p[k])
+		dst.p[k] = float32(x + t*(float64(b.p[k])-x))
 	}
 	for k := range dst.a {
-		dst.a[k] = a.a[k] + t*(b.a[k]-a.a[k])
+		x := float64(a.a[k])
+		dst.a[k] = float32(x + t*(float64(b.a[k])-x))
 	}
 }
 
-// setupTri snaps a clipped triangle to the pixel grid, culls it and bins it into tiles.
-// e holds original-edge flags: bit 0 v0→v1, bit 1 v1→v2, bit 2 v2→v0.
-func (c *core) setupTri(cmd int32, v0, v1, v2 *cvert, e uint8) {
+// polyLevel picks one mip level for a whole clipped polygon (so the pieces of one source
+// triangle never disagree), from its total texel area over its total window area.
+// It returns -1 when the command has no mip chain.
+func (c *core) polyLevel(cmd int32, poly *[maxPoly]cvert, n int) int32 {
+	tex := c.cmds[cmd].tex
+	if tex == nil || len(tex.levels) <= 1 {
+		return -1
+	}
+	W, H := float64(c.target.W), float64(c.target.H)
+	var sx, sy [maxPoly]float64
+	for i := 0; i < n; i++ {
+		w := float64(poly[i].p[3])
+		if !(w > 0) {
+			return 0
+		}
+		sx[i] = (float64(poly[i].p[0])/w*0.5 + 0.5) * W
+		sy[i] = (0.5 - float64(poly[i].p[1])/w*0.5) * H
+	}
+	var uv, px float64
+	for i := 1; i+1 < n; i++ {
+		du1, dv1 := float64(poly[i].a[aU]-poly[0].a[aU]), float64(poly[i].a[aV]-poly[0].a[aV])
+		du2, dv2 := float64(poly[i+1].a[aU]-poly[0].a[aU]), float64(poly[i+1].a[aV]-poly[0].a[aV])
+		uv += math.Abs(du1*dv2 - du2*dv1)
+		px += math.Abs((sx[i]-sx[0])*(sy[i+1]-sy[0]) - (sy[i]-sy[0])*(sx[i+1]-sx[0]))
+	}
+	return mipLevel(tex, uv, px)
+}
+
+// mipLevel returns ⌊log₄(texel area / pixel area)⌋ clamped to the chain, from doubled
+// UV-space and window-space areas.
+func mipLevel(tex *texture, uvArea2, pixelArea2 float64) int32 {
+	if !(pixelArea2 > 0) {
+		return int32(len(tex.levels) - 1)
+	}
+	l0 := &tex.levels[0]
+	ratio := uvArea2 * float64(l0.w) * float64(l0.h) / pixelArea2
+	lv := int32(0)
+	for ratio >= 4 && int(lv) < len(tex.levels)-1 {
+		ratio /= 4
+		lv++
+	}
+	return lv
+}
+
+// setupTri snaps a (clipped) triangle to the pixel grid, culls it and bins it into the
+// tiles of chunk ch. e holds original-edge flags: bit 0 v0→v1, bit 1 v1→v2, bit 2 v2→v0.
+// lv is the mip level, or -1 to compute it from this triangle. It reports whether the
+// triangle was binned.
+func (c *core) setupTri(ch *setupCtx, cmd int32, v0, v1, v2 *cvert, e uint8, lv int32) bool {
 	fb := c.target
 	W, H := float32(fb.W), float32(fb.H)
 	vs := [3]*cvert{v0, v1, v2}
@@ -315,16 +480,16 @@ func (c *core) setupTri(cmd int32, v0, v1, v2 *cvert, e uint8) {
 	for k, v := range vs {
 		w := v.p[3]
 		if !(w > 0) {
-			c.stats.Culled++
-			return
+			return false
 		}
 		inv := 1 / w
 		sx := (v.p[0]*inv*0.5 + 0.5) * W
 		sy := (0.5 - v.p[1]*inv*0.5) * H
-		if !(sx >= -1 && sx <= W+1 && sy >= -1 && sy <= H+1) { // also rejects NaN
-			c.stats.Culled++
-			return
+		if !gmath.IsFinite(sx) || !gmath.IsFinite(sy) {
+			return false
 		}
+		// Vertices are inside the frustum by construction; any excess is rounding.
+		sx, sy = gmath.Clamp(sx, 0, W), gmath.Clamp(sy, 0, H)
 		X[k] = int64(math.Floor(float64(sx*16) + 0.5))
 		Y[k] = int64(math.Floor(float64(sy*16) + 0.5))
 		z[k] = v.p[2]*inv*0.5 + 0.5
@@ -332,14 +497,22 @@ func (c *core) setupTri(cmd int32, v0, v1, v2 *cvert, e uint8) {
 	}
 	area := (X[1]-X[0])*(Y[2]-Y[0]) - (Y[1]-Y[0])*(X[2]-X[0])
 	if area == 0 {
-		c.stats.Culled++
-		return
+		return false
 	}
 	cs := &c.cmds[cmd]
+	// Counter-clockwise in NDC (y up) is negative in y-down window space: a front face,
+	// unless the model matrix mirrors.
+	front := (area < 0) != cs.flip
+	cull := cs.state.Cull
+	if c.mode == gfx.ModeNormals {
+		cull = gfx.CullNone // show back faces so inside-out parts are flagged
+	}
+	if !front && cull == gfx.CullBack {
+		return false
+	}
 	e01, e12, e20 := e&1 != 0, e&2 != 0, e&4 != 0
 	if area < 0 {
-		// Counter-clockwise in NDC (y up) is negative in y-down window space: a front
-		// face. Swap v1 and v2 so every rasterized triangle has positive area.
+		// Swap v1 and v2 so every rasterized triangle has positive area.
 		vs[1], vs[2] = vs[2], vs[1]
 		X[1], X[2] = X[2], X[1]
 		Y[1], Y[2] = Y[2], Y[1]
@@ -347,9 +520,6 @@ func (c *core) setupTri(cmd int32, v0, v1, v2 *cvert, e uint8) {
 		iw[1], iw[2] = iw[2], iw[1]
 		e01, e20 = e20, e01
 		area = -area
-	} else if cs.state.Cull == gfx.CullBack {
-		c.stats.Culled++
-		return
 	}
 
 	minX := max(0, min(X[0], X[1], X[2])>>4)
@@ -357,13 +527,13 @@ func (c *core) setupTri(cmd int32, v0, v1, v2 *cvert, e uint8) {
 	minY := max(0, min(Y[0], Y[1], Y[2])>>4)
 	maxY := min(int64(fb.H-1), max(Y[0], Y[1], Y[2])>>4)
 	if minX > maxX || minY > maxY {
-		c.stats.Culled++
-		return
+		return false
 	}
 
-	c.tris = append(c.tris, tri{})
-	t := &c.tris[len(c.tris)-1]
+	ch.tris = append(ch.tris, tri{})
+	t := &ch.tris[len(ch.tris)-1]
 	t.cmd = cmd
+	t.back = !front
 	t.minX, t.minY, t.maxX, t.maxY = int32(minX), int32(minY), int32(maxX), int32(maxY)
 	if e12 {
 		t.wire |= 1
@@ -383,7 +553,9 @@ func (c *core) setupTri(cmd int32, v0, v1, v2 *cvert, e uint8) {
 			ec--
 		}
 		t.ec[k], t.edx[k], t.edy[k] = ec, -dy*16, dx*16
-		t.einv[k] = float32(1 / (16 * math.Sqrt(float64(dx*dx+dy*dy))))
+		if c.mode == gfx.ModeWireframe { // einv is only read by wireColor
+			t.einv[k] = float32(1 / (16 * math.Sqrt(float64(dx*dx+dy*dy))))
+		}
 		t.z[k], t.iw[k] = z[k], iw[k]
 		for j := 0; j < nattr; j++ {
 			t.a[k][j] = vs[k].a[j] * iw[k]
@@ -392,28 +564,26 @@ func (c *core) setupTri(cmd int32, v0, v1, v2 *cvert, e uint8) {
 	t.invArea = float32(1 / float64(area))
 
 	if tex := cs.tex; tex != nil && len(tex.levels) > 1 {
-		// Mip per triangle: texel area over pixel area, both as doubled triangle areas.
-		l0 := &tex.levels[0]
-		du1, dv1 := float64(vs[1].a[aU]-vs[0].a[aU]), float64(vs[1].a[aV]-vs[0].a[aV])
-		du2, dv2 := float64(vs[2].a[aU]-vs[0].a[aU]), float64(vs[2].a[aV]-vs[0].a[aV])
-		texels := math.Abs(du1*dv2-du2*dv1) * float64(l0.w) * float64(l0.h)
-		ratio := texels / (float64(area) / 256)
-		lv := int32(0)
-		for ratio >= 4 && int(lv) < len(tex.levels)-1 {
-			ratio /= 4
-			lv++
+		if lv >= 0 {
+			t.level = lv
+		} else {
+			// Mip per triangle: texel area over pixel area, both as doubled triangle
+			// areas (area is in 1/256 px²).
+			du1, dv1 := float64(vs[1].a[aU]-vs[0].a[aU]), float64(vs[1].a[aV]-vs[0].a[aV])
+			du2, dv2 := float64(vs[2].a[aU]-vs[0].a[aU]), float64(vs[2].a[aV]-vs[0].a[aV])
+			t.level = mipLevel(tex, math.Abs(du1*dv2-du2*dv1), float64(area)/256)
 		}
-		t.level = lv
 	}
 
-	c.stats.Drawn++
-	idx := int32(len(c.tris) - 1)
+	ch.stats.Drawn++
+	idx := int32(len(ch.tris) - 1)
 	tx0, tx1 := int(minX)/TileSize, int(maxX)/TileSize
 	ty0, ty1 := int(minY)/TileSize, int(maxY)/TileSize
 	for ty := ty0; ty <= ty1; ty++ {
 		row := ty * c.tilesX
 		for tx := tx0; tx <= tx1; tx++ {
-			c.bins[row+tx] = append(c.bins[row+tx], idx)
+			ch.bins[row+tx] = append(ch.bins[row+tx], idx)
 		}
 	}
+	return true
 }

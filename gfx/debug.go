@@ -7,14 +7,12 @@ func IDColor(id uint32) uint32 {
 	if id == 0 {
 		return 0xff000000
 	}
-	// Golden-ratio hue stepping in 16.16 fixed point, then a cheap HSV→RGB with s=0.7,
-	// v=0.95; the value alternates slightly so neighbours with close hues still differ.
-	h := (id * 40503) & 0xffff // 40503/65536 ≈ 0.618034
-	v := uint32(242)
-	if id&1 == 0 {
-		v = 200
-	}
-	lo := v * 30 / 100
+	// Golden-ratio (Fibonacci) hashing of the id gives a well-spread 16-bit hue; value
+	// cycles over three levels and saturation over two, so ids with close hues still
+	// differ. Then a cheap integer HSV→RGB.
+	h := (id * 2654435769) >> 16
+	v := [3]uint32{242, 200, 158}[id%3]
+	lo := v * [2]uint32{22, 55}[(id/3)&1] / 100
 	sector := h * 6 >> 16
 	f := (h * 6) & 0xffff
 	rise := lo + (v-lo)*f>>16

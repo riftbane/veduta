@@ -53,7 +53,7 @@ func (c *core) postDepth(dl *gfx.DrawList) {
 	eye := func(d float32) float64 {
 		zn := 2*float64(d) - 1
 		if persp {
-			return b / (-zn - a) // -z_eye, positive in front of the camera
+			return b / (zn + a) // -z_eye = m14/(z_ndc + m10), positive in front of the camera
 		}
 		return zn
 	}

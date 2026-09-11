@@ -39,6 +39,20 @@ func floorf(x float32) float32 {
 	return x
 }
 
+// floorfi returns floorf(x) and int32(floorf(x)) without converting back and forth.
+func floorfi(x float32) (float32, int32) {
+	if x > -8388608 && x < 8388608 {
+		i := int32(x)
+		f := float32(i)
+		if f > x {
+			i--
+			f--
+		}
+		return f, i
+	}
+	return x, int32(x)
+}
+
 func wrapCoord(x, size, mask int32, wrap gfx.Wrap) int32 {
 	if wrap == gfx.WrapClamp {
 		if x < 0 {
@@ -59,17 +73,31 @@ func wrapCoord(x, size, mask int32, wrap gfx.Wrap) int32 {
 	return x
 }
 
+// bound limits a texel coordinate to ±2^24 before it is floored and converted to int32.
+// Every float32 that large is already an integer, so nothing is lost; the bound makes
+// huge and NaN coordinates (NaN goes to the low bound) wrap or clamp deterministically on
+// every architecture instead of relying on out-of-range float→int conversion.
+func bound(x float32) float32 {
+	if x >= 1<<24 {
+		return 1 << 24
+	}
+	if !(x > -(1 << 24)) {
+		return -(1 << 24)
+	}
+	return x
+}
+
 func (t *texture) nearest(lv int32, u, v float32) uint32 {
 	l := &t.levels[lv]
-	x := wrapCoord(int32(floorf(u*l.fw)), l.w, l.wmask, t.wrap)
-	y := wrapCoord(int32(floorf(v*l.fh)), l.h, l.hmask, t.wrap)
+	x := wrapCoord(int32(floorf(bound(u*l.fw))), l.w, l.wmask, t.wrap)
+	y := wrapCoord(int32(floorf(bound(v*l.fh))), l.h, l.hmask, t.wrap)
 	return l.pix[y*l.w+x]
 }
 
 func (t *texture) bilinear(lv int32, u, v float32) uint32 {
 	l := &t.levels[lv]
-	fu := u*l.fw - 0.5
-	fv := v*l.fh - 0.5
+	fu := bound(u*l.fw - 0.5)
+	fv := bound(v*l.fh - 0.5)
 	xf, yf := floorf(fu), floorf(fv)
 	fx := uint32((fu - xf) * 256)
 	fy := uint32((fv - yf) * 256)

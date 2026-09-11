@@ -2,10 +2,11 @@
 //
 // Pipeline: per draw command, vertices are transformed and lit (Lambert, per vertex) once,
 // triangles are clipped in homogeneous clip space against all six frustum planes, snapped
-// to 28.4 fixed point, culled, set up and binned into 64×64 screen tiles. Tiles are then
-// rasterized in parallel by a persistent worker pool; each tile is owned by exactly one
-// worker at a time and triangles are processed in submission order, so the output is
-// identical for any number of workers.
+// to 28.4 fixed point, culled, set up and binned into 64×64 screen tiles. Setup runs in
+// parallel over contiguous chunks of the frame's triangle stream, each chunk with its own
+// bins. Tiles are then rasterized in parallel by a persistent worker pool; each tile is
+// owned by exactly one worker at a time and consumes the chunks in order, so triangles are
+// processed in submission order and the output is identical for any number of workers.
 //
 // Rasterization uses integer edge functions with the top-left fill rule, perspective-
 // correct attribute interpolation and a float32 depth buffer (less-than test). The steady
@@ -16,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -36,6 +38,12 @@ type Options struct {
 // Renderer is the software implementation of gfx.Backend. It is not safe for concurrent
 // use; one goroutine drives it while it uses its own workers internally.
 type Renderer struct {
+	*handle
+}
+
+// handle is shared by every copy of a Renderer value; the cleanup that stops the workers
+// is attached to it, so a live copy keeps the workers running.
+type handle struct {
 	*core
 }
 
@@ -48,20 +56,31 @@ func New(opt Options) *Renderer {
 	if n <= 0 {
 		n = runtime.GOMAXPROCS(0)
 	}
-	c := &core{workers: n}
-	r := &Renderer{c}
+	c := &core{workers: n, chunks: make([]setupCtx, n)}
+	h := &handle{c}
+	r := &Renderer{h}
 	if n > 1 {
 		c.jobs = make(chan struct{})
 		for i := 0; i < n; i++ {
 			go c.worker()
 		}
-		runtime.AddCleanup(r, (*core).stop, c)
+		// Methods that hand work to the workers keep the handle alive until they join.
+		runtime.AddCleanup(h, (*core).stop, c)
 	}
 	return r
 }
 
-// Close stops the worker goroutines. The renderer must not be used afterwards.
-func (r *Renderer) Close() { r.stop() }
+// Close stops the worker goroutines. Later calls to Begin and Draw return an error.
+func (r *Renderer) Close() {
+	r.closed = true
+	r.stop()
+}
+
+// Phases run by the worker pool.
+const (
+	phaseRaster = iota
+	phaseSetup
+)
 
 // core holds all renderer state; workers reference core, never Renderer, so an
 // abandoned Renderer can be collected and its cleanup can stop the workers.
@@ -70,7 +89,9 @@ type core struct {
 	jobs     chan struct{}
 	wg       sync.WaitGroup
 	stopOnce sync.Once
+	closed   bool
 	next     atomic.Int32
+	phase    int // written before jobs are sent, read by workers after receiving
 
 	textures []*texture
 	meshes   []*gfx.MeshData
@@ -83,14 +104,14 @@ type core struct {
 	clear      bool
 	clearColor uint32
 	cmds       []cmdState
-	tris       []tri
-	bins       [][]int32
+	xforms     []xform  // parallel to cmds
+	srcs       []cmdSrc // parallel to cmds
+	chunks     []setupCtx
+	nchunks    int     // chunks used by the current Draw
+	order      []int32 // tile indices in raster start order (orderTiles)
+	weight     []int32 // triangles binned per tile (orderTiles)
 	tilesX     int
 	tilesY     int
-	xv         []cvert
-	stamp      []uint32
-	gen        uint32
-	poly       [2][maxPoly]cvert
 	overdraw   []uint16
 	stats      gfx.FrameStats
 	fragments  atomic.Int64
@@ -106,20 +127,71 @@ func (c *core) stop() {
 
 func (c *core) worker() {
 	for range c.jobs {
-		c.drainTiles()
+		c.drain()
 		c.wg.Done()
 	}
 }
 
-func (c *core) drainTiles() {
-	n := int32(c.tilesX * c.tilesY)
+// drain processes work items of the current phase until none are left.
+func (c *core) drain() {
+	if c.phase == phaseSetup {
+		n := int32(c.nchunks)
+		for {
+			k := c.next.Add(1) - 1
+			if k >= n {
+				return
+			}
+			c.setupChunk(&c.chunks[k])
+		}
+	}
+	n := int32(len(c.order))
 	for {
 		t := c.next.Add(1) - 1
 		if t >= n {
 			return
 		}
-		c.rasterTile(int(t))
+		c.rasterTile(int(c.order[t]))
 	}
+}
+
+// run executes phase on every worker (inline without workers) and waits for it.
+func (c *core) run(phase int) {
+	c.phase = phase
+	c.next.Store(0)
+	if c.jobs == nil {
+		c.drain()
+		return
+	}
+	c.wg.Add(c.workers)
+	for i := 0; i < c.workers; i++ {
+		c.jobs <- struct{}{}
+	}
+	c.wg.Wait()
+}
+
+// orderTiles lists the tiles with the most binned triangles first, so the longest tiles
+// start early and the frame does not end waiting on one late heavy tile. Ties keep index
+// order. Tiles are independent, so the order never changes the image.
+func (c *core) orderTiles() {
+	n := c.tilesX * c.tilesY
+	if cap(c.order) < n {
+		c.order = make([]int32, n)
+		c.weight = make([]int32, n)
+	}
+	c.order, c.weight = c.order[:n], c.weight[:n]
+	for i := range c.order {
+		w := 0
+		for k := 0; k < c.nchunks; k++ {
+			w += len(c.chunks[k].bins[i])
+		}
+		c.order[i], c.weight[i] = int32(i), int32(w)
+	}
+	slices.SortFunc(c.order, func(a, b int32) int {
+		if d := c.weight[b] - c.weight[a]; d != 0 {
+			return int(d)
+		}
+		return int(a - b)
+	})
 }
 
 // CreateTexture uploads a texture with its mip chain. Level dimensions must halve
@@ -170,6 +242,9 @@ func (r *Renderer) CreateMesh(m *gfx.MeshData) (gfx.MeshID, error) {
 
 // Begin starts rendering into target.
 func (r *Renderer) Begin(target *gfx.Framebuffer) error {
+	if r.closed {
+		return errors.New("soft: renderer is closed")
+	}
 	if target == nil || target.W <= 0 || target.H <= 0 {
 		return errors.New("soft: invalid target")
 	}
@@ -179,11 +254,7 @@ func (r *Renderer) Begin(target *gfx.Framebuffer) error {
 	}
 	r.target = target
 	r.began = true
-	tx, ty := (target.W+TileSize-1)/TileSize, (target.H+TileSize-1)/TileSize
-	if tx != r.tilesX || ty != r.tilesY || len(r.bins) != tx*ty {
-		r.tilesX, r.tilesY = tx, ty
-		r.bins = make([][]int32, tx*ty)
-	}
+	r.tilesX, r.tilesY = (target.W+TileSize-1)/TileSize, (target.H+TileSize-1)/TileSize
 	return nil
 }
 
@@ -202,9 +273,13 @@ func (r *Renderer) Stats() gfx.FrameStats { return r.stats }
 
 // Draw renders dl into the current target immediately.
 func (r *Renderer) Draw(dl *gfx.DrawList) error {
+	if r.closed {
+		return errors.New("soft: renderer is closed")
+	}
 	if !r.began {
 		return errors.New("soft: Draw without Begin")
 	}
+	defer runtime.KeepAlive(r.handle) // the workers must not be stopped mid-frame
 	c := r.core
 	c.stats = gfx.FrameStats{}
 	c.fragments.Store(0)
@@ -222,7 +297,9 @@ func (r *Renderer) Draw(dl *gfx.DrawList) error {
 			c.overdraw = make([]uint16, n)
 		}
 		c.overdraw = c.overdraw[:n]
-		clear(c.overdraw)
+		if dl.Clear { // several draws per frame accumulate heat
+			clear(c.overdraw)
+		}
 	}
 
 	if err := c.setup(dl); err != nil {
@@ -237,14 +314,6 @@ func (r *Renderer) Draw(dl *gfx.DrawList) error {
 
 // rasterAll processes every tile, in parallel when workers are available.
 func (c *core) rasterAll() {
-	c.next.Store(0)
-	if c.jobs == nil {
-		c.drainTiles()
-		return
-	}
-	c.wg.Add(c.workers)
-	for i := 0; i < c.workers; i++ {
-		c.jobs <- struct{}{}
-	}
-	c.wg.Wait()
+	c.orderTiles()
+	c.run(phaseRaster)
 }
