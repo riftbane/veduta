@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- First-person games: `Input.MouseDelta` reports the cursor movement of each tick (derived
+  from the positions a window or a scenario provides, so scenarios and traces are
+  unchanged), and `scene.Camera.LookFrom(eye, yawDeg, pitchDeg)` builds an eye camera from
+  the scene's own camera, keeping its projection. The demo toggles a first-person view with
+  `KeyF`: the mouse looks around, WASD moves relative to the view and the hero's own model
+  is hidden; the `look` scenario covers it headless.
+
 ### Fixed
 
 - `veduta upgrade` right after a release wrote its changelog entry directly above the

@@ -102,6 +102,7 @@ type Input struct {
 	Held            KeySet     // keys down at the end of this tick (a tap within the tick is only in Pressed and Released)
 	Released        KeySet     // keys that went up this tick
 	Mouse           gmath.Vec2 // cursor position in window pixels (origin top-left)
+	MouseDelta      gmath.Vec2 // cursor movement during this tick, in pixels (mouse look)
 	Buttons         ButtonSet  // mouse buttons held
 	ButtonsPressed  ButtonSet
 	ButtonsReleased ButtonSet
@@ -142,6 +143,7 @@ type InputState struct {
 	buttonsPressed  ButtonSet
 	buttonsReleased ButtonSet
 	mouse           gmath.Vec2
+	lastMouse       gmath.Vec2 // cursor at the end of the previous tick, for MouseDelta
 	text            []byte
 }
 
@@ -203,12 +205,13 @@ func (s *InputState) ReleaseAll() {
 func (s *InputState) Next() Input {
 	in := Input{
 		Pressed: s.pressed, Held: s.held, Released: s.released,
-		Mouse: s.mouse, Buttons: s.buttons,
+		Mouse: s.mouse, MouseDelta: s.mouse.Sub(s.lastMouse), Buttons: s.buttons,
 		ButtonsPressed: s.buttonsPressed, ButtonsReleased: s.buttonsReleased,
 		Text: string(s.text),
 	}
 	s.pressed, s.released = KeySet{}, KeySet{}
 	s.buttonsPressed, s.buttonsReleased = 0, 0
+	s.lastMouse = s.mouse
 	s.text = s.text[:0]
 	return in
 }

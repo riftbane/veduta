@@ -51,7 +51,7 @@ first update (tick 1), because no update runs at tick 0.
 | `press` | array of key names | Keys that go down at this tick. A pressed key stays held until a later event releases it. A key that is already held cannot be pressed again. |
 | `release` | array of key names | Held keys that go up at this tick. Releasing a key that is not held is an error. A key cannot be pressed and released in the same event. |
 | `buttons` | array of button names | The complete set of mouse buttons held from this tick on: `left`, `right`, `middle`. `[]` releases all buttons; omitting the field leaves them unchanged. |
-| `mouse` | object `{ "x": number, "y": number }` | Mouse position in window pixels from this tick on (origin top-left, y down). Omitted: unchanged. The initial position is (0, 0). |
+| `mouse` | object `{ "x": number, "y": number }` | Mouse position in window pixels from this tick on (origin top-left, y down). Omitted: unchanged. The initial position is (0, 0). The game also sees the movement since the previous tick as `in.MouseDelta`, so mouse look is scripted by moving the cursor: a jump from `{ "x": 0 }` to `{ "x": 600 }` is a delta of 600 pixels in that tick and 0 in the next. |
 | `text` | string | Characters typed during this tick (for text entry). Text is not derived from `press`: pressing `KeyA` does not type "a". |
 
 Each event must set at least one of `press`, `release`, `buttons`, `mouse`, `text`.

@@ -80,6 +80,7 @@ type StateCodec interface {
 | `Down(code)`, `JustPressed(code)`, `JustReleased(code)` | key queries |
 | `Axis(neg, pos)` | −1, 0 or +1, e.g. `in.Axis("KeyA", "KeyD")` |
 | `Mouse gmath.Vec2` | cursor in window pixels, origin top-left |
+| `MouseDelta gmath.Vec2` | how far the cursor moved during this tick, in pixels (mouse look) |
 | `Buttons`, `ButtonsPressed`, `ButtonsReleased`, `Button(name)` | mouse buttons `left`, `middle`, `right` |
 | `Text string` | characters typed during the tick |
 

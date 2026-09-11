@@ -88,6 +88,7 @@ type ScriptState struct {
 	Held            KeySet
 	Buttons         ButtonSet
 	Mouse           gmath.Vec2
+	LastMouse       gmath.Vec2 // cursor at the end of the previous tick (MouseDelta)
 	LastTick        uint64
 	PendingPressed  KeySet
 	PendingReleased KeySet
@@ -95,12 +96,12 @@ type ScriptState struct {
 
 // State returns the script position (between ticks).
 func (s *Script) State() ScriptState {
-	return ScriptState{Pos: s.pos, Held: s.st.held, Buttons: s.st.buttons, Mouse: s.st.mouse, LastTick: s.last, PendingPressed: s.st.pressed, PendingReleased: s.st.released}
+	return ScriptState{Pos: s.pos, Held: s.st.held, Buttons: s.st.buttons, Mouse: s.st.mouse, LastMouse: s.st.lastMouse, LastTick: s.last, PendingPressed: s.st.pressed, PendingReleased: s.st.released}
 }
 
 // SetState restores a position returned by State.
 func (s *Script) SetState(st ScriptState) {
 	s.pos = st.Pos
 	s.last = st.LastTick
-	s.st = InputState{held: st.Held, buttons: st.Buttons, mouse: st.Mouse, pressed: st.PendingPressed, released: st.PendingReleased}
+	s.st = InputState{held: st.Held, buttons: st.Buttons, mouse: st.Mouse, lastMouse: st.LastMouse, pressed: st.PendingPressed, released: st.PendingReleased}
 }

@@ -99,6 +99,18 @@ func (s *Scene) CameraPreset(name string, aspect float32) (Camera, error) {
 	return Camera{}, fmt.Errorf("unknown camera preset %q (want one of %v, orbit:<deg>, or a camera entity)", name, Presets)
 }
 
+// LookFrom returns c placed at eye and looking along yaw and pitch degrees: yaw 0 looks
+// along -Z and grows counter-clockwise seen from above (90 looks along -X), positive
+// pitch looks up. Projection, near and far are kept, so a game can make a first-person
+// camera from the scene's own camera:
+//
+//	ctx.Scene.Camera = ctx.Scene.Camera.LookFrom(eye, yaw, pitch)
+func (c Camera) LookFrom(eye gmath.Vec3, yawDeg, pitchDeg float32) Camera {
+	c.Position = eye
+	c.Target = eye.Add(OrbitDir(yawDeg, -pitchDeg))
+	return c
+}
+
 // OrbitDir returns the viewing direction of a camera at yaw degrees around +Y (0 looks
 // along -Z) and pitch degrees above the horizon.
 func OrbitDir(yawDeg, pitchDeg float32) gmath.Vec3 {

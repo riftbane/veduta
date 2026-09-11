@@ -62,6 +62,32 @@ func TestInputStateEdges(t *testing.T) {
 	}
 }
 
+func TestMouseDelta(t *testing.T) {
+	var s InputState
+	if in := s.Next(); in.MouseDelta != (gmath.Vec2{}) {
+		t.Fatalf("first tick delta %v, want zero", in.MouseDelta)
+	}
+	s.MouseMove(100, 40)
+	in := s.Next()
+	if in.Mouse != gmath.V2(100, 40) || in.MouseDelta != gmath.V2(100, 40) {
+		t.Fatalf("moved tick: mouse %v delta %v", in.Mouse, in.MouseDelta)
+	}
+	if in = s.Next(); in.Mouse != gmath.V2(100, 40) || in.MouseDelta != (gmath.Vec2{}) {
+		t.Fatalf("still tick: mouse %v delta %v, want zero delta", in.Mouse, in.MouseDelta)
+	}
+	// Several moves within one tick are one delta.
+	s.MouseMove(110, 40)
+	s.MouseMove(90, 60)
+	if in = s.Next(); in.MouseDelta != gmath.V2(-10, 20) {
+		t.Fatalf("merged delta %v, want (-10, 20)", in.MouseDelta)
+	}
+	// Releasing everything (lost focus) is not a mouse jump.
+	s.ReleaseAll()
+	if in = s.Next(); in.MouseDelta != (gmath.Vec2{}) {
+		t.Fatalf("delta after ReleaseAll %v, want zero", in.MouseDelta)
+	}
+}
+
 func TestScriptTimeline(t *testing.T) {
 	mouse := gmath.V2(5, 6)
 	sc, err := NewScript([]InputEvent{
