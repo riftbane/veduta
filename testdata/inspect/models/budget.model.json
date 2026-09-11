@@ -1,0 +1,9 @@
+{
+  "veduta": "model/1",
+  "pivot": "bottom-center",
+  "triangle_budget": 500,
+  "parts": [
+    { "shape": "sphere", "radius": 0.5, "segments": 32, "rings": 16, "material": "hero" },
+    { "shape": "box", "size": [0.2, 0.2, 0.2], "position": [0, 0.6, 0], "material": "hero_nose" }
+  ]
+}

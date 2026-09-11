@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/riftbane/veduta/gfx"
 	"github.com/riftbane/veduta/gmath"
@@ -135,6 +136,10 @@ func (f *Frame) Coverage() Coverage {
 	return out
 }
 
+// round4 rounds to 4 decimals, half away from zero; non-finite values pass through.
 func round4(x float64) float64 {
-	return float64(int64(x*10000+0.5)) / 10000
+	if math.IsNaN(x) || math.IsInf(x, 0) {
+		return x
+	}
+	return math.Round(x*10000) / 10000
 }

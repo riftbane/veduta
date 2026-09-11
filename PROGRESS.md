@@ -75,3 +75,72 @@ Factual log for the human reviewer. One section per phase of `SPEC-v0.1.0.md` §
   - Contact sheet looked at: `testdata/golden/scenario_collect_sheet.png` (gem collected
     by tick 60, second gem by 140, reset at 150, trajectory tile).
 - Deferred: the player window (phase 7).
+
+## Phase 4 — inspection (2026-09-11)
+
+- Built: `inspect` — model inspector (13 MESH_* codes, 7 sheet kinds), texture inspector
+  (6 TEX_* codes + TEX_LAYERS_NOT_CHECKED, 6 sheet kinds incl. `on_model:<model>`), scene
+  inspector (7 SCENE_* codes, camera/top/ids sheets with legend), image diff, frame
+  bundles and queries. Reference: `docs/inspect.md`.
+- Verified:
+  - `go test ./inspect/` — every code triggered by a crafted fixture and absent on the
+    template assets; determinism (two runs, identical JSON and PNG bytes).
+  - §15.5: `TestModelFlippedNormals` — hero with `"flip_normals": true` on the cylinder
+    reports `MESH_FLIPPED_NORMALS` on part 0 and the normals sheet has 4229 hatched
+    pixels inside that part (0 for the unmodified hero). Image:
+    `testdata/golden/inspect_model_hero_flipped_normals.png`.
+  - Sheets looked at: `inspect_scene_main_summary.png`, `inspect_texture_grass_summary.png`,
+    `inspect_model_hero_summary.png`.
+
+## Phases 5–6 — the veduta tool and the MCP server (2026-09-11)
+
+- Built: `cmd/veduta` with every command of §10, `internal/cli` (one Session method per
+  operation, shared by the CLI and MCP), `veduta init` from the embedded template,
+  `veduta test` (go test + scenarios + goldens in `tests/golden`), `veduta fuzz`, and the
+  MCP server (`mcp/`, JSON-RPC 2.0 over stdio) with the 13 tools of §11.
+- Verified:
+  - `go test ./internal/cli/` — `TestInitAndCommands` (init → build --vet → test →
+    located compile errors → exit codes), `TestMCPEndToEnd` (a full MCP session over
+    pipes: initialize, tools/list with strict schemas, every tool; render, simulate,
+    query and diff return PNG images inline), `TestReleaseProjectFlow` (release against
+    a local bare remote).
+  - By hand from a built binary: `veduta init demo --engine-dir <repo> && cd demo &&
+    veduta test` → PASS in 7.8 s.
+  - §15.6: `veduta fuzz --games 200 --ticks 600 --seed 1` on the demo → 0 violations in
+    15.4 s; with `PlayerSpeed = 400.0` (×100) → 50/50 games violate `within_bounds`,
+    minimized repro `tests/scenarios/fuzz_703219f1.scenario.json` (18 ticks, one input
+    event: KeyS held from tick 3), which `veduta simulate` then reports as `fail`.
+- Deferred to phase 8: running the MCP server inside Claude Code on this repository
+  (`.mcp.json`), which needs the released tool on PATH.
+
+## Phase 7 — player windows (2026-09-11)
+
+- Built: `platform` — X11 client in pure Go over the unix socket (Xauthority, setup,
+  BIG-REQUESTS, PutImage strips, keysym → W3C table, auto-repeat filtering, sticky X
+  errors) and Win32 via `syscall` (one window procedure callback, StretchDIBits, scan
+  code → W3C table, repeat filtering, SC_KEYMENU swallowed, DPI awareness); the player
+  loop in `player.go` (60 Hz, one frame per tick, framebuffer reused).
+- Verified here: `go test ./platform/` against an in-process fake X server (request
+  sequences, strip sizes with and without BIG-REQUESTS, event decoding, auto-repeat,
+  errors, no allocation in Present); both key tables produce all 99 `asset.KeyCodes`;
+  `CGO_ENABLED=0 GOOS=windows go vet ./...` and `go test -c` for windows; `go list -deps
+  ./cmd/veduta` does not contain `platform`.
+- Verified by CI: `TestDisplaySmoke` under Xvfb (ubuntu-latest) and on windows-latest
+  (opens a 320×240 window, presents 30 frames, polls, checks size, closes).
+- **A human must test on a real desktop** (this machine has no display):
+  - Linux (Xorg and XWayland): the demo opens a 1280×720 window titled with the game
+    name; colors correct; resizing follows; the close button exits with status 0; holding
+    W moves smoothly and releasing stops at once; Alt-Tab while holding a key leaves
+    nothing stuck; left/middle/right clicks at the right place; numpad, AltGr, Super,
+    F-keys, PageUp/PageDown and punctuation produce the right codes; `ssh -X` works;
+    without a matching Xauthority entry the error is clear, not a hang.
+  - Windows 10/11: 1280×720 client area, sharp at 125%/150% scaling, 60 fps; WASD
+    movement and gem collection; NumLock on/off gives the same Numpad codes; left/right
+    modifiers distinguished; AltGr gives a single AltRight; é, € and emoji arrive as
+    Text; Alt or F10 does not freeze the game; Alt+F4 and the close button exit cleanly;
+    Alt-Tab releases keys; dragging a button outside the window still delivers ButtonUp;
+    resize/maximize/minimize/restore; moving between monitors of different DPI; with a
+    Japanese IME active WASD still moves; works over Remote Desktop.
+  - Event logging aid on either OS: `VEDUTA_DISPLAY_TEST=1 go test -count=1 -v -run
+    TestDisplaySmoke ./platform/` (on Windows `VEDUTA_DISPLAY_TEST_SECONDS=60` keeps the
+    window open and logs every event).

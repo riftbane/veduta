@@ -1,0 +1,9 @@
+{
+  "veduta": "model/1",
+  "pivot": "bottom-center",
+  "symmetry": "x",
+  "parts": [
+    { "shape": "box", "size": [1, 1, 1], "position": [0, 0.5, 0], "material": "hero" },
+    { "shape": "sphere", "radius": 0.3, "segments": 12, "rings": 6, "position": [0.7, 0.8, 0], "material": "hero_nose" }
+  ]
+}

@@ -51,6 +51,22 @@ All notable changes to this project are documented here. The format follows
 - `template/`: the demo game (WASD, jump, gems, KeyR reset, HUD) with its assets and the
   `idle`, `move` and `collect` scenarios, compiled inside the module so CI runs it; its
   trace hashes and contact sheets are goldens (`testdata/golden/scenario_*`).
+- `inspect`: model, texture and scene inspectors (issue codes of §9.1–§9.3 with counts,
+  locations and hints, metrics, sheets), image diff, frame bundles (`.vframe`) and
+  ID-buffer queries with per-entity coverage and occlusion ratios.
+- `veduta` tool (`cmd/veduta`, `internal/cli`): every command of §10 — `init`, `doctor`,
+  `build`, `run`, `cook`, `render`, `simulate`, `inspect`, `query`, `diff`, `test`, `fuzz`,
+  `release`, `mcp`, `update`, `upgrade`, `version` — with human or `--json` output. Game
+  operations build the game and run it with `-headless`; compile errors come back as
+  `{file,line,col,msg}`.
+- `mcp`: JSON-RPC 2.0 MCP server over stdio with the tools of §11 (`status`, `build`,
+  `cook`, `render`, `simulate`, `trace`, `inspect`, `query`, `diff`, `test`, `fuzz`,
+  `release`, `docs`); images inline as PNG.
+- `platform`: the player window — X11 protocol client in pure Go (Linux) and
+  user32/gdi32 through `syscall` (Windows), keyboard (W3C codes), mouse, text, resize,
+  close and focus events; the 60 Hz player loop.
+- `internal/update`, `install.sh`: release lookup, SHA-256-verified download and atomic
+  self-replacement; the POSIX installer of §13.2.
 
 ### Decisions
 
@@ -177,6 +193,55 @@ All notable changes to this project are documented here. The format follows
   sources in memory at startup, so a player archive only needs the binary, `veduta.json`
   and `assets/`; when `veduta.json` is not in the working directory, the directory of the
   executable is used.
+- **Inspection thresholds** (documented in `docs/inspect.md`): positions welded within
+  1e-6 × diagonal; flipped normals from negative signed volume of closed parts or vertex
+  normals opposing winding (error), mixed winding (error), holes/non-manifold/degenerate
+  (warning); symmetry score = share of vertices whose mirror image lies on the surface,
+  threshold 0.98; texel density CV > 0.5; texture seams must beat 2× the inside difference
+  + 4 and every internal line; mip 2 contrast ratio < 0.35; layers without effect found by
+  re-rendering with each layer skipped. Extra info code `TEX_LAYERS_NOT_CHECKED` makes
+  skipped layer analysis explicit. Scene checks use one render at `inspect_resolution`;
+  `SCENE_OVERLAP` covers static entities only (1 mm tolerance); z-fight risk needs
+  coplanar, same-facing (or double-sided) triangles of two entities; at most 16 issues per
+  code plus one summary issue. Info-level findings of one kind are merged to keep reports
+  short.
+- **Player windows.** Keys are reported by physical position (US-layout W3C codes from
+  the unshifted keysym / scan code), text separately. Auto-repeat is filtered (X11: a
+  release followed within 1 ms by a press of the same key; Win32: lParam bit 30).
+  Consecutive mouse moves and resizes are merged per Poll. X errors and lost connections
+  are sticky. The keymap is read once at open. Windows: one window class per window, one
+  window-procedure callback per process, Alt/F10 menu mode swallowed, per-monitor DPI
+  awareness when available; the game pauses while the frame is dragged (Windows' modal
+  loop) but keeps showing the last frame. The player renders at the client size, one
+  frame per tick, and skips ahead after stalls longer than 5 ticks instead of racing.
+- **Network use (§15.1).** Every `go` command the tool runs gets `GOPROXY=direct` and
+  `GONOSUMDB=github.com/riftbane/veduta` unless the user set them, so after installation
+  a project needs no network except GitHub (the engine module is fetched with git).
+  `veduta init --engine-dir PATH` adds a `replace` to a local engine checkout (development
+  and CI's template smoke test).
+- **Tool/game split.** `render`, `simulate` and fuzz games run in the game binary;
+  `inspect`, `query` and `diff` need no game code and run in the tool. `veduta test`
+  keeps per-scenario goldens in the project's `tests/golden/` (`<name>.hash`,
+  `<name>.png`); a missing golden is reported as `new`, not a failure.
+- **Fuzzing.** Random players hold keys from a default set (WASD, arrows, Space, Enter,
+  ShiftLeft, KeyE, KeyQ, KeyR; `--keys` overrides) for random durations and move/click the
+  mouse; game i uses a seed derived from `--seed`. Games run in parallel through the
+  game binary without sheets. The first violation is minimized by delta debugging over
+  whole key holds and mouse events (press/release pairs stay valid), then written to
+  `tests/scenarios/fuzz_<hash>.scenario.json`, which fails until the bug is fixed.
+- **MCP server.** Protocol versions 2025-06-18 (preferred), 2025-03-26 and 2024-11-05;
+  requests are handled in order; tool arguments are decoded strictly (the schemas say
+  `additionalProperties: false`); tool failures are `isError` results carrying located
+  errors or the build report. `query` returns the frame with a marker (or the ID buffer
+  for coverage) so all five visual tools return an image. The server re-reads
+  `veduta.json` on every call so edits are seen without a restart.
+- **Releases.** `veduta release` works in a game project (tests, cook, smoke render) and
+  in the engine repository (vet, tests, building and running `cmd/veduta`); it needs a
+  clean tree on a branch with an `origin` remote, a version above every existing tag and
+  a non-empty `## Unreleased` changelog section, which becomes `## vX.Y.Z — date`.
+- **Updates.** Tool self-update is Linux-only in v0.1.0 (Windows tool binaries are out of
+  scope, §2); the new binary must run and report the expected version before the atomic
+  rename. `auto` mode updates before `veduta mcp` serves and re-executes the new binary.
 - **`.vda` hashes.** `META.source_hash` is the SHA-256 computed by `cook` over a version
   line, the compiler version, then the source and each dependency as
   `<tag> <path> <length>\n<bytes>`; a missing dependency hashes as `missing <path>`.

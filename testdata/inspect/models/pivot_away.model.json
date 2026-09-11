@@ -1,0 +1,6 @@
+{
+  "veduta": "model/1",
+  "parts": [
+    { "shape": "box", "size": [1, 1, 1], "position": [3, 0.5, 2], "material": "hero" }
+  ]
+}
