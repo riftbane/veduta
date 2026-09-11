@@ -22,6 +22,9 @@ type fakeOS struct {
 	up       map[uint32]bool   // virtual keys GetKeyState reports released
 	vsc      map[uint32]uint32 // MapVirtualKey results
 	paints   int
+
+	cursorPos   [][2]int32 // SetCursorPos calls, in screen pixels
+	cursorShown []bool     // ShowCursor calls
 }
 
 func (f *fakeOS) defWindowProc(_ uintptr, m uint32, _, _ uintptr) uintptr {
@@ -44,6 +47,56 @@ func (f *fakeOS) messageTime() uint32         { return f.time }
 func (f *fakeOS) keyPressed(vk uint32) bool   { return !f.up[vk] }
 func (f *fakeOS) scanFromVK(vk uint32) uint32 { return f.vsc[vk] }
 func (f *fakeOS) paint(*window)               { f.paints++ }
+func (f *fakeOS) setCursorPos(x, y int32)     { f.cursorPos = append(f.cursorPos, [2]int32{x, y}) }
+func (f *fakeOS) showCursor(show bool)        { f.cursorShown = append(f.cursorShown, show) }
+
+// clientToScreen offsets by a fixed amount, as a window away from the screen corner does.
+func (f *fakeOS) clientToScreen(_ uintptr, x, y int32) (int32, int32) { return x + 1000, y + 2000 }
+
+// TestPointerLock checks the virtual position a locked pointer reports: movement is
+// measured from the previous position, and from the center again after every recentering.
+func TestPointerLock(t *testing.T) {
+	w, f := newFakeWindow()
+	w.w, w.h = 320, 240
+	if err := w.SetPointerLock(true); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(f.cursorShown, []bool{false}) {
+		t.Fatalf("ShowCursor calls %v, want one hide", f.cursorShown)
+	}
+	if len(f.cursorPos) != 1 || f.cursorPos[0] != [2]int32{1160, 2120} {
+		t.Fatalf("cursor put at %v, want the client center in screen pixels", f.cursorPos)
+	}
+	w.move(170, 130) // +10, +10 from the center
+	w.move(175, 130) // +5, 0
+	w.button(sim.ButtonLeft, true, 175, 130)
+	if got, want := describe(w.takeEvents()), []string{"move 15,10", "bdown 1 15,10"}; !slices.Equal(got, want) {
+		t.Fatalf("locked events %v, want %v", got, want)
+	}
+	// Poll recenters after movement; the next event is measured from the center.
+	w.recenterPointer()
+	if len(f.cursorPos) != 2 || f.cursorPos[1] != [2]int32{1160, 2120} {
+		t.Fatalf("recentered to %v", f.cursorPos)
+	}
+	w.move(165, 125) // +5, +5 from the center, not from 175, 130
+	if got, want := describe(w.takeEvents()), []string{"move 20,15"}; !slices.Equal(got, want) {
+		t.Fatalf("events after recentering %v, want %v", got, want)
+	}
+	// Unlocking shows the cursor again and goes back to real positions.
+	if err := w.SetPointerLock(false); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(f.cursorShown, []bool{false, true}) {
+		t.Fatalf("ShowCursor calls %v, want hide then show", f.cursorShown)
+	}
+	w.move(10, 20)
+	if got, want := describe(w.takeEvents()), []string{"move 10,20"}; !slices.Equal(got, want) {
+		t.Fatalf("unlocked events %v, want %v", got, want)
+	}
+	if err := w.SetPointerLock(false); err != nil || len(f.cursorShown) != 2 {
+		t.Fatalf("unlocking twice: %v, ShowCursor %v", err, f.cursorShown)
+	}
+}
 
 func newFakeWindow() (*window, *fakeOS) {
 	f := &fakeOS{up: map[uint32]bool{}, vsc: map[uint32]uint32{}}

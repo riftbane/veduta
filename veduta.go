@@ -118,8 +118,18 @@ type Context struct {
 	Font        *sprite.Font
 	FontTexture gfx.TextureID
 
-	eng *engine
+	eng         *engine
+	pointerLock bool
 }
+
+// LockPointer asks the player window to hide the cursor and keep it inside the window.
+// The cursor then never reaches the edge of the screen, so Input.MouseDelta keeps
+// reporting movement however far the player looks around; it is what a first-person
+// camera needs. Headless runs have no window and ignore it.
+func (c *Context) LockPointer(on bool) { c.pointerLock = on }
+
+// PointerLocked reports the last LockPointer request (the player loop applies it).
+func (c *Context) PointerLocked() bool { return c.pointerLock }
 
 // Trace emits a structured game event into the current tick's trace. Field values must
 // be JSON-encodable (numbers, strings, bools, vectors, slices, maps, structs).

@@ -64,6 +64,14 @@ type Window interface {
 	Present(img *gfx.Image) error
 	// Size returns the current client area size.
 	Size() (w, h int)
+	// SetPointerLock hides the cursor and keeps it inside the window: mouse movement is
+	// then reported as a position that keeps moving in the direction of the movement
+	// instead of stopping at the edge of the screen, which is what a first-person camera
+	// needs. While locked, the X and Y of MouseMove, ButtonDown and ButtonUp are that
+	// virtual position, not the cursor's place on screen; only their differences mean
+	// anything. Unlocking shows the cursor again. Locking an unfocused window is allowed;
+	// it takes effect when the pointer is over the window.
+	SetPointerLock(on bool) error
 	// Close destroys the window. It is safe to call more than once.
 	Close() error
 }

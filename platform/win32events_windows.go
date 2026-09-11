@@ -21,6 +21,13 @@ type winOS interface {
 	// releaseCapture ends mouse capture (ReleaseCapture); the system then sends
 	// WM_CAPTURECHANGED synchronously.
 	releaseCapture()
+	// setCursorPos moves the cursor to a position in screen pixels (SetCursorPos).
+	setCursorPos(x, y int32)
+	// showCursor shows or hides this application's cursor (ShowCursor).
+	showCursor(show bool)
+	// clientToScreen turns a position in the client area into a screen position
+	// (ClientToScreen).
+	clientToScreen(hwnd uintptr, x, y int32) (int32, int32)
 	// peekNext copies the next queued message to m without removing it (PeekMessageW
 	// with PM_NOREMOVE) and reports whether there was one.
 	peekNext(m *msg) bool
@@ -57,7 +64,11 @@ type window struct {
 	mouseX    int32
 	mouseY    int32
 	mouseSeen bool
-	surrogate utf16Decoder
+
+	locked       bool    // pointer locked: the cursor is hidden and kept centered
+	lockMoved    bool    // it moved since the last recentering
+	virtX, virtY float32 // virtual cursor position reported while locked
+	surrogate    utf16Decoder
 
 	last    *gfx.Image // last presented image, redrawn on WM_PAINT (referenced, not copied)
 	bmi     bitmapInfo // StretchDIBits header, reused every frame
@@ -326,7 +337,19 @@ func (w *window) move(x, y int32) {
 	if w.mouseSeen && x == w.mouseX && y == w.mouseY {
 		return
 	}
+	var dx, dy int32
+	if w.mouseSeen {
+		dx, dy = x-w.mouseX, y-w.mouseY
+	}
 	w.mouseX, w.mouseY, w.mouseSeen = x, y, true
+	if w.locked {
+		// Only the movement matters: the cursor itself goes back to the middle of the
+		// client area at the end of Poll.
+		w.virtX, w.virtY = w.virtX+float32(dx), w.virtY+float32(dy)
+		w.lockMoved = true
+		w.push(Event{Kind: MouseMove, X: w.virtX, Y: w.virtY})
+		return
+	}
 	w.push(Event{Kind: MouseMove, X: float32(x), Y: float32(y)})
 }
 
@@ -334,17 +357,21 @@ func (w *window) move(x, y int32) {
 // release is seen even outside the window.
 func (w *window) button(b sim.ButtonSet, down bool, x, y int32) {
 	w.mouseX, w.mouseY, w.mouseSeen = x, y, true
+	ex, ey := float32(x), float32(y)
+	if w.locked { // the cursor sits in the middle; the game knows the virtual position
+		ex, ey = w.virtX, w.virtY
+	}
 	if down {
 		if w.buttons == 0 {
 			w.os.setCapture(w.hwnd)
 		}
 		w.buttons |= b
-		w.push(Event{Kind: ButtonDown, Button: b, X: float32(x), Y: float32(y)})
+		w.push(Event{Kind: ButtonDown, Button: b, X: ex, Y: ey})
 		return
 	}
 	held := w.buttons
 	w.buttons &^= b
-	w.push(Event{Kind: ButtonUp, Button: b, X: float32(x), Y: float32(y)})
+	w.push(Event{Kind: ButtonUp, Button: b, X: ex, Y: ey})
 	if held != 0 && w.buttons == 0 {
 		w.os.releaseCapture()
 	}

@@ -1139,6 +1139,77 @@ func equalEvents(a, b []Event) bool {
 	return true
 }
 
+// TestPointerLock checks the requests a lock sends and the virtual position it reports:
+// the warp's own MotionNotify is dropped and the rest accumulate.
+func TestPointerLock(t *testing.T) {
+	s, w := openFake(t, fakeConfig{}, Options{Width: 320, Height: 240})
+	n := len(s.requests())
+	if err := w.SetPointerLock(true); err != nil {
+		t.Fatal(err)
+	}
+	want := []byte{opCreatePixmap, opCreateGC, opPolyFillRectangle, opCreateCursor, opFreeGC,
+		opChangeWindowAttributes, opWarpPointer}
+	waitFor(t, "the pointer lock requests", func() bool { return len(s.requests()) >= n+len(want) })
+	reqs := s.requests()[n:]
+	got := make([]byte, len(reqs))
+	for i, q := range reqs {
+		got[i] = q.op
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("lock requests %v, want %v", got, want)
+	}
+	if cwa := reqs[5]; le32(cwa.raw[8:]) != 0x4000 || le32(cwa.raw[12:]) == 0 {
+		t.Errorf("ChangeWindowAttributes mask 0x%x cursor 0x%x, want the cursor attribute set",
+			le32(cwa.raw[8:]), le32(cwa.raw[12:]))
+	}
+	if warp := reqs[6]; int16(le16(warp.raw[20:])) != 160 || int16(le16(warp.raw[22:])) != 120 {
+		t.Errorf("warped to %d,%d, want the middle of the 320x240 client area",
+			int16(le16(warp.raw[20:])), int16(le16(warp.raw[22:])))
+	}
+
+	s.send(
+		pointerMsg(xMotionNotify, 0, 160, 120, w.win), // the warp's own event: dropped
+		pointerMsg(xMotionNotify, 0, 170, 130, w.win), // +10, +10
+		pointerMsg(xMotionNotify, 0, 175, 130, w.win), // +5, 0
+		pointerMsg(xButtonPress, 1, 175, 130, w.win),  // reported at the virtual position
+	)
+	waitFor(t, "4 queued events", func() bool { return w.queued() >= 4 })
+	evs, err := w.Poll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantEvents := []Event{{Kind: MouseMove, X: 15, Y: 10}, {Kind: ButtonDown, Button: sim.ButtonLeft, X: 15, Y: 10}}
+	if !equalEvents(evs, wantEvents) {
+		t.Fatalf("locked Poll:\n got %+v\nwant %+v", evs, wantEvents)
+	}
+	// Movement recenters the pointer for the next tick.
+	waitFor(t, "the warp after the movement", func() bool { return len(s.requests()) > n+len(want) })
+	if last := s.requests()[len(s.requests())-1]; last.op != opWarpPointer {
+		t.Errorf("request after a locked Poll is %d, want WarpPointer", last.op)
+	}
+
+	// Unlocking puts the normal cursor back; locking again reuses the hidden one.
+	m := len(s.requests())
+	if err := w.SetPointerLock(false); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the unlock request", func() bool { return len(s.requests()) > m })
+	if q := s.requests()[m]; q.op != opChangeWindowAttributes || le32(q.raw[12:]) != 0 {
+		t.Errorf("unlock request %d cursor 0x%x, want ChangeWindowAttributes with None", q.op, le32(q.raw[12:]))
+	}
+	m = len(s.requests())
+	if err := w.SetPointerLock(true); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the second lock", func() bool { return len(s.requests()) >= m+2 })
+	if q := s.requests()[m]; q.op != opChangeWindowAttributes {
+		t.Errorf("second lock starts with request %d, want no new cursor", q.op)
+	}
+	if err := w.SetPointerLock(true); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPollHoldsTrailingRelease(t *testing.T) {
 	s, w := openFake(t, fakeConfig{}, Options{})
 	poll := func(send [][]byte, want ...Event) {

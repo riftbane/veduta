@@ -24,19 +24,24 @@ import (
 
 // Core protocol request opcodes used by the window.
 const (
-	opCreateWindow       = 1
-	opDestroyWindow      = 4
-	opMapWindow          = 8
-	opInternAtom         = 16
-	opChangeProperty     = 18
-	opGetInputFocus      = 43
-	opCreateGC           = 55
-	opFreeGC             = 60
-	opPutImage           = 72
-	opCreateColormap     = 78
-	opQueryExtension     = 98
-	opGetKeyboardMapping = 101
-	opGetModifierMapping = 119
+	opCreateWindow           = 1
+	opChangeWindowAttributes = 2
+	opDestroyWindow          = 4
+	opMapWindow              = 8
+	opInternAtom             = 16
+	opChangeProperty         = 18
+	opWarpPointer            = 41
+	opGetInputFocus          = 43
+	opCreatePixmap           = 53
+	opCreateGC               = 55
+	opFreeGC                 = 60
+	opPolyFillRectangle      = 70
+	opPutImage               = 72
+	opCreateColormap         = 78
+	opCreateCursor           = 93
+	opQueryExtension         = 98
+	opGetKeyboardMapping     = 101
+	opGetModifierMapping     = 119
 )
 
 // Predefined atoms (X11 protocol, appendix B).
@@ -671,6 +676,60 @@ func encCreateGC(gc, drawable uint32) []byte {
 func encResource(op byte, id uint32) []byte {
 	b := request(op, 0, 8)
 	put32(b[4:], id)
+	return b
+}
+
+// encChangeWindowAttributes encodes ChangeWindowAttributes with values ordered by their
+// mask bits.
+func encChangeWindowAttributes(window, mask uint32, values ...uint32) []byte {
+	b := request(opChangeWindowAttributes, 0, 12+4*len(values))
+	put32(b[4:], window)
+	put32(b[8:], mask)
+	for i, v := range values {
+		put32(b[12+4*i:], v)
+	}
+	return b
+}
+
+func encCreatePixmap(depth byte, pid, drawable uint32, width, height int) []byte {
+	b := request(opCreatePixmap, depth, 16)
+	put32(b[4:], pid)
+	put32(b[8:], drawable)
+	put16(b[12:], uint16(width))
+	put16(b[14:], uint16(height))
+	return b
+}
+
+// encPolyFillRectangle encodes PolyFillRectangle with a single rectangle.
+func encPolyFillRectangle(drawable, gc uint32, x, y, width, height int) []byte {
+	b := request(opPolyFillRectangle, 0, 20)
+	put32(b[4:], drawable)
+	put32(b[8:], gc)
+	put16(b[12:], uint16(int16(x)))
+	put16(b[14:], uint16(int16(y)))
+	put16(b[16:], uint16(width))
+	put16(b[18:], uint16(height))
+	return b
+}
+
+// encCreateCursor encodes CreateCursor from a depth-1 source and its mask. With an
+// all-zero mask no pixel is drawn, which is the invisible cursor of a locked pointer;
+// the colors and the hotspot are left zero.
+func encCreateCursor(cid, source, mask uint32) []byte {
+	b := request(opCreateCursor, 0, 32)
+	put32(b[4:], cid)
+	put32(b[8:], source)
+	put32(b[12:], mask)
+	return b
+}
+
+// encWarpPointer encodes WarpPointer with no source window: the cursor jumps to x, y
+// relative to dst wherever it is.
+func encWarpPointer(dst uint32, x, y int) []byte {
+	b := request(opWarpPointer, 0, 24)
+	put32(b[8:], dst)
+	put16(b[20:], uint16(int16(x)))
+	put16(b[22:], uint16(int16(y)))
 	return b
 }
 

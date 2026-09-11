@@ -13,7 +13,10 @@ All notable changes to this project are documented here. The format follows
   unchanged), and `scene.Camera.LookFrom(eye, yawDeg, pitchDeg)` builds an eye camera from
   the scene's own camera, keeping its projection. The demo toggles a first-person view with
   `KeyF`: the mouse looks around, WASD moves relative to the view and the hero's own model
-  is hidden; the `look` scenario covers it headless.
+  is hidden; the `look` scenario covers it headless. `Context.LockPointer` asks the player
+  window to hide the cursor and keep it inside (X11 warps it back to the middle with an
+  empty cursor, Win32 hides it and recenters it), so looking around never stops at the
+  edge of the screen; headless runs ignore it.
 
 ### Fixed
 

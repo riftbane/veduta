@@ -274,6 +274,9 @@ func (w *window) Poll() ([]Event, error) {
 	if !w.destroyed {
 		w.releaseStuckKeys()
 	}
+	if w.locked && w.lockMoved && !w.destroyed {
+		w.recenterPointer()
+	}
 	return w.takeEvents(), nil
 }
 
@@ -350,6 +353,38 @@ func (w *window) Size() (int, int) {
 
 // Close destroys the window and unregisters its class. It is safe to call more than
 // once; it must be called from the thread that created the window.
+// SetPointerLock hides the cursor and keeps putting it back in the middle of the client
+// area, so looking around never runs out of screen. See Window.
+func (w *window) SetPointerLock(on bool) error {
+	if w.closed || w.destroyed {
+		return errors.New("platform: SetPointerLock on a closed window")
+	}
+	if on == w.locked {
+		return nil
+	}
+	w.locked = on
+	w.virtX, w.virtY = 0, 0
+	w.os.showCursor(!on) // ShowCursor counts: once per change of state
+	if on {
+		w.recenterPointer()
+	}
+	w.lockMoved = false
+	return nil
+}
+
+// recenterPointer moves the cursor to the middle of the client area; the next movement is
+// measured from there.
+func (w *window) recenterPointer() {
+	if w.w <= 0 || w.h <= 0 {
+		return
+	}
+	cx, cy := int32(w.w/2), int32(w.h/2)
+	sx, sy := w.os.clientToScreen(w.hwnd, cx, cy)
+	w.os.setCursorPos(sx, sy)
+	w.mouseX, w.mouseY, w.mouseSeen = cx, cy, true
+	w.lockMoved = false
+}
+
 func (w *window) Close() error {
 	if w.closed {
 		return nil

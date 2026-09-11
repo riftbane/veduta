@@ -83,6 +83,8 @@ func (g *Game) setView(ctx *veduta.Context, firstPerson bool) {
 		}
 	}
 	g.FirstPerson = firstPerson
+	// In the player window the cursor is hidden and kept inside while looking around.
+	ctx.LockPointer(firstPerson)
 	ctx.Trace("view", map[string]any{"first_person": firstPerson})
 }
 

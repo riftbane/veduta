@@ -17,6 +17,7 @@ var (
 
 	procAdjustWindowRectEx = user32.NewProc("AdjustWindowRectEx")
 	procBeginPaint         = user32.NewProc("BeginPaint")
+	procClientToScreen     = user32.NewProc("ClientToScreen")
 	procCreateWindowExW    = user32.NewProc("CreateWindowExW")
 	procDefWindowProcW     = user32.NewProc("DefWindowProcW")
 	procDestroyWindow      = user32.NewProc("DestroyWindow")
@@ -35,7 +36,9 @@ var (
 	procReleaseCapture     = user32.NewProc("ReleaseCapture")
 	procReleaseDC          = user32.NewProc("ReleaseDC")
 	procSetCapture         = user32.NewProc("SetCapture")
+	procSetCursorPos       = user32.NewProc("SetCursorPos")
 	procSetWindowPos       = user32.NewProc("SetWindowPos")
+	procShowCursor         = user32.NewProc("ShowCursor")
 	procShowWindow         = user32.NewProc("ShowWindow")
 	procTranslateMessage   = user32.NewProc("TranslateMessage")
 	procUnregisterClassW   = user32.NewProc("UnregisterClassW")
@@ -128,6 +131,25 @@ func (user32OS) defWindowProc(hwnd uintptr, m uint32, wp, lp uintptr) uintptr {
 func (user32OS) setCapture(hwnd uintptr) { syscall.SyscallN(procSetCapture.Addr(), hwnd) }
 
 func (user32OS) releaseCapture() { syscall.SyscallN(procReleaseCapture.Addr()) }
+
+func (user32OS) setCursorPos(x, y int32) {
+	syscall.SyscallN(procSetCursorPos.Addr(), uintptr(x), uintptr(y))
+}
+
+// showCursor changes user32's cursor counter, so it is called once per change of state.
+func (user32OS) showCursor(show bool) {
+	var s uintptr
+	if show {
+		s = 1
+	}
+	syscall.SyscallN(procShowCursor.Addr(), s)
+}
+
+func (user32OS) clientToScreen(hwnd uintptr, x, y int32) (int32, int32) {
+	p := point{x: x, y: y}
+	syscall.SyscallN(procClientToScreen.Addr(), hwnd, uintptr(unsafe.Pointer(&p)))
+	return p.x, p.y
+}
 
 // peekNext requires m to point into the heap (it is &window.peekMsg).
 func (user32OS) peekNext(m *msg) bool {

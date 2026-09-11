@@ -51,6 +51,24 @@ func TestDisplaySmoke(t *testing.T) {
 		}
 		time.Sleep(16 * time.Millisecond)
 	}
+	// Pointer lock: the cursor is hidden and warped back to the middle of the window.
+	if err := w.SetPointerLock(true); err != nil {
+		t.Fatalf("SetPointerLock(true): %v", err)
+	}
+	for f := 0; f < 5; f++ {
+		events, err := w.Poll()
+		if err != nil {
+			t.Fatalf("locked frame %d: Poll: %v", f, err)
+		}
+		for _, ev := range events {
+			t.Logf("locked frame %d: event %+v", f, ev)
+		}
+		time.Sleep(16 * time.Millisecond)
+	}
+	if err := w.SetPointerLock(false); err != nil {
+		t.Fatalf("SetPointerLock(false): %v", err)
+	}
+
 	// Errors of the last frames arrive asynchronously.
 	time.Sleep(100 * time.Millisecond)
 	if _, err := w.Poll(); err != nil {

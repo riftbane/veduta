@@ -25,6 +25,7 @@ func runPlayer(g Game, p *asset.Project, a *Assets) error {
 		return err
 	}
 	var input sim.InputState
+	pointerLocked := false
 	period := time.Second / time.Duration(p.TickRate)
 	next := time.Now()
 	for {
@@ -56,6 +57,12 @@ func runPlayer(g Game, p *asset.Project, a *Assets) error {
 		}
 		if err := e.step(input.Next()); err != nil {
 			return err
+		}
+		if want := e.ctx.PointerLocked(); want != pointerLocked {
+			pointerLocked = want
+			// A window that cannot lock the pointer still plays: the game only loses the
+			// mouse look once the cursor reaches the edge of the screen.
+			_ = win.SetPointerLock(want)
 		}
 		w, h := win.Size()
 		if w > 0 && h > 0 {

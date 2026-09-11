@@ -67,6 +67,17 @@ func TestDisplaySmoke(t *testing.T) {
 	for n := 0; n < 30; n++ {
 		frame(n)
 	}
+
+	// Pointer lock: the cursor is hidden and put back in the middle of the client area.
+	if err := win.SetPointerLock(true); err != nil {
+		t.Fatalf("SetPointerLock(true): %v", err)
+	}
+	for n := 0; n < 5; n++ {
+		frame(n)
+	}
+	if err := win.SetPointerLock(false); err != nil {
+		t.Fatalf("SetPointerLock(false): %v", err)
+	}
 	if s, _ := strconv.Atoi(os.Getenv("VEDUTA_DISPLAY_TEST_SECONDS")); s > 0 {
 		t.Logf("interactive for %d s: press keys, type, click, drag, resize; close the window to stop", s)
 		deadline := time.Now().Add(time.Duration(s) * time.Second)

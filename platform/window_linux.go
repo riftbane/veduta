@@ -86,6 +86,12 @@ type x11Window struct {
 	hasHeld       bool
 	down          [256]bool // keycodes currently down
 	width, height int
+
+	// Pointer lock state, owned by the same goroutine.
+	locked       bool
+	hiddenCursor uint32  // invisible cursor, created on the first lock (0: none yet)
+	virtX, virtY float32 // virtual cursor position reported while locked
+	lastX, lastY int16   // previous pointer position: where it was warped to, then each event
 }
 
 // rawEvent is an X event for the window, reduced to the fields Poll needs. kind is the
@@ -480,6 +486,7 @@ func (w *x11Window) Poll() ([]Event, error) {
 	w.qmu.Unlock()
 
 	var out []Event
+	moved := false // the pointer moved while locked: warp it back at the end
 	i := 0
 	if w.hasHeld {
 		w.hasHeld = false
@@ -506,10 +513,20 @@ func (w *x11Window) Poll() ([]Event, error) {
 				out = w.keyUp(out, e)
 			}
 		case xMotionNotify:
+			x, y := float32(e.x), float32(e.y)
+			if w.locked {
+				dx, dy := e.x-w.lastX, e.y-w.lastY
+				w.lastX, w.lastY = e.x, e.y
+				if dx == 0 && dy == 0 {
+					continue // the MotionNotify of our own warp
+				}
+				w.virtX, w.virtY = w.virtX+float32(dx), w.virtY+float32(dy)
+				x, y, moved = w.virtX, w.virtY, true
+			}
 			if n := len(out); n > 0 && out[n-1].Kind == MouseMove {
-				out[n-1].X, out[n-1].Y = float32(e.x), float32(e.y)
+				out[n-1].X, out[n-1].Y = x, y
 			} else {
-				out = append(out, Event{Kind: MouseMove, X: float32(e.x), Y: float32(e.y)})
+				out = append(out, Event{Kind: MouseMove, X: x, Y: y})
 			}
 		case xButtonPress, xButtonRelease:
 			b := xButton(e.detail)
@@ -520,7 +537,11 @@ func (w *x11Window) Poll() ([]Event, error) {
 			if e.kind == xButtonRelease {
 				k = ButtonUp
 			}
-			out = append(out, Event{Kind: k, Button: b, X: float32(e.x), Y: float32(e.y)})
+			x, y := float32(e.x), float32(e.y)
+			if w.locked { // the cursor is somewhere in the middle; the virtual position is what the game knows
+				x, y = w.virtX, w.virtY
+			}
+			out = append(out, Event{Kind: k, Button: b, X: x, Y: y})
 		case xFocusOut:
 			w.down = [256]bool{}
 			out = append(out, Event{Kind: FocusLost})
@@ -540,6 +561,11 @@ func (w *x11Window) Poll() ([]Event, error) {
 		}
 	}
 	w.spare = raw[:0]
+	if moved {
+		if werr := w.warpToCenter(); werr != nil && err == nil {
+			err = werr
+		}
+	}
 	return out, err
 }
 
@@ -581,6 +607,56 @@ func xButton(b byte) sim.ButtonSet {
 // Size returns the client area size of the last Resize delivered by Poll (initially the
 // requested size).
 func (w *x11Window) Size() (int, int) { return w.width, w.height }
+
+// SetPointerLock hides the cursor with an empty 1×1 cursor and keeps warping it back to
+// the middle of the window, so looking around never runs out of screen. See Window.
+func (w *x11Window) SetPointerLock(on bool) error {
+	if w.closing.Load() {
+		return errClosed
+	}
+	if err := w.stickyErr(); err != nil {
+		return err
+	}
+	if on == w.locked {
+		return nil
+	}
+	var c batch
+	cursor := uint32(0) // None: the cursor of the parent window, that is the normal one
+	if on {
+		if w.hiddenCursor == 0 {
+			pixmap, gc := w.newID(), w.newID()
+			w.hiddenCursor = w.newID()
+			c.add(encCreatePixmap(1, pixmap, w.win, 1, 1))
+			c.add(encCreateGC(gc, pixmap))
+			// CreatePixmap leaves the bits undefined; the GC's foreground is 0, so
+			// filling clears them. A cursor with an all-zero mask draws nothing.
+			c.add(encPolyFillRectangle(pixmap, gc, 0, 0, 1, 1))
+			c.add(encCreateCursor(w.hiddenCursor, pixmap, pixmap))
+			c.add(encResource(opFreeGC, gc))
+		}
+		cursor = w.hiddenCursor
+	}
+	c.add(encChangeWindowAttributes(w.win, 0x4000, cursor)) // cursor
+	if _, err := w.send(&c); err != nil {
+		return err
+	}
+	w.locked = on
+	w.virtX, w.virtY = 0, 0
+	if !on {
+		return nil
+	}
+	return w.warpToCenter()
+}
+
+// warpToCenter puts the pointer back in the middle of the client area and takes that as
+// the position the next movement is measured from.
+func (w *x11Window) warpToCenter() error {
+	w.lastX, w.lastY = int16(w.width/2), int16(w.height/2)
+	var c batch
+	c.add(encWarpPointer(w.win, int(w.lastX), int(w.lastY)))
+	_, err := w.send(&c)
+	return err
+}
 
 // Present draws img at the top-left corner of the window, clipped to the window.
 func (w *x11Window) Present(img *gfx.Image) error {
