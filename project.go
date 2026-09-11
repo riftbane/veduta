@@ -37,11 +37,6 @@ func loadProject(dir string) (*asset.Project, *Assets, error) {
 	return p, lib, nil
 }
 
-// runPlayer opens the game window.
-func runPlayer(g Game, p *asset.Project, a *Assets) error {
-	return errors.New("the player window is not available in this build")
-}
-
 // renderWith is render with an extra hook that can add to the draw list (for example
 // debug lines) after the scene and before the HUD.
 func (e *engine) renderWith(cam scene.Camera, w, h int, mode gfx.RenderMode, normals bool, extra func(dl *gfx.DrawList, view int)) (*frame, error) {

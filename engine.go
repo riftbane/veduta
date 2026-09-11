@@ -41,6 +41,7 @@ type engine struct {
 	renderer *soft.Renderer
 	res      *scene.Resources
 	dl       gfx.DrawList
+	fb       *gfx.Framebuffer
 	extra    func(dl *gfx.DrawList, view int)
 }
 
@@ -243,7 +244,13 @@ func (e *engine) render(cam scene.Camera, w, h int, mode gfx.RenderMode, normals
 		}
 		e.ctx.FontTexture = ft
 	}
-	fb := gfx.NewFramebuffer(w, h, normals)
+	// Reuse the framebuffer across frames of the same size: the player renders 60 of them
+	// a second. Callers use a frame before the next render (or clone it).
+	fb := e.fb
+	if fb == nil || fb.W != w || fb.H != h || (fb.Normal != nil) != normals {
+		fb = gfx.NewFramebuffer(w, h, normals)
+		e.fb = fb
+	}
 	e.dl.Reset()
 	e.ctx.Scene.Draw(&e.dl, e.res, scene.DrawOptions{Camera: cam, Width: w, Height: h, Mode: mode})
 	if e.extra != nil {

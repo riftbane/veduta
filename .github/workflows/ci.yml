@@ -52,6 +52,30 @@ jobs:
             echo "rasterizer benchmark allocates"; exit 1
           fi
 
+      - name: template smoke test (veduta init tmp && cd tmp && veduta test)
+        run: |
+          go build -o "$RUNNER_TEMP/veduta${{ runner.os == 'Windows' && '.exe' || '' }}" ./cmd/veduta
+          cd "$RUNNER_TEMP"
+          ./veduta init tmp --engine-dir "$GITHUB_WORKSPACE"
+          cd tmp
+          ../veduta test
+
+      - name: the veduta tool never links the platform layer
+        run: |
+          if go list -deps ./cmd/veduta | grep -q 'github.com/riftbane/veduta/platform'; then
+            echo "cmd/veduta imports platform"; exit 1
+          fi
+
+      - name: player window smoke test (Xvfb)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y -qq xvfb >/dev/null
+          VEDUTA_DISPLAY_TEST=1 xvfb-run -a -s "-screen 0 1280x720x24" go test ./platform/ -run TestDisplaySmoke -count=1 -v
+
+      - name: player window smoke test (Win32)
+        if: runner.os == 'Windows'
+        run: VEDUTA_DISPLAY_TEST=1 go test ./platform/ -run TestDisplaySmoke -count=1 -v
+
       - name: cross-compile windows/amd64
         run: GOOS=windows GOARCH=amd64 go build ./...
 
