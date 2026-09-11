@@ -1,0 +1,9 @@
+{
+  "veduta": "material/1",
+  "albedo": "#ffffff",
+  "texture": "crate_wood",
+  "unlit": false,
+  "alpha": "opaque",
+  "cull": "back",
+  "filter": "bilinear"
+}

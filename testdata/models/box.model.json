@@ -1,0 +1,7 @@
+{
+  "veduta": "model/1",
+  "name": "box",
+  "parts": [
+    { "shape": "box", "size": [2, 1, 1], "material": "crate_wood" }
+  ]
+}

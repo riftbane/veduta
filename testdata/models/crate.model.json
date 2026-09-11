@@ -1,0 +1,16 @@
+{
+  "veduta": "model/1",
+  "name": "crate",
+  "units": "m",
+  "pivot": "bottom-center",
+  "smooth_angle_deg": 30,
+  "parts": [
+    { "shape": "box", "size": [1, 1, 1], "position": [0, 0.5, 0], "material": "crate_wood" },
+    { "shape": "cylinder", "radius": 0.1, "height": 1.2, "segments": 12, "position": [0.6, 0.6, 0] },
+    { "shape": "sphere", "radius": 0.3, "segments": 16, "rings": 8 },
+    { "shape": "plane", "size": [10, 10] },
+    { "shape": "extrude", "profile": [[0,0],[1,0],[1,2],[0,2]], "depth": 0.5 },
+    { "shape": "lathe", "profile": [[0,0],[0.5,0],[0.4,1],[0,1.2]], "segments": 16 },
+    { "shape": "mirror", "axis": "x", "of": 1 }
+  ]
+}

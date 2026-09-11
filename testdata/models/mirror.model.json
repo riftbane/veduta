@@ -1,0 +1,14 @@
+{
+  "veduta": "model/1",
+  "name": "mirror",
+  "symmetry": "x",
+  "parts": [
+    { "shape": "box", "size": [0.5, 0.6, 0.4], "position": [0, 0.3, 0], "material": "body" },
+    { "shape": "cylinder", "radius": 0.07, "height": 0.7, "segments": 12,
+      "position": [0.45, 0.55, 0], "rotation_deg": [0, 0, -50], "material": "arm" },
+    { "shape": "mirror", "axis": "x", "of": 1 },
+    { "shape": "sphere", "radius": 0.12, "segments": 12, "rings": 6,
+      "position": [0.72, 0.8, 0.1], "material": "hand" },
+    { "shape": "mirror", "axis": "x", "of": 3, "material": "hand_left" }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "veduta": "scenario/1",
+  "scene": "main",
+  "seed": 42,
+  "ticks": 300,
+  "inputs": [
+    { "tick": 10, "press": ["KeyW"] },
+    { "tick": 70, "release": ["KeyW"] },
+    { "tick": 80, "press": ["Space"] },
+    { "tick": 81, "release": ["Space"], "mouse": { "x": 320, "y": 180 }, "buttons": ["left"] },
+    { "tick": 82, "buttons": [], "text": "hi" }
+  ],
+  "expect": [
+    { "tick": 120, "entity": "player", "path": "position.z", "op": "<", "value": -1 },
+    { "tick": 120, "entity": "player", "path": "tags", "op": "contains", "value": "player" },
+    { "tick": 300, "trace": "gem_collected", "count_min": 1 },
+    { "tick": 300, "trace": "invariant_violation", "count_max": 0 }
+  ],
+  "invariants": ["finite_positions", "within_bounds", "entity_count_max:500", "no_overlap:player,wall"],
+  "screenshots": [0, 60, 120, 300]
+}

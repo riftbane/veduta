@@ -1,0 +1,14 @@
+{
+  "veduta": "scene/1",
+  "camera": { "type": "perspective", "fov_deg": 60, "near": 0.1, "far": 200,
+              "position": [0, 5, 10], "look_at": [0, 0, 0] },
+  "light":  { "direction": [-0.4, -1, -0.3], "color": "#ffffff", "ambient": "#404040" },
+  "background": "#202830",
+  "entities": [
+    { "name": "ground", "kind": "static", "model": "ground", "material": "grass" },
+    { "name": "player", "kind": "player", "model": "hero", "material": "hero",
+      "position": [0, 0, 0], "rotation_deg": [0, 180, 0], "tags": ["player"] },
+    { "name": "gem_1", "kind": "collectible", "model": "gem", "material": "gem",
+      "position": [3, 0.5, -2], "tags": ["gem"] }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "veduta": "model/1",
+  "name": "cylinder",
+  "parts": [
+    { "shape": "cylinder", "radius": 0.5, "height": 1.5 }
+  ]
+}

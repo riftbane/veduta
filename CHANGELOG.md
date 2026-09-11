@@ -23,6 +23,17 @@ All notable changes to this project are documented here. The format follows
 - `sprite`: 2D batcher (rects, images, 9-slice, text) on the same DrawList with an
   orthographic overlay view, and a built-in 8×8 bitmap font.
 - `internal/golden`: golden image/text comparison under `testdata/golden`.
+- `asset`: every source format of §8 (model, texture, material, scene, scenario, project
+  manifest) as strict JSON: unknown fields, duplicate keys, wrong types, trailing data
+  and bad headers are errors located by file, line and column (`{file,line,col,msg}`),
+  and every problem is reported at once. Compilers for materials, scenes, scenarios and
+  the manifest; W3C key code list; the `.vda` chunked container (magic `VDA1`, CRC per
+  chunk, canonical JSON `META`) with bit-exact codecs for models, textures, materials and
+  scenes.
+- `asset/model`: model compiler — box, cylinder, sphere, plane, extrude (ear clipping),
+  lathe and mirror parts with transforms, UV mapping in meters, angle-based smoothing,
+  pivots; watertight closed shapes with outward winding.
+- Format references in `docs/` (model, material, scene, scenario, project, vda).
 
 ### Decisions
 
@@ -75,6 +86,35 @@ All notable changes to this project are documented here. The format follows
   clipped polygon).
 - **Rasterizer lifecycle.** Using a closed renderer returns an error; the worker-stopping
   cleanup is attached to a handle shared by copies and kept alive during Draw.
+- **Source validation.** Vectors and colors are decoded as plain JSON values and validated
+  by path so every error has a line and column. A field a shape or layer type does not
+  use is an error even when it is `0`, `false` or `null`; an explicit `0` for a count
+  (segments, rings, triangle budget) is out of range rather than "default".
+- **Model smoothing (§8.1 `smooth_angle_deg`, default 30).** Around each position,
+  triangles of the same part that share an edge there and whose normals are within the
+  angle (+0.001°) are joined, transitively; a corner's normal is the angle-weighted average
+  of its group. 12+-segment cylinders and 16×8 spheres come out smooth, box edges and caps
+  sharp; parts never smooth into each other.
+- **Model UVs** are in meters from the part's scaled geometry before rotation and
+  translation (textures tile at one repeat per meter and follow the part); box/planar faces
+  start at their top-left corner seen from outside; cylindrical/spherical seams sit at −Z.
+  Planar projects along the part's thinnest axis.
+- **Model parts.** `mirror` may mirror any earlier part (mirrors included), inheriting its
+  material (overridable), `uv` and `flip_normals`; the mirror plane goes through the model
+  origin before the pivot. Extrude profiles must be simple polygons; lathe open profiles
+  run bottom to top (closed ones are oriented automatically). Units: meters only.
+  `symmetry` (x|y|z) and `triangle_budget` (default 20000) are model fields that only
+  drive inspection.
+- **Scenario expectations** address the trace's entity summary: `position[.x|y|z]`,
+  `rotation_deg[...]`, `scale[...]`, `aabb.min|max[...]`, `visible`, `tags`, `kind`,
+  `model`, `material`, `parent`, `state.<field>...`; operators are type-checked against the
+  path. Input events must press only released keys and release only held ones.
+- **Defaults.** Scene camera: perspective, fov 60°, near 0.1, far 200; light direction
+  [-0.4,-1,-0.3], color #ffffff, ambient #404040; background #202830. Material: albedo
+  #ffffff, opaque, cutoff 0.5, cull back, filter bilinear. Manifest defaults per §5.2.
+- **`.vda` hashes.** `META.source_hash` is the SHA-256 computed by `cook` over a version
+  line, the compiler version, then the source and each dependency as
+  `<tag> <path> <length>\n<bytes>`; a missing dependency hashes as `missing <path>`.
 - **Sprites** are unlit, drawn with `gfx.State2D`, counter-clockwise on screen (front
   facing), and only rendered in `color` mode (debug modes show the 3D scene alone).
 - **Wireframe mode** is a hidden-line wireframe (dark fill + one-pixel edges computed from

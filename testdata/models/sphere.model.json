@@ -1,0 +1,7 @@
+{
+  "veduta": "model/1",
+  "name": "sphere",
+  "parts": [
+    { "shape": "sphere", "radius": 0.6 }
+  ]
+}

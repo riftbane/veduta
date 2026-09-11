@@ -1,0 +1,7 @@
+{
+  "veduta": "model/1",
+  "name": "plane",
+  "parts": [
+    { "shape": "plane", "size": [2, 1.5] }
+  ]
+}
