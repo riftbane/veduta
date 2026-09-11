@@ -1,0 +1,7 @@
+{
+  "veduta": "texture/1",
+  "size": [64, 64],
+  "layers": [
+    { "type": "image", "path": "textures/src/logo.png", "fit": "contain" }
+  ]
+}

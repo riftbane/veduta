@@ -1,0 +1,8 @@
+{
+  "veduta": "texture/1",
+  "size": [128, 128],
+  "layers": [
+    { "type": "stripes", "width": 6.5, "angle_deg": 30, "colors": ["#e63946", "#f1faee", "#457b9d"] },
+    { "type": "stripes", "width": 16, "angle_deg": 90, "colors": ["#00000000", "#00000060"] }
+  ]
+}

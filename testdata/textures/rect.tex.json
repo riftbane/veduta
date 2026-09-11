@@ -1,0 +1,14 @@
+{
+  "veduta": "texture/1",
+  "size": [160, 96],
+  "layers": [
+    { "type": "solid", "color": "#264653" },
+    { "type": "rect", "xy": [8, 8], "size": [40, 32], "color": "#e9c46a" },
+    { "type": "rect", "xy": [56, 8], "size": [40, 32], "color": "#f4a261", "corner": 10 },
+    { "type": "rect", "xy": [104.5, 8.5], "size": [48, 32], "color": "#e76f51", "corner": 100 },
+    { "type": "rect", "xy": [8, 52], "size": [40, 36], "color": "#ffffff", "outline": 3 },
+    { "type": "rect", "xy": [56, 52], "size": [40, 36], "color": "#ffffff", "corner": 12, "outline": 4 },
+    { "type": "rect", "xy": [104, 52], "size": [48, 36], "color": "#2a9d8f", "corner": 8, "outline": 30 },
+    { "type": "rect", "xy": [-20, 44], "size": [200, 4], "color": "#ffffff80", "corner": 2 }
+  ]
+}

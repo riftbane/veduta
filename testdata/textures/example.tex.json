@@ -1,0 +1,16 @@
+{
+  "veduta": "texture/1",
+  "size": [256, 256],
+  "tiling": true,
+  "mipmaps": true,
+  "layers": [
+    { "type": "solid",    "color": "#8a5a2b" },
+    { "type": "noise",    "seed": 7, "scale": 16, "octaves": 3, "color": "#000000", "opacity": 0.25, "blend": "multiply" },
+    { "type": "stripes",  "width": 8, "angle_deg": 90, "colors": ["#00000000", "#00000030"] },
+    { "type": "rect",     "xy": [16, 16], "size": [224, 224], "color": "#ffffff20", "corner": 6, "outline": 2 },
+    { "type": "circle",   "center": [128, 128], "radius": 40, "color": "#ff0000" },
+    { "type": "gradient", "from": "#ffffff", "to": "#000000", "angle_deg": 45, "opacity": 0.3 },
+    { "type": "checker",  "cells": 8, "colors": ["#c0c0c0", "#404040"] },
+    { "type": "image",    "path": "textures/src/logo.png", "fit": "contain" }
+  ]
+}

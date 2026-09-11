@@ -1,0 +1,16 @@
+{
+  "veduta": "texture/1",
+  "size": [128, 128],
+  "tiling": true,
+  "layers": [
+    { "type": "solid", "color": "#9c6b3c" },
+    { "type": "noise", "seed": 3, "scale": 2, "octaves": 5, "color": "#5a3a1a", "opacity": 0.7 },
+    { "type": "noise", "seed": 9, "scale": 32, "octaves": 2, "color": "#000000", "opacity": 0.15, "blend": "multiply" },
+    { "type": "stripes", "width": 2, "angle_deg": 90,
+      "colors": ["#00000000", "#00000000", "#00000000", "#00000000", "#00000000", "#00000000",
+                 "#00000000", "#00000000", "#00000000", "#00000000", "#00000000", "#00000000",
+                 "#00000000", "#00000000", "#00000000", "#2a1a0acc"] },
+    { "type": "rect", "xy": [0, 0], "size": [128, 128], "color": "#3a2410", "outline": 4 },
+    { "type": "gradient", "from": "#ffffff", "to": "#000000", "angle_deg": 90, "opacity": 0.12, "blend": "screen" }
+  ]
+}

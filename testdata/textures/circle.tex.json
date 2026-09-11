@@ -1,0 +1,13 @@
+{
+  "veduta": "texture/1",
+  "size": [128, 128],
+  "layers": [
+    { "type": "solid", "color": "#1d3557" },
+    { "type": "circle", "center": [40, 40], "radius": 28, "color": "#e63946" },
+    { "type": "circle", "center": [88, 40], "radius": 28, "color": "#f1faee", "outline": 4 },
+    { "type": "circle", "center": [64, 64], "radius": 24, "color": "#a8dadc", "opacity": 0.6 },
+    { "type": "circle", "center": [40.5, 96.25], "radius": 20.5, "color": "#457b9d", "outline": 100 },
+    { "type": "circle", "center": [96, 96], "radius": 1.5, "color": "#ffffff" },
+    { "type": "circle", "center": [128, 128], "radius": 12, "color": "#ffb703", "outline": 2 }
+  ]
+}

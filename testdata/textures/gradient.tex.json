@@ -1,0 +1,8 @@
+{
+  "veduta": "texture/1",
+  "size": [128, 64],
+  "layers": [
+    { "type": "gradient", "from": "#ff8800", "to": "#0044ff", "angle_deg": 45 },
+    { "type": "gradient", "from": "#00000000", "to": "#000000c0", "angle_deg": 90 }
+  ]
+}
