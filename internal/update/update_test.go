@@ -161,16 +161,23 @@ func TestCheckCachesAndIsOfflineSafe(t *testing.T) {
 
 func TestLoadConfig(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir) // Linux
+	t.Setenv("APPDATA", dir)         // Windows
+	t.Setenv("HOME", dir)            // macOS: $HOME/Library/Application Support
+	base, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if cfg, err := LoadConfig(); err != nil || cfg != DefaultConfig {
 		t.Fatalf("default: %+v %v", cfg, err)
 	}
-	os.MkdirAll(filepath.Join(dir, "veduta"), 0o755)
-	os.WriteFile(filepath.Join(dir, "veduta", "config.json"), []byte(`{"auto_update":"auto","check_interval_hours":6}`), 0o644)
+	file := filepath.Join(base, "veduta", "config.json")
+	os.MkdirAll(filepath.Dir(file), 0o755)
+	os.WriteFile(file, []byte(`{"auto_update":"auto","check_interval_hours":6}`), 0o644)
 	if cfg, err := LoadConfig(); err != nil || cfg.AutoUpdate != "auto" || cfg.CheckIntervalHours != 6 {
 		t.Fatalf("auto: %+v %v", cfg, err)
 	}
-	os.WriteFile(filepath.Join(dir, "veduta", "config.json"), []byte(`{"auto_update":"sometimes"}`), 0o644)
+	os.WriteFile(file, []byte(`{"auto_update":"sometimes"}`), 0o644)
 	if _, err := LoadConfig(); err == nil {
 		t.Fatal("invalid mode accepted")
 	}

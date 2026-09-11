@@ -521,6 +521,10 @@ func TestSceneDeterministic(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Each run writes to its own directory; on Windows the path appears
+			// JSON-escapes (backslashes doubled) in the report.
+			esc, _ := json.Marshal(dir)
+			b = bytes.ReplaceAll(b, esc[1:len(esc)-1], []byte("OUT"))
 			reps.Write(bytes.ReplaceAll(b, []byte(dir), []byte("OUT")))
 			for _, p := range r.Sheets {
 				data, err := os.ReadFile(p)

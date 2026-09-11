@@ -173,7 +173,7 @@ func init() {
 			if len(args) > 0 {
 				return nil, usagef("doctor takes no arguments")
 			}
-			return Doctor(env, ""), nil
+			return Doctor(env, mcpProjectDir), nil
 		},
 	})
 }
