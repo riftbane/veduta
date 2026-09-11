@@ -1,0 +1,26 @@
+# [[.Name]]
+
+A game made with [Veduta](https://github.com/riftbane/veduta) [[.Engine]].
+
+## Play
+
+Download the archive for your system from the project's GitHub Releases, unpack it and
+run `[[.Name]]` (`[[.Name]].exe` on Windows). WASD moves the hero, Space jumps, R resets
+the level. Collect every gem.
+
+## Develop
+
+```sh
+veduta test                      # go test + every scenario in tests/scenarios
+veduta simulate --scenario tests/scenarios/collect.scenario.json
+veduta render --scene main --out out/main.png
+veduta inspect model hero
+veduta release v0.1.0            # tag; GitHub Actions builds linux and windows archives
+```
+
+The project is set up for Claude Code: `claude` in this directory connects to the
+`veduta` MCP server (see `.mcp.json`) and follows `CLAUDE.md`.
+
+Layout: `veduta.json` (manifest), `cmd/game` (entry point), `game/` (game logic and entity
+kinds), `assets/` (JSON sources for models, textures, materials and scenes),
+`tests/scenarios/` (deterministic scenario tests).

@@ -370,6 +370,7 @@ func (h *headless) simulate(args []string) (int, error) {
 	invs := fs.String("invariants", "", "comma-separated invariants (default: scenario's, else the project's)")
 	out := fs.String("out", "", "output directory (default out/runs/<scenario or scene>)")
 	width := fs.Int("width", 0, "screenshot tile width (default fits a 640-pixel sheet)")
+	withSheet := fs.Bool("sheet", true, "render screenshots and the contact sheet (false: trace and verdict only)")
 	if err := parse(fs, args); err != nil {
 		return 0, err
 	}
@@ -413,7 +414,7 @@ func (h *headless) simulate(args []string) (int, error) {
 		}
 		dir = filepath.Join("out", "runs", name)
 	}
-	res, err := h.runScenario(spec, dir, *width)
+	res, err := h.runScenario(spec, dir, *width, *withSheet)
 	if err != nil {
 		return 0, err
 	}
@@ -437,7 +438,7 @@ func parseInts(s string) ([]int, error) {
 }
 
 // runScenario runs spec, writing trace.jsonl, result.json and sheet.png into dir.
-func (h *headless) runScenario(spec *scenarioSpec, dir string, tileW int) (*simResult, error) {
+func (h *headless) runScenario(spec *scenarioSpec, dir string, tileW int, withSheet bool) (*simResult, error) {
 	for _, t := range spec.Screenshots {
 		if t < 0 || t > spec.Ticks {
 			return nil, fmt.Errorf("screenshot tick %d outside [0, %d]", t, spec.Ticks)
@@ -468,7 +469,7 @@ func (h *headless) runScenario(spec *scenarioSpec, dir string, tileW int) (*simR
 
 	shots := map[int]bool{}
 	for _, t := range spec.Screenshots {
-		shots[t] = true
+		shots[t] = withSheet
 	}
 	cols, tw, th := sheetLayout(len(spec.Screenshots)+1, tileW, h.project)
 	var tiles []*gfx.Image
@@ -518,15 +519,18 @@ func (h *headless) runScenario(spec *scenarioSpec, dir string, tileW int) (*simR
 			results[i] = sim.ExpectResult{Tick: spec.Expect[i].Tick, Error: "tick never reached"}
 		}
 	}
-	traj, err := trail.render(e, tw, th)
-	if err != nil {
-		return nil, err
-	}
-	tiles = append(tiles, traj)
-	labels = append(labels, "trajectories (top)")
-	sheetPath := filepath.Join(dir, "sheet.png")
-	if err := writePNG(sheetPath, sheet.Grid(tiles, labels, cols, 4)); err != nil {
-		return nil, err
+	sheetPath := ""
+	if withSheet {
+		traj, err := trail.render(e, tw, th)
+		if err != nil {
+			return nil, err
+		}
+		tiles = append(tiles, traj)
+		labels = append(labels, "trajectories (top)")
+		sheetPath = filepath.Join(dir, "sheet.png")
+		if err := writePNG(sheetPath, sheet.Grid(tiles, labels, cols, 4)); err != nil {
+			return nil, err
+		}
 	}
 
 	res := &simResult{

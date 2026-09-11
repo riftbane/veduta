@@ -1,0 +1,9 @@
+module [[.Module]]
+
+go 1.25
+
+require github.com/riftbane/veduta [[.Engine]]
+[[- if .EngineDir]]
+
+replace github.com/riftbane/veduta => [[.EngineDir]]
+[[- end]]

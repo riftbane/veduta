@@ -1,0 +1,54 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CGO_ENABLED: "0"
+  GOAMD64: v1
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: build archives
+        run: |
+          set -eu
+          tag="${GITHUB_REF_NAME}"
+          name="[[.Name]]"
+          mkdir -p dist
+          for target in linux/amd64 windows/amd64; do
+            os="${target%/*}"
+            arch="${target#*/}"
+            stage="build/${os}_${arch}/${name}"
+            mkdir -p "$stage"
+            exe="$name"
+            if [ "$os" = windows ]; then exe="$name.exe"; fi
+            GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "-s -w" -o "$stage/$exe" ./cmd/game
+            cp veduta.json README.md "$stage/"
+            cp -r assets "$stage/assets"
+            rm -rf "$stage/assets/.cooked"
+            archive="${name}_${tag}_${os}_${arch}"
+            if [ "$os" = windows ]; then
+              (cd "build/${os}_${arch}" && zip -q -r -X "../../dist/${archive}.zip" "$name")
+            else
+              tar -C "build/${os}_${arch}" -czf "dist/${archive}.tar.gz" "$name"
+            fi
+          done
+          (cd dist && sha256sum * > checksums.txt)
+          cat dist/checksums.txt
+
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" --generate-notes dist/*

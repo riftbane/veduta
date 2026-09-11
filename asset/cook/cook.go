@@ -109,17 +109,28 @@ func Load(root string) (*asset.Library, error) {
 
 // LoadProject is Load with an already parsed manifest (nil reads it).
 func LoadProject(root string, p *asset.Project) (*asset.Library, error) {
-	c, err := newCooker(root, p)
+	lib, errs, err := LoadPartial(root, p)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.run(); err != nil {
-		return nil, err
-	}
-	if errs := c.report.Errors(); len(errs) > 0 {
+	if len(errs) > 0 {
 		return nil, errs
 	}
-	return c.lib, nil
+	return lib, nil
+}
+
+// LoadPartial is LoadProject that keeps going: it returns every asset that compiles and
+// the located errors of those that do not (inspection of one asset should not be blocked
+// by another broken one). The error is only for I/O problems.
+func LoadPartial(root string, p *asset.Project) (*asset.Library, asset.Errors, error) {
+	c, err := newCooker(root, p)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := c.run(); err != nil {
+		return nil, nil, err
+	}
+	return c.lib, c.report.Errors(), nil
 }
 
 type cooker struct {
