@@ -50,6 +50,7 @@ type Locator struct {
 	data     []byte
 	lines    []int          // byte offset of each line start
 	pos      map[string]int // path → offset of the value
+	byOff    map[int]string // offset of a value → its path (innermost value wins)
 	keys     []keyPos       // every object key, in file order
 	rootKind byte
 }
@@ -63,7 +64,7 @@ type keyPos struct {
 // NewLocator indexes data. It fails with a located error when data is not valid JSON or
 // contains duplicate object keys.
 func NewLocator(file string, data []byte) (*Locator, error) {
-	l := &Locator{file: file, data: data, lines: []int{0}, pos: map[string]int{}}
+	l := &Locator{file: file, data: data, lines: []int{0}, pos: map[string]int{}, byOff: map[int]string{}}
 	for i, b := range data {
 		if b == '\n' {
 			l.lines = append(l.lines, i+1)
@@ -167,6 +168,7 @@ func (l *Locator) index() error {
 			case '{', '[':
 				p := valuePath()
 				l.pos[p] = start
+				l.byOff[start] = p
 				if len(stack) == 0 {
 					l.rootKind = byte(d)
 				}
@@ -176,7 +178,9 @@ func (l *Locator) index() error {
 				afterValue()
 			}
 		default:
-			l.pos[valuePath()] = start
+			vp := valuePath()
+			l.pos[vp] = start
+			l.byOff[start] = vp
 			if len(stack) == 0 {
 				l.rootKind = 'v'
 			}
@@ -235,9 +239,14 @@ func (l *Locator) convert(err error) error {
 	var typ *json.UnmarshalTypeError
 	switch {
 	case errors.As(err, &syn):
-		off := int(syn.Offset) - 1 // Offset counts the offending byte
+		// Go releases disagree by one on where Offset points; normalize to the first
+		// non-blank byte at or after offset-1 so positions do not depend on the toolchain.
+		off := int(syn.Offset) - 1
 		if off < 0 {
 			off = 0
+		}
+		for off < len(l.data) && (l.data[off] == ' ' || l.data[off] == '\t' || l.data[off] == '\r' || l.data[off] == '\n') {
+			off++
 		}
 		return l.errAt(off, "invalid JSON: "+strings.TrimPrefix(syn.Error(), "json: "))
 	case errors.As(err, &typ):
@@ -249,11 +258,17 @@ func (l *Locator) convert(err error) error {
 		for off > 0 && off < len(l.data) && (l.data[off] == ' ' || l.data[off] == '\n' || l.data[off] == '\t' || l.data[off] == '\r') {
 			off--
 		}
-		field := goPath(typ.Field)
+		// The path comes from our own index (Go releases differ in whether Field carries
+		// array indices), falling back to encoding/json's field path.
+		start := l.valueStartBefore(off)
+		field, ok := l.byOff[start]
+		if !ok {
+			field = goPath(typ.Field)
+		}
 		if field == "" {
 			field = "value"
 		}
-		return l.errAt(l.valueStartBefore(off), fmt.Sprintf("%s: cannot use JSON %s as %s", field, typ.Value, typ.Type))
+		return l.errAt(start, fmt.Sprintf("%s: cannot use JSON %s as %s", field, typ.Value, typ.Type))
 	case strings.HasPrefix(err.Error(), "json: unknown field "):
 		name, _ := strconv.Unquote(strings.TrimPrefix(err.Error(), "json: unknown field "))
 		for _, k := range l.keys {
