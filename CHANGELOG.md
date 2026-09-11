@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## v0.1.0 — 2026-09-11
+
 ### Added
 
 - Repository skeleton: module `github.com/riftbane/veduta`, MIT license, CI and release
