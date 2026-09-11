@@ -45,6 +45,13 @@ jobs:
       - name: go test
         run: go test ./...
 
+      - name: rasterizer benchmark (0 allocs/op gate)
+        run: |
+          go test -bench . -benchmem -benchtime=10x -run '^$' ./gfx/soft | tee bench.txt
+          if grep -E '^Benchmark' bench.txt | grep -vqE '[[:space:]]0 allocs/op'; then
+            echo "rasterizer benchmark allocates"; exit 1
+          fi
+
       - name: cross-compile windows/amd64
         run: GOOS=windows GOARCH=amd64 go build ./...
 
