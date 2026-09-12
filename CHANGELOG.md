@@ -46,8 +46,9 @@ The specification of v0.1.0 is left as it shipped; these extend §13 and are rec
   an answer from the other channel is a miss, not a stale hit.
 - **`--channel` is a subscription.** It is saved to the configuration, because a binary
   that went back to stable while the configuration still said beta would be pulled onto a
-  candidate again by the next automatic update. It is saved only when a release is really
-  installed, so `--check` previews another channel without changing anything.
+  candidate again by the next automatic update. Naming a channel saves it even when there
+  is nothing to install; `--check` never writes, so it previews another channel without
+  changing anything.
 - **Downgrades stay explicit.** Leaving beta for an older stable release needs `--force`,
   the flag that already meant "reinstall even when up to date"; `auto` mode never
   downgrades and never crosses channels.
