@@ -161,7 +161,62 @@ func Compare(a, b string) int {
 	case mb[4] == "":
 		return -1
 	}
-	return strings.Compare(ma[4], mb[4])
+	return comparePre(ma[4], mb[4])
+}
+
+// comparePre orders two pre-release suffixes as SemVer §11.4 does: identifier by
+// identifier, numeric identifiers as numbers and below alphanumeric ones, and a suffix
+// that runs out of identifiers first sorts lower ("rc" before "rc.1").
+func comparePre(a, b string) int {
+	as, bs := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < len(as) && i < len(bs); i++ {
+		x, y := as[i], bs[i]
+		if x == y {
+			continue
+		}
+		switch {
+		case isNum(x) && isNum(y):
+			return compareNum(x, y)
+		case isNum(x):
+			return -1
+		case isNum(y):
+			return 1
+		}
+		return strings.Compare(x, y)
+	}
+	switch {
+	case len(as) < len(bs):
+		return -1
+	case len(as) > len(bs):
+		return 1
+	}
+	return 0
+}
+
+// isNum reports whether s is a non-empty run of digits.
+func isNum(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// compareNum orders two digit strings by value. They are compared as strings, so an
+// identifier too large for an int cannot overflow.
+func compareNum(a, b string) int {
+	a, b = strings.TrimLeft(a, "0"), strings.TrimLeft(b, "0")
+	if len(a) != len(b) {
+		if len(a) < len(b) {
+			return -1
+		}
+		return 1
+	}
+	return strings.Compare(a, b)
 }
 
 // ArchiveName is the release archive of the tool for goos/goarch (spec §13.1).

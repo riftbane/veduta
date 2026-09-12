@@ -27,10 +27,19 @@ func TestCompare(t *testing.T) {
 		{"v0.1.0", "v0.1.0", 0}, {"v0.1.0", "v0.1.1", -1}, {"v0.2.0", "v0.10.0", -1},
 		{"v1.0.0", "v0.99.99", 1}, {"v0.1.0-rc.1", "v0.1.0", -1}, {"dev", "v0.0.1", -1},
 		{"v0.1.0-rc.1", "v0.1.0-rc.2", -1},
+		// Pre-release suffixes follow SemVer §11.4, not string order: the tenth
+		// candidate comes after the second.
+		{"v0.2.0-rc.2", "v0.2.0-rc.10", -1}, {"v0.2.0-beta.10", "v0.2.0-beta.9", 1},
+		{"v0.2.0-alpha.1", "v0.2.0-beta.1", -1}, {"v0.2.0-rc", "v0.2.0-rc.1", -1},
+		{"v0.2.0-rc.1", "v0.2.0-rc.1.1", -1}, {"v0.2.0-1", "v0.2.0-alpha", -1},
+		{"v0.2.0-rc.1", "v0.2.0-rc.1", 0}, {"v0.2.0-rc.007", "v0.2.0-rc.7", 0},
 	}
 	for _, c := range cases {
 		if got := Compare(c.a, c.b); got != c.want {
 			t.Errorf("Compare(%s, %s) = %d, want %d", c.a, c.b, got, c.want)
+		}
+		if got := Compare(c.b, c.a); got != -c.want {
+			t.Errorf("Compare(%s, %s) = %d, want %d (the order must be symmetric)", c.b, c.a, got, -c.want)
 		}
 	}
 	if ArchiveName("v0.1.0", "linux", "amd64") != "veduta_v0.1.0_linux_amd64.tar.gz" || ArchiveName("v0.1.0", "windows", "amd64") != "veduta_v0.1.0_windows_amd64.zip" {
