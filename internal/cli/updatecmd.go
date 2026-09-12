@@ -36,8 +36,12 @@ func (r *UpdateReport) Human() string {
 
 // Update checks for (and, unless check is set, installs) the latest release of the tool.
 func Update(ctx context.Context, env *Env, check, force bool) (*UpdateReport, error) {
+	cfg, err := update.LoadConfig()
+	if err != nil {
+		return nil, err
+	}
 	client := &http.Client{Timeout: 60 * time.Second}
-	rel, err := update.Latest(ctx, client)
+	rel, err := update.Latest(ctx, client, cfg.Channel)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +71,7 @@ func autoUpdate(env *Env) (*update.Result, error) {
 	if err != nil || cfg.AutoUpdate != "auto" || !update.IsVersion(env.Version) {
 		return nil, err
 	}
-	st := update.Check(context.Background(), env.Version, time.Duration(cfg.CheckIntervalHours)*time.Hour, time.Now())
+	st := update.Check(context.Background(), env.Version, cfg.Channel, time.Duration(cfg.CheckIntervalHours)*time.Hour, time.Now())
 	if !st.Available {
 		return nil, nil
 	}
@@ -177,7 +181,7 @@ func init() {
 		if cfg.AutoUpdate == "off" {
 			return Check{Name: "update", OK: true, Detail: "update checks disabled (auto_update: off)"}
 		}
-		st := update.Check(context.Background(), env.Version, time.Duration(cfg.CheckIntervalHours)*time.Hour, time.Now())
+		st := update.Check(context.Background(), env.Version, cfg.Channel, time.Duration(cfg.CheckIntervalHours)*time.Hour, time.Now())
 		switch {
 		case st.Error != "":
 			return Check{Name: "update", OK: true, Detail: "could not check for updates: " + st.Error}

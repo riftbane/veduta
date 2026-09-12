@@ -36,14 +36,38 @@ var APIBase = "https://api.github.com"
 // CheckTimeout bounds background update checks (spec §13.3).
 const CheckTimeout = 3 * time.Second
 
+// Release channels. The stable channel takes the release GitHub marks as the latest one;
+// the beta channel takes the newest of every published release, pre-releases included, so
+// it is a superset that serves a stable release whenever that is the newer one.
+const (
+	ChannelStable = "stable"
+	ChannelBeta   = "beta"
+)
+
+// releaseListSize is how many of the newest releases the beta channel looks at.
+const releaseListSize = 30
+
+// ValidChannel reports whether s names a release channel.
+func ValidChannel(s string) bool { return s == ChannelStable || s == ChannelBeta }
+
+// normChannel maps the empty channel to stable, so a zero Config and a cache file written
+// before channels existed both mean stable.
+func normChannel(s string) string {
+	if s == "" {
+		return ChannelStable
+	}
+	return s
+}
+
 // Config is ~/.config/veduta/config.json.
 type Config struct {
 	AutoUpdate         string `json:"auto_update"` // check (default), auto, off
 	CheckIntervalHours int    `json:"check_interval_hours"`
+	Channel            string `json:"channel"` // stable (default), beta
 }
 
 // DefaultConfig is used when the file is missing.
-var DefaultConfig = Config{AutoUpdate: "check", CheckIntervalHours: 24}
+var DefaultConfig = Config{AutoUpdate: "check", CheckIntervalHours: 24, Channel: ChannelStable}
 
 // ConfigPath returns the path of the configuration file.
 func ConfigPath() (string, error) {
@@ -74,15 +98,75 @@ func LoadConfig() (Config, error) {
 	if err := dec.Decode(&cfg); err != nil {
 		return DefaultConfig, fmt.Errorf("%s: %w", p, err)
 	}
+	return validate(cfg, p)
+}
+
+// validate rejects invalid values and gives every field left at its zero value its
+// default. p names the file in the error messages.
+func validate(cfg Config, p string) (Config, error) {
 	switch cfg.AutoUpdate {
 	case "check", "auto", "off":
 	default:
 		return DefaultConfig, fmt.Errorf("%s: auto_update %q (want check, auto or off)", p, cfg.AutoUpdate)
 	}
+	switch cfg.Channel {
+	case "": // absent or empty: the default channel, like every other zero value
+		cfg.Channel = DefaultConfig.Channel
+	case ChannelStable, ChannelBeta:
+	default:
+		return DefaultConfig, fmt.Errorf("%s: channel %q (want stable or beta)", p, cfg.Channel)
+	}
 	if cfg.CheckIntervalHours <= 0 {
 		cfg.CheckIntervalHours = DefaultConfig.CheckIntervalHours
 	}
 	return cfg, nil
+}
+
+// SaveConfig writes the configuration, creating its directory. It is written to a
+// temporary file next to its destination and renamed, so an interrupted write never
+// leaves half a configuration behind. It returns the path written.
+func SaveConfig(cfg Config) (string, error) {
+	p, err := ConfigPath()
+	if err != nil {
+		return "", err
+	}
+	if cfg, err = validate(cfg, p); err != nil {
+		return "", err
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	data = append(data, '\n')
+	dir := filepath.Dir(p)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	tmp, err := os.CreateTemp(dir, ".config-*")
+	if err != nil {
+		return "", err
+	}
+	name := tmp.Name()
+	fail := func(err error) (string, error) {
+		tmp.Close()
+		os.Remove(name)
+		return "", err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		return fail(err)
+	}
+	if err := tmp.Chmod(0o644); err != nil {
+		return fail(err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(name)
+		return "", err
+	}
+	if err := os.Rename(name, p); err != nil {
+		os.Remove(name)
+		return "", err
+	}
+	return p, nil
 }
 
 // Release is a published release.
@@ -91,39 +175,93 @@ type Release struct {
 	Assets map[string]string `json:"assets"` // file name → download URL
 }
 
-// Latest asks GitHub for the latest release.
-func Latest(ctx context.Context, client *http.Client) (*Release, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, APIBase+"/repos/"+Repo+"/releases/latest", nil)
+// Latest asks GitHub for the newest release of a channel. An empty channel means stable.
+func Latest(ctx context.Context, client *http.Client, channel string) (*Release, error) {
+	switch normChannel(channel) {
+	case ChannelStable:
+		return latestStable(ctx, client)
+	case ChannelBeta:
+		return latestBeta(ctx, client)
+	}
+	return nil, fmt.Errorf("latest release: channel %q (want stable or beta)", channel)
+}
+
+// releaseBody is the part of a GitHub release the tool reads. Decoding stays lenient: the
+// rest of the fields are none of its business.
+type releaseBody struct {
+	TagName string `json:"tag_name"`
+	Draft   bool   `json:"draft"`
+	Assets  []struct {
+		Name string `json:"name"`
+		URL  string `json:"browser_download_url"`
+	} `json:"assets"`
+}
+
+func (b releaseBody) release() *Release {
+	r := &Release{Tag: b.TagName, Assets: map[string]string{}}
+	for _, a := range b.Assets {
+		r.Assets[a.Name] = a.URL
+	}
+	return r
+}
+
+// apiGet reads a GitHub API path into v.
+func apiGet(ctx context.Context, client *http.Client, path string, limit int64, v any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, APIBase+path, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("latest release: %w", err)
+		return fmt.Errorf("latest release: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("latest release: GitHub answered %s", resp.Status)
+		return fmt.Errorf("latest release: GitHub answered %s", resp.Status)
 	}
-	var body struct {
-		TagName string `json:"tag_name"`
-		Assets  []struct {
-			Name string `json:"name"`
-			URL  string `json:"browser_download_url"`
-		} `json:"assets"`
+	if err := json.NewDecoder(io.LimitReader(resp.Body, limit)).Decode(v); err != nil {
+		return fmt.Errorf("latest release: %w", err)
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&body); err != nil {
-		return nil, fmt.Errorf("latest release: %w", err)
+	return nil
+}
+
+// latestStable takes the release GitHub marks as the latest one, which never is a
+// pre-release.
+func latestStable(ctx context.Context, client *http.Client) (*Release, error) {
+	var body releaseBody
+	if err := apiGet(ctx, client, "/repos/"+Repo+"/releases/latest", 4<<20, &body); err != nil {
+		return nil, err
 	}
 	if !IsVersion(body.TagName) {
 		return nil, fmt.Errorf("latest release: tag %q is not a version", body.TagName)
 	}
-	r := &Release{Tag: body.TagName, Assets: map[string]string{}}
-	for _, a := range body.Assets {
-		r.Assets[a.Name] = a.URL
+	return body.release(), nil
+}
+
+// latestBeta takes the highest version among the newest published releases. GitHub returns
+// them in publication order, which is not version order (a patch of an old line can be
+// published after a candidate of a new one), so the order is never trusted: every usable
+// tag is compared.
+func latestBeta(ctx context.Context, client *http.Client) (*Release, error) {
+	var list []releaseBody
+	path := fmt.Sprintf("/repos/%s/releases?per_page=%d", Repo, releaseListSize)
+	if err := apiGet(ctx, client, path, 8<<20, &list); err != nil {
+		return nil, err
 	}
-	return r, nil
+	var best *Release
+	for _, b := range list {
+		if b.Draft || !IsVersion(b.TagName) {
+			continue
+		}
+		if best == nil || Compare(b.TagName, best.Tag) > 0 {
+			best = b.release()
+		}
+	}
+	if best == nil {
+		return nil, fmt.Errorf("latest release: no published release with a version tag among the newest %d", releaseListSize)
+	}
+	return best, nil
 }
 
 var versionRe = regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$`)
@@ -231,16 +369,25 @@ func ArchiveName(tag, goos, goarch string) string {
 // Status is the result of an update check.
 type Status struct {
 	Current   string    `json:"current"`
+	Channel   string    `json:"channel"`
 	Latest    string    `json:"latest,omitempty"`
 	Available bool      `json:"available"`
+	Downgrade bool      `json:"downgrade"` // the channel's newest release is older than this build
 	CheckedAt time.Time `json:"checked_at,omitempty"`
 	Cached    bool      `json:"cached"`
 	Error     string    `json:"error,omitempty"`
 }
 
+// setDirection fills Available and Downgrade from Current and Latest.
+func (st *Status) setDirection() {
+	c := Compare(st.Current, st.Latest)
+	st.Available, st.Downgrade = c < 0, c > 0
+}
+
 type cacheFile struct {
 	CheckedAt time.Time `json:"checked_at"`
 	Latest    string    `json:"latest"`
+	Channel   string    `json:"channel"`
 }
 
 // CachePath is ~/.cache/veduta/update.json.
@@ -255,30 +402,33 @@ func CachePath() (string, error) {
 // Check reports whether a newer release than current exists. It asks GitHub at most once
 // per interval (the answer is cached), never takes longer than CheckTimeout, and turns
 // network problems into Status.Error instead of failing.
-func Check(ctx context.Context, current string, interval time.Duration, now time.Time) Status {
-	st := Status{Current: current}
+func Check(ctx context.Context, current, channel string, interval time.Duration, now time.Time) Status {
+	ch := normChannel(channel)
+	st := Status{Current: current, Channel: ch}
 	cp, _ := CachePath()
 	if cp != "" && interval > 0 {
 		if data, err := os.ReadFile(cp); err == nil {
 			var c cacheFile
-			if json.Unmarshal(data, &c) == nil && now.Sub(c.CheckedAt) < interval && IsVersion(c.Latest) {
+			// An answer from another channel is a miss, not a stale hit; a file written
+			// before channels existed holds a stable answer.
+			if json.Unmarshal(data, &c) == nil && normChannel(c.Channel) == ch && now.Sub(c.CheckedAt) < interval && IsVersion(c.Latest) {
 				st.Latest, st.CheckedAt, st.Cached = c.Latest, c.CheckedAt, true
-				st.Available = Compare(current, c.Latest) < 0
+				st.setDirection()
 				return st
 			}
 		}
 	}
 	ctx, cancel := context.WithTimeout(ctx, CheckTimeout)
 	defer cancel()
-	rel, err := Latest(ctx, &http.Client{Timeout: CheckTimeout})
+	rel, err := Latest(ctx, &http.Client{Timeout: CheckTimeout}, ch)
 	if err != nil {
 		st.Error = err.Error()
 		return st
 	}
 	st.Latest, st.CheckedAt = rel.Tag, now
-	st.Available = Compare(current, rel.Tag) < 0
+	st.setDirection()
 	if cp != "" {
-		if data, err := json.Marshal(cacheFile{CheckedAt: now, Latest: rel.Tag}); err == nil {
+		if data, err := json.Marshal(cacheFile{CheckedAt: now, Latest: rel.Tag, Channel: ch}); err == nil {
 			_ = os.MkdirAll(filepath.Dir(cp), 0o755)
 			_ = os.WriteFile(cp, data, 0o644)
 		}
