@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -98,6 +97,9 @@ func LoadConfig() (Config, error) {
 	if err := dec.Decode(&cfg); err != nil {
 		return DefaultConfig, fmt.Errorf("%s: %w", p, err)
 	}
+	if _, err := dec.Token(); err != io.EOF {
+		return DefaultConfig, fmt.Errorf("%s: unexpected data after the JSON object", p)
+	}
 	return validate(cfg, p)
 }
 
@@ -105,6 +107,8 @@ func LoadConfig() (Config, error) {
 // default. p names the file in the error messages.
 func validate(cfg Config, p string) (Config, error) {
 	switch cfg.AutoUpdate {
+	case "": // absent or empty: the default, like every other zero value
+		cfg.AutoUpdate = DefaultConfig.AutoUpdate
 	case "check", "auto", "off":
 	default:
 		return DefaultConfig, fmt.Errorf("%s: auto_update %q (want check, auto or off)", p, cfg.AutoUpdate)
@@ -258,6 +262,13 @@ func latestBeta(ctx context.Context, client *http.Client) (*Release, error) {
 			best = b.release()
 		}
 	}
+	// The page holds the newest releases in publication order, so the release GitHub calls
+	// the latest one can fall outside it (a maintenance line publishing after a newer line
+	// went stable). Fold it in, or beta would stop being a superset of stable and could
+	// answer with an older version than stable does.
+	if rel, err := latestStable(ctx, client); err == nil && (best == nil || Compare(rel.Tag, best.Tag) > 0) {
+		best = rel
+	}
 	if best == nil {
 		return nil, fmt.Errorf("latest release: no published release with a version tag among the newest %d", releaseListSize)
 	}
@@ -282,13 +293,8 @@ func Compare(a, b string) int {
 		return 1
 	}
 	for i := 1; i <= 3; i++ {
-		x, _ := strconv.Atoi(ma[i])
-		y, _ := strconv.Atoi(mb[i])
-		if x != y {
-			if x < y {
-				return -1
-			}
-			return 1
+		if c := compareNum(ma[i], mb[i]); c != 0 {
+			return c
 		}
 	}
 	switch {

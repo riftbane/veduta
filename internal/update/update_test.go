@@ -258,6 +258,65 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
+func TestLoadConfigRejectsTrailingData(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("APPDATA", dir)
+	t.Setenv("HOME", dir)
+	base, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(base, "veduta", "config.json")
+	os.MkdirAll(filepath.Dir(file), 0o755)
+	os.WriteFile(file, []byte(`{"channel":"beta"}{"channel":"stable"}`), 0o644)
+	if _, err := LoadConfig(); err == nil || !strings.Contains(err.Error(), "unexpected data") {
+		t.Fatalf("err = %v, want one about data after the object", err)
+	}
+}
+
+// TestConfigZeroValues pins the documented rule: a field left at its zero value takes its
+// default, which is also what lets SaveConfig write a configuration built in Go.
+func TestConfigZeroValues(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("APPDATA", dir)
+	t.Setenv("HOME", dir)
+	base, _ := os.UserConfigDir()
+	file := filepath.Join(base, "veduta", "config.json")
+	os.MkdirAll(filepath.Dir(file), 0o755)
+	os.WriteFile(file, []byte(`{"auto_update":"","check_interval_hours":0,"channel":""}`), 0o644)
+	if cfg, err := LoadConfig(); err != nil || cfg != DefaultConfig {
+		t.Fatalf("zero values: %+v %v", cfg, err)
+	}
+	if _, err := SaveConfig(Config{Channel: ChannelBeta}); err != nil {
+		t.Fatalf("SaveConfig of a fresh Config: %v", err)
+	}
+	if cfg, err := LoadConfig(); err != nil || cfg.Channel != ChannelBeta || cfg.AutoUpdate != DefaultConfig.AutoUpdate {
+		t.Fatalf("after saving: %+v %v", cfg, err)
+	}
+}
+
+// TestLatestBetaFoldsInStable covers the case the release list cannot show: a maintenance
+// line publishing after a newer line went stable pushes the stable release out of the
+// page, and beta must still be a superset of stable rather than answer with less.
+func TestLatestBetaFoldsInStable(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/"+Repo+"/releases", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode([]map[string]any{{"tag_name": "v0.9.30", "draft": false, "assets": []map[string]string{}}})
+	})
+	mux.HandleFunc("/repos/"+Repo+"/releases/latest", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"tag_name": "v1.0.0", "assets": []map[string]string{}})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	useServer(t, srv)
+	rel, err := Latest(context.Background(), srv.Client(), ChannelBeta)
+	if err != nil || rel.Tag != "v1.0.0" {
+		t.Fatalf("beta = %+v, %v, want v1.0.0 (the stable release outside the list)", rel, err)
+	}
+}
+
 func TestLatestChannels(t *testing.T) {
 	for _, c := range []struct {
 		name    string
