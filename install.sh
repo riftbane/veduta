@@ -119,6 +119,16 @@ if [ -z "$version" ]; then
 				i = index(t, "-")
 				if (i) { pre = substr(t, i + 1); t = substr(t, 1, i - 1) }
 				if (t !~ /^[0-9]+\.[0-9]+\.[0-9]+$/) next
+				if (pre != "~") {
+					# Pad the numeric identifiers of the suffix too, or rc.9 would sort
+					# after rc.10.
+					n = split(pre, q, ".")
+					pre = ""
+					for (j = 1; j <= n; j++) {
+						if (q[j] ~ /^[0-9]+$/) q[j] = sprintf("%010d", q[j])
+						pre = pre (j > 1 ? "." : "") q[j]
+					}
+				}
 				split(t, p, ".")
 				printf "%010d%010d%010d%s %s\n", p[1], p[2], p[3], pre, tag
 			}' | LC_ALL=C sort -r | head -n 1 | cut -d" " -f2)"
@@ -208,4 +218,11 @@ fi
 # 7. Doctor and next steps.
 "$prefix/veduta" doctor || true
 say ""
+if [ "$channel" != stable ]; then
+	# Installing from a channel does not subscribe to it: the tool reads its own
+	# configuration, which only it writes.
+	say "This is a $channel build. To keep receiving $channel releases:"
+	say "  veduta update --channel $channel"
+	say ""
+fi
 say "Next: veduta init mygame && cd mygame && claude"
