@@ -80,7 +80,10 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sh -n install.sh
-          sh install.sh --channel nightly 2>&1 | grep -q 'want stable or beta'
+          # The installer exits non-zero here on purpose, and this step runs with
+          # pipefail: take its output first, then look at it.
+          out="$(sh install.sh --channel nightly 2>&1 || true)"
+          printf '%s\n' "$out" | grep -q 'want stable or beta'
           for ch in stable beta; do
             sh install.sh --channel "$ch" --prefix "$RUNNER_TEMP/inst-$ch" --no-go --yes
             "$RUNNER_TEMP/inst-$ch/veduta" version
