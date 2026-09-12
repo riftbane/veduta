@@ -182,7 +182,31 @@ Factual log for the human reviewer. One section per phase of `SPEC-v0.1.0.md` §
   `demo_v0.1.0_linux_amd64.tar.gz` and `demo_v0.1.0_windows_amd64.zip` (checksums OK,
   the Linux binary simulates headless from the extracted folder). That upgrade exposed a
   missing blank line in the changelog entry, fixed after the tag (Unreleased).
-- **For the human** (needs real desktops): download the demo's v0.1.0 archives from
+- **For the human** (needs real desktops, first): download the demo's v0.1.0 archives from
   https://github.com/riftbane/veduta-demo/releases, run them on Windows 10/11 and on a
   Linux desktop and go through the phase 7 checklist (1280×720 window, 60 fps, WASD, gem
   collection, clean close).
+
+## After v0.1.0 (2026-09-12)
+
+- **First person.** `Input.MouseDelta` (the movement of one tick, derived from the
+  positions a window or a scenario already gave, so no format changed),
+  `scene.Camera.LookFrom`, `Context.LockPointer` with the cursor hidden and recentred by
+  both player windows, and a demo that switches view with `KeyF`. Verified here by
+  `go test ./...`, the new `look` scenario and its golden contact sheet
+  (`testdata/golden/scenario_look_sheet.png`, looked at), and in CI by the display smoke
+  tests, which now lock and unlock a real window under Xvfb and on windows-latest.
+- **Beta release channel.** `veduta update --channel beta` and `install.sh --channel beta`
+  follow release candidates; `channel` in `~/.config/veduta/config.json` records the
+  choice (`docs/config.md`); tags with a suffix are published as pre-releases; pre-release
+  suffixes are ordered as SemVer does. Verified here: `go test ./internal/update/
+  ./internal/cli/`; `install.sh` resolving both channels against the real GitHub API (beta
+  answers `v0.1.0`, not the older `v0.1.0-rc.1`, which is the invariant that makes opting
+  in safe) and installing what it resolved; `veduta release v0.2.0-rc.1 --dry-run` refused
+  with exit 2. CI installs from both channels and runs the binary it got.
+- **Before any candidate is cut** (the ordering this forces): a configuration naming a
+  channel is unreadable to an older tool, because unknown keys are errors. So this work
+  must first ship in a stable release (v0.2.0) that users reach through the stable
+  channel; only then tag `v0.2.1-rc.1` by hand and walk the rehearsal — `veduta update
+  --check --channel beta` (saves nothing), `veduta update --channel beta`, `veduta
+  doctor`, `veduta update --channel stable --force` — recording the output here.

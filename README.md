@@ -24,7 +24,9 @@ curl -fsSL https://raw.githubusercontent.com/riftbane/veduta/main/install.sh | s
 The installer downloads the `veduta` tool from GitHub Releases (SHA-256 verified) into
 `~/.local/bin`, installs Go ≥ 1.25 into `~/.local/go` when it is missing (`--with-go`,
 default when non-interactive; `--no-go` to skip), checks git and runs `veduta doctor`.
-Flags: `--prefix DIR`, `--version vX.Y.Z`, `--with-go`, `--no-go`, `--yes`.
+Flags: `--prefix DIR`, `--version vX.Y.Z`, `--channel stable|beta`, `--with-go`, `--no-go`,
+`--yes`; `$VEDUTA_VERSION` and `$VEDUTA_CHANNEL` set the first two without flags. The beta
+channel installs release candidates as well as releases.
 
 ## Quick start
 
@@ -56,7 +58,7 @@ its GitHub Actions workflow publishes Linux and Windows archives.
 | `veduta fuzz --scene S --games N --ticks T --seed N` | random games; minimized repro of the first violation |
 | `veduta release vX.Y.Z [--dry-run]` | checklist → CHANGELOG → tag → push (CI publishes) |
 | `veduta mcp` | MCP server on stdio for AI agents |
-| `veduta update [--check]` | update the tool from GitHub Releases |
+| `veduta update [--check] [--force] [--channel stable\|beta]` | update the tool from GitHub Releases; beta also offers release candidates |
 | `veduta upgrade` | move the project to the tool's engine version |
 | `veduta version` | version, commit, build date |
 
@@ -84,7 +86,8 @@ contains game logic.
 Format references (also served by the MCP `docs` tool): [model](docs/model.md),
 [texture](docs/texture.md), [material](docs/material.md), [scene](docs/scene.md),
 [scenario](docs/scenario.md), [game API](docs/api.md), [project manifest](docs/project.md),
-[.vda container](docs/vda.md), [inspection](docs/inspect.md).
+[.vda container](docs/vda.md), [inspection](docs/inspect.md),
+[tool configuration](docs/config.md).
 
 ## Repository layout
 
@@ -112,10 +115,17 @@ implemented in Go with explicit rounding, so it matches on every architecture.
 ## Updates
 
 `~/.config/veduta/config.json`: `{"auto_update": "check" | "auto" | "off",
-"check_interval_hours": 24}` (default `check`). `veduta doctor` and the MCP `status`
-tool report available updates (checked at most once per interval, 3 s timeout, offline
-safe); in `auto` mode `veduta mcp` updates itself before serving. Updating the tool never
-changes a project; `veduta upgrade` does, explicitly.
+"check_interval_hours": 24, "channel": "stable" | "beta"}` (defaults `check`, 24,
+`stable`). `veduta doctor` and the MCP `status` tool report available updates on the
+configured channel (checked at most once per interval, 3 s timeout, offline safe); in
+`auto` mode `veduta mcp` updates itself before serving.
+
+The beta channel offers release candidates as well as releases, so it always answers with
+whichever is newer: `veduta update --channel beta` installs one and follows beta from then
+on, `veduta update --check --channel beta` only previews it, and
+`veduta update --channel stable --force` goes back (`--force` because that is a
+downgrade). See [configuration](docs/config.md). Updating the tool never changes a
+project; `veduta upgrade` does, explicitly.
 
 ## Status
 

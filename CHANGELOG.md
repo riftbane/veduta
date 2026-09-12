@@ -18,10 +18,52 @@ All notable changes to this project are documented here. The format follows
   empty cursor, Win32 hides it and recenters it), so looking around never stops at the
   edge of the screen; headless runs ignore it.
 
+- A beta release channel: `veduta update --channel beta` follows release candidates and
+  `veduta update --channel stable --force` goes back, `install.sh --channel beta` (or
+  `$VEDUTA_CHANNEL`) installs one, and `channel` in `~/.config/veduta/config.json` says
+  which one the tool follows (`docs/config.md`). Tags with a pre-release suffix are now
+  published as pre-releases, so a candidate never reaches anyone who did not ask for one.
+
 ### Fixed
 
 - `veduta upgrade` right after a release wrote its changelog entry directly above the
   release heading, without a blank line.
+- Pre-release suffixes were ordered as plain strings, so `v0.2.0-rc.10` sorted before
+  `v0.2.0-rc.2`. They now follow SemVer §11.4, which also changes which tags
+  `veduta release` accepts.
+
+### Decisions
+
+The specification of v0.1.0 is left as it shipped; these extend §13 and are recorded here.
+
+- **Release channels.** `stable` takes the release GitHub marks as the latest one (never a
+  pre-release); `beta` takes the newest of every published release, candidates included.
+  Beta is therefore a superset that answers with a stable release whenever that is the
+  newer one, so opting in can never hand back an older binary and a beta user is never
+  stranded on an abandoned candidate. The channel is recorded in the update cache as well:
+  an answer from the other channel is a miss, not a stale hit.
+- **`--channel` is a subscription.** It is saved to the configuration, because a binary
+  that went back to stable while the configuration still said beta would be pulled onto a
+  candidate again by the next automatic update. It is saved only when a release is really
+  installed, so `--check` previews another channel without changing anything.
+- **Downgrades stay explicit.** Leaving beta for an older stable release needs `--force`,
+  the flag that already meant "reinstall even when up to date"; `auto` mode never
+  downgrades and never crosses channels.
+- **The channel key ships before the first candidate.** Configuration parsing rejects
+  unknown keys, so a configuration naming a channel is unreadable to an older tool: the
+  feature must be in a stable release everyone can reach before a beta tag is cut from
+  that line, and going back below it means deleting the key.
+- **An empty channel is the default one.** `"channel": ""` means stable rather than being
+  an error, unlike `auto_update`, following the zero-value convention of the source
+  formats; it is also what lets a cache file written before channels existed still read.
+- **Pre-release tags are cut by hand.** `veduta release` refuses them, because its
+  checklist moves the changelog's Unreleased section into the tag being released and a
+  candidate would consume the section the release itself needs.
+- **install.sh picks the highest version, not the first.** The release list does not
+  arrive in version order, so the installer sorts with `awk`, ranking a release ahead of
+  its own candidates. Between candidates of one version the comparison is textual — the
+  only place where the installer and the tool can disagree, and the first `veduta update`
+  reconciles it.
 
 ## v0.1.0 — 2026-09-11
 
