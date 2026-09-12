@@ -314,7 +314,12 @@ func comparePre(a, b string) int {
 		}
 		switch {
 		case isNum(x) && isNum(y):
-			return compareNum(x, y)
+			// Equal in value but not as text ("007" and "7"): keep going, the next
+			// identifier decides.
+			if c := compareNum(x, y); c != 0 {
+				return c
+			}
+			continue
 		case isNum(x):
 			return -1
 		case isNum(y):

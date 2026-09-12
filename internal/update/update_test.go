@@ -33,6 +33,8 @@ func TestCompare(t *testing.T) {
 		{"v0.2.0-alpha.1", "v0.2.0-beta.1", -1}, {"v0.2.0-rc", "v0.2.0-rc.1", -1},
 		{"v0.2.0-rc.1", "v0.2.0-rc.1.1", -1}, {"v0.2.0-1", "v0.2.0-alpha", -1},
 		{"v0.2.0-rc.1", "v0.2.0-rc.1", 0}, {"v0.2.0-rc.007", "v0.2.0-rc.7", 0},
+		// Identifiers equal in value but not as text must not end the comparison.
+		{"v0.2.0-rc.007.1", "v0.2.0-rc.7.2", -1}, {"v0.2.0-rc.7.2", "v0.2.0-rc.007.10", -1},
 	}
 	for _, c := range cases {
 		if got := Compare(c.a, c.b); got != c.want {
