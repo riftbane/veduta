@@ -54,4 +54,9 @@ jobs:
       - name: publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" --generate-notes dist/*
+        run: |
+          # A tag with a pre-release suffix (v0.2.0-rc.1) is published as a pre-release, so
+          # GitHub keeps it out of /releases/latest and only the beta channel offers it.
+          pre=""
+          case "${GITHUB_REF_NAME}" in *-*) pre="--prerelease" ;; esac
+          gh release create "${GITHUB_REF_NAME}" $pre --generate-notes dist/*
