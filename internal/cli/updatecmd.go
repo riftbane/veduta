@@ -23,11 +23,20 @@ type UpdateReport struct {
 	Available bool           `json:"available"`
 	Downgrade bool           `json:"downgrade"` // the channel's newest release is older than this build
 	Updated   bool           `json:"updated"`
+	Warnings  []string       `json:"warnings"`
 	Result    *update.Result `json:"result,omitempty"`
 }
 
-// Human prints one line.
+// Human prints one line, after any warning.
 func (r *UpdateReport) Human() string {
+	var b strings.Builder
+	for _, w := range r.Warnings {
+		fmt.Fprintln(&b, "warning:", w)
+	}
+	return b.String() + r.line()
+}
+
+func (r *UpdateReport) line() string {
 	cmd := "veduta update"
 	if r.Channel != r.Following { // previewing another channel: the flag is part of the command
 		cmd += " --channel " + r.Channel
@@ -48,10 +57,7 @@ func (r *UpdateReport) Human() string {
 // but the configuration is written only when a release is actually installed, so --check
 // stays a preview.
 func Update(ctx context.Context, env *Env, channel string, check, force bool) (*UpdateReport, error) {
-	cfg, err := update.LoadConfig()
-	if err != nil && channel == "" {
-		return nil, err // an explicit channel still works with a broken configuration
-	}
+	cfg, cfgErr := update.LoadConfig()
 	following := cfg.Channel
 	if following == "" {
 		following = update.ChannelStable
@@ -59,13 +65,33 @@ func Update(ctx context.Context, env *Env, channel string, check, force bool) (*
 	if channel == "" {
 		channel = following
 	}
+	// Naming another channel subscribes to it, which means writing the configuration.
+	subscribe := !check && channel != following
+	if cfgErr != nil && subscribe {
+		// LoadConfig hands back the defaults with its error, so saving now would replace
+		// whatever the file holds with them. Refuse before the binary is touched.
+		return nil, fmt.Errorf("%w (fix it, or drop --channel to update on the %s channel)", cfgErr, following)
+	}
+	r := &UpdateReport{Current: env.Version, Channel: channel, Following: following, Warnings: []string{}}
+	if cfgErr != nil {
+		r.Warnings = append(r.Warnings, fmt.Sprintf("%v; following the %s channel", cfgErr, following))
+	}
+	if subscribe {
+		// Saved before installing: the subscription is what was asked for, and a failed
+		// install must not be able to lose it (nor a failed write to undo an install).
+		cfg.Channel = channel
+		if _, err := update.SaveConfig(cfg); err != nil {
+			return nil, err
+		}
+		r.Following = channel
+	}
 	client := &http.Client{Timeout: 60 * time.Second}
 	rel, err := update.Latest(ctx, client, channel)
 	if err != nil {
 		return nil, err
 	}
 	c := update.Compare(env.Version, rel.Tag)
-	r := &UpdateReport{Current: env.Version, Channel: channel, Following: following, Latest: rel.Tag, Available: c < 0, Downgrade: c > 0}
+	r.Latest, r.Available, r.Downgrade = rel.Tag, c < 0, c > 0
 	if check || (!r.Available && !force) {
 		return r, nil
 	}
@@ -81,15 +107,6 @@ func Update(ctx context.Context, env *Env, channel string, check, force bool) (*
 		return nil, err
 	}
 	r.Updated, r.Result = true, res
-	if channel != following {
-		// The channel is a subscription, not a one-off: keep it, or the next automatic
-		// update would follow the old one again.
-		cfg.Channel = channel
-		if _, err := update.SaveConfig(cfg); err != nil {
-			return nil, err
-		}
-		r.Following = channel
-	}
 	return r, nil
 }
 
@@ -208,12 +225,12 @@ func init() {
 			return Check{Name: "update", OK: false, Detail: err.Error(), Fix: "fix ~/.config/veduta/config.json"}
 		}
 		if cfg.AutoUpdate == "off" {
-			return Check{Name: "update", OK: true, Detail: "update checks disabled (auto_update: off)"}
+			return Check{Name: "update", OK: true, Detail: fmt.Sprintf("update checks disabled (auto_update: off; channel %s)", cfg.Channel)}
 		}
 		st := update.Check(context.Background(), env.Version, cfg.Channel, time.Duration(cfg.CheckIntervalHours)*time.Hour, time.Now())
 		switch {
 		case st.Error != "":
-			return Check{Name: "update", OK: true, Detail: "could not check for updates: " + st.Error}
+			return Check{Name: "update", OK: true, Detail: fmt.Sprintf("could not check the %s channel for updates: %s", st.Channel, st.Error)}
 		case st.Available:
 			// doctor prints the fix only for a failing check, so the call to action goes
 			// in the detail; Fix stays for --json and the MCP status tool.

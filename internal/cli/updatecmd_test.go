@@ -2,11 +2,96 @@ package cli
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/riftbane/veduta/internal/update"
 )
+
+// fakeReleases points the update package at a server offering one release on both routes,
+// and redirects the configuration and cache directories to a temporary one, which it
+// returns.
+func fakeReleases(t *testing.T, tag string) string {
+	t.Helper()
+	mux := http.NewServeMux()
+	body := map[string]any{"tag_name": tag, "draft": false, "assets": []map[string]string{}}
+	mux.HandleFunc("/repos/"+update.Repo+"/releases/latest", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(body)
+	})
+	mux.HandleFunc("/repos/"+update.Repo+"/releases", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode([]map[string]any{body})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	old := update.APIBase
+	update.APIBase = srv.URL
+	t.Cleanup(func() { update.APIBase = old })
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("APPDATA", dir)
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(dir, "cache"))
+	t.Setenv("LOCALAPPDATA", filepath.Join(dir, "cache"))
+	return dir
+}
+
+// TestUpdateKeepsAnUnreadableConfig checks that naming a channel refuses rather than
+// replacing a configuration it could not read, and that a run which writes nothing still
+// works and says what is wrong.
+func TestUpdateKeepsAnUnreadableConfig(t *testing.T) {
+	dir := fakeReleases(t, "v9.9.9")
+	p := filepath.Join(dir, "veduta", "config.json")
+	os.MkdirAll(filepath.Dir(p), 0o755)
+	before := []byte(`{"auto_update":"off","check_interval_hours":168,"chanel":"beta"}`)
+	os.WriteFile(p, before, 0o644)
+
+	if _, err := Update(context.Background(), &Env{Version: "v0.1.0"}, "beta", false, false); err == nil {
+		t.Fatal("a configuration that could not be read was accepted for rewriting")
+	}
+	after, _ := os.ReadFile(p)
+	if !bytes.Equal(after, before) {
+		t.Fatalf("configuration changed:\n got %s\nwant %s", after, before)
+	}
+	r, err := Update(context.Background(), &Env{Version: "v0.1.0"}, "", true, false)
+	if err != nil || r.Latest != "v9.9.9" || len(r.Warnings) == 0 {
+		t.Fatalf("check with an unreadable configuration: %+v %v", r, err)
+	}
+	if after, _ := os.ReadFile(p); !bytes.Equal(after, before) {
+		t.Fatalf("a check wrote to the configuration: %s", after)
+	}
+}
+
+// TestUpdateSubscribesWithoutInstalling checks that naming a channel takes effect even
+// when its newest release is the one already running, and that --check never does.
+func TestUpdateSubscribesWithoutInstalling(t *testing.T) {
+	dir := fakeReleases(t, "v9.9.9")
+	p := filepath.Join(dir, "veduta", "config.json")
+
+	r, err := Update(context.Background(), &Env{Version: "v9.9.9"}, "beta", true, false)
+	if err != nil || r.Updated || r.Following != update.ChannelStable {
+		t.Fatalf("preview: %+v %v", r, err)
+	}
+	if _, err := os.Stat(p); err == nil {
+		t.Fatal("--check wrote the configuration")
+	}
+	r, err = Update(context.Background(), &Env{Version: "v9.9.9"}, "beta", false, false)
+	if err != nil || r.Updated || r.Available {
+		t.Fatalf("nothing to install: %+v %v", r, err)
+	}
+	if r.Following != update.ChannelBeta {
+		t.Fatalf("report follows %q, want beta", r.Following)
+	}
+	cfg, err := update.LoadConfig()
+	if err != nil || cfg.Channel != update.ChannelBeta {
+		t.Fatalf("configuration after subscribing: %+v %v", cfg, err)
+	}
+}
 
 func TestUpdateReportHuman(t *testing.T) {
 	for _, c := range []struct {

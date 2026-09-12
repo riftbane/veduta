@@ -25,8 +25,10 @@ The installer downloads the `veduta` tool from GitHub Releases (SHA-256 verified
 `~/.local/bin`, installs Go ≥ 1.25 into `~/.local/go` when it is missing (`--with-go`,
 default when non-interactive; `--no-go` to skip), checks git and runs `veduta doctor`.
 Flags: `--prefix DIR`, `--version vX.Y.Z`, `--channel stable|beta`, `--with-go`, `--no-go`,
-`--yes`; `$VEDUTA_VERSION` and `$VEDUTA_CHANNEL` set the first two without flags. The beta
-channel installs release candidates as well as releases.
+`--yes`; `$VEDUTA_VERSION` and `$VEDUTA_CHANNEL` set `--version` and `--channel` without
+flags, `$VEDUTA_HOME` sets the prefix (`$VEDUTA_HOME/bin`). The beta channel installs
+release candidates as well as releases; to keep following it afterwards, run
+`veduta update --channel beta` once.
 
 ## Quick start
 

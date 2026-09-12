@@ -53,9 +53,15 @@ The specification of v0.1.0 is left as it shipped; these extend §13 and are rec
   unknown keys, so a configuration naming a channel is unreadable to an older tool: the
   feature must be in a stable release everyone can reach before a beta tag is cut from
   that line, and going back below it means deleting the key.
-- **An empty channel is the default one.** `"channel": ""` means stable rather than being
-  an error, unlike `auto_update`, following the zero-value convention of the source
-  formats; it is also what lets a cache file written before channels existed still read.
+- **Zero values take their default.** `"channel": ""` means stable and `"auto_update": ""`
+  means check, following the convention of the source formats; it is also what lets a
+  cache file written before channels existed still read as a stable answer. An unknown
+  key, or a value that names nothing, stays an error.
+- **A configuration that cannot be read is never rewritten.** `--channel` has to save the
+  choice, so it refuses outright rather than replacing the file with defaults and silently
+  dropping settings; without `--channel` the command still runs and reports the problem.
+  The choice is saved before installing, so a failed install cannot lose it and a failed
+  save cannot undo an install.
 - **Pre-release tags are cut by hand.** `veduta release` refuses them, because its
   checklist moves the changelog's Unreleased section into the tag being released and a
   candidate would consume the section the release itself needs.

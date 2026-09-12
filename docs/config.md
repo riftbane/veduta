@@ -46,8 +46,11 @@ veduta update --channel beta            # install it and follow beta from now on
 veduta update --channel stable --force  # go back; --force because it is a downgrade
 ```
 
-The channel is saved only when a release is actually installed, so `--check` stays a
-preview. `veduta update` never downgrades on its own: when this build is newer than its
+Naming a channel saves it, even when there is nothing to install; `--check` never writes,
+so it stays a preview. `install.sh --channel beta` only installs a beta build — the
+configuration is the tool's own, so run `veduta update --channel beta` once to keep
+receiving them. When the file cannot be read, naming a channel is refused rather than
+overwriting it with defaults; without `--channel` the command still works and says why. `veduta update` never downgrades on its own: when this build is newer than its
 channel's newest release — after leaving beta, say — it says so and installs nothing until
 `--force` is given. Automatic updates (`auto_update: auto`) follow the configured channel
 and never downgrade.
