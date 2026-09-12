@@ -6,7 +6,8 @@
 #
 # Flags:
 #   --prefix DIR   install directory (default: $VEDUTA_HOME/bin or ~/.local/bin)
-#   --version V    release to install (default: $VEDUTA_VERSION or the latest)
+#   --version V    release to install (default: $VEDUTA_VERSION, or the newest in the channel)
+#   --channel C    release channel: stable (default) or beta, which includes candidates
 #   --with-go      install Go into ~/.local/go when it is missing or older than 1.25
 #   --no-go        never install Go
 #   --yes          do not ask questions
@@ -19,6 +20,7 @@ GO_MIN_MINOR=25
 
 prefix=""
 version="${VEDUTA_VERSION:-}"
+channel="${VEDUTA_CHANNEL:-stable}"
 with_go=""
 assume_yes=""
 
@@ -31,6 +33,8 @@ while [ $# -gt 0 ]; do
 	--prefix=*) prefix="${1#*=}"; shift ;;
 	--version) [ $# -ge 2 ] || die "--version needs a value"; version="$2"; shift 2 ;;
 	--version=*) version="${1#*=}"; shift ;;
+	--channel) [ $# -ge 2 ] || die "--channel needs a value"; channel="$2"; shift 2 ;;
+	--channel=*) channel="${1#*=}"; shift ;;
 	--with-go) with_go="yes"; shift ;;
 	--no-go) with_go="no"; shift ;;
 	--yes|-y) assume_yes="yes"; shift ;;
@@ -38,6 +42,11 @@ while [ $# -gt 0 ]; do
 	*) die "unknown flag $1 (try --help)" ;;
 	esac
 done
+
+case "$channel" in
+stable | beta) ;;
+*) die "unknown channel $channel (want stable or beta)" ;;
+esac
 
 # 1. Platform.
 os="$(uname -s)"
@@ -84,8 +93,39 @@ trap 'rm -rf "$tmp"' EXIT INT TERM
 
 # 2. Version.
 if [ -z "$version" ]; then
-	version="$(fetch_stdout "https://api.github.com/repos/$REPO/releases/latest" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
-	[ -n "$version" ] || die "could not find the latest release (GitHub API unreachable?); pass --version vX.Y.Z"
+	# The beta channel reads the whole list, which includes pre-releases; GitHub returns
+	# it newest first. The stable endpoint never answers with a pre-release.
+	if [ "$channel" = beta ]; then
+		url="https://api.github.com/repos/$REPO/releases?per_page=30"
+	else
+		url="https://api.github.com/repos/$REPO/releases/latest"
+	fi
+	# One JSON field per line before matching: the answer may arrive as a single line,
+	# where a greedy match would take the last tag_name instead of the first, and where
+	# the first field would still carry the opening [ and {. The anchor then keeps an
+	# escaped \"tag_name\" inside release notes from matching.
+	tags="$(fetch_stdout "$url" | tr ',{[' '\n\n\n' | sed -n 's/^[[:space:]]*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+	if [ "$channel" = beta ]; then
+		# The list is not in version order, so take the highest version rather than the
+		# first: major, minor and patch as numbers, and a release ahead of its own
+		# candidates (~ sorts after every letter and digit). Among candidates of one
+		# version the comparison is textual, which the tool itself then corrects.
+		version="$(printf '%s\n' "$tags" | awk '
+			{
+				tag = $0
+				t = tag
+				sub(/^v/, "", t)
+				pre = "~"
+				i = index(t, "-")
+				if (i) { pre = substr(t, i + 1); t = substr(t, 1, i - 1) }
+				if (t !~ /^[0-9]+\.[0-9]+\.[0-9]+$/) next
+				split(t, p, ".")
+				printf "%010d%010d%010d%s %s\n", p[1], p[2], p[3], pre, tag
+			}' | LC_ALL=C sort -r | head -n 1 | cut -d" " -f2)"
+	else
+		version="$(printf '%s\n' "$tags" | head -n 1)"
+	fi
+	[ -n "$version" ] || die "could not find the newest $channel release (GitHub API unreachable?); pass --version vX.Y.Z"
 fi
 case "$version" in v[0-9]*) ;; *) version="v$version" ;; esac
 
