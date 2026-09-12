@@ -1,7 +1,7 @@
 {
   "veduta": "project/1",
   "name": "demo",
-  "engine": "v0.1.0",
+  "engine": "v0.2.0",
   "entry": "./cmd/game",
   "resolution": [1280, 720],
   "inspect_resolution": [640, 360],
