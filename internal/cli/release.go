@@ -77,6 +77,11 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 	if !update.IsVersion(o.Version) {
 		return nil, usagef("release: %q is not a version like v0.1.0", o.Version)
 	}
+	if strings.Contains(o.Version, "-") {
+		// The checklist moves the changelog's Unreleased section into the version being
+		// released; a candidate would eat the section the release itself needs.
+		return nil, usagef("release: %s is a pre-release; tag it by hand (git tag %s && git push origin %s), which keeps the Unreleased section for the release", o.Version, o.Version, o.Version)
+	}
 	dir := projectDir
 	if dir == "" {
 		dir, _ = os.Getwd()
