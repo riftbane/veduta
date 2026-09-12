@@ -141,7 +141,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 	tools := []mcp.Tool{
 		{
 			Name:        "status",
-			Description: "Versions (tool, engine, project), project summary, cooked and stale assets, the last build result of this session and update availability. Call it first.",
+			Description: "Versions (tool, engine, project), project summary, cooked and stale assets, the last build result of this session and update availability on the configured release channel. Call it first.",
 			InputSchema: schema(map[string]any{}),
 			Handler: withSession(func(ctx context.Context, s *Session, args json.RawMessage) (*mcp.Result, error) {
 				var a struct{}
@@ -560,7 +560,7 @@ func init() {
 			if res, err := autoUpdate(env); err != nil {
 				fmt.Fprintln(env.Stderr, "veduta mcp: update skipped:", err)
 			} else if res != nil {
-				fmt.Fprintf(env.Stderr, "veduta mcp: updated %s → %s, restarting\n", res.From, res.To)
+				fmt.Fprintf(env.Stderr, "veduta mcp: updated %s → %s on the %s channel, restarting\n", res.Result.From, res.Result.To, res.Channel)
 				if err := execSelf(); err != nil {
 					fmt.Fprintln(env.Stderr, "veduta mcp: restart failed, serving with the old binary:", err)
 				}

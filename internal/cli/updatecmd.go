@@ -17,35 +17,55 @@ import (
 // UpdateReport is the result of update.
 type UpdateReport struct {
 	Current   string         `json:"current"`
+	Channel   string         `json:"channel"`   // the channel this run followed
+	Following string         `json:"following"` // the channel the configuration names
 	Latest    string         `json:"latest"`
 	Available bool           `json:"available"`
+	Downgrade bool           `json:"downgrade"` // the channel's newest release is older than this build
 	Updated   bool           `json:"updated"`
 	Result    *update.Result `json:"result,omitempty"`
 }
 
 // Human prints one line.
 func (r *UpdateReport) Human() string {
+	cmd := "veduta update"
+	if r.Channel != r.Following { // previewing another channel: the flag is part of the command
+		cmd += " --channel " + r.Channel
+	}
 	switch {
 	case r.Updated:
-		return fmt.Sprintf("updated %s → %s (%s verified, sha256 %s)\n", r.Result.From, r.Result.To, r.Result.Archive, r.Result.SHA256)
+		return fmt.Sprintf("updated %s → %s on the %s channel (%s verified, sha256 %s)\n", r.Result.From, r.Result.To, r.Channel, r.Result.Archive, r.Result.SHA256)
 	case r.Available:
-		return fmt.Sprintf("%s is available (current %s): run veduta update\n", r.Latest, r.Current)
+		return fmt.Sprintf("%s is available on the %s channel (current %s): run %s\n", r.Latest, r.Channel, r.Current, cmd)
+	case r.Downgrade:
+		return fmt.Sprintf("%s is the newest %s release, older than this build (%s): run %s --force to go back\n", r.Latest, r.Channel, r.Current, cmd)
 	}
-	return fmt.Sprintf("up to date (%s, latest release %s)\n", r.Current, r.Latest)
+	return fmt.Sprintf("up to date (%s, newest %s release %s)\n", r.Current, r.Channel, r.Latest)
 }
 
-// Update checks for (and, unless check is set, installs) the latest release of the tool.
-func Update(ctx context.Context, env *Env, check, force bool) (*UpdateReport, error) {
+// Update checks for (and, unless check is set, installs) the newest release of the tool on
+// a channel. An empty channel means the configured one; naming one follows it from then on,
+// but the configuration is written only when a release is actually installed, so --check
+// stays a preview.
+func Update(ctx context.Context, env *Env, channel string, check, force bool) (*UpdateReport, error) {
 	cfg, err := update.LoadConfig()
-	if err != nil {
-		return nil, err
+	if err != nil && channel == "" {
+		return nil, err // an explicit channel still works with a broken configuration
+	}
+	following := cfg.Channel
+	if following == "" {
+		following = update.ChannelStable
+	}
+	if channel == "" {
+		channel = following
 	}
 	client := &http.Client{Timeout: 60 * time.Second}
-	rel, err := update.Latest(ctx, client, cfg.Channel)
+	rel, err := update.Latest(ctx, client, channel)
 	if err != nil {
 		return nil, err
 	}
-	r := &UpdateReport{Current: env.Version, Latest: rel.Tag, Available: update.Compare(env.Version, rel.Tag) < 0}
+	c := update.Compare(env.Version, rel.Tag)
+	r := &UpdateReport{Current: env.Version, Channel: channel, Following: following, Latest: rel.Tag, Available: c < 0, Downgrade: c > 0}
 	if check || (!r.Available && !force) {
 		return r, nil
 	}
@@ -61,12 +81,21 @@ func Update(ctx context.Context, env *Env, check, force bool) (*UpdateReport, er
 		return nil, err
 	}
 	r.Updated, r.Result = true, res
+	if channel != following {
+		// The channel is a subscription, not a one-off: keep it, or the next automatic
+		// update would follow the old one again.
+		cfg.Channel = channel
+		if _, err := update.SaveConfig(cfg); err != nil {
+			return nil, err
+		}
+		r.Following = channel
+	}
 	return r, nil
 }
 
 // autoUpdate applies an available update when the configuration says auto (spec §13.3).
-// It returns the result when the binary was replaced.
-func autoUpdate(env *Env) (*update.Result, error) {
+// It returns the report when the binary was replaced.
+func autoUpdate(env *Env) (*UpdateReport, error) {
 	cfg, err := update.LoadConfig()
 	if err != nil || cfg.AutoUpdate != "auto" || !update.IsVersion(env.Version) {
 		return nil, err
@@ -75,11 +104,11 @@ func autoUpdate(env *Env) (*update.Result, error) {
 	if !st.Available {
 		return nil, nil
 	}
-	r, err := Update(context.Background(), env, false, false)
+	r, err := Update(context.Background(), env, cfg.Channel, false, false)
 	if err != nil || !r.Updated {
 		return nil, err
 	}
-	return r.Result, nil
+	return r, nil
 }
 
 // UpgradeReport is the result of upgrade.
@@ -186,20 +215,28 @@ func init() {
 		case st.Error != "":
 			return Check{Name: "update", OK: true, Detail: "could not check for updates: " + st.Error}
 		case st.Available:
-			return Check{Name: "update", OK: true, Detail: fmt.Sprintf("%s is available (current %s)", st.Latest, st.Current), Fix: "run veduta update"}
+			// doctor prints the fix only for a failing check, so the call to action goes
+			// in the detail; Fix stays for --json and the MCP status tool.
+			return Check{Name: "update", OK: true, Detail: fmt.Sprintf("%s is available on the %s channel (current %s): run veduta update", st.Latest, st.Channel, st.Current), Fix: "run veduta update"}
+		case st.Downgrade:
+			return Check{Name: "update", OK: true, Detail: fmt.Sprintf("this build is %s, newer than the newest %s release %s: run veduta update --force to go back", st.Current, st.Channel, st.Latest), Fix: "run veduta update --force"}
 		}
-		return Check{Name: "update", OK: true, Detail: fmt.Sprintf("up to date (latest release %s)", st.Latest)}
+		return Check{Name: "update", OK: true, Detail: fmt.Sprintf("up to date on the %s channel (newest release %s)", st.Channel, st.Latest)}
 	}
 	register(command{
-		name: "update", usage: "update [--check] [--force]", summary: "update the tool binary from GitHub Releases (checksum verified, atomic)",
+		name: "update", usage: "update [--check] [--force] [--channel stable|beta]", summary: "update the tool binary from GitHub Releases (checksum verified, atomic)",
 		run: func(env *Env, _ *Session, args []string) (any, error) {
 			fs := newFlags("update", env.Stderr)
 			check := fs.Bool("check", false, "only report whether an update is available")
-			force := fs.Bool("force", false, "reinstall even when up to date or on a dev build")
+			force := fs.Bool("force", false, "reinstall even when up to date, on a dev build, or to go back to an older release")
+			channel := fs.String("channel", "", "release channel to follow from now on: stable or beta (default: the configured one)")
 			if err := parseFlags(fs, args); err != nil {
 				return nil, err
 			}
-			return Update(context.Background(), env, *check, *force)
+			if *channel != "" && !update.ValidChannel(*channel) {
+				return nil, usagef("update: channel %q (want stable or beta)", *channel)
+			}
+			return Update(context.Background(), env, *channel, *check, *force)
 		},
 	})
 	register(command{
