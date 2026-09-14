@@ -2,6 +2,7 @@ package asset
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/riftbane/veduta/gmath"
@@ -14,6 +15,7 @@ func TestParseProjectDefaults(t *testing.T) {
 	}
 	want := DefaultProject
 	want.Name, want.Engine = "mygame", "v0.1.0"
+	want.Title = want.Name // a game that names no title is shown by its name
 	if !reflect.DeepEqual(*p, want) {
 		t.Fatalf("got  %+v\nwant %+v", *p, want)
 	}
@@ -40,6 +42,7 @@ func TestParseProjectSample(t *testing.T) {
 	}
 	want := DefaultProject
 	want.Name, want.Engine = "mygame", "v0.1.0"
+	want.Title = want.Name
 	want.Invariants = []string{"finite_positions", "within_bounds"}
 	if !reflect.DeepEqual(*p, want) {
 		t.Fatalf("got  %+v\nwant %+v", *p, want)
@@ -55,12 +58,41 @@ func TestParseProjectCustom(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Project{Name: "space-race", Engine: "v0.2.0-rc.1+build.7", Entry: ".", Resolution: [2]int{800, 600},
+	want := Project{Name: "space-race", Title: "space-race", Engine: "v0.2.0-rc.1+build.7", Entry: ".", Resolution: [2]int{800, 600},
 		InspectResolution: [2]int{320, 180}, TickRate: 30, DefaultScene: "level_1", DefaultSeed: 99,
 		Assets: "data/src", Cooked: "data/bin", Invariants: []string{"entity_count_max:10", "no_crash"},
 		Bounds: gmath.AABB{Min: gmath.V3(-1, -2, -3), Max: gmath.V3(1, 2, 3)}}
 	if !reflect.DeepEqual(*p, want) {
 		t.Fatalf("got  %+v\nwant %+v", *p, want)
+	}
+}
+
+// TestParseProjectTitleAndIcon covers what a console dashboard shows: a readable name and
+// a picture, neither of which the identifier in name can carry.
+func TestParseProjectTitleAndIcon(t *testing.T) {
+	head := `{"veduta": "project/1", "name": "mygame", "engine": "v0.1.0", `
+	p, err := ParseProject("veduta.json", []byte(head+`"title": "Caverna delle Gemme", "icon": "icon.png"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Title != "Caverna delle Gemme" || p.Icon != "icon.png" {
+		t.Fatalf("title %q icon %q", p.Title, p.Icon)
+	}
+	// An icon may sit in a subdirectory, as long as it stays inside the project.
+	if p, err = ParseProject("veduta.json", []byte(head+`"icon": "art/tile.png"}`)); err != nil || p.Icon != "art/tile.png" {
+		t.Fatalf("icon in a subdirectory: %v %v", p, err)
+	}
+	for _, c := range []struct{ body, errHas string }{
+		{`"title": "` + strings.Repeat("x", 65) + `"`, "want 1 to 64"},
+		{`"title": "two\nlines"`, "cannot be printed"},
+		{`"icon": "icon.jpg"`, "must be a .png file"},
+		{`"icon": "../outside.png"`, "clean relative path"},
+		{`"icon": "/etc/icon.png"`, "must be relative"},
+	} {
+		_, err := ParseProject("veduta.json", []byte(head+c.body+`}`))
+		if err == nil || !strings.Contains(err.Error(), c.errHas) {
+			t.Errorf("%s: err = %v, want one containing %q", c.body, err, c.errHas)
+		}
 	}
 }
 

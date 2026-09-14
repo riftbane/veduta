@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/riftbane/veduta/gmath"
 )
@@ -18,6 +19,8 @@ const MaxResolution = 8192
 // Project is a compiled project manifest (veduta.json) with every default filled in.
 type Project struct {
 	Name              string     // project name, a valid asset name
+	Title             string     // name shown to a player, defaults to Name
+	Icon              string     // optional PNG at the project root, shown beside the title
 	Engine            string     // engine version the project targets, "vX.Y.Z[-pre][+build]"
 	Entry             string     // Go package of the game binary, "./cmd/game"
 	Resolution        [2]int     // player window and default render size (width, height)
@@ -79,6 +82,19 @@ func CompileProject(src *ProjectSource, loc *Locator) (*Project, error) {
 		c.Errorf("name", "is required (the game's name, for example \"mygame\")")
 	} else {
 		c.Name("name", src.Name)
+	}
+	// A console shows the title and the icon; name is an identifier and cannot carry a
+	// space or an accent, so a game that wants to be called something readable says so.
+	p.Title = orDefault(src.Title, src.Name)
+	if src.Title != "" {
+		checkTitle(c, "title", src.Title)
+	}
+	if src.Icon != "" {
+		p.Icon = src.Icon
+		checkRelPath(c, "icon", src.Icon)
+		if !strings.HasSuffix(src.Icon, ".png") {
+			c.Errorf("icon", "%q must be a .png file", src.Icon)
+		}
 	}
 	if src.Engine == "" {
 		c.Errorf("engine", "is required (engine version, for example \"v0.1.0\")")
@@ -157,6 +173,23 @@ func bounds(c *Checker, v [][]float32, def gmath.AABB) gmath.AABB {
 		return def
 	}
 	return b
+}
+
+// checkTitle reports a display title that is empty, too long, or holds a character that
+// cannot be printed: a dashboard shows it as it stands, so a newline or a tab would break
+// the tile it sits in.
+func checkTitle(c *Checker, path, s string) {
+	n := 0
+	for _, r := range s {
+		if !unicode.IsPrint(r) {
+			c.Errorf(path, "%q contains a character that cannot be printed", s)
+			return
+		}
+		n++
+	}
+	if n > 64 {
+		c.Errorf(path, "%q is %d characters, want 1 to 64", s, n)
+	}
 }
 
 // checkRelPath reports a directory path that is not a clean, slash-separated path

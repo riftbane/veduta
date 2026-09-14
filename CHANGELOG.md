@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- A player backend for machines with no display server, which is what a console is: the
+  panel's own framebuffer. It is found by reading sysfs rather than by assuming a device
+  number, frames are packed to RGB565 honouring a padded stride, and an integer render
+  scale lets a slower board draw a quarter of the pixels and still fill the glass. Which
+  backend runs is decided when the player starts, not when it is built — `VEDUTA_BACKEND`
+  forces one, and by default X11 is used when a display server is there and the panel when
+  it is not — so one binary serves a desktop and an appliance. `VEDUTA_FB`, `VEDUTA_PAD`
+  and `VEDUTA_SCALE` override what is found.
+- Gamepad input, read from evdev and translated into W3C key codes in the platform layer,
+  so `sim.Input`, scenarios, traces and goldens are untouched and a session recorded on a
+  console replays like any other. A D-pad is understood as a hat, a stick or four buttons;
+  auto-repeat is dropped; what is held is released when the kernel admits it lost events
+  or when the pad is unplugged mid-game, and the pad is looked for again afterwards.
+  Select and Start together close the window, which is the way back on a device with no
+  keyboard.
+- `title` and `icon` in the project manifest: the name a player sees and the picture shown
+  beside it, neither of which the identifier in `name` can carry (`docs/project.md`).
+
 ## v0.2.0 — 2026-09-12
 
 ### Added

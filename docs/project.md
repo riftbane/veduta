@@ -22,6 +22,8 @@ default scene and seed, where assets live, project-wide invariants and world bou
 |-------|------|---------|---------|
 | `veduta` | string | required | Must be exactly `"project/1"`. |
 | `name` | string | required | The game's name: 1–64 characters of `a-z`, `0-9`, `_`, `-`, starting with a letter or digit. Used for release archive names (`<name>_v1.2.3_linux_amd64.tar.gz`). |
+| `title` | string | the `name` | The name a player sees, on a console dashboard for instance: 1–64 printable characters, spaces and accents allowed (`"Cave of Gems"`). Unlike `name` it never appears in a file name, and it may repeat between games. |
+| `icon` | string | none | Optional PNG shown beside the title, relative to the project root and outside the assets directory (`"icon.png"`), so cooking never sees it. A console that finds none draws a placeholder. |
 | `engine` | string | required | Veduta version the project targets, `vMAJOR.MINOR.PATCH` with optional `-prerelease` and `+build` (for example `"v0.1.0"`, `"v0.2.0-rc.1"`). `doctor` and `status` warn when it differs from the tool's version by a minor version or more. |
 | `entry` | string | `"./cmd/game"` | Go package of the game binary, as given to `go build`: `"."` or a relative path starting with `./`. |
 | `resolution` | `[width, height]` | `[1280, 720]` | Player window size and default render size, in pixels; each 1 to 8192. |

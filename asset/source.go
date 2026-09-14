@@ -171,6 +171,8 @@ type ExpectSource struct {
 type ProjectSource struct {
 	Veduta            string      `json:"veduta"`
 	Name              string      `json:"name"`
+	Title             string      `json:"title"`
+	Icon              string      `json:"icon"`
 	Engine            string      `json:"engine"`
 	Entry             string      `json:"entry"`
 	Resolution        []int       `json:"resolution"`
