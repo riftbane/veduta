@@ -225,8 +225,9 @@ func TestInputSourceAttachesAndSurvivesUnplugging(t *testing.T) {
 	if p.Devices() != "event0" {
 		t.Errorf("reading %q", p.Devices())
 	}
-	// Pulled out: the console keeps running and lets the device go.
-	if evs, err := p.poll(); err != nil || len(evs) != 0 {
+	// Pulled out: the console keeps running and lets the device go, and the key it held
+	// comes back up even though this fake, unlike a real device, did not say so.
+	if evs, err := p.poll(); err != nil || describePad(evs) != "up Space" {
 		t.Fatalf("unplugged poll: %v %v", evs, err)
 	}
 	if p.Devices() != "" || pad.closed != 1 {
@@ -352,6 +353,115 @@ func TestInputSourcePicksUpALatePad(t *testing.T) {
 	codes()
 	if p.Devices() != "event0" || pad.closed != 1 {
 		t.Fatalf("after the failed read: reading %q, pad closed %d", p.Devices(), pad.closed)
+	}
+}
+
+// decodingPad is an input device whose records go through the real decoder, one poll's
+// worth at a time. Once err is set it is unplugged: it releases what it holds, as a real
+// device does, unless vanish says it goes without a word.
+type decodingPad struct {
+	d      *padDecoder
+	next   []byte
+	err    error
+	vanish bool
+}
+
+func (f *decodingPad) poll() ([]Event, error) {
+	if f.err != nil {
+		if f.vanish {
+			return nil, f.err
+		}
+		return f.d.releaseAll(nil), f.err
+	}
+	b := f.next
+	f.next = nil
+	return f.d.decode(b, nil)
+}
+
+func (f *decodingPad) close() error { return nil }
+
+// TestInputSourceCountsHolds: a pad's hat, its stick and its D-pad buttons, and the
+// keyboard beside it, all report the same few keys. A key is held while anything holds it:
+// it goes down with the first and up with the last, whichever button, axis or device that
+// is. Before, letting the stick back to the middle released ArrowLeft while the hat still
+// held it, and the hero stopped with the D-pad pressed.
+func TestInputSourceCountsHolds(t *testing.T) {
+	fakeInputs(t, "event0 AT Keyboard|"+keyboardBits, "event1 Rii Gamepad|"+padBits)
+	const size = 24
+	pad := &decodingPad{d: newPadDecoder()}
+	keyboard := &decodingPad{d: newPadDecoder()}
+	pad.d.size, keyboard.d.size = size, size
+	byNode := map[string]events{"event1": pad, "event0": keyboard}
+	old := openPad
+	openPad = func(path string) (events, error) { return byNode[filepath.Base(path)], nil }
+	t.Cleanup(func() { openPad = old })
+
+	p := newInputSource("")
+	rec := func(typ, code uint16, value int32) []byte { return record(size, typ, code, value) }
+	const keySpace, keyLeft = 57, 105
+	for _, s := range []struct {
+		name          string
+		pad, keyboard []byte
+		want          string
+	}{
+		{name: "hat left", pad: rec(evAbs, absHat0X, -1), want: "down ArrowLeft"},
+		{name: "stick left as well", pad: rec(evAbs, absX, -30000), want: ""},
+		{name: "stick back to the middle", pad: rec(evAbs, absX, 0), want: ""},
+		{name: "D-pad button left as well", pad: rec(evKey, 0x222, 1), want: ""},
+		{name: "hat back", pad: rec(evAbs, absHat0X, 0), want: ""},
+		{name: "D-pad button back", pad: rec(evKey, 0x222, 0), want: "up ArrowLeft"},
+		{name: "Space on the keyboard", keyboard: rec(evKey, keySpace, 1), want: "down Space"},
+		{name: "A on the pad as well", pad: rec(evKey, btnSouth, 1), want: ""},
+		{name: "the keyboard lets go", keyboard: rec(evKey, keySpace, 0), want: ""},
+		{name: "the pad lets go", pad: rec(evKey, btnSouth, 0), want: "up Space"},
+		{name: "left on both at once", pad: rec(evAbs, absHat0X, -1), keyboard: rec(evKey, keyLeft, 1), want: "down ArrowLeft"},
+	} {
+		pad.next, keyboard.next = s.pad, s.keyboard
+		evs, err := p.poll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := describePad(evs); got != s.want {
+			t.Fatalf("%s: %q, want %q", s.name, got, s.want)
+		}
+	}
+	// The pad is unplugged while both hold ArrowLeft: the keyboard still does.
+	pad.err = errors.New("device removed")
+	if evs, _ := p.poll(); describePad(evs) != "" || p.Devices() != "event0" {
+		t.Fatalf("unplugged while the keyboard holds the key: %q, reading %q", describePad(evs), p.Devices())
+	}
+	keyboard.next = rec(evKey, keyLeft, 0)
+	if evs, _ := p.poll(); describePad(evs) != "up ArrowLeft" {
+		t.Fatalf("the keyboard lets go: %q, want up ArrowLeft", describePad(evs))
+	}
+	// A device that goes without releasing what it held still lets go of it: no key
+	// outlives the device holding it.
+	keyboard.next = rec(evKey, 17, 1) // KEY_W
+	if evs, _ := p.poll(); describePad(evs) != "down KeyW" {
+		t.Fatalf("W: %q", describePad(evs))
+	}
+	keyboard.err, keyboard.vanish = errors.New("gone"), true
+	if evs, _ := p.poll(); describePad(evs) != "up KeyW" || p.Devices() != "" {
+		t.Fatalf("a device gone without a word: %q, reading %q", describePad(evs), p.Devices())
+	}
+}
+
+// TestInputSourceIdlePollAllocatesNothing: the player polls every tick, and a tick where
+// nothing is pressed must not feed the collector.
+func TestInputSourceIdlePollAllocatesNothing(t *testing.T) {
+	fakeInputs(t, "event0 AT Keyboard|"+keyboardBits)
+	idle := &fakePad{}
+	old := openPad
+	openPad = func(string) (events, error) { return idle, nil }
+	t.Cleanup(func() { openPad = old })
+	p := newInputSource("")
+	now := time.Now()
+	p.now = func() time.Time { return now }
+	if _, err := p.poll(); err != nil || p.Devices() != "event0" {
+		t.Fatalf("first poll: %v, reading %q", err, p.Devices())
+	}
+	if n := testing.AllocsPerRun(100, func() { p.poll() }); n != 0 {
+		t.Errorf("an idle poll allocates %v times", n)
 	}
 }
 

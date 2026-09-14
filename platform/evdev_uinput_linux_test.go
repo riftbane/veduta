@@ -370,6 +370,13 @@ func TestEvdevUinputJoystick(t *testing.T) {
 		{"stick right", func() { pad.emit(evAbs, absX, 255); pad.emit(evAbs, absX, 128) }, "down ArrowRight,up ArrowRight"},
 		{"stick nearly full left", func() { pad.emit(evAbs, absX, 1); pad.emit(evAbs, absX, 127) }, "down ArrowLeft,up ArrowLeft"},
 		{"stick up", func() { pad.emit(evAbs, absY, 0); pad.emit(evAbs, absY, 128) }, "down ArrowUp,up ArrowUp"},
+		// The hat and the stick press the same arrow: it stays down while either holds it.
+		{"hat left, stick left and back", func() {
+			pad.emit(evAbs, absHat0X, -1)
+			pad.emit(evAbs, absX, 0)
+			pad.emit(evAbs, absX, 127)
+		}, "down ArrowLeft"},
+		{"hat back", func() { pad.emit(evAbs, absHat0X, 0) }, "up ArrowLeft"},
 		{"first button", func() { pad.emit(evKey, btnTrigger, 1); pad.emit(evKey, btnTrigger, 0) }, "down Space,up Space"},
 		{"Start alone", func() { pad.emit(evKey, btnTrigger+7, 1); pad.emit(evKey, btnTrigger+7, 0) }, "down Enter,up Enter"},
 		{"Select+Start", func() { pad.emit(evKey, btnTrigger+6, 1); pad.emit(evKey, btnTrigger+7, 1) }, "down Tab,up Tab,close"},

@@ -151,22 +151,29 @@ func bitmapHasWords(bitmap string, bit, wordBits int) bool {
 type openDevice struct {
 	node string
 	src  events
+	down map[string]int // W3C code → how many of this device's buttons and axes hold it
 }
 
 // inputSource reads every gamepad and keyboard at once and hands their events on together.
 // Reading all of them rather than choosing one is what lets a console be driven from a
 // keyboard while its pad is unplugged, and lets the pad take over the moment it appears,
 // without anything having to be restarted.
+//
+// Several things report the same key: a pad's hat, its stick and its D-pad buttons all
+// press the arrows, and a keyboard's Space is the pad's A. A key is therefore held while
+// anything holds it, and reported down with the first press and up with the last release.
 type inputSource struct {
 	want  string
 	open  []openDevice
+	down  map[string]int   // W3C code → how many buttons and axes, over every device, hold it
+	out   []Event          // what the last poll returned, reused so an idle poll allocates nothing
 	next  time.Time        // when to look again
 	now   func() time.Time // replaced in tests
 	tried bool
 }
 
 func newInputSource(want string) *inputSource {
-	return &inputSource{want: want, now: time.Now}
+	return &inputSource{want: want, now: time.Now, down: map[string]int{}}
 }
 
 // Devices names what is being read, for diagnostics; empty when nothing is.
@@ -178,15 +185,19 @@ func (p *inputSource) Devices() string {
 	return strings.Join(nodes, ",")
 }
 
+// poll returns the events of every device since the last call. The slice is reused by the
+// next call.
 func (p *inputSource) poll() ([]Event, error) {
 	p.attach()
-	var out []Event
+	p.out = p.out[:0]
 	for i := 0; i < len(p.open); {
 		d := p.open[i]
 		evs, err := d.src.poll()
-		out = append(out, evs...)
+		p.pass(d, evs)
 		if err != nil {
-			// Unplugged: evs already carries the keys it had down, released.
+			// Unplugged: evs already carried the keys it had down, released. Whatever it
+			// did not release is let go of here, so no key outlives the device holding it.
+			p.forget(d)
 			d.src.close()
 			p.open = append(p.open[:i], p.open[i+1:]...)
 			p.next = p.now().Add(padRescan)
@@ -194,7 +205,60 @@ func (p *inputSource) poll() ([]Event, error) {
 		}
 		i++
 	}
-	return out, nil
+	return p.out, nil
+}
+
+// pass hands on what one device sent, counting presses by W3C code: a key goes down when
+// the first button or axis anywhere holds it and up when the last one lets go. A release
+// from a device that never pressed the key is not a release at all.
+func (p *inputSource) pass(d openDevice, evs []Event) {
+	for _, e := range evs {
+		switch e.Kind {
+		case KeyDown:
+			d.down[e.Code]++
+			if p.down[e.Code]++; p.down[e.Code] == 1 {
+				p.out = append(p.out, e)
+			}
+		case KeyUp:
+			n := d.down[e.Code]
+			if n == 0 {
+				continue
+			}
+			if n == 1 {
+				delete(d.down, e.Code)
+			} else {
+				d.down[e.Code] = n - 1
+			}
+			p.release(e.Code, 1)
+		default:
+			p.out = append(p.out, e)
+		}
+	}
+}
+
+// release lets go of n presses of a key and reports it up when none is left.
+func (p *inputSource) release(code string, n int) {
+	left := p.down[code] - n
+	if left > 0 {
+		p.down[code] = left
+		return
+	}
+	delete(p.down, code)
+	p.out = append(p.out, Event{Kind: KeyUp, Code: code})
+}
+
+// forget lets go of everything a departing device still holds, in code order so the same
+// session gives the same events.
+func (p *inputSource) forget(d openDevice) {
+	codes := make([]string, 0, len(d.down))
+	for code := range d.down {
+		codes = append(codes, code)
+	}
+	sort.Strings(codes)
+	for _, code := range codes {
+		p.release(code, d.down[code])
+		delete(d.down, code)
+	}
 }
 
 // attach looks for devices at most once per rescan interval, whether or not something is
@@ -231,7 +295,7 @@ func (p *inputSource) attach() {
 		if err != nil {
 			continue // a device that will not open is one we do without
 		}
-		list = append(list, openDevice{node: d.Node, src: src})
+		list = append(list, openDevice{node: d.Node, src: src, down: map[string]int{}})
 	}
 	for i, d := range p.open {
 		if !kept[i] {
