@@ -6,25 +6,214 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+The first stable release, and a breaking one: Veduta now makes games for the Veduta
+console — a linux/arm64 board with a 320×240 panel refreshed at 20 Hz and a gamepad — and
+the machines that author them no longer open a window. `SPEC-v1.0.0.md` describes the
+result and supersedes `SPEC-v0.1.0.md`, which stays as the record of v0.1.0.
+
+### Upgrading from v0.x
+
+- Run `veduta upgrade`. A project that left `resolution`, `inspect_resolution` or
+  `tick_rate` to their defaults gets the old values written into `veduta.json`
+  (`[1280, 720]`, `[640, 360]`, `60`), so its size, physics and trace hashes do not move;
+  the project's changelog names every pinned field. Then decide: a game meant for the
+  console should move to `[320, 240]` and `20` deliberately, re-time its scenarios and
+  regenerate its goldens (`veduta doctor` warns until it does).
+- The game no longer opens a window on Windows or a desktop Linux session: see it with
+  `render`, `simulate` and `inspect`, and play it on the console (or at a Linux text
+  console with a framebuffer). `VEDUTA_BACKEND=x11` is an error and `platform.BackendX11`
+  is gone.
+- Add `linux/arm64` to the project's release workflow and a `card.json` beside
+  `veduta.json` (compare with what `veduta init` writes); `veduta release` refuses a
+  project whose release the console cannot install.
+- Run `veduta doctor`: it lists every line of the game's own code that compiles to a fused
+  multiply-add on arm64. Wrap each product that feeds `+` or `-` in a conversion to its own
+  type (`y += float32(v * ctx.DT)`), or the console's traces drift from the goldens.
+- A scene that uses `hitbox` or `layer` cannot be read by a v0.x tool, and cooked assets
+  are recompiled once (the asset compiler version moved to `veduta-asset/0.2.0`).
+- MCP `render` images are 320×240 by default and at most 640×480 (were 640×360 and
+  1280×720); inspection views are framed 4:3.
+
 ### Added
 
-- A player backend for machines with no display server, which is what a console is: the
-  panel's own framebuffer. It is found by reading sysfs rather than by assuming a device
-  number, frames are packed to RGB565 honouring a padded stride, and an integer render
-  scale lets a slower board draw a quarter of the pixels and still fill the glass. Which
-  backend runs is decided when the player starts, not when it is built — `VEDUTA_BACKEND`
-  forces one, and by default X11 is used when a display server is there and the panel when
-  it is not — so one binary serves a desktop and an appliance. `VEDUTA_FB`, `VEDUTA_PAD`
-  and `VEDUTA_SCALE` override what is found.
-- Gamepad input, read from evdev and translated into W3C key codes in the platform layer,
-  so `sim.Input`, scenarios, traces and goldens are untouched and a session recorded on a
-  console replays like any other. A D-pad is understood as a hat, a stick or four buttons;
-  auto-repeat is dropped; what is held is released when the kernel admits it lost events
-  or when the pad is unplugged mid-game, and the pad is looked for again afterwards.
-  Select and Start together close the window, which is the way back on a device with no
-  keyboard.
+- The console player: frames are drawn on the panel's framebuffer, found by reading sysfs
+  rather than by assuming a device number (a 16-bit framebuffer is the panel, a 32-bit one
+  is used when there is none), packed to RGB565 or XRGB honouring a padded stride, and
+  written without allocating. `VEDUTA_SCALE` divides the panel so a slower board draws a
+  quarter of the pixels and still fills the glass; `VEDUTA_FB` names a framebuffer.
+- Gamepads and keyboards, read from evdev and translated into W3C key codes in the platform
+  layer, so `sim.Input`, scenarios, traces and goldens are untouched and a session played on
+  the console replays like any other. The D-pad is understood as a hat, a stick or four
+  buttons (arrows), A is `Space`, B `Escape`, X `KeyF`, Y `KeyR`, L1 `KeyQ`, R1 `KeyE`,
+  Select `Tab`, Start `Enter`; keyboards report keys by physical position, keypad
+  included. Auto-repeat is dropped; what is held is released when the kernel admits it lost
+  events or a device is unplugged, and devices are looked for again every second, a pad
+  plugged in while a keyboard is being read included. Select and Start together, or Ctrl+Q
+  on a keyboard, close the player: on a device with no keyboard it is the way back to the
+  dashboard. `VEDUTA_PAD` names a device.
 - `title` and `icon` in the project manifest: the name a player sees and the picture shown
   beside it, neither of which the identifier in `name` can carry (`docs/project.md`).
+- `card.json`, the frozen `card/1` description the console lists, written by `veduta init`;
+  a new project's release workflow builds linux/arm64 and linux/amd64 archives that each
+  unpack to a card folder, with the tag stamped into the card as its version.
+- `internal/fused`, which reads a linux/arm64 binary, finds fused multiply-add instructions
+  by their encoding and maps them to source lines. `TestEngineHasNoFusedMultiplyAdd` builds
+  the tool and the template game for arm64 and fails on any engine line that fused.
+- A CI job that runs the whole suite for linux/arm64 under `qemu-aarch64-static`, so the
+  goldens recorded on amd64 are checked on the console's architecture.
+- `veduta doctor` checks the project against the console: where it plays (and whether this
+  machine has a framebuffer), a `tick_rate` above 20 or a `resolution` that is not 4:3, the
+  linux/arm64 build (a failure is located), every line of the game's code that fused into a
+  multiply-add, a release workflow without linux/arm64, and a `card.json` that is missing
+  or disagrees with `veduta.json`. Findings that do not stop the game are warnings, marked
+  `warn`. The MCP `status` tool reports the target.
+- 2D in the scene format: an entity's optional `hitbox` (a local-space box that replaces
+  the model's bounds for collisions, `ctx.Overlapping`, `no_overlap` and the trace's
+  `aabb`; an entity with a hitbox and no model is a trigger zone) and `layer` (−1000…1000,
+  the first key of the draw order); `scene.Camera2D(center, height)`; the `2d` docs topic
+  with the recipe and its three silent traps; a `quad` model and a `sprite` material in the
+  template; a 2D fixture project under `testdata/twod` run through `render --bundle`,
+  `query --at` and `simulate`.
+- The demo reads the arrows as well as WASD, so it plays on the pad, and its new `pad`
+  scenario walks, collects and jumps with only the codes the pad produces.
+- Tests of the console's input path that need no hardware: `TestEvdevUinput` creates a real
+  gamepad through `/dev/uinput` (skipped without access) and reads it through sysfs and
+  `/dev/input`; `TestEvdevKeymapCoversKeyCodes` requires the kernel key table to produce
+  every W3C code the engine knows and nothing else.
+
+### Changed
+
+- The manifest defaults follow the panel: `resolution` and `inspect_resolution` are
+  `[320, 240]` and `tick_rate` is `20` (were `[1280, 720]`, `[640, 360]` and `60`). `ctx.DT`
+  is 1/20 by default, so the trace hash of every project relying on the default changes. A
+  player asked for no size opens at 320×240, and `simulate --ticks` and `fuzz --ticks`
+  default to 200 (ten seconds, as 600 were). The demo's scenarios are re-timed to the same
+  seconds.
+- MCP images are sized after the panel: `render` returns 320×240 unless asked, at most
+  640×480, and one side alone gets the other at 4:3; the tool's schema text is generated
+  from those limits. Contact sheets and inspection sheets are fitted inside 640×720, and a
+  query image keeps its crosshair sharp at every frame size.
+- `inspect scene` views are framed 4:3 (640×480 single views, 317×238 summary tiles), a
+  width given alone sets the height to 3/4 of it in every inspector, and the top view draws
+  the camera frustum at the aspect of the camera view on the same sheet. Overlap and
+  z-fighting are judged from the models that are drawn, not from hitboxes, and translucent
+  sprites stacked by layer are not reported.
+- `veduta run` refuses on a machine with no framebuffer (and off Linux), naming
+  `VEDUTA_FB` and `VEDUTA_SCALE`, instead of deciding with `$DISPLAY`.
+- `veduta release` refuses a project that does not build for linux/arm64 or whose workflow
+  publishes no linux/arm64 archive.
+- `veduta upgrade` from a v0.x engine to v1 pins the v0.x defaults (see Upgrading), edits
+  `veduta.json` as text so every other byte stays, and writes it only after `go get` and
+  `go mod tidy` succeed.
+- Blended parts are sorted back to front by depth along the camera's view axis, not by
+  distance from the eye, which was wrong under an orthographic camera.
+- `ctx.Width` and `ctx.Height` are set before `Init` and every `Update`, to the project's
+  resolution in every mode, so the HUD can be laid out during `Update`; `Draw` still sees
+  the frame it draws.
+- The trajectory tile of `simulate` is drawn in the XY plane when the scene camera is
+  orthographic and looks along −Z, so a 2D game's paths no longer collapse onto a line.
+- Models whose vertices leave the float32 range after sizes, positions and scales are
+  applied are refused with an error on the part.
+- The rasterizer benchmark draws its 10k triangles into a 320×240 frame
+  (`BenchmarkDraw10kTriangles320x240`); 0 allocs/op remains the gate.
+- The template's README, `CLAUDE.md` and the API reference speak of the console: the pad's
+  bindings, the exit chord, the target, and the rule for rounding products.
+
+### Removed
+
+- The X11 player window (Linux) and the Win32 player window (Windows): eight source files
+  and their tests, 5,510 lines. `platform.BackendX11`, the display smoke tests and their
+  CI steps went with them; the platform package's `runtime.LockOSThread`, needed only by
+  Win32's message pump, is gone too.
+- The demo's first-person view (`KeyF`, mouse look, crosshair), its `look` scenario and that
+  scenario's two goldens. `Input.MouseDelta`, `Camera.LookFrom` and `Context.LockPointer`
+  stay in the API; no player backend produces mouse movement or locks a pointer.
+
+### Fixed
+
+- The goldens did not reproduce on linux/arm64: the compiler fused products into
+  multiply-adds that round once where amd64 rounds twice. Every product that feeds an
+  addition or subtraction in the engine and the demo is now rounded explicitly (133 fused
+  engine lines before, 0 after), and the whole suite passes under qemu-aarch64 against the
+  amd64 goldens. `inspect` no longer uses `math.Log` and `math.Cbrt`, which differ between
+  architectures, and the debug line drawer, the scene sheets' labels and `simulate`'s tile
+  height clamp values whose float-to-integer conversion would differ.
+- The console never saw a press on a real pad or keyboard: the evdev reader set a read
+  deadline already in the past, which the Go runtime refuses without reading. It now reads
+  the non-blocking descriptor directly until `EAGAIN`.
+- A gamepad was not found unless `VEDUTA_PAD` named it: sysfs capability bitmaps were
+  parsed with a word width guessed from the text, while the kernel prints words unpadded.
+- A pad plugged in while a keyboard was already being read was never opened, and only the
+  left Ctrl made Ctrl+Q close the player.
+- `ctx.HUD` panicked when called during `Init` or `Update`.
+- `veduta upgrade` from a release candidate to its release (v1.0.0-rc.1 to v1.0.0) left
+  `go.mod` on the candidate, and a manifest key spelled in another case was not upgraded.
+
+### Decisions
+
+- **`SPEC-v1.0.0.md` supersedes `SPEC-v0.1.0.md`.** The old file records what a released
+  product promised and what its §15 acceptance walk certified; amending it in place would
+  falsify that record. The successor is the source of truth, repeats every section so it
+  reads on its own, and says in its first lines that it supersedes the old one.
+- **The console is the only player target.** Windows and desktop Linux became authoring
+  machines. Keeping X11 and Win32 would have kept three quarters of `platform/` alive for a
+  target the product no longer has, with checks (Xvfb, windows-latest) that prove nothing
+  about the panel. The loss is real — a developer can no longer play on their own PC — and
+  is paid with `render`, `simulate`, a QEMU arm64 machine with a framebuffer, or the console.
+- **20 Hz, 320×240.** They feed `ctx.DT` and the frame size, and so every trace hash and
+  scenario expectation; they are set once, in the release that may break formats, rather
+  than later. A tick count keeps meaning ticks, so the template's scenarios were re-timed
+  (divided by three) to keep describing the same seconds of play.
+- **Rounding by conversion, checked by disassembly.** The Go specification makes an
+  explicit conversion a rounding point the compiler may not fuse across, so that is the
+  rule, applied to every product that feeds `+` or `-` (a division by a power-of-two
+  constant counts: the compiler turns it into a product). It is enforced by reading the
+  built arm64 binary for FMADD/FMSUB/FNMADD/FNMSUB instructions (`internal/fused`), not by
+  the compiler's unsupported `-d=fmahash` debug flag, which a game built with plain
+  `go build` would not get. A fusion with a power-of-two constant is harmless in value but
+  still flagged, so the rule has no exceptions to remember. `gmath` rounds inside its own
+  operations, so `pos.Add(vel.Scale(dt))` is safe as written.
+- **Other architecture differences are refused, not tolerated.** Out-of-range float to
+  integer conversions are clamped in floating point with the result amd64 already gave;
+  a model that overflows float32 is an error, because a NaN made from infinities carries
+  a sign that differs between amd64 and arm64 and would change the cooked bytes.
+- **Pinning on upgrade is decided by the major version.** A project moving from a 0.x engine
+  to 1.x or later is pinned; release candidates of 1.0.0 already carry the new defaults and
+  count as 1.x, so v0.2.0 → v1.0.0-rc.1 pins and v1.0.0-rc.1 → v1.0.0 does not. A field is
+  pinned exactly when `CompileProject` would fill it in (absent, `null` or zero), the frozen
+  v0 values live in one table that never reads `DefaultProject`, and the manifest is edited
+  as text and re-parsed before it is written.
+- **`VEDUTA_BACKEND=x11` gets its own error** naming the removal, so an old service file
+  says what happened instead of "unknown value"; `auto` and `fbdev` both mean the
+  framebuffer. The mouse, text, resize and focus event kinds and `SetPointerLock` stay in
+  the API, documented as never produced, so games and scenarios that use them still build.
+- **The keyboard table maps only codes the engine knows.** The keypad now reports `Numpad*`;
+  kernel keys whose W3C name is not in `asset.KeyCodes` (NumLock, PrintScreen, Pause, …)
+  stay unmapped, since no scenario could name them.
+- **Images.** `render` defaults to 320×240 and stops at 640×480, two panel pixels per
+  image pixel. Sheets get their own 640×720 box, because 4:3 tiles stack taller and a
+  480-pixel cap would shrink the common 2×2 sheet (640×482); simulate sheets stay 640 wide
+  since 320-wide tiles are illegible.
+- **Layer orders drawing, depth still decides among opaque parts.** The rasterizer's depth
+  test is strict, so a layer never lifts an opaque or cutout sprite over a nearer one;
+  blended parts write no depth, so for them the layer decides. The docs tell games to order
+  sprites with z and translucent overlays with layer as well. `Hitbox` is a pointer, because
+  a zero box would give every spawn template an AABB.
+- **`Camera2D` is a helper, not a preset**, because a new preset name would change the
+  `describe` report and the documented preset lists. It sits at z = 100 looking at z = 0 with
+  the scene's default near and far, so z from −100 to 99.9 is visible.
+- **`ctx.Width`/`Height` in `Update` are the project resolution in every mode**, so a trace
+  never depends on `render --width`, the screenshot tile or the panel's scale.
+- **`card.json` is static and the release stamps its version.** The console's format is
+  frozen and optional in every field; the workflow inserts `"version"` after the header line
+  with `awk`, and a hand-edited card whose header line differs is shipped without one rather
+  than broken. `doctor` warns when the card and the manifest disagree.
+- **`doctor` warns, `release` refuses.** A desktop-shaped manifest or a fused line is a
+  choice the author may be making on purpose, so it does not fail `doctor`; a release the
+  console cannot install serves nobody, so `release` stops.
+- **The benchmark keeps 10k triangles at 320×240**, several times what a level for a Pi Zero
+  2 W should submit, so it measures the rasterizer under load; the 50 ms tick on the board
+  is a target only hardware can check.
 
 ## v0.2.0 — 2026-09-12
 
