@@ -101,11 +101,11 @@ func inModule(module string) func(Site) bool {
 // matches none of them would find no fused site and pass whatever the code does.
 func linesIn(t *testing.T, bin, module string) bool {
 	t.Helper()
-	tab, err := open(bin)
+	files, err := Files(bin)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for f := range tab.syms.Files {
+	for _, f := range files {
 		if InModule(f, module) {
 			return true
 		}

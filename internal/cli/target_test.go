@@ -57,6 +57,30 @@ func TestFindPanel(t *testing.T) {
 	}
 }
 
+func TestModulePathAndEngineFile(t *testing.T) {
+	for in, want := range map[string]string{
+		"module demo\n\ngo 1.25\n":                         "demo",
+		"// a game\nmodule \"example.com/my.game\" // x\n": "example.com/my.game",
+		"go 1.25\nmodule\texample.com/g\n":                 "example.com/g",
+		"modules x\n":                                      "",
+		"go 1.25\n":                                        "",
+	} {
+		if got := modulePath([]byte(in)); got != want {
+			t.Errorf("modulePath(%q) = %q, want %q", in, got, want)
+		}
+	}
+	for in, want := range map[string]string{
+		"github.com/riftbane/veduta/gmath/vec.go":        "gmath/vec.go",
+		"github.com/riftbane/veduta@v1.0.0/gmath/vec.go": "gmath/vec.go",
+		"github.com/riftbane/veduta-extra/x.go":          "github.com/riftbane/veduta-extra/x.go",
+		"example.com/lib@v1.2.0/lib.go":                  "example.com/lib@v1.2.0/lib.go",
+	} {
+		if got := engineFile(in); got != want {
+			t.Errorf("engineFile(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 // check returns the doctor check called name, failing when there is none.
 func check(t *testing.T, r *DoctorReport, name string) Check {
 	t.Helper()
@@ -95,8 +119,11 @@ func TestDoctorConsoleChecks(t *testing.T) {
 	kinds := filepath.Join(dir, "game", "kinds.go")
 	src, _ := os.ReadFile(kinds)
 	fusedSrc := strings.Replace(string(src), "st.VelY -= float32(Gravity * ctx.DT)", "st.VelY -= Gravity * ctx.DT * st.VelY", 1)
-	if fusedSrc == string(src) {
-		t.Fatal("kinds.go no longer holds the gravity line this test edits")
+	// Ordinary movement code: the products fuse with the addition inside gmath's Add once
+	// it is inlined into updatePlayer, so the fused instruction sits on gmath/vec.go.
+	fusedSrc = strings.Replace(fusedSrc, "e.Transform.Position.Add(dir.Scale(PlayerSpeed * ctx.DT))", "e.Transform.Position.Add(gmath.V3(dir.X*ctx.DT, 0, dir.Z*ctx.DT))", 1)
+	if strings.Count(fusedSrc, "ctx.DT * st.VelY")+strings.Count(fusedSrc, "gmath.V3(dir.X*ctx.DT") != 2 {
+		t.Fatal("kinds.go no longer holds the gravity and movement lines this test edits")
 	}
 	os.WriteFile(kinds, []byte(fusedSrc+"\n//go:noinline\nfunc fusedForTest(a, b, c float32) float32 { return a*b + c }\n\nvar _ = fusedForTest\n"), 0o644)
 	wf := filepath.Join(dir, ".github", "workflows", "release.yml")
@@ -104,12 +131,25 @@ func TestDoctorConsoleChecks(t *testing.T) {
 	os.WriteFile(wf, []byte(strings.ReplaceAll(string(w), "linux/arm64 ", "")), 0o644)
 	os.WriteFile(filepath.Join(dir, "card.json"), []byte(`{"veduta": "card/1", "title": "Gems", "name": "demo", "exec": "demo"}`), 0o644)
 
-	r = Doctor(env, dir)
+	// The fused lines are found whatever the paths look like: GOFLAGS asks every build for
+	// module-relative file names, and doctor runs in a subdirectory of the project reached
+	// through a symlink, where the go command records the physical path unless told
+	// otherwise.
+	t.Setenv("GOFLAGS", "-trimpath")
+	from := dir
+	if link := filepath.Join(t.TempDir(), "link"); os.Symlink(dir, link) == nil {
+		from = link
+	}
+	r = Doctor(env, filepath.Join(from, "game"))
 	if c := check(t, r, "frame"); !c.Warning || !strings.Contains(c.Detail, "tick_rate 60") || !strings.Contains(c.Detail, "1280x720") {
 		t.Fatalf("frame: %+v", c)
 	}
-	if c := check(t, r, "arm64"); !c.OK || !c.Warning || !strings.Contains(c.Detail, "game/kinds.go:") {
+	c := check(t, r, "arm64")
+	if !c.OK || !c.Warning || !strings.Contains(c.Detail, "game/kinds.go:") || !strings.Contains(c.Detail, "gmath/vec.go:") || !strings.Contains(c.Detail, " inlined in demo/game.updatePlayer") {
 		t.Fatalf("arm64: %+v", c)
+	}
+	if strings.Contains(c.Detail, from) || strings.Contains(c.Detail, "github.com/") {
+		t.Fatalf("arm64 lists full paths: %+v", c)
 	}
 	if c := check(t, r, "release"); !c.Warning || !strings.Contains(c.Detail, "no linux/arm64") {
 		t.Fatalf("release: %+v", c)

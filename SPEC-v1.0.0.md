@@ -605,9 +605,11 @@ game -headless describe                                    # registered kinds, i
 - `veduta doctor` prints the target (`linux/arm64, 320x240 panel at 20 Hz, gamepad`) and, as
   warnings that do not fail the run: `tick_rate` above 20 or a `resolution` that is not 4:3;
   every line of the game's own code that compiles to a fused multiply-add in its linux/arm64
-  build (`file:line`); a release workflow that builds no linux/arm64 archive; a missing
-  `card.json` or one whose title or name disagrees with `veduta.json`. A game that does not
-  build for linux/arm64 fails the check, with the located compiler error.
+  build (`file:line`), and every line of another package that does so once inlined into a
+  function of the game (`file:line inlined in function`); a release workflow that builds no
+  linux/arm64 archive; a missing `card.json` or one whose title or name disagrees with
+  `veduta.json`. A game that does not build for linux/arm64 fails the check, with the
+  located compiler error.
 - `veduta release` refuses a project that does not build for linux/arm64 or whose workflow
   publishes no linux/arm64 archive.
 

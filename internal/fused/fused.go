@@ -100,6 +100,22 @@ func Scan(path string, keep func(Site) bool) ([]Site, error) {
 	return out, nil
 }
 
+// Files returns the source files of the linux/arm64 binary at path, as its line table
+// records them, sorted. A caller whose filter matches none of them can tell a clean
+// binary from a filter that cannot see the code it looks for.
+func Files(path string) ([]string, error) {
+	t, err := open(path)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(t.syms.Files))
+	for f := range t.syms.Files {
+		out = append(out, f)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
 // InModule reports whether name, a file or package path as a -trimpath build records it,
 // belongs to the module whose path is module: it is the module's root package or lies
 // under it. A module whose path merely starts with the same letters (demolition for demo)

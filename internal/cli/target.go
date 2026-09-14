@@ -81,7 +81,10 @@ func runRefusal() string {
 }
 
 // consoleBuild compiles the game for the console into a temporary file and returns its
-// path, which the caller removes. Compile errors come back located, as from build.
+// path, which the caller removes. Compile errors come back located, as from build. The
+// build is -trimpath, as the release workflow's is: the file names it records are then
+// module paths (demo/game/kinds.go), which fusedSites matches whatever directory, symlink
+// or GOFLAGS the tool runs with (a flag on the command line overrides GOFLAGS).
 func (s *Session) consoleBuild() (string, []CompileError, error) {
 	f, err := os.CreateTemp("", "veduta-console-*")
 	if err != nil {
@@ -89,7 +92,7 @@ func (s *Session) consoleBuild() (string, []CompileError, error) {
 	}
 	bin := f.Name()
 	f.Close()
-	cmd := s.goCmd("build", "-o", bin, s.Project.Entry)
+	cmd := s.goCmd("build", "-trimpath", "-o", bin, s.Project.Entry)
 	cmd.Env = append(cmd.Env, "GOOS="+targetOS, "GOARCH="+targetArch)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -110,19 +113,113 @@ func firstNonEmpty(a, b string) string {
 	return b
 }
 
-// fusedSites lists the lines of the project's own code that compiled to fused
-// multiply-adds in the console binary at bin, as root-relative "file:line".
+// fusedSites lists the places in the game's own code that compiled to fused multiply-adds
+// in the console binary at bin, built by consoleBuild. The game's code is its main module
+// and its entry package. A line of the game is listed as root-relative "file:line"; a line
+// of another module (a gmath helper, say) that was inlined into a function of the game,
+// where the product the game passed in fused with the helper's addition, is listed with
+// that function: "gmath/vec.go:105 inlined in demo/game.updatePlayer". Lines of the game
+// come first, each once, in file and line order.
 func (s *Session) fusedSites(bin string) ([]string, error) {
-	root := filepath.ToSlash(s.Root) + "/"
-	sites, err := fused.Scan(bin, func(st fused.Site) bool { return strings.HasPrefix(filepath.ToSlash(st.File), root) })
+	mod, modDir, err := s.mainModule()
 	if err != nil {
 		return nil, err
 	}
-	out := make([]string, 0, len(sites))
-	for _, st := range sites {
-		out = append(out, fmt.Sprintf("%s:%d", strings.TrimPrefix(filepath.ToSlash(st.File), root), st.Line))
+	files, err := fused.Files(bin)
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	seen := false
+	for _, f := range files {
+		if fused.InModule(f, mod) {
+			seen = true
+			break
+		}
+	}
+	if !seen {
+		return nil, fmt.Errorf("no file of module %s in the console build, so its lines cannot be told apart", mod)
+	}
+	ours := func(st fused.Site) bool { return st.Package == "main" || fused.InModule(st.Package, mod) }
+	sites, err := fused.Scan(bin, func(st fused.Site) bool { return fused.InModule(st.File, mod) || ours(st) })
+	if err != nil {
+		return nil, err
+	}
+	var lines, inlined []string
+	listed := map[string]bool{}
+	for _, st := range sites {
+		var p string
+		if fused.InModule(st.File, mod) {
+			p = fmt.Sprintf("%s:%d", s.Rel(filepath.Join(modDir, filepath.FromSlash(strings.TrimPrefix(st.File, mod+"/")))), st.Line)
+		} else {
+			p = fmt.Sprintf("%s:%d inlined in %s", engineFile(st.File), st.Line, st.Func)
+		}
+		if listed[p] {
+			continue
+		}
+		listed[p] = true
+		if fused.InModule(st.File, mod) {
+			lines = append(lines, p)
+		} else {
+			inlined = append(inlined, p)
+		}
+	}
+	return append(lines, inlined...), nil
+}
+
+// engineFile shortens a file of the engine module, as a -trimpath build records it with or
+// without a version, to its path inside the engine (gmath/vec.go). Other files are kept.
+func engineFile(f string) string {
+	const engine = "github.com/riftbane/veduta"
+	rest, ok := strings.CutPrefix(f, engine)
+	if !ok {
+		return f
+	}
+	if strings.HasPrefix(rest, "@") {
+		_, rest, _ = strings.Cut(rest, "/")
+		return rest
+	}
+	if r, ok := strings.CutPrefix(rest, "/"); ok {
+		return r
+	}
+	return f
+}
+
+// mainModule finds the go.mod that governs the project root, as the go command does, and
+// returns its module path and directory.
+func (s *Session) mainModule() (path, dir string, err error) {
+	for d := s.Root; ; {
+		data, err := os.ReadFile(filepath.Join(d, "go.mod"))
+		if err == nil {
+			if m := modulePath(data); m != "" {
+				return m, d, nil
+			}
+			return "", "", fmt.Errorf("%s has no module line", filepath.Join(d, "go.mod"))
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return "", "", fmt.Errorf("no go.mod in %s or any parent directory", s.Root)
+		}
+		d = parent
+	}
+}
+
+// modulePath returns the path the module line of a go.mod names, or "".
+func modulePath(gomod []byte) string {
+	for _, line := range strings.Split(string(gomod), "\n") {
+		if i := strings.Index(line, "//"); i >= 0 {
+			line = line[:i]
+		}
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "module")
+		if !ok || rest == "" || !strings.ContainsAny(rest[:1], " \t\"") {
+			continue
+		}
+		rest = strings.TrimSpace(rest)
+		if p, err := strconv.Unquote(rest); err == nil {
+			return p
+		}
+		return rest
+	}
+	return ""
 }
 
 // releaseTargetsConsole reports whether the project's release workflow builds for the
@@ -207,8 +304,9 @@ func (s *Session) consoleChecks() []Check {
 				shown = append(shown[:10:10], fmt.Sprintf("and %d more", len(sites)-10))
 			}
 			cs = append(cs, Check{Name: "arm64", OK: true, Warning: true,
-				Detail: fmt.Sprintf("builds, but %d line(s) of the game compile to fused multiply-adds on arm64, so the console computes different bits than this machine and traces, goldens and scenarios can drift: %s", len(sites), strings.Join(shown, ", ")),
-				Fix:    "wrap each product that feeds + or - in a conversion to its own type, float32(a*b) + c; gmath's Vec.Scale, Mul, Dot and matrix products already do (docs: api, Determinism rules)"})
+				Detail: fmt.Sprintf("builds, but %d place(s) in the game's code compile to fused multiply-adds on arm64, so the console computes different bits than this machine and traces, goldens and scenarios can drift: %s", len(sites), strings.Join(shown, ", ")),
+				Fix: "wrap each product that feeds + or - in a conversion to its own type, float32(a*b) + c; gmath's Vec.Scale, Mul, Dot and matrix products already do. " +
+					"A line of another package inlined in a game function adds a product that function passes in: round it there, pos.Add(gmath.V3(float32(a*b), 0, 0)) (docs: api, Determinism rules)"})
 		default:
 			cs = append(cs, Check{Name: "arm64", OK: true, Detail: "builds for " + targetOS + "/" + targetArch + " with no fused multiply-add in the game's code"})
 		}

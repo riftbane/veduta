@@ -164,7 +164,10 @@ default); there is no interpolation and the player renders once per tick.
   too. `gmath` already rounds inside its own operations (`Vec3.Scale`, `Mul`, `Dot`,
   `Cross`, `Lerp`, matrix and quaternion products), so `pos.Add(vel.Scale(ctx.DT))` is
   safe as written. `veduta doctor` builds the game for linux/arm64 and lists every line of
-  the game's code where a fusion happened.
+  the game's code where a fusion happened, and every line of another package that fused
+  after it was inlined into a function of the game, such as
+  `gmath/vec.go:105 inlined in demo/game.updatePlayer`: there the product to round is the
+  one that function passes in, `pos.Add(gmath.V3(float32(a*b), 0, 0))`.
 - Use `gmath`'s trigonometry, never `math.Sin`, `math.Exp`, `math.Pow` or `math.Log`: those
   are not the same on every architecture. `math.Sqrt`, `Abs`, `Floor`, `Ceil`, `Trunc`
   and `Mod` are exact everywhere.
