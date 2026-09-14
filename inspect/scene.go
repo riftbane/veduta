@@ -1617,18 +1617,18 @@ func scnFBox(b gmath.AABB) string { return "[" + scnFV(b.Min) + ", " + scnFV(b.M
 
 // scnSize returns the size of a rendered view, framed 4:3 like the console panel:
 // summary tiles default to 317×238 (two columns and padding fill 640 pixels), single
-// views to 640×480. opt.Width and opt.Height override both (Height defaults to
-// Width·3/4); widths are clamped to [64, 317] for tiles and [64, 640] for views, heights
-// to [48, 640].
+// views to 640×480. opt.Width and opt.Height override both; widths are clamped to
+// [64, 317] for tiles and [64, 640] for views, heights to [48, 640]. A width given alone
+// is clamped first and the height follows it at 3/4, rounded, so the view stays 4:3.
 func scnSize(opt Options, tile bool) (int, int) {
 	w, h, maxW := 640, 480, 640
 	if tile {
 		w, h, maxW = 317, 238, (640-3*scnPad)/2
 	}
 	if opt.Width > 0 {
-		w, h = opt.Width, opt.Height
+		w, h = min(max(opt.Width, 64), maxW), opt.Height
 		if h <= 0 {
-			h = w * 3 / 4
+			h = (w*3 + 2) / 4
 		}
 	} else if opt.Height > 0 {
 		h = opt.Height

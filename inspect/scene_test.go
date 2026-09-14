@@ -269,8 +269,9 @@ func TestSceneTemplateMain(t *testing.T) {
 	golden.Image(t, "inspect_scene_main_ids", ids)
 }
 
-// TestSceneSheetSize pins the size of scene views: 4:3 by default, the height following
-// the width at 4:3 when only the width is given, and both clamped.
+// TestSceneSheetSize pins the size of scene views: 4:3 by default, and when only the
+// width is given it is clamped first and the height follows it at 4:3 (rounded), so a
+// clamped width still gives a 4:3 view.
 func TestSceneSheetSize(t *testing.T) {
 	for _, c := range []struct {
 		opt          Options
@@ -280,14 +281,16 @@ func TestSceneSheetSize(t *testing.T) {
 		{Options{}, false, 640, 480},
 		{Options{}, true, 317, 238},
 		{Options{Width: 320}, false, 320, 240},
-		{Options{Width: 320}, true, 317, 240},
+		{Options{Width: 320}, true, 317, 238},
+		{Options{Width: 317}, true, 317, 238},
 		{Options{Width: 200}, true, 200, 150},
 		{Options{Width: 400, Height: 100}, false, 400, 100},
 		{Options{Height: 300}, false, 640, 300},
 		{Options{Height: 300}, true, 317, 300},
 		{Options{Width: 10}, false, 64, 48},
 		{Options{Width: 100, Height: 1}, true, 100, 48},
-		{Options{Width: 4000}, false, 640, 640},
+		{Options{Width: 4000}, false, 640, 480},
+		{Options{Width: 4000}, true, 317, 238},
 		{Options{Width: 640, Height: 5000}, false, 640, 640},
 	} {
 		if w, h := scnSize(c.opt, c.tile); w != c.wantW || h != c.wantH {

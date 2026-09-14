@@ -607,6 +607,25 @@ func TestModelSheets(t *testing.T) {
 	}
 }
 
+// TestModelLayoutSize pins the tile size of model sheets given a width alone: the width
+// is clamped first and the height follows it at 4:3, so a clamped width stays 4:3.
+func TestModelLayoutSize(t *testing.T) {
+	for _, c := range []struct {
+		opt          Options
+		wantW, wantH int
+	}{
+		{Options{Width: 100}, 100, 75},
+		{Options{Width: 317}, 317, 238},
+		{Options{Width: 4000}, 1024, 768},
+		{Options{Width: 200, Height: 50}, 200, 50},
+		{Options{Width: 1}, 16, 16},
+	} {
+		if w, h, _ := mdlLayout("silhouette", c.opt); w != c.wantW || h != c.wantH {
+			t.Errorf("mdlLayout(%+v) = %dx%d, want %dx%d", c.opt, w, h, c.wantW, c.wantH)
+		}
+	}
+}
+
 func TestModelDeterministic(t *testing.T) {
 	lib := mdlTestLib(t, "hero_flipped")
 	ir := mdlTestRenderer(t, lib)
