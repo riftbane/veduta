@@ -250,6 +250,12 @@ Win32 windows are gone.
   CHANGELOG → Fixed). The serious ones were all on the console path: the exit chord on
   joystick-style pads, a Raspberry Pi's 16-bit HDMI framebuffer beside the panel, sticks
   with 0..255 axes, keys reaching the text console, and doctor missing fusions.
+- **Found during the acceptance walk:** the MCP walk through Claude Code questioned the
+  distance `query` gave at the hero (6.4 m for 13.3 m). The rasterizer weighed vertices with
+  edge functions still carrying the fill rule's bias, so triangles of a pixel or less were
+  drawn nearer and darker; present since v0.1.0. Fixed with a test of sub-pixel triangles;
+  28 golden images changed by a few pixels along silhouettes (looked at, e.g.
+  `testdata/golden/model_lathe.png`). The candidate `v1.0.0-rc.1` predates this fix.
 - **Verified here:**
   - `go test ./...`, `go vet ./...` (linux and windows), `gofmt -l .`, builds for
     linux/amd64, linux/arm64, linux/arm, windows/amd64, darwin/arm64; the arm64 suite under
