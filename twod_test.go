@@ -203,8 +203,9 @@ func TestSnapshotKeepsHitboxAndLayer(t *testing.T) {
 }
 
 // twodProject is the 2D fixture: an orthographic camera 12 m tall at x = y = 0, sprites
-// drawn as quads with hitboxes and layers, and two planes that show which rotation makes a
-// plane face the camera.
+// drawn as quads with hitboxes and layers, two planes that show which rotation makes a
+// plane face the camera, and two overlapping translucent tints at the same z whose order
+// only their layers decide (the one on the higher layer comes first in the file).
 var twodProject = filepath.Join("testdata", "twod")
 
 // twodXY maps a world point of the fixture's scene to the pixel of its 320×240 frame that
@@ -388,7 +389,8 @@ func TestRotatedPlaneAABBIsFlat(t *testing.T) {
 }
 
 // The 2D fixture renders through the real headless path (compiled from the sources on
-// disk), answers queries at pixels, and simulates a collision between two sprites.
+// disk) in layer order, answers queries at pixels, and simulates a collision between two
+// sprites.
 func TestTwoDFixture(t *testing.T) {
 	dir := t.TempDir()
 	code, rep := runCmd(t, "-project", twodProject, "-headless", "render", "--bundle", "--out", filepath.Join(dir, "twod.png"))
@@ -407,7 +409,7 @@ func TestTwoDFixture(t *testing.T) {
 	}
 	// A plane faces +Y: rotated -90° about X it faces away from a camera looking down -Z
 	// and is culled (+90° faces the camera). A blended sprite never owns id pixels.
-	for _, name := range []string{"plane_facing_away", "shade"} {
+	for _, name := range []string{"plane_facing_away", "shade", "tint_over", "tint_under"} {
 		if seen[name] != 0 {
 			t.Errorf("%s owns %v pixels", name, seen[name])
 		}
@@ -437,6 +439,23 @@ func TestTwoDFixture(t *testing.T) {
 	// The blended shade (layer 1) darkens the sky without owning the pixel.
 	if e, c := query(twodPixel(4, 0)); e != "sky" || c == "#3060a0" {
 		t.Errorf("under the shade: %s %s", e, c)
+	}
+	// Where the tints overlap, the red one (layer 1) is drawn over the green one (layer 0)
+	// although it has the lower id and the same depth: red dominates there, and each tint
+	// alone shows its own color.
+	for _, tc := range []struct {
+		x         float32
+		top, what string
+	}{{-6, "red", "red tint alone"}, {-5, "red", "overlap"}, {-4, "green", "green tint alone"}} {
+		e, c := query(twodPixel(tc.x, 0.5))
+		rgb, err := strconv.ParseUint(strings.TrimPrefix(c, "#"), 16, 32)
+		if e != "sky" || err != nil {
+			t.Errorf("%s: %s %s", tc.what, e, c)
+			continue
+		}
+		if r, g := rgb>>16&0xff, rgb>>8&0xff; (r > g) != (tc.top == "red") {
+			t.Errorf("%s: color %s, want %s on top", tc.what, c, tc.top)
+		}
 	}
 
 	code, sim := runCmd(t, "-project", twodProject, "-headless", "simulate", "--scene", "main", "--ticks", "12", "--out", filepath.Join(dir, "run"))

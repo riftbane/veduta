@@ -13,6 +13,10 @@
     { "name": "plane_facing_camera", "kind": "static", "model": "plane", "material": "hero",
       "position": [-5, 3, 1], "rotation_deg": [90, 0, 0] },
     { "name": "plane_facing_away", "kind": "static", "model": "plane", "material": "hero",
-      "position": [5, 3, 1], "rotation_deg": [-90, 0, 0] }
+      "position": [5, 3, 1], "rotation_deg": [-90, 0, 0] },
+    { "name": "tint_over", "kind": "static", "model": "quad", "material": "red_glass",
+      "position": [-5.5, 0.5, 2], "scale": [2, 1, 1], "layer": 1 },
+    { "name": "tint_under", "kind": "static", "model": "quad", "material": "green_glass",
+      "position": [-4.5, 0.5, 2], "scale": [2, 1, 1] }
   ]
 }
