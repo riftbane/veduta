@@ -135,6 +135,30 @@ func TestUpdateReportHuman(t *testing.T) {
 	}
 }
 
+// TestGoModRequires checks the test that decides whether upgrade must run go get: a
+// release candidate of the version, or a longer version it is a prefix of, is not it.
+func TestGoModRequires(t *testing.T) {
+	for _, c := range []struct {
+		mod, version string
+		want         bool
+	}{
+		{"require github.com/riftbane/veduta v1.0.0\n", "v1.0.0", true},
+		{"require github.com/riftbane/veduta v1.0.0", "v1.0.0", true},
+		{"require (\n\tgithub.com/riftbane/veduta v1.0.0 // indirect\n)\n", "v1.0.0", true},
+		{"require github.com/riftbane/veduta v1.0.0\r\n", "v1.0.0", true},
+		{"require github.com/riftbane/veduta v1.0.0-rc.1\n", "v1.0.0", false},
+		{"require github.com/riftbane/veduta v1.0.0-rc.10\n", "v1.0.0-rc.1", false},
+		{"require github.com/riftbane/veduta v1.0.0-rc.1.2\n", "v1.0.0-rc.1", false},
+		{"require github.com/riftbane/veduta v0.2.0\n", "v1.0.0", false},
+		{"require github.com/riftbane/vedutax v1.0.0\n", "v1.0.0", false},
+		{"", "v1.0.0", false},
+	} {
+		if got := goModRequires([]byte(c.mod), c.version); got != c.want {
+			t.Errorf("goModRequires(%q, %s) = %v, want %v", c.mod, c.version, got, c.want)
+		}
+	}
+}
+
 // TestUpdateChannelFlag checks that an unknown channel is a usage error (exit 2) refused
 // before anything is asked of the network: APIBase points at a port nothing listens on,
 // so a request would fail with a connection error instead.

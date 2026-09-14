@@ -170,7 +170,7 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 		r.Changed = append(r.Changed, "veduta.json")
 	}
 	mod, _ := os.ReadFile(filepath.Join(s.Root, "go.mod"))
-	if !regexp.MustCompile(`github\.com/riftbane/veduta\s+` + regexp.QuoteMeta(to) + `\b`).Match(mod) {
+	if !goModRequires(mod, to) {
 		for _, args := range [][]string{{"get", "github.com/riftbane/veduta@" + to}, {"mod", "tidy"}} {
 			cmd := s.goCmd(args...)
 			if out, err := cmd.CombinedOutput(); err != nil {
@@ -188,6 +188,12 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 	}
 	r.Changed = append(r.Changed, "CHANGELOG.md")
 	return r, nil
+}
+
+// goModRequires reports whether a go.mod names the engine at exactly version. The version
+// must end the word: v1.0.0-rc.1 is not v1.0.0, nor is v1.0.0-rc.10 v1.0.0-rc.1.
+func goModRequires(mod []byte, version string) bool {
+	return regexp.MustCompile(`github\.com/riftbane/veduta\s+` + regexp.QuoteMeta(version) + `(\s|$)`).Match(mod)
 }
 
 // addChangelogEntry adds a line under "## Unreleased", creating the file or section.
