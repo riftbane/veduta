@@ -16,9 +16,31 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/riftbane/veduta/docs"
 	"github.com/riftbane/veduta/inspect"
 	"github.com/riftbane/veduta/internal/golden"
 )
+
+// The docs tool's description names every topic, so an agent reading the tool list learns
+// that the extra topics (the 2d recipe among them) exist.
+func TestMCPDocsToolNamesEveryTopic(t *testing.T) {
+	for _, tl := range (&mcpServer{}).tools() {
+		if tl.Name != "docs" {
+			continue
+		}
+		words := map[string]bool{}
+		for _, w := range strings.FieldsFunc(tl.Description, func(r rune) bool { return r == ' ' || r == ',' || r == '(' || r == ')' || r == '.' || r == ':' }) {
+			words[w] = true
+		}
+		for _, topic := range docs.All() {
+			if !words[topic] {
+				t.Errorf("docs tool description %q does not name topic %q", tl.Description, topic)
+			}
+		}
+		return
+	}
+	t.Fatal("no docs tool")
+}
 
 // newProject creates a demo project with veduta init against this engine checkout.
 func newProject(t *testing.T) (string, *Env) {

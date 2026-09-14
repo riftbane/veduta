@@ -436,7 +436,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 		},
 		{
 			Name:        "docs",
-			Description: "Format reference for writing sources: model, texture, material, scene, scenario, api (also project, vda, inspect, config).",
+			Description: "Format reference for writing sources: model, texture, material, scene, scenario, api (also project, vda, inspect, config, 2d).",
 			InputSchema: schema(map[string]any{"topic": enum("topic", docs.All()...)}, "topic"),
 			Handler: func(ctx context.Context, args json.RawMessage) (*mcp.Result, error) {
 				var a struct {
