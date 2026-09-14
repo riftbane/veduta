@@ -53,7 +53,7 @@ os="$(uname -s)"
 arch="$(uname -m)"
 case "$os" in
 Linux) os=linux ;;
-Darwin) die "macOS is not supported by Veduta v0.1 (it needs cgo for windows); use Linux" ;;
+Darwin) die "no prebuilt veduta tool for macOS (releases carry linux/amd64, linux/arm64 and windows/amd64); build it from source with Go 1.25 or newer: go install -ldflags \"-X main.version=${version:-vX.Y.Z}\" github.com/riftbane/veduta/cmd/veduta@${version:-vX.Y.Z}" ;;
 *) die "unsupported OS $os (Veduta ships Linux and Windows binaries; on Windows download the zip from https://github.com/$REPO/releases)" ;;
 esac
 case "$arch" in

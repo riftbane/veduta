@@ -18,8 +18,8 @@ onto its card ([vedutaos](https://github.com/riftbane/vedutaos)).
 - **Deterministic across architectures.** Same seed + same input ⇒ same trace hash and
   identical frames on the PC that authors a game (linux/amd64, windows/amd64) and on the
   console that plays it (linux/arm64).
-- **Standard library only**, `CGO_ENABLED=0`; the tool runs on Linux and Windows, games
-  are released for linux/arm64.
+- **Standard library only**, `CGO_ENABLED=0`; the tool is released for Linux and Windows
+  and builds from source on macOS, games are released for linux/arm64.
 
 ## Install
 
@@ -35,6 +35,14 @@ Flags: `--prefix DIR`, `--version vX.Y.Z`, `--channel stable|beta`, `--with-go`,
 flags, `$VEDUTA_HOME` sets the prefix (`$VEDUTA_HOME/bin`). The beta channel installs
 release candidates as well as releases; to keep following it afterwards, run
 `veduta update --channel beta` once.
+
+Releases carry the tool for linux/amd64, linux/arm64 and windows/amd64 (on Windows, unzip
+`veduta_<tag>_windows_amd64.zip` from GitHub Releases). On macOS, build it from source with
+Go ≥ 1.25, naming the version so `veduta update` and `veduta upgrade` know it:
+
+```sh
+go install -ldflags "-X main.version=vX.Y.Z" github.com/riftbane/veduta/cmd/veduta@vX.Y.Z
+```
 
 ## Quick start
 

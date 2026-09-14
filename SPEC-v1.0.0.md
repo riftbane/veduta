@@ -47,7 +47,10 @@ shows, the card description a release ships, and the checks that keep a game pla
 the board.
 
 Windows, macOS and desktop Linux are **authoring machines**: they build, cook, inspect,
-render, simulate, test, fuzz and cross-compile. They do not open a window.
+render, simulate, test, fuzz and cross-compile. They do not open a window. Releases carry
+the tool for linux/amd64, linux/arm64 and windows/amd64 (§13.1); a macOS author builds it
+from source, naming the version so `update` and `upgrade` know it:
+`go install -ldflags "-X main.version=vX.Y.Z" github.com/riftbane/veduta/cmd/veduta@vX.Y.Z`.
 
 ### In scope
 
