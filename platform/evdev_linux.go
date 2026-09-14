@@ -22,9 +22,13 @@ type padDecoder struct {
 	size int               // bytes per record, eventSize unless a test says otherwise
 	held map[uint16]string // evdev code → the W3C code reported down for it
 	axis map[uint16]string // axis → the direction currently down for it
-	exit [2]bool           // the two chord buttons, held or not
-	quit bool              // the chord was closed: emit Close once
+	exit [2][2]bool        // the two members of each exit chord, held or not
+	quit bool              // a chord was closed: emit Close once
 }
+
+// exitChords close the window: the pad's Select and Start, and a keyboard's Ctrl and Q.
+// A console has no other way back, and a game must not be able to swallow it.
+var exitChords = [2][2]uint16{exitChord, keyboardExit}
 
 func newPadDecoder() *padDecoder {
 	return &padDecoder{size: eventSize, held: map[uint16]string{}, axis: map[uint16]string{}}
@@ -58,21 +62,30 @@ func (d *padDecoder) event(out []Event, typ, code uint16, value int32) []Event {
 			return out // auto-repeat: the engine reports a key once
 		}
 		down := value != 0
-		if i := chordIndex(code); i >= 0 {
-			d.exit[i] = down
-			if d.exit[0] && d.exit[1] && !d.quit {
-				d.quit = true
-				out = d.releaseAll(out)
-				return append(out, Event{Kind: Close})
-			}
-			if !down {
-				d.quit = false
+		for ci, chord := range exitChords {
+			for i, c := range chord {
+				if c != code {
+					continue
+				}
+				d.exit[ci][i] = down
+				if d.exit[ci][0] && d.exit[ci][1] && !d.quit {
+					d.quit = true
+					out = d.releaseAll(out)
+					return append(out, Event{Kind: Close})
+				}
+				if !down {
+					d.quit = false
+				}
 			}
 		}
 		name, ok := padButtons[code]
 		if !ok {
 			if name, ok = padDPad[code]; !ok {
-				return out
+				// Not a pad at all: a keyboard, which a console falls back to when no
+				// pad is plugged in.
+				if name, ok = evdevKeys[code]; !ok {
+					return out
+				}
 			}
 		}
 		out = d.set(out, code, name, down)
@@ -153,15 +166,6 @@ func sortedCodes(m map[uint16]string) []uint16 {
 		}
 	}
 	return codes
-}
-
-func chordIndex(code uint16) int {
-	for i, c := range exitChord {
-		if c == code {
-			return i
-		}
-	}
-	return -1
 }
 
 // evdevSource reads one pad device.

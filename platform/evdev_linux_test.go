@@ -137,6 +137,44 @@ func TestPadExitChord(t *testing.T) {
 	}
 }
 
+// TestKeyboardKeys: a console with no pad is driven from a keyboard, so the kernel's own
+// key codes have to reach the game as W3C codes. Without this the dashboard draws and then
+// answers nothing at all.
+func TestKeyboardKeys(t *testing.T) {
+	const size = 24
+	got := describePad(decodeAll(t, size,
+		record(size, evKey, 103, 1), // KEY_UP
+		record(size, evKey, 103, 0),
+		record(size, evKey, 28, 1), // KEY_ENTER
+		record(size, evKey, 57, 1), // KEY_SPACE
+		record(size, evKey, keyEsc, 1),
+		record(size, evKey, 17, 1),  // KEY_W
+		record(size, evKey, 190, 1), // a key with no W3C name: ignored, not guessed
+	))
+	want := "down ArrowUp,up ArrowUp,down Enter,down Space,down Escape,down KeyW"
+	if got != want {
+		t.Fatalf("keyboard: %s\n     want: %s", got, want)
+	}
+}
+
+// TestKeyboardExit: a keyboard needs its own way out, since the pad's chord does not exist
+// on one — and it must not be Escape, which the dashboard and games already use.
+func TestKeyboardExit(t *testing.T) {
+	const size = 24
+	got := describePad(decodeAll(t, size,
+		record(size, evKey, 17, 1), // something held, to be released first
+		record(size, evKey, keyboardExit[0], 1),
+		record(size, evKey, keyboardExit[1], 1),
+	))
+	if want := "down KeyW,down ControlLeft,up KeyW,up ControlLeft,close"; got != want {
+		t.Fatalf("Ctrl+Q: %s\n  want: %s", got, want)
+	}
+	// Escape alone is an ordinary key, not a way out of the window.
+	if got := describePad(decodeAll(t, size, record(size, evKey, keyEsc, 1))); got != "down Escape" {
+		t.Fatalf("Escape: %s", got)
+	}
+}
+
 func TestPadPartialRecord(t *testing.T) {
 	d := newPadDecoder()
 	d.size = 24
