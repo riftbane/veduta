@@ -5,15 +5,21 @@
 Veduta is a headless, deterministic game engine and asset toolchain written in pure Go,
 designed to be *looked at by machines*. Its primary user is an AI agent working on a
 server with no display: every feature exists to let that agent see, measure and fix what
-it is building. Humans download the resulting game builds and play them.
+it is building. People play the result on the Veduta console — a Raspberry Pi Zero 2 W or
+Pi 5 with a 320×240 panel refreshed at 20 Hz and a gamepad, which lists the games copied
+onto its card ([vedutaos](https://github.com/riftbane/vedutaos)).
 
 - **Numbers before pixels.** Every inspection produces a JSON report ranked by severity;
   small images (320×240, contact sheets) only confirm.
 - **Declarative sources.** Models, textures, materials, scenes and test scenarios are
   strict JSON with located errors (`file:line:col`).
-- **Headless everywhere except the player build.** The toolchain never opens a window.
-- **Deterministic.** Same seed + same input ⇒ same trace hash and identical frames.
-- **Standard library only**, `CGO_ENABLED=0`, Linux and Windows player builds.
+- **Headless everywhere except the console.** The toolchain never opens a window; the
+  player draws on the console's framebuffer and reads its pad.
+- **Deterministic across architectures.** Same seed + same input ⇒ same trace hash and
+  identical frames on the PC that authors a game (linux/amd64, windows/amd64) and on the
+  console that plays it (linux/arm64).
+- **Standard library only**, `CGO_ENABLED=0`; the tool runs on Linux and Windows, games
+  are released for linux/arm64.
 
 ## Install
 
@@ -38,18 +44,21 @@ veduta test          # go test + the demo's scenarios
 claude               # Claude Code connects to `veduta mcp` through .mcp.json
 ```
 
-The template is a playable demo: WASD moves the hero, Space jumps, gems are collected on
-contact, R resets, and a HUD shows score and tick. `veduta release v0.1.0` tags the game;
-its GitHub Actions workflow publishes Linux and Windows archives.
+The template is a playable demo: the arrows or WASD (the pad's D-pad) move the hero, Space
+(A) jumps, gems are collected on contact, R (Y) resets, and a HUD shows score and tick.
+`veduta release v0.1.0` tags the game; its GitHub Actions workflow publishes a linux/arm64
+archive that unpacks to a folder the console lists by its `card.json`, and a linux/amd64
+one for any other Linux machine with a framebuffer. A 2D game starts from the `2d` docs
+topic ([docs/2d.md](docs/2d.md)).
 
 ## Commands
 
 | Command | Purpose |
 |---------|---------|
 | `veduta init [dir] --name N [--module M]` | create a game project from the embedded template |
-| `veduta doctor` | check Go, git, the manifest, engine/tool versions, assets, updates |
+| `veduta doctor` | check Go, git, the manifest, engine/tool versions, assets, updates, and the game against the console (arm64 build, fused multiply-adds in the game's code, release target, `card.json`) |
 | `veduta build [--vet]` | cook stale assets, `go build` the game; errors as `{file,line,col,msg}` |
-| `veduta run` | run the player window (refuses without a display) |
+| `veduta run` | run the player on this machine's framebuffer (a console or a Linux text console; refuses anywhere else) |
 | `veduta cook [--force]` | compile changed asset sources to `.vda` |
 | `veduta render --scene S [--tick T] [--seed N] [--camera P] [--mode M] [--out f.png] [--bundle]` | render one frame headless |
 | `veduta simulate --scenario F` / `--scene S --ticks N --seed N [--input F]` | trace, verdict, expectations, invariants, one contact sheet |
@@ -58,7 +67,7 @@ its GitHub Actions workflow publishes Linux and Windows archives.
 | `veduta diff A B [--out f.png]` | image diff with an a\|b\|heat sheet |
 | `veduta test [--update-golden]` | `go test ./...` + every scenario + golden hashes and sheets |
 | `veduta fuzz --scene S --games N --ticks T --seed N` | random games; minimized repro of the first violation |
-| `veduta release vX.Y.Z [--dry-run]` | checklist → CHANGELOG → tag → push (CI publishes) |
+| `veduta release vX.Y.Z [--dry-run]` | checklist (tests, cook, smoke render, console build) → CHANGELOG → tag → push (CI publishes) |
 | `veduta mcp` | MCP server on stdio for AI agents |
 | `veduta update [--check] [--force] [--channel stable\|beta]` | update the tool from GitHub Releases; beta also offers release candidates |
 | `veduta upgrade` | move the project to the tool's engine version |
@@ -83,7 +92,7 @@ sized after the 320×240 console panel: renders are 320×240 by default and at m
 
 A game is a Go program: `func main() { veduta.Run(&game.Game{}) }`. Entity behaviours are
 registered by kind with `veduta.RegisterKind`; randomness comes only from `ctx.RNG`. The
-same binary runs the player window or, with `-headless`, the `render`, `simulate`,
+same binary runs the player on the console or, with `-headless`, the `render`, `simulate`,
 `query`, `snapshot` and `describe` subcommands the tool delegates to — the tool never
 contains game logic.
 
@@ -91,7 +100,7 @@ Format references (also served by the MCP `docs` tool): [model](docs/model.md),
 [texture](docs/texture.md), [material](docs/material.md), [scene](docs/scene.md),
 [scenario](docs/scenario.md), [game API](docs/api.md), [project manifest](docs/project.md),
 [.vda container](docs/vda.md), [inspection](docs/inspect.md),
-[tool configuration](docs/config.md).
+[tool configuration](docs/config.md), [2D games](docs/2d.md).
 
 ## Repository layout
 
@@ -103,18 +112,23 @@ sprite/                            2D/HUD batcher and the built-in 8×8 font
 scene/, sim/                       entities and cameras; RNG, input, trace, invariants
 asset/, asset/model, asset/texture, asset/cook   source formats, compilers, .vda, cooking
 inspect/                           reports, sheets, diff, frame bundles and queries
-platform/                          player windows: X11 (pure Go) and Win32 (syscall)
+platform/                          the console player: framebuffer and evdev pad/keyboard (Linux)
 mcp/, internal/cli, cmd/veduta     the MCP server and the veduta tool
+internal/fused                     finds fused multiply-adds in linux/arm64 binaries
 template/                          the project created by veduta init (demo game)
 testdata/                          golden images, trace hashes and fixtures
 ```
 
 ## Determinism
 
-Trace hashes and frames are identical for the same `GOOS`/`GOARCH`; CI compares the demo
-scenarios' trace hashes and contact sheets on `ubuntu-latest` and `windows-latest` against
-committed goldens. Release builds use `CGO_ENABLED=0 GOAMD64=v1`. Trigonometry is
-implemented in Go with explicit rounding, so it matches on every architecture.
+Trace hashes and frames are identical on linux/amd64, windows/amd64 and linux/arm64. CI
+runs every test and golden on `ubuntu-latest`, `windows-latest` and linux/arm64 under
+qemu-user against the same committed files. Release builds use `CGO_ENABLED=0 GOAMD64=v1`.
+Trigonometry is implemented in Go, and every float product that feeds an addition is
+rounded explicitly, because arm64 would otherwise fuse `a*b + c` into one instruction with
+one rounding; `go test ./internal/fused` fails on any engine line where that happened, and
+`veduta doctor` lists the lines of a game's own code (see the determinism rules in
+[docs/api.md](docs/api.md)).
 
 ## Updates
 
@@ -137,9 +151,11 @@ defaults (see [the project manifest](docs/project.md#upgrading)).
 
 ## Status
 
-v0.1.0 is the first release; see [CHANGELOG.md](CHANGELOG.md), the specification
-[SPEC-v0.1.0.md](SPEC-v0.1.0.md) and the progress log [PROGRESS.md](PROGRESS.md).
-Deferred: GPU backend, macOS, skeletal animation, audio, physics beyond AABB, networking.
+v1.0.0 is the first stable release; see [CHANGELOG.md](CHANGELOG.md), the specification
+[SPEC-v1.0.0.md](SPEC-v1.0.0.md) (which supersedes [SPEC-v0.1.0.md](SPEC-v0.1.0.md)) and
+the progress log [PROGRESS.md](PROGRESS.md). From v1.0.0 the source formats are stable
+within 1.x (SPEC §13.4). Deferred: GPU backend, desktop player windows, audio, skeletal
+animation, physics beyond AABB overlap, networking.
 
 ## License
 

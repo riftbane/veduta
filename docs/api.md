@@ -1,8 +1,9 @@
 # Veduta game API (`api`)
 
 A Veduta game is a Go program whose `main` calls `veduta.Run(&game.Game{})`. The same
-binary opens the player window on a desktop and, with `-headless`, renders, simulates and
-answers queries for the `veduta` tool on a server with no display. Game logic lives only
+binary plays on the console (a linux/arm64 board drawing on its panel's framebuffer and
+reading a gamepad) and, with `-headless`, renders, simulates and answers queries for the
+`veduta` tool on any machine, including a server with no display. Game logic lives only
 in the game binary; the tool never contains game code.
 
 ```go
@@ -72,14 +73,14 @@ type StateCodec interface {
 
 ## Input
 
-`veduta.Input` is a value type, identical whether it comes from a window or a script.
+`veduta.Input` is a value type, identical whether it comes from the console or a script.
 
 | Field / method | Meaning |
 |----------------|---------|
 | `Pressed`, `Held`, `Released` | key sets by W3C `KeyboardEvent.code` (`KeyW`, `Space`, `ArrowLeft`, `ShiftLeft`, …) |
 | `Down(code)`, `JustPressed(code)`, `JustReleased(code)` | key queries |
 | `Axis(neg, pos)` | −1, 0 or +1, e.g. `in.Axis("KeyA", "KeyD")` |
-| `Mouse gmath.Vec2` | cursor in window pixels, origin top-left |
+| `Mouse gmath.Vec2` | cursor in frame pixels, origin top-left (scenarios only) |
 | `MouseDelta gmath.Vec2` | how far the cursor moved during this tick, in pixels (mouse look) |
 | `Buttons`, `ButtonsPressed`, `ButtonsReleased`, `Button(name)` | mouse buttons `left`, `middle`, `right` |
 | `Text string` | characters typed during the tick |
