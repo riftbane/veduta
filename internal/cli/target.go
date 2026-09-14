@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -292,24 +291,49 @@ func fusedCheck(sites []string) Check {
 			"A line of another package inlined in a game function adds a product that function passes in: round it there, pos.Add(gmath.V3(float32(a*b), 0, 0)) (docs: api, Determinism rules)"}
 }
 
-// cardProblem compares card.json, the description the console lists, with the manifest.
-// It returns "" when they agree.
-func (s *Session) cardProblem() string {
+// cardFields are the fields card/1 defines besides "veduta"; each is a string when present.
+var cardFields = []string{"title", "name", "version", "exec", "icon"}
+
+// readCard reads card.json, the description the console lists a game by. It returns the
+// card, or why the console could not read it: the file is missing, is not a JSON object,
+// is not card/1 or has a field of the wrong type. The release gate refuses such a card.
+func (s *Session) readCard() (map[string]any, string) {
 	data, err := os.ReadFile(filepath.Join(s.Root, "card.json"))
 	if os.IsNotExist(err) {
-		return "no card.json: the console lists a game by it (veduta init writes one)"
+		return nil, "no card.json: the console lists a game by it (veduta init writes one)"
 	}
 	if err != nil {
-		return err.Error()
+		return nil, err.Error()
 	}
 	var c map[string]any
-	if err := json.Unmarshal(data, &c); err != nil {
-		return "card.json is not a JSON object: " + err.Error()
+	if err := json.Unmarshal(data, &c); err != nil || c == nil {
+		why := "null"
+		if err != nil {
+			why = err.Error()
+		}
+		return nil, "card.json is not a JSON object: " + why
+	}
+	if v, _ := c["veduta"].(string); v != "card/1" {
+		return nil, fmt.Sprintf(`card.json's "veduta" is %q, want "card/1"`, v)
+	}
+	for _, f := range cardFields {
+		if v, ok := c[f]; ok {
+			if _, isString := v.(string); !isString {
+				return nil, fmt.Sprintf("card.json's %q is not a string", f)
+			}
+		}
+	}
+	return c, ""
+}
+
+// cardProblem compares card.json with the manifest. It returns "" when the card is valid
+// and agrees with veduta.json; a card that is not valid is marked as refused by release.
+func (s *Session) cardProblem() string {
+	c, why := s.readCard()
+	if why != "" {
+		return why + "; veduta release refuses until it is fixed"
 	}
 	var diffs []string
-	if v, _ := c["veduta"].(string); v != "card/1" {
-		diffs = append(diffs, fmt.Sprintf(`"veduta" is %q, want "card/1"`, v))
-	}
 	if v, ok := c["title"].(string); ok && v != s.Project.Title {
 		diffs = append(diffs, fmt.Sprintf("title %q differs from veduta.json's %q", v, s.Project.Title))
 	}
@@ -376,10 +400,23 @@ func (s *Session) consoleChecks() []Check {
 	return cs
 }
 
-// consoleReady is the release gate: a release nobody can install on the console is not a
-// release. It returns "" when the game builds for the console and the workflow publishes
-// that build.
-func (s *Session) consoleReady() string {
+// consoleReleasable is the first half of the release gate, a release nobody can install on
+// the console is not a release: it returns "" when a workflow publishes a linux/arm64
+// archive and card.json is one the console can read, and otherwise why not. It only reads
+// files, so release runs it before the tests.
+func (s *Session) consoleReleasable() string {
+	if ok, detail := s.releaseTargetsConsole(); !ok {
+		return detail
+	}
+	if _, why := s.readCard(); why != "" {
+		return why
+	}
+	return ""
+}
+
+// consoleBuilds is the second half of the release gate: it returns "" when the game builds
+// for the console, and otherwise the located error.
+func (s *Session) consoleBuilds() string {
 	bin, errs, err := s.consoleBuild()
 	if err != nil {
 		if len(errs) > 0 {
@@ -388,16 +425,5 @@ func (s *Session) consoleReady() string {
 		return err.Error()
 	}
 	os.Remove(bin)
-	if ok, detail := s.releaseTargetsConsole(); !ok {
-		return detail
-	}
 	return ""
-}
-
-// errorOrNil turns a non-empty explanation into an error.
-func errorOrNil(why string) error {
-	if why == "" {
-		return nil
-	}
-	return errors.New(why)
 }

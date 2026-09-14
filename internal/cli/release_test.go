@@ -88,20 +88,42 @@ func TestReleaseProjectFlow(t *testing.T) {
 	}
 	os.Remove(filepath.Join(dir, "scratch.txt"))
 
-	// A release the console cannot install is refused.
+	// A release the console cannot install is refused, before the tests run, with the
+	// reason and nothing else: a workflow that builds no linux/arm64 archive, or a project
+	// without a card.json for the console to list it by.
+	refused := func(what, want string) {
+		t.Helper()
+		r, err := Release(env, dir, ReleaseOptions{Version: "v0.1.0", DryRun: true})
+		var names []string
+		for _, st := range r.Steps {
+			names = append(names, st.Name)
+		}
+		last := r.Steps[len(r.Steps)-1]
+		if err != nil || r.OK || strings.Join(names, ",") != "version,clean,branch,console" || !strings.Contains(last.Detail, want) || strings.Contains(last.Detail, "publishes the") {
+			t.Fatalf("release %s: %s %v", what, r.Human(), err)
+		}
+		git(dir, "reset", "-q", "--hard", "HEAD~1")
+	}
 	wf := filepath.Join(dir, ".github", "workflows", "release.yml")
 	w, _ := os.ReadFile(wf)
 	os.WriteFile(wf, []byte(strings.Replace(string(w), "for target in linux/arm64 linux/amd64", "for target in linux/amd64", 1)), 0o644)
 	git(dir, "commit", "-q", "-am", "Build no console archive")
-	r, err = Release(env, dir, ReleaseOptions{Version: "v0.1.0", DryRun: true})
-	if last := r.Steps[len(r.Steps)-1]; err != nil || r.OK || last.Name != "console" || !strings.Contains(last.Detail, "no linux/arm64") {
-		t.Fatalf("release without a console build: %s %v", r.Human(), err)
-	}
-	git(dir, "reset", "-q", "--hard", "HEAD~1")
+	refused("without a console build", "no linux/arm64")
+	git(dir, "rm", "-q", "card.json")
+	git(dir, "commit", "-q", "-m", "Drop the card")
+	refused("without card.json", "no card.json")
+	os.WriteFile(filepath.Join(dir, "card.json"), []byte(`{"veduta": "card/2", "title": "demo"}`), 0o644)
+	git(dir, "commit", "-q", "-am", "Write a card the console cannot read")
+	refused("with a card that is not card/1", `"veduta" is "card/2"`)
 
 	r, err = Release(env, dir, ReleaseOptions{Version: "v0.1.0"})
 	if err != nil || !r.OK || !r.Pushed {
 		t.Fatalf("release: %s %v", r.Human(), err)
+	}
+	for _, name := range []string{"console", "arm64"} {
+		if st := findStep(r, name); st == nil || !st.OK || strings.Contains(st.Detail, "failed") {
+			t.Fatalf("%s step: %s", name, r.Human())
+		}
 	}
 	if tags := git(remote, "tag", "--list"); tags != "v0.1.0" {
 		t.Fatalf("remote tags %q", tags)
@@ -114,4 +136,14 @@ func TestReleaseProjectFlow(t *testing.T) {
 	if r, _ := Release(env, dir, ReleaseOptions{Version: "v0.1.0", DryRun: true}); r.OK {
 		t.Fatal("released the same version twice")
 	}
+}
+
+// findStep returns the release step called name, or nil.
+func findStep(r *ReleaseReport, name string) *ReleaseStep {
+	for i := range r.Steps {
+		if r.Steps[i].Name == name {
+			return &r.Steps[i]
+		}
+	}
+	return nil
 }

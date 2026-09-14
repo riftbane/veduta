@@ -610,8 +610,10 @@ game -headless describe                                    # registered kinds, i
   the `sites` field of `--json` all of them; a release workflow that builds no linux/arm64
   archive; a missing `card.json` or one whose title or name disagrees with `veduta.json`. A game that does not build for linux/arm64 fails the check, with the
   located compiler error.
-- `veduta release` refuses a project that does not build for linux/arm64 or whose workflow
-  publishes no linux/arm64 archive.
+- `veduta release` refuses a project whose workflows publish no linux/arm64 archive, whose
+  `card.json` the console cannot read (missing, not a JSON object, not `card/1`, or a field
+  that is not a string), or that does not build for linux/arm64. The first two are checked
+  before the tests, the build after the smoke render.
 
 ## 11. MCP server tools
 

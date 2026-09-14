@@ -135,6 +135,13 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 	}
 	// 3. Tests.
 	if r.Kind == "project" {
+		// A release nobody can install on the console is not a release. The workflow and the
+		// card are files to read, so they are checked before the tests; the console build
+		// comes after the smoke render.
+		why := s.consoleReleasable()
+		if !step("console", why == "", "%s", firstNonEmpty(why, "a workflow publishes the "+targetOS+"/"+targetArch+" archive and card.json is card/1")) {
+			return finish(r), nil
+		}
 		tr, err := s.Test(false)
 		if !step("test", err == nil && tr.OK, "%s", testDetail(tr, err)) {
 			return finish(r), nil
@@ -147,9 +154,8 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 		if !step("smoke", err == nil, "render %v", renderDetail(rep, err)) {
 			return finish(r), nil
 		}
-		// A release nobody can install on the console is not a release.
-		why := s.consoleReady()
-		if !step("console", why == "", "%s", okOr("builds for "+targetOS+"/"+targetArch+" and the release workflow publishes it", errorOrNil(why))) {
+		why = s.consoleBuilds()
+		if !step("arm64", why == "", "%s", firstNonEmpty(why, "the game builds for "+targetOS+"/"+targetArch)) {
 			return finish(r), nil
 		}
 	} else {
