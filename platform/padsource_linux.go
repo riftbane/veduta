@@ -10,18 +10,18 @@ import (
 	"time"
 )
 
-// Finding the pad and surviving it being unplugged. Discovery is reading sysfs, so it is
-// testable anywhere; opening the device is behind openPad so a test can hand back
-// something a regular file cannot be — a character device answers read deadlines, a file
-// does not.
+// Finding what the player holds, and surviving it being unplugged. Discovery is reading
+// sysfs, so it is testable anywhere; opening a device is behind openPad so a test can hand
+// back something a regular file cannot be — a character device answers read deadlines, a
+// file does not.
 var openPad = func(path string) (events, error) { return openEvdev(path) }
 
 // padEnv names a device to use instead of searching: an event node ("event3") or part of a
 // device name ("Rii").
 const padEnv = "VEDUTA_PAD"
 
-// padRescan is how long to wait before looking for a pad again after finding none or
-// losing one. A console is usually switched on before the pad is plugged in.
+// padRescan is how long to wait before looking again after finding nothing or losing a
+// device. A console is usually switched on before the pad is plugged in.
 const padRescan = time.Second
 
 // inputDevice is one /dev/input/eventN and what sysfs says about it.
@@ -31,16 +31,19 @@ type inputDevice struct {
 	Name string // "Rii Gamepad"
 }
 
-// findPad returns the pad among the input devices: the one whose key capabilities carry
-// gamepad or joystick buttons. A keyboard has none of them, which is how the two are told
-// apart without opening either.
-func findPad(want string) (inputDevice, error) {
+// findInputs returns every device worth reading: gamepads first, then keyboards, each
+// group in node order so the same devices are chosen every time. A keyboard counts because
+// a console is often used before its pad is plugged in — on an emulated machine, at a text
+// console, or on the bench the day the panel works and the pad's buttons are still
+// unknown. What a device is, is read from its capabilities in sysfs rather than by opening
+// it.
+func findInputs(want string) ([]inputDevice, error) {
 	dir := filepath.Join(sysRoot, "sys", "class", "input")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return inputDevice{}, fmt.Errorf("platform: no input devices in %s: %w", dir, err)
+		return nil, fmt.Errorf("platform: no input devices in %s: %w", dir, err)
 	}
-	var all, matching []inputDevice
+	var all, matching, pads, keyboards []inputDevice
 	for _, e := range entries {
 		if !strings.HasPrefix(e.Name(), "event") {
 			continue
@@ -51,23 +54,32 @@ func findPad(want string) (inputDevice, error) {
 			Name: readAttr(dir, e.Name(), "device/name"),
 		}
 		all = append(all, d)
+		keys := readAttr(dir, e.Name(), "device/capabilities/key")
 		switch {
 		case want != "":
 			if d.Node == want || (d.Name != "" && strings.Contains(strings.ToLower(d.Name), strings.ToLower(want))) {
 				matching = append(matching, d)
 			}
-		case hasPadButtons(readAttr(dir, e.Name(), "device/capabilities/key")):
-			matching = append(matching, d)
+		case hasPadButtons(keys):
+			pads = append(pads, d)
+		case hasKeyboardKeys(keys):
+			keyboards = append(keyboards, d)
 		}
 	}
-	sort.Slice(matching, func(i, j int) bool { return matching[i].Node < matching[j].Node })
+	byNode := func(l []inputDevice) { sort.Slice(l, func(i, j int) bool { return l[i].Node < l[j].Node }) }
+	byNode(matching)
+	byNode(pads)
+	byNode(keyboards)
+	if want == "" {
+		matching = append(pads, keyboards...)
+	}
 	if len(matching) == 0 {
 		if want != "" {
-			return inputDevice{}, fmt.Errorf("platform: no input device matches %q (found %s)", want, describeInputs(all))
+			return nil, fmt.Errorf("platform: no input device matches %q (found %s)", want, describeInputs(all))
 		}
-		return inputDevice{}, fmt.Errorf("platform: no gamepad among the input devices (found %s); set %s to name one", describeInputs(all), padEnv)
+		return nil, fmt.Errorf("platform: no gamepad or keyboard among the input devices (found %s); set %s to name one", describeInputs(all), padEnv)
 	}
-	return matching[0], nil // the lowest node, so the same pad is chosen every time
+	return matching, nil
 }
 
 func describeInputs(list []inputDevice) string {
@@ -103,6 +115,10 @@ func hasPadButtons(bitmap string) bool {
 	return false
 }
 
+// hasKeyboardKeys reports whether a bitmap is a keyboard's. Escape is on every one of them
+// and on no gamepad.
+func hasKeyboardKeys(bitmap string) bool { return bitmapHas(bitmap, keyEsc) }
+
 // bitmapHas reports whether a bit is set in a sysfs capability bitmap. The kernel prints
 // these as hexadecimal words from the most significant down, one per machine word, so the
 // width is taken from the text itself rather than assumed: the same code reads a 64-bit
@@ -128,57 +144,84 @@ func bitmapHas(bitmap string, bit int) bool {
 	return false
 }
 
-// padSource keeps a pad attached across unplugging: the console goes on running, and the
-// keys the pad had down are reported released rather than left stuck.
-type padSource struct {
+// openDevice is one device being read.
+type openDevice struct {
+	node string
+	src  events
+}
+
+// inputSource reads every gamepad and keyboard at once and hands their events on together.
+// Reading all of them rather than choosing one is what lets a console be driven from a
+// keyboard while its pad is unplugged, and lets the pad take over the moment it appears,
+// without anything having to be restarted.
+type inputSource struct {
 	want  string
-	src   events
-	next  time.Time        // when to look again, while there is no pad
+	open  []openDevice
+	next  time.Time        // when to look again
 	now   func() time.Time // replaced in tests
-	dev   string
 	tried bool
 }
 
-func newPadSource(want string) *padSource {
-	return &padSource{want: want, now: time.Now}
+func newInputSource(want string) *inputSource {
+	return &inputSource{want: want, now: time.Now}
 }
 
-// Device is the node currently read, empty when no pad is attached.
-func (p *padSource) Device() string { return p.dev }
+// Devices names what is being read, for diagnostics; empty when nothing is.
+func (p *inputSource) Devices() string {
+	nodes := make([]string, len(p.open))
+	for i, d := range p.open {
+		nodes[i] = d.node
+	}
+	return strings.Join(nodes, ",")
+}
 
-func (p *padSource) poll() ([]Event, error) {
-	if p.src == nil {
-		if p.tried && p.now().Before(p.next) {
-			return nil, nil
-		}
-		p.tried = true
-		d, err := findPad(p.want)
+func (p *inputSource) poll() ([]Event, error) {
+	p.attach()
+	var out []Event
+	for i := 0; i < len(p.open); {
+		d := p.open[i]
+		evs, err := d.src.poll()
+		out = append(out, evs...)
 		if err != nil {
+			// Unplugged: evs already carries the keys it had down, released.
+			d.src.close()
+			p.open = append(p.open[:i], p.open[i+1:]...)
 			p.next = p.now().Add(padRescan)
-			return nil, nil // no pad yet is a console waiting, not a failure
+			continue
 		}
+		i++
+	}
+	return out, nil
+}
+
+// attach opens whatever is there, at most once per rescan interval. Finding nothing is a
+// console waiting for a pad to be plugged in, not a failure.
+func (p *inputSource) attach() {
+	if len(p.open) > 0 || (p.tried && p.now().Before(p.next)) {
+		return
+	}
+	p.tried = true
+	p.next = p.now().Add(padRescan)
+	devices, err := findInputs(p.want)
+	if err != nil {
+		return
+	}
+	for _, d := range devices {
 		src, err := openPad(d.Dev)
 		if err != nil {
-			p.next = p.now().Add(padRescan)
-			return nil, nil
+			continue // a device that will not open is one we do without
 		}
-		p.src, p.dev = src, d.Node
+		p.open = append(p.open, openDevice{node: d.Node, src: src})
 	}
-	evs, err := p.src.poll()
-	if err != nil {
-		// Unplugged mid-game: evs already carries the releases the decoder produced.
-		p.src.close()
-		p.src, p.dev = nil, ""
-		p.next = p.now().Add(padRescan)
-	}
-	return evs, nil
 }
 
-func (p *padSource) close() error {
-	if p.src == nil {
-		return nil
+func (p *inputSource) close() error {
+	var err error
+	for _, d := range p.open {
+		if cerr := d.src.close(); err == nil {
+			err = cerr
+		}
 	}
-	err := p.src.close()
-	p.src, p.dev = nil, ""
+	p.open = nil
 	return err
 }

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// fakeInputs builds a /sys/class/input tree. Each entry is "node name key-bitmap".
+// fakeInputs builds a /sys/class/input tree. Each entry is "node name|key-bitmap".
 func fakeInputs(t *testing.T, entries ...string) {
 	t.Helper()
 	root := sysRoot
@@ -36,7 +36,8 @@ func fakeInputs(t *testing.T, entries ...string) {
 	}
 }
 
-// A key bitmap with one bit set, printed the way the kernel prints it.
+// bitmapWith prints a capability bitmap with one bit set, the way the kernel prints them:
+// hexadecimal words of the machine's width, most significant first.
 func bitmapWith(bit int, wordChars int) string {
 	words := bit/(wordChars*4) + 1
 	out := make([]string, words)
@@ -44,11 +45,17 @@ func bitmapWith(bit int, wordChars int) string {
 		out[i] = strings.Repeat("0", wordChars)
 	}
 	w := bit / (wordChars * 4)
-	var v uint64 = 1 << uint(bit%(wordChars*4))
-	hex := strconv.FormatUint(v, 16)
+	hex := strconv.FormatUint(1<<uint(bit%(wordChars*4)), 16)
 	out[len(out)-1-w] = strings.Repeat("0", wordChars-len(hex)) + hex
 	return strings.Join(out, " ")
 }
+
+var (
+	padBits      = bitmapWith(btnSouth, 16)
+	joystickBits = bitmapWith(btnTrigger, 16)
+	keyboardBits = bitmapWith(keyEsc, 16)
+	mouseBits    = bitmapWith(0x110, 16) // BTN_LEFT: neither a pad nor a keyboard
+)
 
 func TestBitmapHas(t *testing.T) {
 	// A 64-bit kernel prints sixteen characters per word, a 32-bit one eight.
@@ -67,49 +74,81 @@ func TestBitmapHas(t *testing.T) {
 	}
 }
 
-func TestFindPad(t *testing.T) {
-	keyboard := bitmapWith(0x20, 16) // an ordinary key, no gamepad buttons
-	pad := bitmapWith(btnSouth, 16)
-	joystick := bitmapWith(btnTrigger, 16)
-
-	t.Run("the pad among keyboards", func(t *testing.T) {
-		fakeInputs(t, "event0 AT Keyboard|"+keyboard, "event3 Rii Gamepad|"+pad)
-		d, err := findPad("")
-		if err != nil || d.Node != "event3" {
-			t.Fatalf("found %+v, %v", d, err)
-		}
-		if d.Dev != filepath.Join(sysRoot, "dev", "input", "event3") {
-			t.Errorf("device node %s", d.Dev)
-		}
-	})
-	t.Run("a joystick-style pad counts", func(t *testing.T) {
-		fakeInputs(t, "event0 Clone Joystick|"+joystick)
-		if d, err := findPad(""); err != nil || d.Node != "event0" {
-			t.Fatalf("found %+v, %v", d, err)
-		}
-	})
-	t.Run("chosen by name", func(t *testing.T) {
-		fakeInputs(t, "event0 One Pad|"+pad, "event1 Other Pad|"+pad)
-		if d, err := findPad("other"); err != nil || d.Node != "event1" {
-			t.Fatalf("found %+v, %v", d, err)
-		}
-	})
-	t.Run("the lowest node when several match", func(t *testing.T) {
-		fakeInputs(t, "event5 Pad|"+pad, "event2 Pad|"+pad)
-		if d, err := findPad(""); err != nil || d.Node != "event2" {
-			t.Fatalf("found %+v, %v", d, err)
-		}
-	})
-	t.Run("no pad", func(t *testing.T) {
-		fakeInputs(t, "event0 AT Keyboard|"+keyboard)
-		_, err := findPad("")
-		if err == nil || !strings.Contains(err.Error(), "no gamepad") {
-			t.Fatalf("err = %v", err)
-		}
-	})
+func TestFindInputs(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		entries []string
+		want    string
+		nodes   []string
+		errHas  string
+	}{
+		{
+			// Both are read, and the pad comes first.
+			name:    "a pad and a keyboard",
+			entries: []string{"event0 AT Keyboard|" + keyboardBits, "event3 Rii Gamepad|" + padBits},
+			nodes:   []string{"event3", "event0"},
+		},
+		{
+			// A console with no pad is driven from the keyboard rather than left deaf.
+			name:    "only a keyboard",
+			entries: []string{"event0 AT Keyboard|" + keyboardBits},
+			nodes:   []string{"event0"},
+		},
+		{
+			name:    "a joystick-style pad counts as a pad",
+			entries: []string{"event0 Clone Joystick|" + joystickBits},
+			nodes:   []string{"event0"},
+		},
+		{
+			name:    "pads in node order, then keyboards",
+			entries: []string{"event5 Pad|" + padBits, "event1 Keyboard|" + keyboardBits, "event2 Pad|" + padBits},
+			nodes:   []string{"event2", "event5", "event1"},
+		},
+		{
+			name:    "chosen by name, whatever it is",
+			entries: []string{"event0 One Pad|" + padBits, "event1 Other Pad|" + padBits},
+			want:    "other",
+			nodes:   []string{"event1"},
+		},
+		{
+			name:    "nothing to read",
+			entries: []string{"event0 Some Mouse|" + mouseBits},
+			errHas:  "no gamepad or keyboard",
+		},
+		{
+			name:    "the choice matches nothing",
+			entries: []string{"event0 Pad|" + padBits},
+			want:    "event9",
+			errHas:  "no input device matches",
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			fakeInputs(t, c.entries...)
+			got, err := findInputs(c.want)
+			if c.errHas != "" {
+				if err == nil || !strings.Contains(err.Error(), c.errHas) {
+					t.Fatalf("err = %v, want one containing %q", err, c.errHas)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var nodes []string
+			for _, d := range got {
+				nodes = append(nodes, d.Node)
+			}
+			if strings.Join(nodes, ",") != strings.Join(c.nodes, ",") {
+				t.Fatalf("found %v, want %v", nodes, c.nodes)
+			}
+			if got[0].Dev != filepath.Join(sysRoot, "dev", "input", c.nodes[0]) {
+				t.Errorf("device node %s", got[0].Dev)
+			}
+		})
+	}
 }
 
-// fakePad is an input source a test can drive.
+// fakePad is an input device a test can drive.
 type fakePad struct {
 	batches [][]Event
 	err     error
@@ -127,8 +166,8 @@ func (f *fakePad) poll() ([]Event, error) {
 
 func (f *fakePad) close() error { f.closed++; return nil }
 
-func TestPadSourceAttachesAndSurvivesUnplugging(t *testing.T) {
-	fakeInputs(t, "event0 Rii Gamepad|"+bitmapWith(btnSouth, 16))
+func TestInputSourceAttachesAndSurvivesUnplugging(t *testing.T) {
+	fakeInputs(t, "event0 Rii Gamepad|"+padBits)
 	pad := &fakePad{
 		batches: [][]Event{{{Kind: KeyDown, Code: "Space"}}},
 		err:     errors.New("device removed"),
@@ -139,23 +178,23 @@ func TestPadSourceAttachesAndSurvivesUnplugging(t *testing.T) {
 	t.Cleanup(func() { openPad = old })
 
 	now := time.Now()
-	p := newPadSource("")
+	p := newInputSource("")
 	p.now = func() time.Time { return now }
 
 	if evs, err := p.poll(); err != nil || len(evs) != 1 || evs[0].Code != "Space" {
 		t.Fatalf("first poll: %v %v", evs, err)
 	}
-	if p.Device() != "event0" {
-		t.Errorf("attached to %q", p.Device())
+	if p.Devices() != "event0" {
+		t.Errorf("reading %q", p.Devices())
 	}
-	// The pad is pulled out: the console keeps running and the pad is let go.
+	// Pulled out: the console keeps running and lets the device go.
 	if evs, err := p.poll(); err != nil || len(evs) != 0 {
 		t.Fatalf("unplugged poll: %v %v", evs, err)
 	}
-	if p.Device() != "" || pad.closed != 1 {
-		t.Fatalf("after unplugging: device %q, closed %d", p.Device(), pad.closed)
+	if p.Devices() != "" || pad.closed != 1 {
+		t.Fatalf("after unplugging: reading %q, closed %d", p.Devices(), pad.closed)
 	}
-	// It is not reopened again and again in between.
+	// It is not reopened over and over in between.
 	if _, err := p.poll(); err != nil || opened != 1 {
 		t.Fatalf("polls during the wait opened it %d times", opened)
 	}
@@ -171,12 +210,48 @@ func TestPadSourceAttachesAndSurvivesUnplugging(t *testing.T) {
 	}
 }
 
-func TestPadSourceWithoutAPad(t *testing.T) {
-	fakeInputs(t, "event0 AT Keyboard|"+bitmapWith(0x20, 16))
-	p := newPadSource("")
+// TestInputSourceReadsPadAndKeyboard is the case that makes the console usable before its
+// pad exists: both devices are read, and what either sends arrives.
+func TestInputSourceReadsPadAndKeyboard(t *testing.T) {
+	fakeInputs(t, "event0 AT Keyboard|"+keyboardBits, "event1 Rii Gamepad|"+padBits)
+	pad := &fakePad{batches: [][]Event{{{Kind: KeyDown, Code: "Space"}}}}
+	keyboard := &fakePad{batches: [][]Event{{{Kind: KeyDown, Code: "ArrowDown"}}}}
+	byNode := map[string]*fakePad{"event1": pad, "event0": keyboard}
+	old := openPad
+	openPad = func(path string) (events, error) { return byNode[filepath.Base(path)], nil }
+	t.Cleanup(func() { openPad = old })
+
+	p := newInputSource("")
+	evs, err := p.poll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var codes []string
+	for _, e := range evs {
+		codes = append(codes, e.Code)
+	}
+	// The pad is read first, being the one a console is meant to be played with.
+	if strings.Join(codes, ",") != "Space,ArrowDown" {
+		t.Fatalf("events %v, want the pad's then the keyboard's", codes)
+	}
+	if p.Devices() != "event1,event0" {
+		t.Fatalf("reading %q", p.Devices())
+	}
+	if err := p.close(); err != nil {
+		t.Fatal(err)
+	}
+	if pad.closed != 1 || keyboard.closed != 1 {
+		t.Fatalf("closed pad %d keyboard %d", pad.closed, keyboard.closed)
+	}
+}
+
+// TestInputSourceWithNothingToRead: a console with no pad and no keyboard runs and waits,
+// rather than failing to start.
+func TestInputSourceWithNothingToRead(t *testing.T) {
+	fakeInputs(t, "event0 Some Mouse|"+mouseBits)
+	p := newInputSource("")
 	now := time.Now()
 	p.now = func() time.Time { return now }
-	// A console with no pad plugged in runs; it just receives nothing.
 	for i := 0; i < 3; i++ {
 		if evs, err := p.poll(); err != nil || len(evs) != 0 {
 			t.Fatalf("poll %d: %v %v", i, evs, err)
