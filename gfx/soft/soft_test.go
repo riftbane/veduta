@@ -161,6 +161,80 @@ func TestWorkerCountDoesNotChangeOutput(t *testing.T) {
 
 // TestFillRuleWatertight renders a jittered triangulated grid in overdraw mode: every
 // pixel inside the grid must be covered exactly once (no cracks, no double hits).
+// TestTinyTrianglesInterpolate draws triangles of a pixel or less, flat in depth and in
+// color, and requires every pixel they cover to carry exactly that depth and color. The
+// top-left fill rule biases the edge functions by one 1/256 px² unit; weighting vertices
+// with the biased values made the weights sum to less than one, which for a sub-pixel
+// triangle pulled its depth toward the camera (13 m reported as 6 m at a sphere's
+// silhouette) and darkened its color.
+func TestTinyTrianglesInterpolate(t *testing.T) {
+	const W, H = 64, 48
+	for _, fast := range []bool{false, true} {
+		r := New(Options{Workers: 2})
+		g := lcg(7)
+		var verts []gfx.Vertex
+		var idx []uint32
+		for n := 0; n < 400; n++ {
+			// Products are rounded explicitly so arm64 cannot fuse them into a multiply-add.
+			x := 2 + float32(float32(g.float())*(W-4))
+			y := 2 + float32(float32(g.float())*(H-4))
+			base := uint32(len(verts))
+			for k := 0; k < 3; k++ {
+				dx := float32((float32(g.float()) - 0.5) * 1.6)
+				dy := float32((float32(g.float()) - 0.5) * 1.6)
+				verts = append(verts, gfx.Vertex{Pos: gmath.V3(x+dx, y+dy, 0.25), UV: gmath.V2(0.5, 0.5)})
+			}
+			idx = append(idx, base, base+1, base+2)
+		}
+		var dl gfx.DrawList
+		dl.Clear = true
+		v := dl.AddView(orthoPixelView(W, H))
+		first, count := dl.AddTransient(verts, idx)
+		cmd := gfx.DrawCmd{View: v, First: first, Count: count, Model: gmath.Ident4(), Color: gmath.V4(0.8, 0.6, 0.4, 1),
+			Unlit: true, State: gfx.PipelineState{DepthTest: true, DepthWrite: true, Cull: gfx.CullNone}, ID: 3}
+		if fast {
+			img := gfx.NewImage(4, 4)
+			for i := range img.Pix {
+				img.Pix[i] = 0xffffffff
+			}
+			tex, err := r.CreateTexture(&gfx.TextureData{Levels: []*gfx.Image{img}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cmd.Texture, cmd.State = tex, gfx.StateOpaque
+			cmd.State.Cull = gfx.CullNone
+		}
+		dl.Add(cmd)
+		fb := gfx.NewFramebuffer(W, H, false)
+		r.Begin(fb)
+		if err := r.Draw(&dl); err != nil {
+			t.Fatal(err)
+		}
+		r.End()
+		r.Close()
+		// The plane's depth: z = 0.25 in an orthographic view from -1 to 1.
+		want := float32(0.5 - 0.25*0.5)
+		covered, color := 0, uint32(0)
+		for i, id := range fb.ID {
+			if id != 3 {
+				continue
+			}
+			if covered++; covered == 1 {
+				color = fb.Color[i]
+			}
+			if d := fb.Depth[i] - want; d > 1e-6 || d < -1e-6 {
+				t.Fatalf("fast=%v: pixel %d depth %v, want %v (the flat plane's depth everywhere)", fast, i, fb.Depth[i], want)
+			}
+			if fb.Color[i] != color {
+				t.Fatalf("fast=%v: pixel %d color %#08x differs from %#08x: a flat color darkened", fast, i, fb.Color[i], color)
+			}
+		}
+		if covered < 50 {
+			t.Fatalf("fast=%v: only %d pixels covered; the test draws too little", fast, covered)
+		}
+	}
+}
+
 func TestFillRuleWatertight(t *testing.T) {
 	const W, H, N = 200, 160, 12
 	r := New(Options{Workers: 4})

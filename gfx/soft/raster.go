@@ -120,9 +120,9 @@ func (c *core) rasterTri(t *tri, x0, y0, x1, y1 int) int64 {
 				break // triangles are convex: the row's span has ended
 			}
 			i := row + x
-			l0 := float32(e0) * t.invArea
-			l1 := float32(e1) * t.invArea
-			l2 := float32(e2) * t.invArea
+			l0 := float32(e0+t.eb[0]) * t.invArea
+			l1 := float32(e1+t.eb[1]) * t.invArea
+			l2 := float32(e2+t.eb[2]) * t.invArea
 			e0 += t.edx[0]
 			e1 += t.edx[1]
 			e2 += t.edx[2]
@@ -229,6 +229,7 @@ func (c *core) rasterTriOpaque(t *tri, cs *cmdState, x0, y0, x1, y1 int) int64 {
 	alphaTest := cutoff > 0 // alpha >= 0, so a zero (or NaN) cutoff never discards
 	depthWrite, id := cs.state.DepthWrite, cs.id
 	inv := t.invArea
+	b0, b1, b2 := t.eb[0], t.eb[1], t.eb[2]
 	dx0, dx1, dx2 := t.edx[0], t.edx[1], t.edx[2]
 	z0, z1, z2 := t.z[0], t.z[1], t.z[2]
 	w0, w1, w2 := t.iw[0], t.iw[1], t.iw[2]
@@ -268,9 +269,9 @@ func (c *core) rasterTriOpaque(t *tri, cs *cmdState, x0, y0, x1, y1 int) int64 {
 			if e0|e1|e2 < 0 {
 				break // triangles are convex: the row's span has ended
 			}
-			l0 := float32(e0) * inv
-			l1 := float32(e1) * inv
-			l2 := float32(e2) * inv
+			l0 := float32(e0+b0) * inv
+			l1 := float32(e1+b1) * inv
+			l2 := float32(e2+b2) * inv
 			e0 += dx0
 			e1 += dx1
 			e2 += dx2

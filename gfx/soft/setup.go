@@ -62,12 +62,14 @@ type tri struct {
 	back                   bool  // back-facing (drawn because culling is off)
 	// E_k(x, y) = ec[k] + edx[k]*x + edy[k]*y at the center of pixel (x, y), in 1/256 px²
 	// units, with the top-left bias already applied: a pixel is inside iff all E_k >= 0.
-	ec, edx, edy [3]int64
-	invArea      float32
-	einv         [3]float32 // 1 / (16 × edge length in 28.4 units): E_k × einv = pixels
-	z            [3]float32 // window depth in [0, 1]
-	iw           [3]float32 // 1/w
-	a            [3][nattr]float32
+	// eb[k] is that bias (0 or 1), added back before E_k weighs a vertex: the three weights
+	// then sum to one, which for a triangle of a pixel or less is not a rounding matter.
+	ec, edx, edy, eb [3]int64
+	invArea          float32
+	einv             [3]float32 // 1 / (16 × edge length in 28.4 units): E_k × einv = pixels
+	z                [3]float32 // window depth in [0, 1]
+	iw               [3]float32 // 1/w
+	a                [3][nattr]float32
 }
 
 // xform holds per-command vertex transform and lighting parameters.
@@ -554,10 +556,11 @@ func (c *core) setupTri(ch *setupCtx, cmd int32, v0, v1, v2 *cvert, e uint8, lv 
 		ax, ay, bx, by := X[a], Y[a], X[b], Y[b]
 		dx, dy := bx-ax, by-ay
 		ec := dx*(8-ay) - dy*(8-ax)
+		var bias int64
 		if !(dy < 0 || dy == 0 && dx > 0) { // not a top or left edge
-			ec--
+			bias = 1
 		}
-		t.ec[k], t.edx[k], t.edy[k] = ec, -dy*16, dx*16
+		t.ec[k], t.edx[k], t.edy[k], t.eb[k] = ec-bias, -dy*16, dx*16, bias
 		if c.mode == gfx.ModeWireframe { // einv is only read by wireColor
 			t.einv[k] = float32(1 / (16 * math.Sqrt(float64(dx*dx+dy*dy))))
 		}
