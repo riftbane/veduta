@@ -235,10 +235,10 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 func (s *Session) consoleNext() []string {
 	next := []string{}
 	if ok, detail := s.releaseTargetsConsole(); !ok {
-		next = append(next, detail+": build "+targetOS+"/"+targetArch+" in .github/workflows/release.yml (compare with the workflow veduta init writes); veduta release refuses until then")
+		next = append(next, detail+": "+workflowFix+"; veduta release refuses until then")
 	}
 	if _, why := s.readCard(); why != "" {
-		next = append(next, fmt.Sprintf(`%s: write card.json as {"veduta": "card/1", "title": %q, "name": %q, "exec": %q}; veduta release refuses until then`, why, s.Project.Title, s.Project.Name, s.Project.Name))
+		next = append(next, why+": "+s.cardFix()+"; veduta release refuses until then")
 	}
 	return next
 }

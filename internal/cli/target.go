@@ -345,6 +345,15 @@ func (s *Session) readCard() (map[string]any, string) {
 	return c, ""
 }
 
+// workflowFix is what to do about a project whose workflows build no console archive.
+const workflowFix = "build " + targetOS + "/" + targetArch + " in .github/workflows/release.yml (compare with the workflow veduta init writes)"
+
+// cardFix is what to do about a card.json that is missing, unreadable or disagrees with
+// the manifest: the card veduta init would write for it.
+func (s *Session) cardFix() string {
+	return fmt.Sprintf(`write card.json as {"veduta": "card/1", "title": %q, "name": %q, "exec": %q}`, s.Project.Title, s.Project.Name, s.Project.Name)
+}
+
 // cardProblem compares card.json with the manifest. It returns "" when the card is valid
 // and agrees with veduta.json; a card that is not valid is marked as refused by release.
 func (s *Session) cardProblem() string {
@@ -389,11 +398,11 @@ func (s *Session) consoleChecks() []Check {
 		cs = append(cs, Check{Name: "release", OK: true, Detail: detail})
 	} else {
 		cs = append(cs, Check{Name: "release", OK: true, Warning: true, Detail: detail + ": no release of this project can be installed on the console",
-			Fix: "build linux/arm64 in the release workflow (compare with the one veduta init writes)"})
+			Fix: workflowFix})
 	}
 	if p := s.cardProblem(); p != "" {
 		cs = append(cs, Check{Name: "card", OK: true, Warning: true, Detail: p,
-			Fix: `write card.json as {"veduta": "card/1", "title": <title>, "name": <name>, "exec": <name>}`})
+			Fix: s.cardFix()})
 	} else {
 		cs = append(cs, Check{Name: "card", OK: true, Detail: "card.json agrees with veduta.json"})
 	}
@@ -477,10 +486,10 @@ func (s *Session) consoleBuildFailure(errs []CompileError, err error) (detail, f
 // files, so release runs it before the tests.
 func (s *Session) consoleReleasable() string {
 	if ok, detail := s.releaseTargetsConsole(); !ok {
-		return detail
+		return detail + "; fix: " + workflowFix
 	}
 	if _, why := s.readCard(); why != "" {
-		return why
+		return why + "; fix: " + s.cardFix()
 	}
 	return ""
 }

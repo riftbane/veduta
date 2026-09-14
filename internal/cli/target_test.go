@@ -271,7 +271,7 @@ func TestDoctorConsoleChecks(t *testing.T) {
 	if c := check(t, r, "release"); !c.Warning || !strings.Contains(c.Detail, "no linux/arm64") {
 		t.Fatalf("release: %+v", c)
 	}
-	if c := check(t, r, "card"); !c.Warning || !strings.Contains(c.Detail, `title "Gems" differs`) {
+	if c := check(t, r, "card"); !c.Warning || !strings.Contains(c.Detail, `title "Gems" differs`) || !strings.Contains(c.Fix, `"title": "demo"`) {
 		t.Fatalf("card: %+v", c)
 	}
 	if !strings.Contains(r.Human(), "warn arm64") {

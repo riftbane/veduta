@@ -99,7 +99,7 @@ func TestReleaseProjectFlow(t *testing.T) {
 			names = append(names, st.Name)
 		}
 		last := r.Steps[len(r.Steps)-1]
-		if err != nil || r.OK || strings.Join(names, ",") != "version,clean,branch,console" || !strings.Contains(last.Detail, want) || strings.Contains(last.Detail, "publishes the") {
+		if err != nil || r.OK || strings.Join(names, ",") != "version,clean,branch,console" || !strings.Contains(last.Detail, want) || !strings.Contains(last.Detail, "; fix: ") || strings.Contains(last.Detail, "publishes the") {
 			t.Fatalf("release %s: %s %v", what, r.Human(), err)
 		}
 		git(dir, "reset", "-q", "--hard", "HEAD~1")
