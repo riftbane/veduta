@@ -247,9 +247,12 @@ fields are only ever filled by scenarios.
 
 Absent fields, and fields holding their zero value, take the defaults shown (`title`
 defaults to `name`; `icon` has none). `resolution` is the frame the game is designed for:
-the default render size and the size a player asks for. On the console the frame actually
-drawn is the panel divided by `VEDUTA_SCALE`. The player renders exactly one frame per tick,
-so a `tick_rate` above the panel's 20 Hz only spends time on frames nobody sees.
+the size a player asks for and the size `Init` and `Update` see in `ctx.Width`/`ctx.Height`.
+`inspect_resolution` sizes inspection and simulation images and is the default size of
+`veduta render` and `-headless render`; the MCP `render` tool defaults to 320×240 (§11). On
+the console the frame actually drawn is the panel divided by `VEDUTA_SCALE`. The player
+renders exactly one frame per tick, so a `tick_rate` above the panel's 20 Hz only spends
+time on frames nobody sees.
 
 ## 6. Engine modules
 
@@ -649,9 +652,10 @@ Names and input schemas (JSON Schema, `additionalProperties: false`). Every tool
 
 Rules: `render` images are 320×240 unless `width`/`height` are given (at most 640×480; one
 side alone gets the other at 4:3). Contact sheets and inspection sheets are fitted inside
-640×720. `query` draws its marker on the frame before any fitting, so it stays sharp at
-every frame size. `simulate` never returns more than one image; ask for `render` at a specific tick
-for detail. `trace` output is paginated (max 200 ticks per call).
+640×720. `query` fits the frame inside 640×480 and then draws its marker at the scaled
+position, so the marker stays sharp at every frame size. `simulate` never returns more than
+one image; ask for `render` at a specific tick for detail. `trace` output is paginated (max
+200 ticks per call).
 
 Client configuration produced by `veduta init` (`.mcp.json` at the project root):
 
@@ -731,8 +735,8 @@ unless `--prefix` points to a root-owned dir. Idempotent.
   once per interval (cache in `~/.cache/veduta/update.json`, offline-safe, 3 s timeout) and
   report availability in `status`.
 - `auto`: `veduta mcp` applies the update **before** serving (never mid-session), then
-  execs the new binary. Also applied by `veduta doctor`. Never downgrades, never crosses
-  channels.
+  execs the new binary. `veduta doctor` only reports an update, as `check` does. Never
+  downgrades, never crosses channels.
 - `veduta update`: download, verify checksum, write to a temp file next to the binary,
   atomic rename. `--channel` subscribes; leaving beta for an older stable release needs
   `--force`.
