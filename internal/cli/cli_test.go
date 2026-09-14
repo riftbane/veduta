@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -42,6 +43,18 @@ func TestInitAndCommands(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(dir, f)); err != nil && f != "go.sum" {
 			t.Fatalf("missing %s: %v", f, err)
 		}
+	}
+	// The project is ready for the console: a card description the console's frozen card/1
+	// reader accepts, and a release that builds the board's architecture.
+	var card map[string]string
+	if data, err := os.ReadFile(filepath.Join(dir, "card.json")); err != nil || json.Unmarshal(data, &card) != nil {
+		t.Fatalf("card.json: %v\n%s", err, data)
+	}
+	if want := map[string]string{"veduta": "card/1", "title": "demo", "name": "demo", "exec": "demo"}; !reflect.DeepEqual(card, want) {
+		t.Fatalf("card.json = %v, want %v", card, want)
+	}
+	if wf, _ := os.ReadFile(filepath.Join(dir, ".github", "workflows", "release.yml")); !strings.Contains(string(wf), "linux/arm64") || strings.Contains(string(wf), "windows") {
+		t.Fatalf("release workflow does not build for the console only:\n%s", wf)
 	}
 	main, _ := os.ReadFile(filepath.Join(dir, "cmd", "game", "main.go"))
 	if !strings.Contains(string(main), `"demo/game"`) || strings.Contains(string(main), "template/game") {

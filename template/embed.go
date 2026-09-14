@@ -1,6 +1,6 @@
 // Package template holds the project created by `veduta init`: the demo game (game/,
 // cmd/game), its assets and scenarios, and the templated project files in project/
-// (go.mod, CLAUDE.md, README.md, .gitignore, .mcp.json, the release workflow).
+// (go.mod, CLAUDE.md, README.md, .gitignore, .mcp.json, card.json, the release workflow).
 //
 // The demo is a real package of this module, so the engine's own tests build and run it;
 // init rewrites its import paths to the new module.

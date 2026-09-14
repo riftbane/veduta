@@ -27,23 +27,21 @@ jobs:
           tag="${GITHUB_REF_NAME}"
           name="[[.Name]]"
           mkdir -p dist
-          for target in linux/amd64 windows/amd64; do
+          # linux/arm64 is the console (Raspberry Pi Zero 2 W and Pi 5); linux/amd64 runs on
+          # any other Linux machine with a framebuffer. Each archive unpacks to a folder that
+          # is a game card as it is: copy it onto the console's card.
+          for target in linux/arm64 linux/amd64; do
             os="${target%/*}"
             arch="${target#*/}"
             stage="build/${os}_${arch}/${name}"
             mkdir -p "$stage"
-            exe="$name"
-            if [ "$os" = windows ]; then exe="$name.exe"; fi
-            GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "-s -w" -o "$stage/$exe" ./cmd/game
+            GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "-s -w" -o "$stage/$name" ./cmd/game
             cp veduta.json README.md "$stage/"
+            # card.json is what the console lists; the release stamps its version.
+            awk -v tag="$tag" '{ print } /"veduta": *"card\/1",/ { print "  \"version\": \"" tag "\"," }' card.json > "$stage/card.json"
             cp -r assets "$stage/assets"
             rm -rf "$stage/assets/.cooked"
-            archive="${name}_${tag}_${os}_${arch}"
-            if [ "$os" = windows ]; then
-              (cd "build/${os}_${arch}" && zip -q -r -X "../../dist/${archive}.zip" "$name")
-            else
-              tar -C "build/${os}_${arch}" -czf "dist/${archive}.tar.gz" "$name"
-            fi
+            tar -C "build/${os}_${arch}" -czf "dist/${name}_${tag}_${os}_${arch}.tar.gz" "$name"
           done
           (cd dist && sha256sum * > checksums.txt)
           cat dist/checksums.txt

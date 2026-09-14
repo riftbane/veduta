@@ -74,6 +74,7 @@ var projectFiles = map[string]string{
 	"project/gitignore.tmpl":    ".gitignore",
 	"project/mcp.json.tmpl":     ".mcp.json",
 	"project/release.yml.tmpl":  ".github/workflows/release.yml",
+	"project/card.json.tmpl":    "card.json",
 }
 
 // Init creates a game project from the embedded template (spec §12).
