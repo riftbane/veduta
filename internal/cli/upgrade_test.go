@@ -322,3 +322,37 @@ func TestEngineCheckWarnsOnAMinorGap(t *testing.T) {
 		t.Fatalf("engine check within a minor version: %+v", c)
 	}
 }
+
+// TestUpgradeTellsWhatTheConsoleNeeds checks that a project leaving a v0.x engine is told
+// what veduta release will refuse it for, since upgrade writes neither file.
+func TestUpgradeTellsWhatTheConsoleNeeds(t *testing.T) {
+	manifest := "{\n  \"veduta\": \"project/1\",\n  \"name\": \"mygame\",\n  \"engine\": \"v0.2.0\"\n}\n"
+	s := upgradeProject(t, manifest, "v1.0.0")
+	wfs := filepath.Join(s.Root, ".github", "workflows")
+	os.MkdirAll(wfs, 0o755)
+	os.WriteFile(filepath.Join(wfs, "release.yml"), []byte("# linux/arm64 some day\nrun: for target in linux/amd64 windows/amd64; do go build; done\n"), 0o644)
+	r, err := s.Upgrade(&Env{Version: "v1.0.0"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Next) != 2 || !strings.Contains(r.Next[0], "no linux/arm64 build") || !strings.Contains(r.Next[1], `no card.json`) ||
+		!strings.Contains(r.Next[1], `{"veduta": "card/1", "title": "mygame", "name": "mygame", "exec": "mygame"}`) {
+		t.Fatalf("next: %q", r.Next)
+	}
+	if h := r.Human(); !strings.Contains(h, "\nnext: .github/workflows has no linux/arm64 build") || !strings.Contains(h, "\nnext: no card.json") {
+		t.Fatalf("human report:\n%s", h)
+	}
+
+	// A project that already has both is told nothing, and so is one that stays on v1.
+	s = upgradeProject(t, manifest, "v1.0.0")
+	os.MkdirAll(filepath.Join(s.Root, ".github", "workflows"), 0o755)
+	os.WriteFile(filepath.Join(s.Root, ".github", "workflows", "release.yml"), []byte("run: for target in linux/arm64; do go build; done\n"), 0o644)
+	os.WriteFile(filepath.Join(s.Root, "card.json"), []byte(`{"veduta": "card/1"}`), 0o644)
+	if r, err := s.Upgrade(&Env{Version: "v1.0.0"}, false); err != nil || len(r.Next) != 0 {
+		t.Fatalf("ready project: %+v %v", r, err)
+	}
+	s = upgradeProject(t, strings.Replace(manifest, "v0.2.0", "v1.0.0", 1), "v1.1.0")
+	if r, err := s.Upgrade(&Env{Version: "v1.1.0"}, false); err != nil || len(r.Next) != 0 {
+		t.Fatalf("v1 project: %+v %v", r, err)
+	}
+}

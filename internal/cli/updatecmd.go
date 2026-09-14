@@ -137,6 +137,10 @@ type UpgradeReport struct {
 	// Migrations describes each change made to keep the project's behaviour, one sentence
 	// each, such as `pin "tick_rate": 60 in veduta.json (the default before v1.0.0)`.
 	Migrations []string `json:"migrations"`
+	// Next lists what the project still lacks for the console after crossing from a v0.x
+	// engine, one sentence each, because upgrade does not write it and veduta release
+	// refuses until it is there: a workflow that builds linux/arm64, a card.json.
+	Next []string `json:"next"`
 }
 
 // Human prints what changed, then one line per migration.
@@ -148,6 +152,9 @@ func (r *UpgradeReport) Human() string {
 	fmt.Fprintf(&b, "upgraded %s → %s (%s)\n", r.From, r.To, strings.Join(r.Changed, ", "))
 	for _, m := range r.Migrations {
 		fmt.Fprintln(&b, "migration:", m)
+	}
+	for _, n := range r.Next {
+		fmt.Fprintln(&b, "next:", n)
 	}
 	return b.String()
 }
@@ -163,7 +170,7 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 		return nil, fmt.Errorf("upgrade: this tool is a development build (%s) and has no engine version to move to", to)
 	}
 	from := s.Project.Engine
-	r := &UpgradeReport{From: from, To: to, Changed: []string{}, Migrations: []string{}}
+	r := &UpgradeReport{From: from, To: to, Changed: []string{}, Migrations: []string{}, Next: []string{}}
 	if c := update.Compare(from, to); c > 0 && !force {
 		return nil, fmt.Errorf("upgrade: the project targets %s, newer than this tool (%s); run veduta update, or --force to downgrade", from, to)
 	}
@@ -217,7 +224,23 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 		return nil, err
 	}
 	r.Changed = append(r.Changed, "CHANGELOG.md")
+	if v0Engine(from) && !v0Engine(to) {
+		r.Next = s.consoleNext()
+	}
 	return r, nil
+}
+
+// consoleNext lists what a project that just left a v0.x engine still needs before veduta
+// release publishes it for the console.
+func (s *Session) consoleNext() []string {
+	next := []string{}
+	if ok, detail := s.releaseTargetsConsole(); !ok {
+		next = append(next, detail+": build "+targetOS+"/"+targetArch+" in .github/workflows/release.yml (compare with the workflow veduta init writes); veduta release refuses until then")
+	}
+	if _, why := s.readCard(); why != "" {
+		next = append(next, fmt.Sprintf(`%s: write card.json as {"veduta": "card/1", "title": %q, "name": %q, "exec": %q}; veduta release refuses until then`, why, s.Project.Title, s.Project.Name, s.Project.Name))
+	}
+	return next
 }
 
 // goModRequires reports whether a go.mod names the engine at exactly version. The version

@@ -58,7 +58,9 @@ defaults. The changelog line names the pinned fields, as does the `migrations` l
 JSON report (`pin "tick_rate": 60 in veduta.json (the default before v1.0.0)`). Only those
 fields are written: every other byte of the file, its formatting and its key order stay as
 they were. A project already on v1.0.0 or later, or moving between two v0.x versions, pins
-nothing.
+nothing. Upgrading from a v0.x engine writes no release workflow and no `card.json`: when
+no workflow builds linux/arm64 or `card.json` is missing or not `card/1`, the report says so
+in its `next` list, since `veduta release` refuses the project until both are there.
 
 ## Full example
 
