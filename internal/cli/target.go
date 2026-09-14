@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -148,39 +149,27 @@ func (s *Session) fusedSites(bin string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	seen := false
-	for _, f := range files {
-		if fused.InModule(f, mod) {
-			seen = true
-			break
-		}
-	}
-	if !seen {
+	if !slices.ContainsFunc(files, func(f string) bool { return fused.InModule(f, mod) }) {
 		return nil, fmt.Errorf("no file of module %s in the console build, so its lines cannot be told apart", mod)
 	}
-	ours := func(st fused.Site) bool { return st.Package == "main" || fused.InModule(st.Package, mod) }
-	sites, err := fused.Scan(bin, func(st fused.Site) bool { return fused.InModule(st.File, mod) || ours(st) })
+	sites, err := fused.Scan(bin, func(st fused.Site) bool {
+		return fused.InModule(st.File, mod) || fused.InModule(st.Package, mod) || st.Package == "main"
+	})
 	if err != nil {
 		return nil, err
 	}
 	var lines, inlined []string
 	listed := map[string]bool{}
 	for _, st := range sites {
-		var p string
 		if fused.InModule(st.File, mod) {
-			p = fmt.Sprintf("%s:%d", s.Rel(filepath.Join(modDir, filepath.FromSlash(strings.TrimPrefix(st.File, mod+"/")))), st.Line)
-		} else {
-			p = fmt.Sprintf("%s:%d inlined in %s", engineFile(st.File), st.Line, st.Func)
-		}
-		if listed[p] {
+			p := fmt.Sprintf("%s:%d", s.Rel(filepath.Join(modDir, filepath.FromSlash(strings.TrimPrefix(st.File, mod+"/")))), st.Line)
+			if !listed[p] { // a line of the game inlined into several of its functions
+				listed[p] = true
+				lines = append(lines, p)
+			}
 			continue
 		}
-		listed[p] = true
-		if fused.InModule(st.File, mod) {
-			lines = append(lines, p)
-		} else {
-			inlined = append(inlined, p)
-		}
+		inlined = append(inlined, fmt.Sprintf("%s:%d inlined in %s", engineFile(st.File), st.Line, st.Func))
 	}
 	return append(lines, inlined...), nil
 }
