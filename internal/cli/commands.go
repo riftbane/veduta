@@ -198,7 +198,7 @@ func init() {
 			if len(args) > 0 {
 				return nil, usagef("run takes no arguments")
 			}
-			if why := runRefusal(); why != "" {
+			if why := runRefusal(s.Project.Engine); why != "" {
 				return nil, errors.New(why)
 			}
 			bin, err := s.ensureGame()

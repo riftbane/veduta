@@ -67,9 +67,17 @@ func findPanel() string {
 	return strings.Join(found, ", ")
 }
 
-// runRefusal explains why `veduta run` cannot show the game on this machine, or returns ""
-// when it can.
-func runRefusal() string {
+// runRefusal explains why `veduta run` cannot show the game of a project on the given
+// engine version on this machine, or returns "" when it can. A project still on a v0.x
+// engine has the player of that engine, which opens a desktop window, so it is checked as
+// v0.x tools checked it: updating the tool must not stop an un-upgraded game from running.
+func runRefusal(engine string) string {
+	if v0Engine(engine) {
+		if hasDisplay() {
+			return ""
+		}
+		return "run: no display on this machine, and the project's engine " + engine + " plays in a window; use render and simulate, or veduta upgrade to move the game to the console's framebuffer player"
+	}
 	if runtime.GOOS != "linux" {
 		return fmt.Sprintf("run: the player draws on a Linux framebuffer and this is %s/%s; build, render, simulate and test here, and play the game on the console (its release builds %s/%s)",
 			runtime.GOOS, runtime.GOARCH, targetOS, targetArch)
@@ -79,6 +87,16 @@ func runRefusal() string {
 			"Set VEDUTA_FB to name a framebuffer and VEDUTA_SCALE to divide it; use render and simulate to see the game here"
 	}
 	return ""
+}
+
+// hasDisplay reports whether a v0.x player could open its window here, as the v0.x tools
+// decided: always on Windows and macOS, and on Linux when DISPLAY or WAYLAND_DISPLAY is set.
+func hasDisplay() bool {
+	switch runtime.GOOS {
+	case "windows", "darwin":
+		return true
+	}
+	return os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != ""
 }
 
 // consoleBuild compiles the game for the console into a temporary file and returns its

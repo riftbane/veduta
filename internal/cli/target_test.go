@@ -35,9 +35,10 @@ func fakeGraphics(t *testing.T, fbs map[string][2]string) {
 }
 
 func TestFindPanel(t *testing.T) {
+	const engine = "v1.0.0"
 	if runtime.GOOS != "linux" {
-		if findPanel() != "" || !strings.Contains(runRefusal(), "Linux framebuffer") {
-			t.Fatalf("off Linux: panel %q, refusal %q", findPanel(), runRefusal())
+		if findPanel() != "" || !strings.Contains(runRefusal(engine), "Linux framebuffer") || runRefusal("v0.2.0") != "" {
+			t.Fatalf("off Linux: panel %q, refusal %q, v0.x refusal %q", findPanel(), runRefusal(engine), runRefusal("v0.2.0"))
 		}
 		return
 	}
@@ -46,15 +47,27 @@ func TestFindPanel(t *testing.T) {
 	if p := findPanel(); p != "" {
 		t.Fatalf("an 8-bit framebuffer and fbcon count as a panel: %q", p)
 	}
-	if why := runRefusal(); !strings.Contains(why, "no framebuffer on this machine") || !strings.Contains(why, "VEDUTA_FB") {
+	if why := runRefusal(engine); !strings.Contains(why, "no framebuffer on this machine") || !strings.Contains(why, "VEDUTA_FB") {
 		t.Fatalf("refusal without a panel: %q", why)
 	}
 	fakeGraphics(t, map[string][2]string{"fb0": {"32", "simpledrmdrmfb"}, "fb1": {"16", "mi0283qtdrmfb"}})
 	if p := findPanel(); p != "fb0 (simpledrmdrmfb, 32 bpp), fb1 (mi0283qtdrmfb, 16 bpp)" {
 		t.Fatalf("panels = %q", p)
 	}
-	if why := runRefusal(); why != "" {
+	if why := runRefusal(engine); why != "" {
 		t.Fatalf("refused with a framebuffer: %q", why)
+	}
+	// A project on a v0.x engine plays in a window: a display is what it needs, not a
+	// framebuffer.
+	t.Setenv("DISPLAY", "")
+	t.Setenv("WAYLAND_DISPLAY", "")
+	if why := runRefusal("v0.2.0"); !strings.Contains(why, "no display") || !strings.Contains(why, "veduta upgrade") {
+		t.Fatalf("v0.x project without a display: %q", why)
+	}
+	t.Setenv("DISPLAY", ":0")
+	fakeGraphics(t, nil)
+	if why := runRefusal("v0.2.0"); why != "" {
+		t.Fatalf("v0.x project refused with a display: %q", why)
 	}
 	fakeGraphics(t, nil)
 	t.Setenv("VEDUTA_FB", "fb3")

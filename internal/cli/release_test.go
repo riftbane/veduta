@@ -116,6 +116,20 @@ func TestReleaseProjectFlow(t *testing.T) {
 	git(dir, "commit", "-q", "-am", "Write a card the console cannot read")
 	refused("with a card that is not card/1", `"veduta" is "card/2"`)
 
+	// A project still on a v0.x engine predates the console: the tool it was made with did
+	// not check the console, and a newer tool does not start refusing it.
+	os.Remove(filepath.Join(dir, "card.json"))
+	os.WriteFile(wf, []byte(strings.Replace(string(w), "for target in linux/arm64 linux/amd64", "for target in linux/amd64 windows/amd64", 1)), 0o644)
+	manifest := filepath.Join(dir, "veduta.json")
+	m, _ := os.ReadFile(manifest)
+	os.WriteFile(manifest, []byte(strings.Replace(string(m), `"engine": "v1.0.0"`, `"engine": "v0.2.0"`, 1)), 0o644)
+	git(dir, "commit", "-q", "-am", "Stay on v0.2.0")
+	r, err = Release(env, dir, ReleaseOptions{Version: "v0.1.0", DryRun: true})
+	if st := findStep(r, "console"); err != nil || !r.OK || st == nil || !st.OK || !strings.Contains(st.Detail, "veduta upgrade") || findStep(r, "arm64") != nil {
+		t.Fatalf("release of a v0.x project: %s %v", r.Human(), err)
+	}
+	git(dir, "reset", "-q", "--hard", "HEAD~1")
+
 	r, err = Release(env, dir, ReleaseOptions{Version: "v0.1.0"})
 	if err != nil || !r.OK || !r.Pushed {
 		t.Fatalf("release: %s %v", r.Human(), err)

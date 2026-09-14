@@ -137,9 +137,13 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 	if r.Kind == "project" {
 		// A release nobody can install on the console is not a release. The workflow and the
 		// card are files to read, so they are checked before the tests; the console build
-		// comes after the smoke render.
-		why := s.consoleReleasable()
-		if !step("console", why == "", "%s", firstNonEmpty(why, "a workflow publishes the "+targetOS+"/"+targetArch+" archive and card.json is card/1")) {
+		// comes after the smoke render. A project still on a v0.x engine predates the
+		// console and releases as it did: updating the tool must not stop that.
+		preConsole := v0Engine(s.Project.Engine)
+		why := ""
+		if preConsole {
+			step("console", true, "not checked: the project's engine %s predates the console (v1.0.0); after veduta upgrade, release refuses a workflow without a %s/%s archive, a missing card.json and a game that does not build for the console", s.Project.Engine, targetOS, targetArch)
+		} else if why = s.consoleReleasable(); !step("console", why == "", "%s", firstNonEmpty(why, "a workflow publishes the "+targetOS+"/"+targetArch+" archive and card.json is card/1")) {
 			return finish(r), nil
 		}
 		tr, err := s.Test(false)
@@ -154,9 +158,11 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 		if !step("smoke", err == nil, "render %v", renderDetail(rep, err)) {
 			return finish(r), nil
 		}
-		why = s.consoleBuilds()
-		if !step("arm64", why == "", "%s", firstNonEmpty(why, "the game builds for "+targetOS+"/"+targetArch)) {
-			return finish(r), nil
+		if !preConsole {
+			why = s.consoleBuilds()
+			if !step("arm64", why == "", "%s", firstNonEmpty(why, "the game builds for "+targetOS+"/"+targetArch)) {
+				return finish(r), nil
+			}
 		}
 	} else {
 		out, err := runIn(root, "go", "vet", "./...")

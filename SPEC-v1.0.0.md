@@ -601,7 +601,9 @@ game -headless describe                                    # registered kinds, i
 
 - `veduta run` looks for what the player looks for — a `/sys/class/graphics/fbN` with 16 or
   32 bits per pixel, or `VEDUTA_FB` — and otherwise refuses, naming `VEDUTA_FB` and
-  `VEDUTA_SCALE`; off Linux it refuses outright.
+  `VEDUTA_SCALE`; off Linux it refuses outright. A project whose `veduta.json` still names
+  a v0.x engine has that engine's windowed player, so `run` checks it as v0.x did: it runs
+  on Windows and macOS, and on Linux where `DISPLAY` or `WAYLAND_DISPLAY` is set.
 - `veduta doctor` prints the target (`linux/arm64, 320x240 panel at 20 Hz, gamepad`) and, as
   warnings that do not fail the run: `tick_rate` above 20 or a `resolution` that is not 4:3;
   every line of the game's own code that compiles to a fused multiply-add in its linux/arm64
@@ -613,7 +615,9 @@ game -headless describe                                    # registered kinds, i
 - `veduta release` refuses a project whose workflows publish no linux/arm64 archive, whose
   `card.json` the console cannot read (missing, not a JSON object, not `card/1`, or a field
   that is not a string), or that does not build for linux/arm64. The first two are checked
-  before the tests, the build after the smoke render.
+  before the tests, the build after the smoke render. A project still on a v0.x engine
+  predates the console: its `console` step passes with a note to run `veduta upgrade`, and
+  the build is not checked.
 
 ## 11. MCP server tools
 
