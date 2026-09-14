@@ -742,7 +742,9 @@ func (a *scnAnalysis) checkOverlap() {
 		ax, dir, sep := scnSeparation(ei.AABB, ej.AABB)
 		// Rounded to 4 decimals, then up to the cm: the boxes are left at most 5e-5 m deep,
 		// below scnOverlapMin, so the moved pair is no longer reported.
-		amount := math.Ceil(scnRound(sep)*100) / 100
+		// Whole centimetres counted in integers: sep*100 would carry float noise into Ceil
+		// (0.07*100 is 7.000000000000001) and overshoot by a centimetre.
+		amount := math.Ceil(math.Round(sep*1e4)/100) / 100
 		axis := "xyz"[ax : ax+1]
 		move := fmt.Sprintf("Move %q by %s%s m along %s (entities[%d].position%s", ej.Name, scnSign(dir), scnF(amount), axis, pr.j, a.parentNote(pr.j))
 		if a.idx(ej.Parent) < 0 {
