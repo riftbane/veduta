@@ -48,6 +48,36 @@ func at(x, y, z float32) Transform {
 	return Transform{Position: gmath.V3(x, y, z), Rotation: gmath.QuatIdent(), Scale: gmath.One3}
 }
 
+// Blended parts are sorted back to front by depth along the view axis. Under an
+// orthographic camera looking down -Z, a sprite nearer the camera but off to the side is
+// farther from the eye point than one straight ahead and behind it: sorting by distance
+// from the eye (the old order) drew the far sprite over the near one.
+func TestDrawOrderBlendedViewDepth(t *testing.T) {
+	ortho := Camera{Ortho: true, Size: 20, Near: 0.1, Far: 200, Position: gmath.V3(0, 0, 10)}
+	// back: depth 10, |eye - center|² = 100; front: depth 9, |eye - center|² = 36 + 81 = 117.
+	back := Entity{Name: "back", Material: "glass", Transform: at(0, 0, 0)}
+	front := Entity{Name: "front", Material: "glass", Transform: at(6, 0, 1)}
+	for _, ents := range [][]Entity{{back, front}, {front, back}} {
+		if got, want := drawOrder(t, ortho, ents...), []string{"back", "front"}; !reflect.DeepEqual(got, want) {
+			t.Fatalf("orthographic: draw order %v, want %v", got, want)
+		}
+	}
+
+	// A perspective camera sorts by the same view-axis depth.
+	persp := Camera{FovDeg: 90, Near: 0.1, Far: 200, Position: gmath.V3(0, 0, 10)}
+	if got, want := drawOrder(t, persp, front, back), []string{"back", "front"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("perspective: draw order %v, want %v", got, want)
+	}
+
+	// With a hitbox the drawing's bounds decide, not the collision box.
+	far := Entity{Name: "far_glass", Material: "glass", Transform: at(0, 0, -3),
+		Hitbox: &gmath.AABB{Min: gmath.V3(-1, -1, 8), Max: gmath.V3(1, 1, 9)}}
+	near := Entity{Name: "near_glass", Material: "glass", Transform: at(0, 0, 0)}
+	if got, want := drawOrder(t, ortho, near, far), []string{"far_glass", "near_glass"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("hitbox: draw order %v, want %v", got, want)
+	}
+}
+
 // Layer is the first key of the draw order whatever the file order; within a layer the
 // order is unchanged (opaque in id order, then blended back to front), and the default
 // layer 0 keeps the order of a scene without layers.

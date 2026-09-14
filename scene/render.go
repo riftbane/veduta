@@ -100,13 +100,18 @@ type pending struct {
 // Draw appends the scene to dl: clear to the background, one view for the camera, one
 // command per visible model part, and in collision mode the AABB of every entity as debug
 // lines. Parts are ordered by entity Layer (lower first); within a layer opaque parts come
-// first in id order, then blended parts back to front.
+// first in id order, then blended parts back to front by the depth of their bounds' center
+// along the camera's view axis.
 func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 	dl.Clear = true
 	dl.ClearColor = s.Background
 	dl.Mode = opt.Mode
 	dl.Light = s.Light
 	view := dl.AddView(opt.Camera.GfxView(opt.Width, opt.Height))
+	// Blended parts are sorted by depth along the view axis, not by distance from the eye:
+	// under an orthographic camera every point of a plane facing it is equally deep, and a
+	// sprite off to the side is no farther away than one in the middle.
+	forward := opt.Camera.Target.Sub(opt.Camera.Position).Normalize()
 	var cmds []pending
 	for _, e := range s.entities {
 		if e.dead || !e.Visible || e.Model == "" {
@@ -116,8 +121,11 @@ func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 		if !ok {
 			continue
 		}
-		center := e.AABB.Center()
-		dist := center.Sub(opt.Camera.Position).LenSq()
+		box := e.AABB
+		if e.Hitbox != nil { // the drawing's bounds, not the collision box
+			box = mr.Model.Mesh.Bounds.Transform(e.world)
+		}
+		dist := box.Center().Sub(opt.Camera.Position).Dot(forward)
 		for pi, part := range mr.Model.Mesh.Parts {
 			if part.Count == 0 {
 				continue
