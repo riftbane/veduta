@@ -66,7 +66,7 @@ topic ([docs/2d.md](docs/2d.md)).
 | `veduta init [dir] --name N [--module M]` | create a game project from the embedded template |
 | `veduta doctor` | check Go, git, the manifest, engine/tool versions, assets, updates, and the game against the console (arm64 build, fused multiply-adds in the game's code, release target, `card.json`) |
 | `veduta build [--vet]` | cook stale assets, `go build` the game; errors as `{file,line,col,msg}` |
-| `veduta run` | run the player on this machine's framebuffer (a console or a Linux text console; refuses anywhere else) |
+| `veduta run` | run the player on this machine's framebuffer; refuses where there is none (no 16 or 32 bpp `/sys/class/graphics/fbN`, no `VEDUTA_FB`). A desktop session's DRM framebuffer counts as one: play from a text console (a VT) |
 | `veduta cook [--force]` | compile changed asset sources to `.vda` |
 | `veduta render --scene S [--tick T] [--seed N] [--camera P] [--mode M] [--out f.png] [--bundle]` | render one frame headless |
 | `veduta simulate --scenario F` / `--scene S --ticks N --seed N [--input F]` | trace, verdict, expectations, invariants, one contact sheet |

@@ -193,7 +193,7 @@ func init() {
 		},
 	})
 	register(command{
-		name: "run", usage: "run", summary: "build and run the player on this machine's framebuffer (a console or a Linux text console; refuses anywhere else)", project: true,
+		name: "run", usage: "run", summary: "build and run the player on this machine's framebuffer; refuses where there is none (no 16 or 32 bpp /sys/class/graphics/fbN, no VEDUTA_FB)", project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) {
 			if len(args) > 0 {
 				return nil, usagef("run takes no arguments")

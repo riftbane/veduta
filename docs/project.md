@@ -24,7 +24,7 @@ default scene and seed, where assets live, project-wide invariants and world bou
 | `name` | string | required | The game's name: 1–64 characters of `a-z`, `0-9`, `_`, `-`, starting with a letter or digit. Used for release archive names (`<name>_v1.2.3_linux_amd64.tar.gz`). |
 | `title` | string | the `name` | The name a player sees, on a console dashboard for instance: 1–64 printable characters, spaces and accents allowed (`"Cave of Gems"`). Unlike `name` it never appears in a file name, and it may repeat between games. |
 | `icon` | string | none | Optional PNG shown beside the title, relative to the project root and outside the assets directory (`"icon.png"`), so cooking never sees it. The release workflow copies it into each archive as `icon.png` at the root of the game folder, beside `card.json`, and names it there as the card's `icon`; the job stops when the file does not exist. A console that finds none draws a placeholder. |
-| `engine` | string | required | Veduta version the project targets, `vMAJOR.MINOR.PATCH` with optional `-prerelease` and `+build` (for example `"v0.1.0"`, `"v0.2.0-rc.1"`). `doctor` and `status` warn when it differs from the tool's version by a minor version or more. |
+| `engine` | string | required | Veduta version the project targets, `vMAJOR.MINOR.PATCH` with optional `-prerelease` and `+build` (for example `"v1.0.0"`, `"v1.1.0-rc.1"`). `doctor` and `status` warn when it differs from the tool's version by a minor version or more. |
 | `entry` | string | `"./cmd/game"` | Go package of the game binary, as given to `go build`: `"."` or a relative path starting with `./`. |
 | `resolution` | `[width, height]` | `[320, 240]` | The frame the game is designed for, in pixels, each 1 to 8192: the size a player asks for, and `ctx.Width`/`ctx.Height` in `Init`, `Update` and behaviours in every mode. On the console the frame actually drawn is the panel's size divided by `VEDUTA_SCALE` (320×240 on the reference panel), so design for that. |
 | `inspect_resolution` | `[width, height]` | `[320, 240]` | Default size of inspection and simulation images, and of `veduta render` and `-headless render` when no `--width`/`--height` is given (the MCP `render` tool defaults to 320×240 instead); each 1 to 8192. |
@@ -68,7 +68,7 @@ in its `next` list, since `veduta release` refuses the project until both are th
 {
   "veduta": "project/1",
   "name": "mygame",
-  "engine": "v0.1.0",
+  "engine": "v1.0.0",
   "entry": "./cmd/game",
   "resolution": [320, 240],
   "inspect_resolution": [320, 240],
@@ -85,5 +85,5 @@ in its `next` list, since `veduta release` refuses the project until both are th
 Minimal manifest (every other field takes its default):
 
 ```json
-{ "veduta": "project/1", "name": "mygame", "engine": "v0.1.0" }
+{ "veduta": "project/1", "name": "mygame", "engine": "v1.0.0" }
 ```
