@@ -152,6 +152,50 @@ result and supersedes `SPEC-v0.1.0.md`, which stays as the record of v0.1.0.
 - `ctx.HUD` panicked when called during `Init` or `Update`.
 - `veduta upgrade` from a release candidate to its release (v1.0.0-rc.1 to v1.0.0) left
   `go.mod` on the candidate, and a manifest key spelled in another case was not upgraded.
+- Found by the pre-release review of the console path, before any board ran it:
+  - Select+Start did not close the player on a joystick-style pad (buttons from
+    `BTN_TRIGGER`); the exit chords are now read from the button table, so correcting the
+    table against the real pad moves them too.
+  - A Raspberry Pi's HDMI framebuffer is 16-bit, like the panel, so the player refused to
+    choose between them; the board's own framebuffers (`vc4drmfb`, `BCM2708 FB`,
+    `simpledrmdrmfb`) are now passed over and then the smallest wins.
+  - A stick on a 0..255 or −128..127 axis was dead, and a push to 1 read as the opposite
+    direction; sticks are read against the range the device reports (`EVIOCGABS`).
+  - At a text console every key also reached the console and the shell behind it (echoed
+    over the frames, run as commands after quitting). The player now takes its devices for
+    itself while it polls (`EVIOCGRAB`), gives them back after 2 s without a poll so a hung
+    game cannot lock the keyboard, waits for the closing chord to be let go, and flushes the
+    terminal's unread input on close.
+  - Releasing one of two things holding the same key (the hat and the stick, a keyboard's
+    Space and the pad's A) released the key; a key is now held while anything holds it.
+    After dropped events a half-pressed exit chord is forgotten, so its other half alone no
+    longer quits.
+  - A player with no readable input said nothing; it now says why on stderr, once per
+    change, with a hint when the input group is missing.
+  - `veduta doctor` missed fused multiply-adds when `GOFLAGS=-trimpath` was set, when the
+    project was reached through a symlink, and when a game's product fused inside an
+    inlined engine helper; it now builds with `-trimpath`, matches module paths, lists such
+    places as `gmath/vec.go:105 inlined in demo/game.updatePlayer`, and gives every place in
+    the `sites` of its JSON report. The engine gate is likewise independent of paths, and
+    also scans a program that refers to every exported function and method of the public
+    engine packages, so API that no linked binary calls is checked.
+  - The console check of `doctor` and `release` was fooled by a comment naming linux/arm64,
+    by arm64 built for another system and by a test-only CI job, and missed matrix
+    workflows; it now reads the release workflows (triggered by a tag or a release) with
+    comments cut.
+  - The game release workflow stamped `card.json` by matching a line, which broke a
+    one-line card and duplicated an existing `version`; it now edits the card as JSON with
+    `jq`, stops on an invalid card before building, ships the manifest's `icon` as
+    `icon.png`, and builds with Go `stable`. `veduta release` refuses a project without a
+    valid `card.json`, checks the workflow and the card before the tests, and prints the
+    reason and the fix when it refuses.
+  - `inspect scene` counted translucent overlays as occluders of important entities, and its
+    `SCENE_OVERLAP` hint moved by the overlap depth, which does not separate a hitbox from a
+    thin quad; the hint now moves by the separating distance.
+  - A project and a tool a minor version apart failed `doctor` although the specification
+    calls it a warning, and a tool updated automatically from v0.2.0 would have applied the
+    console's rules to projects still on a v0.x engine; such projects are now told to
+    upgrade instead of refused, and `veduta run` checks for a display for them as before.
 
 ### Decisions
 
@@ -208,10 +252,30 @@ result and supersedes `SPEC-v0.1.0.md`, which stays as the record of v0.1.0.
   the scene's default near and far, so z from −100 to 99.9 is visible.
 - **`ctx.Width`/`Height` in `Update` are the project resolution in every mode**, so a trace
   never depends on `render --width`, the screenshot tile or the panel's scale.
-- **`card.json` is static and the release stamps its version.** The console's format is
-  frozen and optional in every field; the workflow inserts `"version"` after the header line
-  with `awk`, and a hand-edited card whose header line differs is shipped without one rather
-  than broken. `doctor` warns when the card and the manifest disagree.
+- **`card.json` is static and the release stamps it.** The console's format is frozen and
+  optional in every field; the workflow edits the card as JSON with `jq` (preinstalled on
+  the runners) once, before any target is built: `version` becomes the tag, and when the
+  manifest names an icon the file ships as `icon.png` and the card names it. An invalid
+  card stops the job, and `veduta release` refuses it before tagging. `doctor` warns when
+  the card and the manifest disagree.
+- **The player takes its input for itself.** Grabbing every device it reads keeps keys away
+  from a text console and from anything else reading the pad during a game; a 2 s watchdog
+  gives the devices back to a player that stopped polling, so a hung game never takes
+  Ctrl+C, console switching and SysRq with it. The console's cursor is not hidden: an escape
+  sequence could not be undone for a player killed outright; a console image sets
+  `vt.global_cursor_default=0` instead.
+- **Workflow detection is a text heuristic without an override.** It reads the workflows
+  that run on a tag or a release, comments cut, and accepts `linux/arm64` or GOOS linux with
+  GOARCH arm64 (directly or from a matrix). A workflow can still mislead it; the release
+  archive itself is the proof.
+- **An engine release waits for arm64.** `veduta release` in the engine repository runs the
+  suite under `qemu-aarch64-static` when it is installed, and `release.yml` runs it again
+  before building archives, so a commit whose goldens fail on the console is never
+  published.
+- **Pre-console projects are not held to console rules.** A v1 tool may reach a v0.x project
+  by an automatic update, and updating the tool must not change what a project can do:
+  until the project is upgraded, `release` passes the console step with a note and `run`
+  checks for a display as v0.x did.
 - **`doctor` warns, `release` refuses.** A desktop-shaped manifest or a fused line is a
   choice the author may be making on purpose, so it does not fail `doctor`; a release the
   console cannot install serves nobody, so `release` stops.

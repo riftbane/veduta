@@ -1,6 +1,7 @@
 # Progress log
 
-Factual log for the human reviewer. One section per step of `SPEC-v1.0.0.md` §16.
+Factual log for the human reviewer. One section per phase of `SPEC-v0.1.0.md` §16 and per
+release line after it (`SPEC-v1.0.0.md` §16 for v1.0.0).
 
 ## Phase 0 — repository skeleton (2026-09-11)
 
@@ -210,3 +211,72 @@ Factual log for the human reviewer. One section per step of `SPEC-v1.0.0.md` §1
   channel; only then tag `v0.2.1-rc.1` by hand and walk the rehearsal — `veduta update
   --check --channel beta` (saves nothing), `veduta update --channel beta`, `veduta
   doctor`, `veduta update --channel stable --force` — recording the output here.
+
+## v1.0.0 — the console (2026-09-14)
+
+The engine now makes games for the Veduta console (linux/arm64, 320×240 panel at 20 Hz,
+gamepad). `SPEC-v1.0.0.md` supersedes the v0.1.0 specification; `CHANGELOG.md` (Unreleased)
+lists every change and decision. The phase 7 desktop checklist above is void: the X11 and
+Win32 windows are gone.
+
+- **Step 0, arm64 determinism.** The goldens did not reproduce on arm64: the compiler fuses
+  `a*b + c` into one FMADD with a single rounding. 133 fused engine lines were found by
+  disassembling arm64 builds of the tool and the demo, and rounded with same-type
+  conversions (amd64 results unchanged: no golden moved, benchmark unchanged). Two audits
+  removed `math.Log`/`math.Cbrt` from inspect and clamped out-of-range float→int
+  conversions. `internal/fused` reads arm64 binaries and is now a test gate
+  (`go test ./internal/fused`), covering the tool, the demo and every exported function of
+  the public packages. Verified: `CGO_ENABLED=0 GOARCH=arm64 go test -exec qemu-aarch64-static ./...`
+  green against the amd64 goldens, locally and in the new CI job.
+- **Steps 1–3.** CI runs the whole suite for linux/arm64 under qemu-user. `veduta init`
+  writes `card.json` and a release workflow for linux/arm64 and linux/amd64. Defaults moved
+  to 320×240 / 20 Hz; the demo lost first person (look scenario and its goldens deleted),
+  gained the arrows and a `pad` scenario, and its scenarios were re-timed to the same
+  seconds. Blast radius, looked at: `scenario_{collect,idle,move}` hashes and sheets
+  (640×246→640×324 and 640×364→640×482, as predicted), three `inspect_scene_*` top views.
+  Re-timing check: walking ends at the same place at 20 Hz as at 60 Hz; the jump apex is
+  0.77 m instead of 0.85 m (Euler step). Image: `testdata/golden/scenario_collect_sheet.png`.
+- **Steps 4–9** (four agents in isolated worktrees, each reviewed adversarially and fixed):
+  `veduta upgrade` pins the v0.x defaults; MCP and inspection images follow the panel (4:3,
+  320×240 default, 640×480 max; six `inspect_scene_*` goldens regenerated and looked at, e.g.
+  `testdata/golden/inspect_scene_main_summary.png`); X11 and Win32 removed (5,510 lines),
+  keypad codes added, a real `/dev/uinput` gamepad test, which found two input bugs no fake
+  had shown (reads never delivered, pads never found); `run`, `doctor`, `release` and
+  `status` check the project against the console; 2D: `hitbox`, `layer`, view-axis blended
+  sort, `Camera2D`, `docs/2d.md`, the `testdata/twod` fixture; benchmark at 320×240; the
+  v1.0.0 specification, README and template prose.
+- **Pre-release review.** Six reviewers over the whole diff, every finding checked by an
+  independent skeptic: 49 confirmed, fixed in four worktrees and checked again (details in
+  CHANGELOG → Fixed). The serious ones were all on the console path: the exit chord on
+  joystick-style pads, a Raspberry Pi's 16-bit HDMI framebuffer beside the panel, sticks
+  with 0..255 axes, keys reaching the text console, and doctor missing fusions.
+- **Verified here:**
+  - `go test ./...`, `go vet ./...` (linux and windows), `gofmt -l .`, builds for
+    linux/amd64, linux/arm64, linux/arm, windows/amd64, darwin/arm64; the arm64 suite under
+    qemu-user.
+  - `veduta init demo --engine-dir . && cd demo && veduta test`: 4 scenarios pass in 2.3 s.
+  - `veduta fuzz --games 200 --ticks 200 --seed 1` on the demo: 0 violations in 5.7 s; with
+    `PlayerSpeed = 400.0`: every game violates `within_bounds`, minimized repro
+    `tests/scenarios/fuzz_cd96a0cd.scenario.json` (6 ticks, one input), which `simulate`
+    reports as `fail`.
+  - Rasterizer: `BenchmarkDraw10kTriangles320x240` 2.9–3.8 ms/frame, 0 allocs/op on this VPS;
+    31 ms/frame under qemu-aarch64 (emulation, an order of magnitude only, not a board).
+  - Emulated console, end to end: Debian 13 arm64 under `qemu-system-aarch64` (TCG, 4
+    cores) with `virtio-gpu-pci` at 1280×960 and `virtio-keyboard-pci`; the demo built for
+    arm64 ran at boot with `VEDUTA_BACKEND=fbdev VEDUTA_SCALE=4` on `virtio_gpudrmfb`
+    (32 bpp). Keys sent through the QEMU monitor: holding the up arrow walked the hero to a
+    gem (SCORE 1), right and Space moved and jumped, R reset, Ctrl+Q closed the player with
+    exit status 0. Screendumps looked at (about 15 ticks a second under emulation). This
+    ran before the review fixes that grab devices; the uinput test covers the grab since.
+- **For a person, on hardware** (nothing here emulates it):
+  - The SPI panel: the game fills the ILI9341 at 320×240, colours right (RGB565 byte
+    order), about 20 frames a second, no tearing that makes it unplayable.
+  - The Rii GP100: which physical buttons arrive as A, B, X, Y, Select, Start
+    (`platform/padmap_linux.go` is provisional); the D-pad moves the hero; Select+Start
+    returns to the dashboard; unplugging and replugging the pad mid-game.
+  - A Raspberry Pi Zero 2 W holds 20 Hz on the demo (50 ms per tick for update, render and
+    present); if not, `VEDUTA_SCALE=2` and fewer triangles.
+  - With HDMI connected as well as the panel, the game still picks the panel.
+- **Deferred:** the demo platformer in `veduta-demo`; hiding the console cursor (an image
+  setting); a hardware-verified pad table.
+
