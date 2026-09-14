@@ -36,40 +36,78 @@ func fakeInputs(t *testing.T, entries ...string) {
 	}
 }
 
-// bitmapWith prints a capability bitmap with one bit set, the way the kernel prints them:
-// hexadecimal words of the machine's width, most significant first.
-func bitmapWith(bit int, wordChars int) string {
-	words := bit/(wordChars*4) + 1
-	out := make([]string, words)
-	for i := range out {
-		out[i] = strings.Repeat("0", wordChars)
+// bitmapWith prints a capability bitmap with the given bits set, the way the kernel prints
+// one for a reader whose words are wordBits wide: an unpadded hexadecimal number per word,
+// most significant first, the empty words at the top left out.
+func bitmapWith(wordBits int, bits ...int) string {
+	top := 0
+	for _, b := range bits {
+		top = max(top, b/wordBits)
 	}
-	w := bit / (wordChars * 4)
-	hex := strconv.FormatUint(1<<uint(bit%(wordChars*4)), 16)
-	out[len(out)-1-w] = strings.Repeat("0", wordChars-len(hex)) + hex
+	words := make([]uint64, top+1)
+	for _, b := range bits {
+		words[b/wordBits] |= 1 << uint(b%wordBits)
+	}
+	out := make([]string, 0, len(words))
+	for i := len(words) - 1; i >= 0; i-- {
+		out = append(out, strconv.FormatUint(words[i], 16))
+	}
 	return strings.Join(out, " ")
 }
 
 var (
-	padBits      = bitmapWith(btnSouth, 16)
-	joystickBits = bitmapWith(btnTrigger, 16)
-	keyboardBits = bitmapWith(keyEsc, 16)
-	mouseBits    = bitmapWith(0x110, 16) // BTN_LEFT: neither a pad nor a keyboard
+	padBits      = bitmapWith(strconv.IntSize, btnSouth)
+	joystickBits = bitmapWith(strconv.IntSize, btnTrigger)
+	keyboardBits = bitmapWith(strconv.IntSize, keyEsc)
+	mouseBits    = bitmapWith(strconv.IntSize, 0x110) // BTN_LEFT: neither a pad nor a keyboard
 )
 
 func TestBitmapHas(t *testing.T) {
-	// A 64-bit kernel prints sixteen characters per word, a 32-bit one eight.
-	for _, chars := range []int{8, 16} {
-		for _, bit := range []int{0, 1, 63, 64, 0x130, 0x220} {
-			if !bitmapHas(bitmapWith(bit, chars), bit) {
-				t.Errorf("%d-char words: bit %#x not found in %q", chars, bit, bitmapWith(bit, chars))
+	// A 64-bit reader gets 64-bit words, a 32-bit one 32-bit words, on any kernel.
+	for _, wordBits := range []int{32, 64} {
+		for _, bit := range []int{0, 1, 31, 32, 63, 64, 0x130, 0x220} {
+			b := bitmapWith(wordBits, bit)
+			if !bitmapHasWords(b, bit, wordBits) {
+				t.Errorf("%d-bit words: bit %#x not found in %q", wordBits, bit, b)
 			}
-			if bitmapHas(bitmapWith(bit, chars), bit+1) {
-				t.Errorf("%d-char words: bit %#x found where only %#x is set", chars, bit+1, bit)
+			if bitmapHasWords(b, bit+1, wordBits) {
+				t.Errorf("%d-bit words: bit %#x found in %q, where only %#x is set", wordBits, bit+1, b, bit)
+			}
+		}
+		// The empty words in between are a lone "0", not a word's worth of zeros.
+		b := bitmapWith(wordBits, keyEsc, btnSouth)
+		if !bitmapHasWords(b, keyEsc, wordBits) || !bitmapHasWords(b, btnSouth, wordBits) || bitmapHasWords(b, btnSouth-1, wordBits) {
+			t.Errorf("%d-bit words: %q read wrongly", wordBits, b)
+		}
+	}
+	// As the kernel printed them for a 64-bit reader: /sys/class/input/eventN/device/
+	// capabilities/key of a VM's power button (KEY_POWER, 116), its AT keyboard, and a
+	// uinput gamepad with A, B, Select and Start (0x130, 0x131, 0x13a, 0x13b); then that
+	// gamepad as a 32-bit reader sees it.
+	padButtons := []int{btnSouth, btnSouth + 1, 0x13a, 0x13b}
+	for _, c := range []struct {
+		bitmap   string
+		wordBits int
+		set      []int
+		unset    []int
+	}{
+		{"8000 10000000000000 0", 64, []int{116}, []int{keyEsc, btnSouth, 115, 117}},
+		{"402000002 3803078f800d001 feffffdfffefffff fffffffffffffffe", 64, []int{keyEsc, keyQ, 57}, []int{0, btnSouth}},
+		{"c03000000000000 0 0 0 0", 64, padButtons, []int{keyEsc, btnTrigger, btnSouth + 2}},
+		{"c030000 0 0 0 0 0 0 0 0 0", 32, padButtons, []int{keyEsc, btnTrigger, btnSouth + 2}},
+	} {
+		for _, bit := range c.set {
+			if !bitmapHasWords(c.bitmap, bit, c.wordBits) {
+				t.Errorf("%q (%d-bit words): bit %#x not found", c.bitmap, c.wordBits, bit)
+			}
+		}
+		for _, bit := range c.unset {
+			if bitmapHasWords(c.bitmap, bit, c.wordBits) {
+				t.Errorf("%q (%d-bit words): bit %#x found", c.bitmap, c.wordBits, bit)
 			}
 		}
 	}
-	if bitmapHas("", 0x130) || bitmapHas("zzz", 0x130) {
+	if bitmapHas("", 0x130) || bitmapHas("zzz", 0x130) || bitmapHas("zzz", 0) || bitmapHas("1", -1) {
 		t.Error("nonsense accepted as a bitmap")
 	}
 }

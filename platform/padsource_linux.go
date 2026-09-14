@@ -12,8 +12,7 @@ import (
 
 // Finding what the player holds, and surviving it being unplugged. Discovery is reading
 // sysfs, so it is testable anywhere; opening a device is behind openPad so a test can hand
-// back something a regular file cannot be — a character device answers read deadlines, a
-// file does not.
+// back a fake that is unplugged on cue.
 var openPad = func(path string) (events, error) { return openEvdev(path) }
 
 // padEnv names a device to use instead of searching: an event node ("event3") or part of a
@@ -119,29 +118,32 @@ func hasPadButtons(bitmap string) bool {
 // and on no gamepad.
 func hasKeyboardKeys(bitmap string) bool { return bitmapHas(bitmap, keyEsc) }
 
-// bitmapHas reports whether a bit is set in a sysfs capability bitmap. The kernel prints
-// these as hexadecimal words from the most significant down, one per machine word, so the
-// width is taken from the text itself rather than assumed: the same code reads a 64-bit
-// board's files and an ARMv6 one's.
+// bitmapHas reports whether a bit is set in a sysfs capability bitmap, as this program
+// reads it. The kernel prints one hexadecimal number per word, most significant first,
+// without leading zeros (an empty word is "0", and the empty words at the top are left
+// out), so the text says nothing about how wide a word is: "8000 10000000000000 0" is
+// three 64-bit words. The width is that of a long in the reading process — 64 bits for a
+// 64-bit program, 32 for a 32-bit one, even on a 64-bit kernel, which splits its words for
+// such a reader — and that is this program's own int.
 func bitmapHas(bitmap string, bit int) bool {
-	words := strings.Fields(bitmap)
-	off := 0
-	for i := len(words) - 1; i >= 0; i-- {
-		w := words[i]
-		width := 4 * len(w)
-		if bit < off+width {
-			if bit < off {
-				return false
-			}
-			v, err := strconv.ParseUint(w, 16, 64)
-			if err != nil {
-				return false
-			}
-			return v>>uint(bit-off)&1 == 1
-		}
-		off += width
+	return bitmapHasWords(bitmap, bit, strconv.IntSize)
+}
+
+// bitmapHasWords is bitmapHas for words of wordBits bits.
+func bitmapHasWords(bitmap string, bit, wordBits int) bool {
+	if bit < 0 {
+		return false
 	}
-	return false
+	words := strings.Fields(bitmap)
+	i := len(words) - 1 - bit/wordBits
+	if i < 0 {
+		return false
+	}
+	v, err := strconv.ParseUint(words[i], 16, wordBits)
+	if err != nil {
+		return false
+	}
+	return v>>uint(bit%wordBits)&1 == 1
 }
 
 // openDevice is one device being read.
