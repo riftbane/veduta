@@ -91,6 +91,7 @@ func (e *engine) prepare(opt runOptions) error {
 	if err := e.loadScene(opt.Scene); err != nil {
 		return err
 	}
+	e.tickSize()
 	if err := e.game.Init(&e.ctx); err != nil {
 		return fmt.Errorf("game Init: %w", err)
 	}
@@ -170,10 +171,19 @@ func (e *engine) registerInvariant(name string, pred func() bool) {
 	e.custom[name] = pred
 }
 
+// tickSize sets ctx.Width and ctx.Height for Init and Update: the project resolution, in
+// every mode. It is the size the console player renders at, and no render or screenshot
+// size can change it, so game logic that reads it gives the same trace in the player, in
+// simulate and before render --tick. Draw then sees the size of the frame being drawn.
+func (e *engine) tickSize() {
+	e.ctx.Width, e.ctx.Height = e.project.Resolution[0], e.project.Resolution[1]
+}
+
 // step runs one tick with the given input.
 func (e *engine) step(in Input) error {
 	e.tick++
 	e.ctx.Tick = e.tick
+	e.tickSize()
 	e.game.Update(&e.ctx, in)
 	s := e.ctx.Scene
 	ents := s.Entities()

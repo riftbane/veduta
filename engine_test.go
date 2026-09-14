@@ -258,6 +258,70 @@ func ParseKindErr() (bool, error) {
 	return true, nil
 }
 
+// sizeGame records ctx.Width and ctx.Height where the game sees them and lays out a HUD
+// during Update, which used to panic: the size was only set for Draw.
+type sizeGame struct {
+	testGame
+	init, update, draw [][2]int
+}
+
+func (g *sizeGame) Init(ctx *Context) error {
+	g.init = append(g.init, [2]int{ctx.Width, ctx.Height})
+	return g.testGame.Init(ctx)
+}
+
+func (g *sizeGame) Update(ctx *Context, in Input) {
+	var dl gfx.DrawList
+	hud := ctx.HUD(&dl)
+	ctx.Text(hud, 2, 2, 1, "UPDATE", 0xffffffff)
+	hud.End()
+	g.update = append(g.update, [2]int{ctx.Width, ctx.Height})
+	g.testGame.Update(ctx, in)
+}
+
+func (g *sizeGame) Draw(ctx *Context, dl *gfx.DrawList) {
+	g.draw = append(g.draw, [2]int{ctx.Width, ctx.Height})
+	g.testGame.Draw(ctx, dl)
+}
+
+// Init and Update see the project resolution whatever size the frames are rendered at;
+// Draw sees the frame's size.
+func TestContextSizeInUpdate(t *testing.T) {
+	p, a := testAssets() // resolution 320×180
+	g := &sizeGame{}
+	e := newEngine(g, p, a)
+	defer e.close()
+	if err := e.start(runOptions{Scene: "main", Seed: 1, Headless: true}); err != nil {
+		t.Fatal(err)
+	}
+	res := [2]int{320, 180}
+	for tick := 1; tick <= 3; tick++ {
+		if err := e.step(Input{}); err != nil {
+			t.Fatal(err)
+		}
+		cam, _ := e.ctx.Scene.CameraPreset("scene", 160.0/90)
+		if _, err := e.render(cam, 160, 90, gfx.ModeColor, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(g.init) != 1 || g.init[0] != res {
+		t.Errorf("Init saw %v, want %v", g.init, res)
+	}
+	for i, s := range g.update {
+		if s != res {
+			t.Errorf("Update %d saw %v, want %v", i+1, s, res)
+		}
+	}
+	for i, s := range g.draw {
+		if s != [2]int{160, 90} {
+			t.Errorf("Draw %d saw %v, want the frame size 160×90", i+1, s)
+		}
+	}
+	if len(g.update) != 3 || len(g.draw) != 3 {
+		t.Fatalf("%d updates, %d draws", len(g.update), len(g.draw))
+	}
+}
+
 func TestEngineRender(t *testing.T) {
 	_, e := run(t, 1, 30, &testGame{})
 	defer e.close()

@@ -113,7 +113,10 @@ type Context struct {
 	Headless bool     // true when run by the tool, false in the player
 	Project  *asset.Project
 
-	// Width and Height are the size of the frame being drawn (valid in Draw).
+	// Width and Height are a frame size in pixels, never zero once Init runs: in Draw, the
+	// size of the frame being drawn; in Init and Update (and behaviours), the project's
+	// resolution in every mode, so game logic that reads them is deterministic and HUD
+	// layout can be computed during Update.
 	Width, Height int
 	// Font is the built-in 8×8 font and FontTexture its texture, for HUD text.
 	Font        *sprite.Font
