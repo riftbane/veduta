@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -222,18 +223,60 @@ func modulePath(gomod []byte) string {
 	return ""
 }
 
-// releaseTargetsConsole reports whether the project's release workflow builds for the
-// console.
+// releaseTargetsConsole reports whether a workflow of the project builds for the console:
+// the first .github/workflows/*.yml or *.yaml, in name order, that buildsConsole accepts.
+// Any workflow counts, not only release.yml, since a project may name or split its own.
 func (s *Session) releaseTargetsConsole() (bool, string) {
-	p := filepath.Join(s.Root, ".github", "workflows", "release.yml")
-	data, err := os.ReadFile(p)
-	if err != nil {
-		return false, "no .github/workflows/release.yml"
+	const dir = ".github/workflows"
+	entries, _ := os.ReadDir(filepath.Join(s.Root, filepath.FromSlash(dir)))
+	found := false
+	for _, e := range entries { // ReadDir sorts by name
+		name := e.Name()
+		if e.IsDir() || !(strings.HasSuffix(name, ".yml") || strings.HasSuffix(name, ".yaml")) {
+			continue
+		}
+		found = true
+		data, err := os.ReadFile(filepath.Join(s.Root, filepath.FromSlash(dir), name))
+		if err == nil && buildsConsole(string(data)) {
+			return true, dir + "/" + name + " builds " + targetOS + "/" + targetArch
+		}
 	}
-	if strings.Contains(string(data), targetOS+"/"+targetArch) || strings.Contains(string(data), "GOARCH="+targetArch) {
-		return true, ".github/workflows/release.yml builds " + targetOS + "/" + targetArch
+	if !found {
+		return false, "no workflow in " + dir + ", so no " + targetOS + "/" + targetArch + " archive"
 	}
-	return false, ".github/workflows/release.yml builds no " + targetOS + "/" + targetArch + " archive"
+	return false, dir + " has no " + targetOS + "/" + targetArch + " build"
+}
+
+var (
+	consoleTargetRe = regexp.MustCompile(`\b` + targetOS + `/` + targetArch + `\b`)
+	targetOSRe      = regexp.MustCompile(`\b` + targetOS + `\b`)
+	targetArchRe    = regexp.MustCompile(`\b` + targetArch + `\b`)
+)
+
+// buildsConsole reports whether the text of a GitHub Actions workflow, its comments left
+// out, builds for the console: it names linux/arm64 (a "for target in linux/arm64 ..."
+// list), or has linux and arm64 as words of their own (GOOS=linux with GOARCH=arm64, or a
+// matrix such as goarch: [arm64, amd64]). It reads text, not YAML, so a workflow can
+// still mislead it, but a comment alone no longer counts.
+func buildsConsole(workflow string) bool {
+	var code strings.Builder
+	for _, line := range strings.Split(workflow, "\n") {
+		code.WriteString(stripYAMLComment(line))
+		code.WriteByte('\n')
+	}
+	text := code.String()
+	return consoleTargetRe.MatchString(text) || targetOSRe.MatchString(text) && targetArchRe.MatchString(text)
+}
+
+// stripYAMLComment cuts a line at a # that starts it or follows white space, which begins
+// a comment in YAML and in the shell of a run block alike (${x#y} and $# are not cut).
+func stripYAMLComment(line string) string {
+	for i := 0; i < len(line); i++ {
+		if line[i] == '#' && (i == 0 || line[i-1] == ' ' || line[i-1] == '\t') {
+			return line[:i]
+		}
+	}
+	return line
 }
 
 // fusedCheck is the arm64 warning for the places fusedSites found. The text names the

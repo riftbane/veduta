@@ -100,6 +100,43 @@ func TestFusedCheckListsEverySite(t *testing.T) {
 	}
 }
 
+func TestBuildsConsole(t *testing.T) {
+	for _, c := range []struct {
+		name, workflow string
+		want           bool
+	}{
+		{"target loop", "run: |\n  for target in linux/arm64 linux/amd64; do\n", true},
+		{"comment only", "# linux/arm64 is the console\nrun: |\n  # GOARCH=arm64 later\n  for target in linux/amd64; do # linux/arm64 too\n", false},
+		{"env", "env:\n  GOOS: linux\n  GOARCH: arm64\n", true},
+		{"inline env", "run: GOOS=linux GOARCH=arm64 go build ./cmd/game\n", true},
+		{"matrix", "strategy:\n  matrix:\n    goarch: [arm64, amd64]\nenv:\n  GOOS: linux\n  GOARCH: ${{ matrix.goarch }}\n", true},
+		{"shell expansion", "run: |\n  os=\"${target%/*}\"; arch=\"${target#*/}\"\n  for target in linux/amd64; do echo $#; done\n", false},
+		{"other arm", "run: GOOS=linux GOARCH=arm go build\n", false},
+		{"no linux", "run: GOOS=darwin GOARCH=arm64 go build\n", false},
+	} {
+		if got := buildsConsole(c.workflow); got != c.want {
+			t.Errorf("%s: buildsConsole = %v, want %v", c.name, got, c.want)
+		}
+	}
+
+	// Every workflow file counts, whatever its name or extension.
+	dir := t.TempDir()
+	s := &Session{Root: dir}
+	if ok, detail := s.releaseTargetsConsole(); ok || !strings.Contains(detail, "no workflow") {
+		t.Fatalf("no workflows: %v %q", ok, detail)
+	}
+	wfs := filepath.Join(dir, ".github", "workflows")
+	os.MkdirAll(wfs, 0o755)
+	os.WriteFile(filepath.Join(wfs, "ci.yml"), []byte("run: go test ./...\n"), 0o644)
+	if ok, detail := s.releaseTargetsConsole(); ok || !strings.Contains(detail, "no linux/arm64") {
+		t.Fatalf("ci only: %v %q", ok, detail)
+	}
+	os.WriteFile(filepath.Join(wfs, "publish.yaml"), []byte("env:\n  GOOS: linux\n  GOARCH: arm64\n"), 0o644)
+	if ok, detail := s.releaseTargetsConsole(); !ok || detail != ".github/workflows/publish.yaml builds linux/arm64" {
+		t.Fatalf("publish.yaml: %v %q", ok, detail)
+	}
+}
+
 // check returns the doctor check called name, failing when there is none.
 func check(t *testing.T, r *DoctorReport, name string) Check {
 	t.Helper()
@@ -147,7 +184,12 @@ func TestDoctorConsoleChecks(t *testing.T) {
 	os.WriteFile(kinds, []byte(fusedSrc+"\n//go:noinline\nfunc fusedForTest(a, b, c float32) float32 { return a*b + c }\n\nvar _ = fusedForTest\n"), 0o644)
 	wf := filepath.Join(dir, ".github", "workflows", "release.yml")
 	w, _ := os.ReadFile(wf)
-	os.WriteFile(wf, []byte(strings.ReplaceAll(string(w), "linux/arm64 ", "")), 0o644)
+	// Only the build loop loses the console; the comment that names linux/arm64 stays.
+	noConsole := strings.Replace(string(w), "for target in linux/arm64 linux/amd64", "for target in linux/amd64", 1)
+	if noConsole == string(w) || !strings.Contains(noConsole, "linux/arm64") {
+		t.Fatal("release.yml no longer has the build loop and comment this test edits")
+	}
+	os.WriteFile(wf, []byte(noConsole), 0o644)
 	os.WriteFile(filepath.Join(dir, "card.json"), []byte(`{"veduta": "card/1", "title": "Gems", "name": "demo", "exec": "demo"}`), 0o644)
 
 	// The fused lines are found whatever the paths look like: GOFLAGS asks every build for
