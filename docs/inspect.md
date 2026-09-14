@@ -122,8 +122,11 @@ Metrics: `entities`, `drawn_entities`, `visible_entities`, `important_entities`,
 `id`, `name`, `pixels`, `bbox`; first 64), `lit_parts`, `unlit_parts`, `overlap_pairs`,
 `zfight_pairs`, `zfight_tests`, `zfight_truncated`.
 
-Sheets:
-- `summary` (default): camera, top, ids and legend in one 640-pixel-wide grid.
+Sheets are framed 4:3 like the console panel: single views are 640×480 (`ids` adds its
+legend below) and summary tiles 317×238. The camera view keeps the scene camera's
+vertical `fov_deg`, so its horizontal field follows the aspect.
+
+- `summary` (default): camera, top, ids and legend in one 640×482 grid.
 - `camera`: the scene camera with issue overlays (red overlap boxes and out-of-bounds
   entities, orange boxes of hidden important entities, magenta z-fight outlines).
 - `top`: orthographic top view with -Z up, every entity AABB and name, the camera frustum

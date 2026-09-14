@@ -255,12 +255,45 @@ func TestSceneTemplateMain(t *testing.T) {
 	if len(r.Sheets) != 2 {
 		t.Fatalf("sheets %v", r.Sheets)
 	}
+	// Views are framed 4:3 like the console panel: two 317×238 tiles per row fill 640
+	// pixels, and a single ids view is 640×480 above its legend.
 	sum := scnSheet(t, r, "summary")
-	if sum.W > 640 {
-		t.Errorf("summary sheet is %d px wide", sum.W)
+	if sum.W != 640 || sum.H != 2*238+3*scnPad {
+		t.Errorf("summary sheet is %dx%d, want 640x%d", sum.W, sum.H, 2*238+3*scnPad)
 	}
 	golden.Image(t, "inspect_scene_main_summary", sum)
-	golden.Image(t, "inspect_scene_main_ids", scnSheet(t, r, "ids"))
+	ids := scnSheet(t, r, "ids")
+	if ids.W != 640 || ids.H <= 480 {
+		t.Errorf("ids sheet is %dx%d, want 640 wide and taller than 480", ids.W, ids.H)
+	}
+	golden.Image(t, "inspect_scene_main_ids", ids)
+}
+
+// TestSceneSheetSize pins the size of scene views: 4:3 by default, the height following
+// the width at 4:3 when only the width is given, and both clamped.
+func TestSceneSheetSize(t *testing.T) {
+	for _, c := range []struct {
+		opt          Options
+		tile         bool
+		wantW, wantH int
+	}{
+		{Options{}, false, 640, 480},
+		{Options{}, true, 317, 238},
+		{Options{Width: 320}, false, 320, 240},
+		{Options{Width: 320}, true, 317, 240},
+		{Options{Width: 200}, true, 200, 150},
+		{Options{Width: 400, Height: 100}, false, 400, 100},
+		{Options{Height: 300}, false, 640, 300},
+		{Options{Height: 300}, true, 317, 300},
+		{Options{Width: 10}, false, 64, 48},
+		{Options{Width: 100, Height: 1}, true, 100, 48},
+		{Options{Width: 4000}, false, 640, 640},
+		{Options{Width: 640, Height: 5000}, false, 640, 640},
+	} {
+		if w, h := scnSize(c.opt, c.tile); w != c.wantW || h != c.wantH {
+			t.Errorf("scnSize(%+v, tile=%v) = %dx%d, want %dx%d", c.opt, c.tile, w, h, c.wantW, c.wantH)
+		}
+	}
 }
 
 func TestSceneMissingAsset(t *testing.T) {

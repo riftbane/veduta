@@ -1598,7 +1598,7 @@ type mdlTile struct {
 
 // mdlLayout returns the tile size and column count of sheet kind: by default the tiles
 // fill a 640×360 sheet (sections: one row of square tiles); opt.Width/Height override
-// the tile size (Height defaults to Width·9/16).
+// the tile size (Height defaults to Width·3/4).
 func mdlLayout(kind string, opt Options) (w, h, cols int) {
 	rows := 2
 	switch kind {
@@ -1619,7 +1619,7 @@ func mdlLayout(kind string, opt Options) (w, h, cols int) {
 	if opt.Width > 0 {
 		w, h = opt.Width, opt.Height
 		if h <= 0 {
-			h = w * 9 / 16
+			h = w * 3 / 4
 		}
 	} else if opt.Height > 0 {
 		h = opt.Height

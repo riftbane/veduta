@@ -120,7 +120,7 @@ type Options struct {
 	Focus  string   // keep only issues with this code
 	Sheets []string // sheets to write; nil = the inspector's default (one summary sheet); ["none"] = none
 	Width  int      // tile width in pixels (default 640/2 for grids, see each inspector)
-	Height int      // tile height (default Width*9/16)
+	Height int      // tile height (default Width*3/4 when only Width is given, see each inspector)
 }
 
 func (o Options) outDir() string {

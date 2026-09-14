@@ -122,9 +122,11 @@ const (
 // z-fight outlines), top (orthographic top view, -Z up, every entity AABB, entity names,
 // the camera frustum in yellow and the project bounds in blue), ids (entity id false
 // color with a legend of every visible entity by id) and summary (default: camera, top,
-// ids and legend in one 640×362 grid). Single views default to 640×360, summary tiles to
-// 317×178; opt.Width/Height override both. An unknown scene, sheet kind or focus code is
-// an error.
+// ids and legend in one 640×482 grid). Views are framed 4:3 like the console panel:
+// single views default to 640×480 (the ids view adds its legend below), summary tiles to
+// 317×238; opt.Width/Height override both. The camera view keeps the scene camera's
+// vertical field of view, so its horizontal field follows the aspect. An unknown scene,
+// sheet kind or focus code is an error.
 func Scene(ir *Renderer, name string, opt Options) (*Report, error) {
 	if ir == nil || ir.Lib == nil {
 		return nil, errors.New("inspect scene: no library")
@@ -1613,24 +1615,25 @@ func scnFBox(b gmath.AABB) string { return "[" + scnFV(b.Min) + ", " + scnFV(b.M
 // ---------------------------------------------------------------------------------
 // Sheets.
 
-// scnSize returns the size of a rendered view: summary tiles default to 317×178 (two
-// columns and padding fill 640 pixels), single views to 640×360. opt.Width and
-// opt.Height override both (Height defaults to Width·9/16); widths are clamped to
-// [64, 317] for tiles and [64, 640] for views, heights to [36, 640].
+// scnSize returns the size of a rendered view, framed 4:3 like the console panel:
+// summary tiles default to 317×238 (two columns and padding fill 640 pixels), single
+// views to 640×480. opt.Width and opt.Height override both (Height defaults to
+// Width·3/4); widths are clamped to [64, 317] for tiles and [64, 640] for views, heights
+// to [48, 640].
 func scnSize(opt Options, tile bool) (int, int) {
-	w, h, maxW := 640, 360, 640
+	w, h, maxW := 640, 480, 640
 	if tile {
-		w, h, maxW = 317, 178, (640-3*scnPad)/2
+		w, h, maxW = 317, 238, (640-3*scnPad)/2
 	}
 	if opt.Width > 0 {
 		w, h = opt.Width, opt.Height
 		if h <= 0 {
-			h = w * 9 / 16
+			h = w * 3 / 4
 		}
 	} else if opt.Height > 0 {
 		h = opt.Height
 	}
-	return min(max(w, 64), maxW), min(max(h, 36), 640)
+	return min(max(w, 64), maxW), min(max(h, 48), 640)
 }
 
 func (a *scnAnalysis) sheet(kind string, opt Options) (*gfx.Image, error) {

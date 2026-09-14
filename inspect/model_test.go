@@ -600,9 +600,9 @@ func TestModelSheets(t *testing.T) {
 		}
 	}
 	golden.Image(t, "inspect_model_gem_turntable", mdlTestDecode(t, rep.Sheets[1]))
-	// An explicit tile size is honoured.
+	// An explicit tile size is honoured; the height follows the width at 4:3.
 	rep = mdlTestInspect(t, ir, "gem", Options{OutDir: dir, Sheets: []string{"silhouette"}, Width: 100})
-	if img := mdlTestDecode(t, rep.Sheets[0]); img.W != 2*100+3*mdlPad || img.H != 2*56+3*mdlPad {
+	if img := mdlTestDecode(t, rep.Sheets[0]); img.W != 2*100+3*mdlPad || img.H != 2*75+3*mdlPad {
 		t.Errorf("silhouette with Width 100 is %dx%d", img.W, img.H)
 	}
 }
