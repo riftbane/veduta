@@ -124,7 +124,10 @@ Metrics: `entities`, `drawn_entities`, `visible_entities`, `important_entities`,
 
 Sheets are framed 4:3 like the console panel: single views are 640×480 (`ids` adds its
 legend below) and summary tiles 317×238. The camera view keeps the scene camera's
-vertical `fov_deg`, so its horizontal field follows the aspect.
+vertical `fov_deg`, so its horizontal field follows the aspect, and the top view's
+frustum is drawn at that same aspect. Issues and pixel metrics come from the render at
+`inspect_resolution` instead, so with a wider analysis resolution an entity near a side
+edge can count as visible although the camera view and the frustum leave it out.
 
 - `summary` (default): camera, top, ids and legend in one 640×482 grid.
 - `camera`: the scene camera with issue overlays (red overlap boxes and out-of-bounds

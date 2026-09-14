@@ -269,6 +269,44 @@ func TestSceneTemplateMain(t *testing.T) {
 	golden.Image(t, "inspect_scene_main_ids", ids)
 }
 
+// TestSceneTopFrustum checks that the top view draws the camera frustum at the aspect of
+// the camera view on the same sheet, not at the analysis resolution: a 16:9 and a 4:3
+// inspect_resolution give the same top and summary sheets for a scene without issues
+// (issues and pixel metrics still follow inspect_resolution).
+func TestSceneTopFrustum(t *testing.T) {
+	sheets := func(res [2]int) (*Report, *gfx.Image, *gfx.Image) {
+		lib := scnLibrary(t)
+		p := *lib.Project
+		p.InspectResolution = res
+		lib.Project = &p
+		r := scnInspect(t, scnRenderer(t, lib), "main", Options{Sheets: []string{"top", "summary"}})
+		return r, scnSheet(t, r, "top"), scnSheet(t, r, "summary")
+	}
+	wide, wideTop, wideSum := sheets([2]int{640, 360})
+	panel, panelTop, panelSum := sheets([2]int{320, 240})
+	if len(wide.Issues) != 0 || len(panel.Issues) != 0 {
+		t.Fatalf("template main has issues: %v / %v", scnCodes(wide), scnCodes(panel))
+	}
+	if !equalPix(wideTop, panelTop) {
+		t.Error("top view changes with inspect_resolution: the frustum does not follow the camera view")
+	}
+	if !equalPix(wideSum, panelSum) {
+		t.Error("summary sheet changes with inspect_resolution")
+	}
+}
+
+func equalPix(a, b *gfx.Image) bool {
+	if a.W != b.W || a.H != b.H {
+		return false
+	}
+	for i := range a.Pix {
+		if a.Pix[i] != b.Pix[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // TestSceneSheetSize pins the size of scene views: 4:3 by default, and when only the
 // width is given it is clamped first and the height follows it at 4:3 (rounded), so a
 // clamped width still gives a 4:3 view.

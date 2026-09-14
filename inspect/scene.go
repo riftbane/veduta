@@ -125,8 +125,9 @@ const (
 // ids and legend in one 640×482 grid). Views are framed 4:3 like the console panel:
 // single views default to 640×480 (the ids view adds its legend below), summary tiles to
 // 317×238; opt.Width/Height override both. The camera view keeps the scene camera's
-// vertical field of view, so its horizontal field follows the aspect. An unknown scene,
-// sheet kind or focus code is an error.
+// vertical field of view, so its horizontal field follows the aspect, and the top view
+// draws the frustum at that same aspect, not at the analysis resolution. An unknown
+// scene, sheet kind or focus code is an error.
 func Scene(ir *Renderer, name string, opt Options) (*Report, error) {
 	if ir == nil || ir.Lib == nil {
 		return nil, errors.New("inspect scene: no library")
@@ -1761,7 +1762,7 @@ func (a *scnAnalysis) topView(w, h int) (*gfx.Image, error) {
 	box := a.topBox()
 	cam := scene.FrameOrtho(box, gmath.V3(0, -1, 0), aspect)
 	fb, err := a.ir.RenderScene(a.s, cam, w, h, gfx.ModeColor, false, func(dl *gfx.DrawList, view int) {
-		a.topLines(dl, view, box)
+		a.topLines(dl, view, box, aspect)
 		a.issueLines(dl, view)
 	})
 	if err != nil {
@@ -1772,7 +1773,10 @@ func (a *scnAnalysis) topView(w, h int) (*gfx.Image, error) {
 	return img, nil
 }
 
-func (a *scnAnalysis) topLines(dl *gfx.DrawList, view int, box gmath.AABB) {
+// topLines draws the project bounds, every entity box and the scene camera's frustum,
+// at aspect (width/height) of the camera view on the same sheet, which is the size of
+// the top view itself, so the frustum outlines what that camera view shows.
+func (a *scnAnalysis) topLines(dl *gfx.DrawList, view int, box gmath.AABB, aspect float32) {
 	y := box.Center().Y
 	b := a.bounds
 	rect := [4]gmath.Vec3{gmath.V3(b.Min.X, y, b.Min.Z), gmath.V3(b.Max.X, y, b.Min.Z), gmath.V3(b.Max.X, y, b.Max.Z), gmath.V3(b.Min.X, y, b.Max.Z)}
@@ -1803,7 +1807,6 @@ func (a *scnAnalysis) topLines(dl *gfx.DrawList, view int, box gmath.AABB) {
 	u := r.Cross(f)
 	_, reach := scnBoxDist(cam.Position, box)
 	L := min(float32(reach), cam.Far)
-	aspect := float32(a.w) / float32(a.h)
 	var near, far [4]gmath.Vec3
 	signs := [4][2]float32{{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}
 	for i, sg := range signs {
