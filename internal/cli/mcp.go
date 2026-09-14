@@ -495,36 +495,51 @@ func clampSize(w, h int) (int, int) {
 	return min(max(w, 16), mcpMaxW), min(max(h, 16), mcpMaxH)
 }
 
-// queryImage returns a small PNG illustrating a query: the frame with a crosshair at the
-// queried pixel, or the ID buffer colored per entity for coverage.
+// queryMark is the color of the crosshair on query images (magenta).
+const queryMark = 0xffff00ff
+
+// queryImage returns a PNG illustrating a query on the frame bundle at path frame (see
+// queryPicture), or nil when the bundle cannot be read.
 func queryImage(frame, at string, coverage bool) []byte {
 	f, err := inspect.ReadFrame(frame)
 	if err != nil {
 		return nil
 	}
+	var b strings.Builder
+	if queryPicture(f, at, coverage).EncodePNG(&b) != nil {
+		return nil
+	}
+	return []byte(b.String())
+}
+
+// queryPicture draws the image of a query on f: the color buffer with a crosshair on the
+// queried pixel, or the ID buffer colored per entity for coverage. The frame is fitted
+// inside mcpMaxW×mcpMaxH, so any frame an MCP render produces comes back unscaled; the
+// crosshair is drawn after the fit, at the scaled position, so it stays a sharp 17-pixel
+// mark on a larger bundle too.
+func queryPicture(f *inspect.Frame, at string, coverage bool) *gfx.Image {
 	img := gfx.NewImage(f.Width, f.Height)
 	if coverage {
 		for i, id := range f.ID {
 			img.Pix[i] = gfx.IDColor(id)
 		}
-	} else {
-		copy(img.Pix, f.Color)
-		var x, y int
-		if _, err := fmt.Sscanf(strings.ReplaceAll(at, " ", ""), "%d,%d", &x, &y); err == nil {
-			for d := -8; d <= 8; d++ {
-				if d > -2 && d < 2 {
-					continue
-				}
-				img.Set(x+d, y, 0xffff00ff)
-				img.Set(x, y+d, 0xffff00ff)
-			}
+		return sheet.Fit(img, mcpMaxW, mcpMaxH)
+	}
+	copy(img.Pix, f.Color)
+	img = sheet.Fit(img, mcpMaxW, mcpMaxH)
+	var x, y int
+	if _, err := fmt.Sscanf(strings.ReplaceAll(at, " ", ""), "%d,%d", &x, &y); err != nil || x < 0 || y < 0 || x >= f.Width || y >= f.Height {
+		return img
+	}
+	x, y = x*img.W/f.Width, y*img.H/f.Height
+	for d := -8; d <= 8; d++ {
+		if d > -2 && d < 2 {
+			continue
 		}
+		img.Set(x+d, y, queryMark)
+		img.Set(x, y+d, queryMark)
 	}
-	var b strings.Builder
-	if sheet.Fit(img, mcpDefaultW, mcpDefaultH).EncodePNG(&b) != nil {
-		return nil
-	}
-	return []byte(b.String())
+	return img
 }
 
 // status assembles the status report.

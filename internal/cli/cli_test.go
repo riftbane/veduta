@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/png"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/riftbane/veduta/inspect"
 	"github.com/riftbane/veduta/internal/golden"
 )
 
@@ -219,6 +221,56 @@ func TestMCPImageSizes(t *testing.T) {
 	}
 }
 
+// TestQueryPicture checks the image the query tool returns: a frame an MCP render can
+// produce (up to 640×480) comes back unscaled, a larger bundle (a CLI render at a 0.x
+// project's 1280×720) is fitted inside 640×480, and in every case the crosshair is a
+// sharp mark at the queried pixel, not blended by the scaling.
+func TestQueryPicture(t *testing.T) {
+	const bg = 0xff302820
+	for _, c := range []struct {
+		w, h, x, y int
+		want       image.Point
+	}{
+		{320, 240, 160, 120, image.Pt(320, 240)},
+		{640, 480, 100, 50, image.Pt(640, 480)},
+		{1280, 720, 640, 360, image.Pt(640, 360)},
+		{1280, 720, 5, 715, image.Pt(640, 360)},
+	} {
+		n := c.w * c.h
+		f := &inspect.Frame{FrameHeader: inspect.FrameHeader{Width: c.w, Height: c.h},
+			Color: make([]uint32, n), Depth: make([]float32, n), ID: make([]uint32, n)}
+		for i := range f.Color {
+			f.Color[i] = bg
+		}
+		img := queryPicture(f, fmt.Sprintf("%d, %d", c.x, c.y), false)
+		if got := image.Pt(img.W, img.H); got != c.want {
+			t.Errorf("%dx%d frame: query image is %v, want %v", c.w, c.h, got, c.want)
+			continue
+		}
+		cx, cy := c.x*img.W/c.w, c.y*img.H/c.h
+		for d := -8; d <= 8; d++ {
+			want := uint32(queryMark)
+			if d > -2 && d < 2 {
+				want = bg
+			}
+			for _, p := range [2]image.Point{{cx + d, cy}, {cx, cy + d}} {
+				if p.X < 0 || p.Y < 0 || p.X >= img.W || p.Y >= img.H {
+					continue
+				}
+				if got := img.At(p.X, p.Y); got != want {
+					t.Errorf("%dx%d frame, query at %d,%d: pixel %v is %#x, want %#x", c.w, c.h, c.x, c.y, p, got, want)
+				}
+			}
+		}
+		if got := img.At(cx+9, cy); cx+9 < img.W && got != bg {
+			t.Errorf("%dx%d frame: crosshair longer than 8 pixels (%#x)", c.w, c.h, got)
+		}
+		if cov := queryPicture(f, "", true); image.Pt(cov.W, cov.H) != c.want {
+			t.Errorf("%dx%d frame: coverage image is %dx%d, want %v", c.w, c.h, cov.W, cov.H, c.want)
+		}
+	}
+}
+
 func TestMCPEndToEnd(t *testing.T) {
 	dir, _ := newProject(t)
 	inR, inW := io.Pipe()
@@ -277,8 +329,13 @@ func TestMCPEndToEnd(t *testing.T) {
 	if isErr || imgs != 1 || q["pixel"] == nil || c.sizes[0] != image.Pt(320, 240) {
 		t.Fatalf("query: %v %v", q, c.sizes)
 	}
-	if r, imgs, isErr := c.tool("render", map[string]any{"scene": "main", "width": 2000}); isErr || imgs != 1 || c.sizes[0] != image.Pt(640, 480) {
-		t.Fatalf("render at the size limit: %v images=%d %v", r, imgs, c.sizes)
+	big, imgs, isErr := c.tool("render", map[string]any{"scene": "main", "width": 2000, "bundle": true})
+	if isErr || imgs != 1 || c.sizes[0] != image.Pt(640, 480) {
+		t.Fatalf("render at the size limit: %v images=%d %v", big, imgs, c.sizes)
+	}
+	// The query image of the largest render comes back unscaled, so its crosshair is sharp.
+	if q, imgs, isErr := c.tool("query", map[string]any{"frame": big["bundle"], "at": "320,240"}); isErr || imgs != 1 || c.sizes[0] != image.Pt(640, 480) {
+		t.Fatalf("query at the size limit: %v %v", q, c.sizes)
 	}
 	// Sheets keep the render width limit, so a 4:3 summary (640×482) arrives unscaled.
 	if in, imgs, isErr := c.tool("inspect", map[string]any{"kind": "scene", "name": "main"}); isErr || imgs != 1 || c.sizes[0] != image.Pt(640, 482) {
