@@ -69,10 +69,13 @@ func (r *ReleaseReport) Human() string {
 	return b.String()
 }
 
-// Release runs the release checklist (clean tree, tests, cook, smoke render), turns the
-// CHANGELOG's Unreleased section into the version's entry, commits, tags and pushes; CI
-// publishes the artifacts. It works in a game project (veduta.json) and in the engine
-// repository itself.
+// Release runs the release checklist (clean tree, tests, cook, smoke render, console build),
+// turns the CHANGELOG's Unreleased section into the version's entry, commits, tags and
+// pushes; CI publishes the artifacts. It works in a game project (veduta.json) and in the
+// engine repository itself. In a project on a v1 engine the console part refuses, before
+// the tests, a project whose workflows publish no linux/arm64 archive or whose card.json
+// the console cannot read, and after the smoke render one that does not build for
+// linux/arm64. Pre-release versions are refused: they are tagged by hand.
 func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, error) {
 	if !update.IsVersion(o.Version) {
 		return nil, usagef("release: %q is not a version like v0.1.0", o.Version)
@@ -308,7 +311,7 @@ func releaseChangelog(cl []byte, version, date string) ([]byte, error) {
 
 func init() {
 	register(command{
-		name: "release", usage: "release vX.Y.Z [--dry-run]", summary: "checklist (clean tree, test, cook, smoke render) → CHANGELOG entry → tag → push; CI publishes",
+		name: "release", usage: "release vX.Y.Z [--dry-run]", summary: "checklist (clean tree, test, cook, smoke render, console build) → CHANGELOG entry → tag → push; CI publishes. Refuses pre-release tags, which are cut by hand",
 		run: func(env *Env, _ *Session, args []string) (any, error) {
 			fs := newFlags("release", env.Stderr)
 			dry := fs.Bool("dry-run", false, "run the checklist without committing, tagging or pushing")
@@ -335,7 +338,7 @@ func init() {
 	mcpExtraTools = func(m *mcpServer) []mcp.Tool {
 		return append(prev(m), mcp.Tool{
 			Name:        "release",
-			Description: "Run the release checklist (clean tree, test, cook, smoke render); when everything passes and dry_run is false, move the CHANGELOG's Unreleased section to the version, commit, tag and push (CI publishes the archives).",
+			Description: "Run the release checklist (clean tree, test, cook, smoke render, console build: a workflow must publish a linux/arm64 archive and card.json must be card/1, checked before the tests, and the game must build for linux/arm64; a project still on a v0.x engine is not checked against the console); when everything passes and dry_run is false, move the CHANGELOG's Unreleased section to the version, commit, tag and push (CI publishes the archives). Pre-release versions such as v1.1.0-rc.1 are refused: tag them by hand.",
 			InputSchema: schema(map[string]any{"version": str("version tag, e.g. v0.1.0"), "dry_run": boolean("only run the checklist")}, "version"),
 			Handler: func(ctx context.Context, args json.RawMessage) (*mcp.Result, error) {
 				var a struct {

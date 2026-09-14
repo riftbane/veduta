@@ -181,7 +181,7 @@ func init() {
 	register(command{
 		name:    "doctor",
 		usage:   "doctor",
-		summary: "check Go, git, the project manifest, engine/tool versions, assets and updates",
+		summary: "check Go, git, the manifest, engine/tool versions, assets, updates, and the project against the console (arm64 build, fused multiply-adds in the game's code, release workflow, card.json)",
 		run: func(env *Env, _ *Session, args []string) (any, error) {
 			if len(args) > 0 {
 				return nil, usagef("doctor takes no arguments")

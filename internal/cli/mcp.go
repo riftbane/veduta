@@ -160,7 +160,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 	tools := []mcp.Tool{
 		{
 			Name:        "status",
-			Description: "Versions (tool, engine, project), project summary, cooked and stale assets, the last build result of this session and update availability on the configured release channel. Call it first.",
+			Description: "Versions (tool, engine, project), project summary, the console target the game plays on, the engine check (a warning when project and tool differ by a minor version or more), cooked and stale assets, the last build result of this session and update availability on the configured release channel. Call it first.",
 			InputSchema: schema(map[string]any{}),
 			Handler: withSession(func(ctx context.Context, s *Session, args json.RawMessage) (*mcp.Result, error) {
 				var a struct{}
