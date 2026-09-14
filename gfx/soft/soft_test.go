@@ -388,8 +388,10 @@ func TestErrors(t *testing.T) {
 	}
 }
 
-// benchScene builds 10k textured, lit triangles covering a 1280×720 frame: a 50×100
-// quad grid seen in perspective.
+// benchScene builds 10k textured, lit triangles covering a 320×240 frame, the console
+// panel: a 50×100 quad grid seen in perspective. That is several times the triangles a
+// level for a Raspberry Pi Zero 2 W should submit, so it measures the rasterizer under
+// load rather than a typical frame.
 func benchScene(b testing.TB, r *Renderer) (*gfx.DrawList, *gfx.Framebuffer) {
 	const nx, nz = 100, 50
 	mesh := &gfx.MeshData{}
@@ -412,9 +414,9 @@ func benchScene(b testing.TB, r *Renderer) (*gfx.DrawList, *gfx.Framebuffer) {
 	}
 	tex, _ := r.CreateTexture(crateTexture())
 	dl := &gfx.DrawList{Clear: true, ClearColor: 0xff202830, Light: gfx.DefaultLight}
-	v := dl.AddView(perspectiveView(gmath.V3(0, 3.2, 1.5), gmath.V3(0, 0, -3.5), 60, 1280, 720))
+	v := dl.AddView(perspectiveView(gmath.V3(0, 3.2, 1.5), gmath.V3(0, 0, -3.5), 60, 320, 240))
 	dl.Add(gfx.DrawCmd{View: v, Mesh: id, Model: gmath.Ident4(), Texture: tex, Color: white, State: gfx.StateOpaque, ID: 1})
-	return dl, gfx.NewFramebuffer(1280, 720, false)
+	return dl, gfx.NewFramebuffer(320, 240, false)
 }
 
 func TestDrawDoesNotAllocate(t *testing.T) {
@@ -437,7 +439,7 @@ func TestDrawDoesNotAllocate(t *testing.T) {
 	}
 }
 
-func BenchmarkDraw10kTriangles1280x720(b *testing.B) {
+func BenchmarkDraw10kTriangles320x240(b *testing.B) {
 	r := New(Options{})
 	defer r.Close()
 	dl, fb := benchScene(b, r)
@@ -451,5 +453,5 @@ func BenchmarkDraw10kTriangles1280x720(b *testing.B) {
 		r.Draw(dl)
 		r.End()
 	}
-	b.ReportMetric(float64(b.Elapsed().Milliseconds())/float64(b.N), "ms/frame")
+	b.ReportMetric(float64(b.Elapsed().Microseconds())/1000/float64(b.N), "ms/frame")
 }
