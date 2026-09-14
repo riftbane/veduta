@@ -24,6 +24,7 @@ type padDecoder struct {
 	axis   map[uint16]string        // axis → the direction currently down for it
 	exit   [len(exitChords)][2]bool // the two members of each exit chord, held or not
 	quit   bool                     // a chord was closed: emit Close once
+	down   map[uint16]bool          // keys physically down, whatever was reported for them
 	ranges [absHat0Y + 1]axisRange  // what the device says each axis reports; zero when unknown
 }
 
@@ -44,8 +45,12 @@ func (d *padDecoder) setRange(code uint16, lo, hi int32) {
 var exitChords = [...][2]uint16{padExitChords[0], padExitChords[1], keyboardExit[0], keyboardExit[1]}
 
 func newPadDecoder() *padDecoder {
-	return &padDecoder{size: eventSize, held: map[uint16]string{}, axis: map[uint16]string{}}
+	return &padDecoder{size: eventSize, held: map[uint16]string{}, axis: map[uint16]string{}, down: map[uint16]bool{}}
 }
+
+// pressed reports whether any key or button is physically down: a chord that closed the
+// player is reported released to the game while its keys are still held.
+func (d *padDecoder) pressed() bool { return len(d.down) > 0 }
 
 // decode appends the events of one read to out. A partial record at the end is a
 // programming error rather than something to tolerate: the kernel writes whole records.
@@ -74,12 +79,18 @@ func (d *padDecoder) event(out []Event, typ, code uint16, value int32) []Event {
 			out = d.releaseAll(out)
 			d.exit = [len(exitChords)][2]bool{}
 			d.quit = false
+			clear(d.down)
 		}
 	case evKey:
 		if value == 2 {
 			return out // auto-repeat: the engine reports a key once
 		}
 		down := value != 0
+		if down {
+			d.down[code] = true
+		} else {
+			delete(d.down, code)
+		}
 		// Every chord a key belongs to learns of it before any closes: Q is in two, and
 		// stopping at the first would leave the other thinking Q is up.
 		closed := false
@@ -299,3 +310,6 @@ func (s *evdevSource) grab(take bool) error {
 }
 
 func (s *evdevSource) close() error { return s.f.Close() }
+
+// pressed reports whether a key of the device is physically down.
+func (s *evdevSource) pressed() bool { return s.d.pressed() }

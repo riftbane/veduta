@@ -49,7 +49,8 @@ the board.
 Windows, macOS and desktop Linux are **authoring machines**: they build, cook, inspect,
 render, simulate, test, fuzz and cross-compile. They do not open a window. Releases carry
 the tool for linux/amd64, linux/arm64 and windows/amd64 (§13.1); a macOS author builds it
-from source, naming the version so `update` and `upgrade` know it:
+from source, naming the version so `upgrade` and the update checks know it (it cannot
+update itself: no macOS archive is published):
 `go install -ldflags "-X main.version=vX.Y.Z" github.com/riftbane/veduta/cmd/veduta@vX.Y.Z`.
 
 ### In scope
@@ -317,7 +318,8 @@ structure; `kind` instantiates the registered Go behaviour. Built-in kinds: `sta
   (`encoding/gob`). `Restore` must yield an identical trace from that tick onward.
 
 ### 6.6 `platform` — the console player
-One backend, Linux only, pure Go, no ioctl and no mmap for drawing:
+One backend, Linux only, pure Go, no cgo and no mmap (the only ioctls read an axis range and
+take a device for the player alone):
 
 - **Framebuffer.** The panel is found by reading `/sys/class/graphics/fbN/{name,
   bits_per_pixel, virtual_size, stride}`, never by assuming a device number: a 16-bit
@@ -336,8 +338,15 @@ One backend, Linux only, pure Go, no ioctl and no mmap for drawing:
   keyboards by physical position (`KEY_Q` → `KeyQ`). Auto-repeat is dropped. Held keys are
   released when the kernel reports dropped events or a device is unplugged; devices are
   looked for again every second, including a pad plugged in while a keyboard is being read.
-- **Exit.** Select+Start on a pad, or Ctrl+Q (either Ctrl) on a keyboard, closes the player: on a device
-  with no keyboard it is the way back to the dashboard, and no game can swallow it.
+  A key is held while any button, axis or device holds it. A stick is read against the
+  range its device reports (EVIOCGABS). While the player polls, every device is taken for
+  it alone (EVIOCGRAB), so keys never reach a text console or the shell behind it; a player
+  that stops polling for 2 s gives the devices back, so a hung game cannot lock the
+  keyboard. Why nothing is read (no device, a permission refused) is said on stderr.
+- **Exit.** Select+Start on a pad (the buttons the table maps to Select and Start, on either
+  kind of pad), or Ctrl+Q (either Ctrl) on a keyboard, closes the player: on a device with
+  no keyboard it is the way back to the dashboard, and no game can swallow it. The player
+  waits up to half a second for the chord to be let go before giving the devices back.
 - **Choice.** `VEDUTA_BACKEND` is `auto` (default) or `fbdev`; `x11` is refused with the
   reason. `platform.Open` fails with "no framebuffer" on a machine without one, and every
   other GOOS gets a stub that fails at runtime.

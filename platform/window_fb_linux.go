@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/riftbane/veduta/gfx"
 )
@@ -31,6 +32,9 @@ type events interface {
 }
 
 var errFBClosed = errors.New("platform: the panel is closed")
+
+// closeSettle bounds how long Close waits for the keys that closed the player to be let go.
+const closeSettle = 500 * time.Millisecond
 
 // openFB opens the panel named by VEDUTA_FB (or the one findFramebuffer picks) and renders
 // at its size divided by VEDUTA_SCALE, which lets a slower board draw a quarter of the
@@ -131,7 +135,9 @@ var terminal uintptr = 0
 // the first poll, nor while a stalled player has given them back; without this the shell
 // would run those keys once the player quits. The console's cursor is left alone: hiding
 // it could not be undone for a player killed outright, and a cursor that stays hidden at
-// the shell is worse than one blinking over the game.
+// the shell is worse than one blinking over the game. Before the devices are given back,
+// Close waits up to closeSettle for the keys that closed the player to be let go, so
+// neither they nor the kernel's repeats of them reach the console.
 func (w *fbWindow) Close() error {
 	if w.closed {
 		return nil
@@ -139,6 +145,9 @@ func (w *fbWindow) Close() error {
 	w.closed = true
 	err := w.file.Close()
 	if w.source != nil {
+		if s, ok := w.source.(interface{ settle(time.Duration) }); ok {
+			s.settle(closeSettle)
+		}
 		if cerr := w.source.close(); err == nil {
 			err = cerr
 		}

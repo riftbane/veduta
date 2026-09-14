@@ -246,6 +246,40 @@ func (p *inputSource) poll() ([]Event, error) {
 	return p.out, nil
 }
 
+// settle keeps reading, for at most d, until nothing is held. The player closes while the
+// keys that closed it (Select and Start, Ctrl and Q) are still down; letting go of the
+// devices then would hand those keys, and the kernel's repeats of them, to the text console
+// and the shell behind it. Waiting for their release while the devices are still taken
+// keeps them away.
+func (p *inputSource) settle(d time.Duration) {
+	deadline := p.now().Add(d)
+	for p.holding() && p.now().Before(deadline) {
+		time.Sleep(settleStep)
+		p.poll()
+	}
+}
+
+// settleStep is how often settle reads.
+const settleStep = 10 * time.Millisecond
+
+// holding reports whether any key is down, as the game sees it or physically on a device
+// that can tell.
+func (p *inputSource) holding() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, n := range p.down {
+		if n > 0 {
+			return true
+		}
+	}
+	for _, d := range p.open {
+		if s, ok := d.src.(interface{ pressed() bool }); ok && s.pressed() {
+			return true
+		}
+	}
+	return false
+}
+
 // pass hands on what one device sent, counting presses by W3C code: a key goes down when
 // the first button or axis anywhere holds it and up when the last one lets go. A release
 // from a device that never pressed the key is not a release at all.

@@ -365,9 +365,13 @@ type decodingPad struct {
 	next   []byte
 	err    error
 	vanish bool
+	onPoll func() // called before each read, to change what the next one returns
 }
 
 func (f *decodingPad) poll() ([]Event, error) {
+	if f.onPoll != nil {
+		f.onPoll()
+	}
 	if f.err != nil {
 		if f.vanish {
 			return nil, f.err
@@ -380,6 +384,8 @@ func (f *decodingPad) poll() ([]Event, error) {
 }
 
 func (f *decodingPad) close() error { return nil }
+
+func (f *decodingPad) pressed() bool { return f.d.pressed() }
 
 // TestInputSourceCountsHolds: a pad's hat, its stick and its D-pad buttons, and the
 // keyboard beside it, all report the same few keys. A key is held while anything holds it:
@@ -621,5 +627,42 @@ func TestInputSourceReportsProblems(t *testing.T) {
 	named.poll()
 	if got := log.String()[before:]; !strings.Contains(got, `no input device matches "event9"`) || !strings.Contains(got, "Rii Gamepad") {
 		t.Fatalf("a name that matches nothing: logged %q", got)
+	}
+}
+
+// TestInputSourceSettles: the player closes with the chord still held, and waits for it to
+// be let go before giving the devices back, so the keys never reach the text console. A
+// key nobody lets go of does not keep the player from closing.
+func TestInputSourceSettles(t *testing.T) {
+	fakeInputs(t, "event0 AT Keyboard|"+keyboardBits)
+	const size = 24
+	keyboard := &decodingPad{d: newPadDecoder()}
+	keyboard.d.size = size
+	old := openPad
+	openPad = func(string) (events, error) { return keyboard, nil }
+	t.Cleanup(func() { openPad = old })
+	p := newInputSource("")
+	keyboard.next = append(record(size, evKey, keyLeftCtrl, 1), record(size, evKey, keyQ, 1)...)
+	if evs, _ := p.poll(); !strings.Contains(describePad(evs), "close") {
+		t.Fatalf("Ctrl+Q: %q", describePad(evs))
+	}
+	polls := 0
+	keyboard.onPoll = func() {
+		if polls++; polls == 3 {
+			keyboard.next = append(record(size, evKey, keyQ, 0), record(size, evKey, keyLeftCtrl, 0)...)
+		}
+	}
+	start := time.Now()
+	p.settle(time.Second)
+	if p.holding() || polls < 3 || time.Since(start) > 500*time.Millisecond {
+		t.Fatalf("settle: holding %v after %d polls in %v", p.holding(), polls, time.Since(start))
+	}
+	keyboard.onPoll = nil
+	keyboard.next = record(size, evKey, 17, 1) // W, never released
+	p.poll()
+	start = time.Now()
+	p.settle(50 * time.Millisecond)
+	if !p.holding() || time.Since(start) > 400*time.Millisecond {
+		t.Fatalf("a key never let go: holding %v, waited %v", p.holding(), time.Since(start))
 	}
 }
