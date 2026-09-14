@@ -286,3 +286,33 @@ Win32 windows are gone.
 - **Deferred:** the demo platformer in `veduta-demo`; hiding the console cursor (an image
   setting); a hardware-verified pad table.
 
+
+## Unreleased — the console's final controls (2026-09-15)
+
+- **Built:** `Input.Stick` and the scenario `stick` field; the player reads a pad's
+  `ABS_X`/`ABS_Y` as the stick (arrows too, unless the D-pad is `BTN_DPAD_*` buttons), Home
+  (`BTN_MODE`) as an exit, W/A/S/D as the arrows as well as their own codes, and mice and
+  tablets as the stick (`platform/stick_linux.go`). The template demo walks with the stick
+  (`stick` scenario); fuzz players move it. vedutaos: `vedutaos qemu` adds `usb-tablet`.
+- **Verified:**
+  - `go test ./...` and `GOARCH=arm64 go test -exec qemu-aarch64-static ./...`, both green;
+    `go vet`, `gofmt -l`. The uinput tests ran with real kernel devices here (not skipped):
+    a console pad (stick without arrows, D-pad buttons, X, Y, Home, unplug), a mouse and a
+    tablet.
+  - Template: the four existing trace hashes are identical before and after the change;
+    the stick scenario fails on the old game and passes on the new one. New golden looked
+    at: `testdata/golden/scenario_stick_sheet.png`.
+  - QEMU end to end: `vedutaos qemu --fresh --game ../veduta/template` (Debian image from a
+    mirror, SHA-512 checked by hand: the redirector's mirror had an expired certificate);
+    tablet positions sent with QMP `input-send-event` walked the hero right, stopped it at
+    the middle and walked it up (screendumps looked at). HMP `mouse_move` cannot drive a
+    tablet (relative events only).
+- **Not verified:** Home and WASD in QEMU (covered by decoder and uinput tests); a relative
+  mouse on a real machine; the handheld's real controls.
+- **Observed, not investigated:** after `system_powerdown` of that machine, the next boot
+  stopped in the initramfs ("Target filesystem doesn't have requested /sbin/init"); a
+  `--fresh` machine booted normally.
+- **Deferred:** engine release v1.1.0; vedutaos moving to it (its release clones the engine
+  by tag, so no pseudo-version).
+- **Resolved:** the spec is extended, not edited; D-pad vs stick decided by `BTN_DPAD_*`;
+  mouse held where left; Home as a one-button chord (CHANGELOG → Decisions).
