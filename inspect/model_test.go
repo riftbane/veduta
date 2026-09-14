@@ -156,7 +156,7 @@ func mdlTestHatch(img *gfx.Image, x0, y0, x1, y1 int) int {
 func TestModelTemplateClean(t *testing.T) {
 	lib := mdlTestLib(t)
 	ir := mdlTestRenderer(t, lib)
-	for _, name := range []string{"ground", "hero", "gem", "crate"} {
+	for _, name := range []string{"ground", "hero", "gem", "crate", "quad"} {
 		t.Run(name, func(t *testing.T) {
 			rep := mdlTestInspect(t, ir, name, Options{})
 			t.Logf("%s", mdlTestJSON(t, rep))
