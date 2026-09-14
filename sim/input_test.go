@@ -1,6 +1,7 @@
 package sim
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -85,6 +86,60 @@ func TestMouseDelta(t *testing.T) {
 	s.ReleaseAll()
 	if in = s.Next(); in.MouseDelta != (gmath.Vec2{}) {
 		t.Fatalf("delta after ReleaseAll %v, want zero", in.MouseDelta)
+	}
+}
+
+// TestStick: the stick is a position, not an edge. It holds until moved, is copied into
+// every tick's Input, and goes back to rest when input is lost.
+func TestStick(t *testing.T) {
+	var s InputState
+	if in := s.Next(); in.Stick != (gmath.Vec2{}) {
+		t.Fatalf("stick at start %v, want rest", in.Stick)
+	}
+	s.SetStick(0.25, -1)
+	s.SetStick(1, 0.5) // the last position of a tick is the one seen
+	if in := s.Next(); in.Stick != gmath.V2(1, 0.5) {
+		t.Fatalf("moved stick %v", in.Stick)
+	}
+	if in := s.Next(); in.Stick != gmath.V2(1, 0.5) {
+		t.Fatalf("held stick %v, want it where it was left", in.Stick)
+	}
+	s.ReleaseAll()
+	if in := s.Next(); in.Stick != (gmath.Vec2{}) {
+		t.Fatalf("stick after ReleaseAll %v, want rest", in.Stick)
+	}
+}
+
+func TestScriptStick(t *testing.T) {
+	right, back := gmath.V2(1, 0), gmath.V2(0, 0)
+	sc, err := NewScript([]InputEvent{{Tick: 3, Stick: &right}, {Tick: 6, Stick: &back}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for tick := uint64(1); tick <= 4; tick++ {
+		in := sc.Input(tick)
+		if want := map[bool]gmath.Vec2{true: right}[tick >= 3]; in.Stick != want {
+			t.Fatalf("tick %d: stick %v, want %v", tick, in.Stick, want)
+		}
+	}
+	// A snapshot between ticks resumes with the stick where it was.
+	st := sc.State()
+	resumed, _ := NewScript(sc.Events())
+	resumed.SetState(st)
+	for tick := uint64(5); tick <= 6; tick++ {
+		a, b := sc.Input(tick), resumed.Input(tick)
+		if a.Stick != b.Stick {
+			t.Fatalf("tick %d: resumed stick %v, original %v", tick, b.Stick, a.Stick)
+		}
+		if want := map[bool]gmath.Vec2{true: right, false: back}[tick < 6]; a.Stick != want {
+			t.Fatalf("tick %d: stick %v, want %v", tick, a.Stick, want)
+		}
+	}
+	nan := gmath.V2(float32(math.NaN()), 0)
+	for _, bad := range []gmath.Vec2{gmath.V2(1.5, 0), gmath.V2(0, -1.01), nan} {
+		if _, err := NewScript([]InputEvent{{Tick: 1, Stick: &bad}}); err == nil {
+			t.Errorf("stick %v accepted", bad)
+		}
 	}
 }
 

@@ -38,6 +38,7 @@ type Input struct {
 	Buttons []string    // nil: unchanged; otherwise the mouse buttons held from now on (left, right, middle)
 	Mouse   *gmath.Vec2 // nil: unchanged; otherwise the mouse position in frame pixels
 	Text    string      // characters typed during this tick
+	Stick   *gmath.Vec2 // nil: unchanged; otherwise the stick's position from now on, each axis -1…1
 }
 
 // Expectation is one check of a scenario. It is either an entity comparison (Entity,
@@ -241,8 +242,8 @@ func compileInputs(c *Checker, src []InputSource, tick func(string, int)) []Inpu
 			c.Errorf(Path(p, "tick"), "tick %d is before the previous input's tick %d (inputs must be in tick order)", in.Tick, src[i-1].Tick)
 		}
 		ev := Input{Tick: in.Tick, Text: in.Text}
-		if in.Press == nil && in.Release == nil && in.Buttons == nil && in.Mouse == nil && in.Text == "" {
-			c.Errorf(p, "input event has no press, release, buttons, mouse or text")
+		if in.Press == nil && in.Release == nil && in.Buttons == nil && in.Mouse == nil && in.Stick == nil && in.Text == "" {
+			c.Errorf(p, "input event has no press, release, buttons, mouse, stick or text")
 		}
 		ev.Press = keyList(c, Path(p, "press"), in.Press)
 		ev.Release = keyList(c, Path(p, "release"), in.Release)
@@ -287,6 +288,13 @@ func compileInputs(c *Checker, src []InputSource, tick func(string, int)) []Inpu
 				c.Errorf(Path(p, "mouse"), "not a finite position")
 			}
 			ev.Mouse = &m
+		}
+		if in.Stick != nil {
+			st := gmath.V2(in.Stick.X, in.Stick.Y)
+			if !(st.X >= -1 && st.X <= 1 && st.Y >= -1 && st.Y <= 1) {
+				c.Errorf(Path(p, "stick"), "x %g and y %g must be in [-1, 1]", st.X, st.Y)
+			}
+			ev.Stick = &st
 		}
 		out[i] = ev
 	}

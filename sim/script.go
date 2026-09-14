@@ -8,7 +8,8 @@ import (
 )
 
 // InputEvent is one entry of an input script: at Tick, press and release keys, move the
-// mouse, set the held mouse buttons (nil: unchanged, empty: release all) and type text.
+// mouse, set the held mouse buttons (nil: unchanged, empty: release all), type text and
+// move the stick (nil: unchanged).
 type InputEvent struct {
 	Tick    uint64
 	Press   []string
@@ -16,6 +17,7 @@ type InputEvent struct {
 	Mouse   *gmath.Vec2
 	Buttons []string
 	Text    string
+	Stick   *gmath.Vec2
 }
 
 // Script replays input events deterministically. Events are applied at the start of
@@ -28,8 +30,8 @@ type Script struct {
 	last   uint64
 }
 
-// NewScript validates events (ticks non-decreasing, known keys and buttons) and returns
-// a script positioned before tick 1.
+// NewScript validates events (ticks non-decreasing, known keys and buttons, stick axes in
+// -1…1) and returns a script positioned before tick 1.
 func NewScript(events []InputEvent) (*Script, error) {
 	var prev uint64
 	for i, e := range events {
@@ -46,6 +48,9 @@ func NewScript(events []InputEvent) (*Script, error) {
 			if _, err := ParseButton(b); err != nil {
 				return nil, fmt.Errorf("input event %d: %w", i, err)
 			}
+		}
+		if st := e.Stick; st != nil && !(st.X >= -1 && st.X <= 1 && st.Y >= -1 && st.Y <= 1) {
+			return nil, fmt.Errorf("input event %d: stick %v outside -1…1", i, *st)
 		}
 	}
 	return &Script{events: events}, nil
@@ -72,6 +77,9 @@ func (s *Script) Input(tick uint64) Input {
 			}
 			s.st.SetButtons(set)
 		}
+		if e.Stick != nil {
+			s.st.SetStick(e.Stick.X, e.Stick.Y)
+		}
 		s.st.TypeText(e.Text)
 		s.pos++
 	}
@@ -92,16 +100,17 @@ type ScriptState struct {
 	LastTick        uint64
 	PendingPressed  KeySet
 	PendingReleased KeySet
+	Stick           gmath.Vec2
 }
 
 // State returns the script position (between ticks).
 func (s *Script) State() ScriptState {
-	return ScriptState{Pos: s.pos, Held: s.st.held, Buttons: s.st.buttons, Mouse: s.st.mouse, LastMouse: s.st.lastMouse, LastTick: s.last, PendingPressed: s.st.pressed, PendingReleased: s.st.released}
+	return ScriptState{Pos: s.pos, Held: s.st.held, Buttons: s.st.buttons, Mouse: s.st.mouse, LastMouse: s.st.lastMouse, LastTick: s.last, PendingPressed: s.st.pressed, PendingReleased: s.st.released, Stick: s.st.stick}
 }
 
 // SetState restores a position returned by State.
 func (s *Script) SetState(st ScriptState) {
 	s.pos = st.Pos
 	s.last = st.LastTick
-	s.st = InputState{held: st.Held, buttons: st.Buttons, mouse: st.Mouse, lastMouse: st.LastMouse, pressed: st.PendingPressed, released: st.PendingReleased}
+	s.st = InputState{held: st.Held, buttons: st.Buttons, mouse: st.Mouse, lastMouse: st.LastMouse, pressed: st.PendingPressed, released: st.PendingReleased, stick: st.Stick}
 }

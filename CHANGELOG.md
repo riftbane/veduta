@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- The console's analog stick: `Input.Stick` (`gmath.Vec2`, each axis −1…1, +X right, +Y
+  up, zero at rest), `sim.InputState.SetStick`, and the optional `stick` field
+  (`{ "x": …, "y": … }`) of scenario and input-script events, introduced in this release
+  (older tools reject a file that uses it). Traces of games that do not read the stick are
+  unchanged.
+
 ## v1.0.0 — 2026-09-14
 
 The first stable release, and a breaking one: Veduta now makes games for the Veduta

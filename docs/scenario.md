@@ -51,10 +51,11 @@ first update (tick 1), because no update runs at tick 0.
 | `press` | array of key names | Keys that go down at this tick. A pressed key stays held until a later event releases it. A key that is already held cannot be pressed again. |
 | `release` | array of key names | Held keys that go up at this tick. Releasing a key that is not held is an error. A key cannot be pressed and released in the same event. |
 | `buttons` | array of button names | The complete set of mouse buttons held from this tick on: `left`, `right`, `middle`. `[]` releases all buttons; omitting the field leaves them unchanged. |
-| `mouse` | object `{ "x": number, "y": number }` | Mouse position in frame pixels from this tick on (origin top-left, y down). Omitted: unchanged. The initial position is (0, 0). The game also sees the movement since the previous tick as `in.MouseDelta`, so a jump from `{ "x": 0 }` to `{ "x": 600 }` is a delta of 600 pixels in that tick and 0 in the next. The console has no mouse, so this exists for logic tested in scenarios. |
+| `mouse` | object `{ "x": number, "y": number }` | Mouse position in frame pixels from this tick on (origin top-left, y down). Omitted: unchanged. The initial position is (0, 0). The game also sees the movement since the previous tick as `in.MouseDelta`, so a jump from `{ "x": 0 }` to `{ "x": 600 }` is a delta of 600 pixels in that tick and 0 in the next. The console reads a mouse as its stick, never as `mouse`, so this exists for logic tested in scenarios. |
 | `text` | string | Characters typed during this tick (for text entry). Text is not derived from `press`: pressing `KeyA` does not type "a". |
+| `stick` | object `{ "x": number, "y": number }` | Position of the console's analog stick from this tick on (`in.Stick`), each axis −1 to 1, +x right and +y up; an axis left out is 0, so `{}` lets the stick go back to rest. Omitted: unchanged. The initial position is (0, 0). Since v1.1.0. |
 
-Each event must set at least one of `press`, `release`, `buttons`, `mouse`, `text`.
+Each event must set at least one of `press`, `release`, `buttons`, `mouse`, `stick`, `text`.
 Within a list, names must not repeat.
 
 ### Key names
@@ -175,7 +176,9 @@ move.scenario.json:17:47: invariants[2]: invariant "entity_count_max:0": N must 
     { "tick": 70, "release": ["KeyW"] },
     { "tick": 80, "press": ["Space"] },
     { "tick": 81, "release": ["Space"], "mouse": { "x": 320, "y": 180 }, "buttons": ["left"] },
-    { "tick": 82, "buttons": [], "text": "hi" }
+    { "tick": 82, "buttons": [], "text": "hi" },
+    { "tick": 90, "stick": { "x": 1, "y": 0.5 } },
+    { "tick": 110, "stick": {} }
   ],
   "expect": [
     { "tick": 120, "entity": "player", "path": "position.z", "op": "<", "value": -1 },

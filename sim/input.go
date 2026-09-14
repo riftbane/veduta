@@ -106,7 +106,8 @@ type Input struct {
 	Buttons         ButtonSet  // mouse buttons held
 	ButtonsPressed  ButtonSet
 	ButtonsReleased ButtonSet
-	Text            string // characters typed this tick
+	Text            string     // characters typed this tick
+	Stick           gmath.Vec2 // the analog stick: each axis -1…1, +X right, +Y up, zero at rest
 }
 
 // Down reports whether key code is held.
@@ -144,6 +145,7 @@ type InputState struct {
 	buttonsReleased ButtonSet
 	mouse           gmath.Vec2
 	lastMouse       gmath.Vec2 // cursor at the end of the previous tick, for MouseDelta
+	stick           gmath.Vec2
 	text            []byte
 }
 
@@ -191,14 +193,19 @@ func (s *InputState) SetButtons(b ButtonSet) {
 	s.ButtonDown(b &^ s.buttons)
 }
 
+// SetStick records the stick's position: each axis -1…1, +X right, +Y up.
+func (s *InputState) SetStick(x, y float32) { s.stick = gmath.V2(x, y) }
+
 // TypeText appends typed characters.
 func (s *InputState) TypeText(t string) { s.text = append(s.text, t...) }
 
-// ReleaseAll releases every key and button (for example when the player loses its input).
+// ReleaseAll releases every key and button and lets the stick go back to rest (for example
+// when the player loses its input).
 func (s *InputState) ReleaseAll() {
 	s.released = s.released.union(s.held)
 	s.held = KeySet{}
 	s.ButtonUp(s.buttons)
+	s.stick = gmath.Vec2{}
 }
 
 // Next returns the Input of the tick that just ended and starts a new tick.
@@ -207,7 +214,7 @@ func (s *InputState) Next() Input {
 		Pressed: s.pressed, Held: s.held, Released: s.released,
 		Mouse: s.mouse, MouseDelta: s.mouse.Sub(s.lastMouse), Buttons: s.buttons,
 		ButtonsPressed: s.buttonsPressed, ButtonsReleased: s.buttonsReleased,
-		Text: string(s.text),
+		Text: string(s.text), Stick: s.stick,
 	}
 	s.pressed, s.released = KeySet{}, KeySet{}
 	s.buttonsPressed, s.buttonsReleased = 0, 0

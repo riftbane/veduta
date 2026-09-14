@@ -43,7 +43,7 @@ func specFromScenario(sc *asset.Scenario) *scenarioSpec {
 func inputEvents(in []asset.Input) []sim.InputEvent {
 	out := make([]sim.InputEvent, len(in))
 	for i, e := range in {
-		out[i] = sim.InputEvent{Tick: uint64(e.Tick), Press: e.Press, Release: e.Release, Mouse: e.Mouse, Buttons: e.Buttons, Text: e.Text}
+		out[i] = sim.InputEvent{Tick: uint64(e.Tick), Press: e.Press, Release: e.Release, Mouse: e.Mouse, Buttons: e.Buttons, Text: e.Text, Stick: e.Stick}
 	}
 	return out
 }

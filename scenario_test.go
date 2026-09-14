@@ -40,9 +40,9 @@ func TestLoadScenarioFile(t *testing.T) {
 func TestLoadInputArray(t *testing.T) {
 	dir := t.TempDir()
 	good := filepath.Join(dir, "in.json")
-	os.WriteFile(good, []byte(`[{"tick": 1, "press": ["Space"]}, {"tick": 5, "release": ["Space"], "mouse": {"x": 3, "y": 4}}]`), 0o644)
+	os.WriteFile(good, []byte(`[{"tick": 1, "press": ["Space"]}, {"tick": 5, "release": ["Space"], "mouse": {"x": 3, "y": 4}, "stick": {"x": -0.5}}]`), 0o644)
 	events, err := loadInputFile(good)
-	if err != nil || len(events) != 2 || events[1].Mouse == nil || events[1].Mouse.Y != 4 {
+	if err != nil || len(events) != 2 || events[1].Mouse == nil || events[1].Mouse.Y != 4 || events[1].Stick == nil || events[1].Stick.X != -0.5 {
 		t.Fatalf("events %+v err %v", events, err)
 	}
 	bad := filepath.Join(dir, "bad.json")

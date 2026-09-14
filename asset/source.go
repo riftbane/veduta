@@ -149,6 +149,14 @@ type InputSource struct {
 	Mouse   *MouseSource `json:"mouse,omitempty"`
 	Buttons []string     `json:"buttons,omitempty"`
 	Text    string       `json:"text,omitempty"`
+	Stick   *StickSource `json:"stick,omitempty"`
+}
+
+// StickSource is a position of the analog stick: each axis -1…1, +X right, +Y up; an axis
+// left out is at rest.
+type StickSource struct {
+	X float32 `json:"x"`
+	Y float32 `json:"y"`
 }
 
 // MouseSource is a mouse position in frame pixels.

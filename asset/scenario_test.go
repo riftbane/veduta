@@ -51,6 +51,21 @@ func TestParseScenarioSample(t *testing.T) {
 	}
 }
 
+// TestParseScenarioStick: the stick holds a position from its tick on, so it is an input
+// event on its own; either axis left out is at rest.
+func TestParseScenarioStick(t *testing.T) {
+	sc, err := ParseScenario("stick.scenario.json", []byte(`{"veduta": "scenario/1", "scene": "main", "ticks": 10,
+  "inputs": [{"tick": 1, "stick": {"x": -1, "y": 0.5}}, {"tick": 5, "stick": {"y": 1}}, {"tick": 9, "stick": {}}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b, rest := gmath.V2(-1, 0.5), gmath.V2(0, 1), gmath.Vec2{}
+	want := []Input{{Tick: 1, Stick: &a}, {Tick: 5, Stick: &b}, {Tick: 9, Stick: &rest}}
+	if !reflect.DeepEqual(sc.Inputs, want) {
+		t.Fatalf("inputs %+v", sc.Inputs)
+	}
+}
+
 func TestParseScenarioMinimal(t *testing.T) {
 	sc, err := ParseScenario("idle.scenario.json", []byte(`{"veduta": "scenario/1", "scene": "main", "ticks": 1}`))
 	if err != nil {
@@ -108,7 +123,11 @@ func TestParseScenarioErrors(t *testing.T) {
 			[]wantErr{{`inputs[0].buttons[1]: unknown mouse button "back" (want one of [left middle right])`, `"back"`},
 				{`inputs[0].buttons[2]: duplicate mouse button "left"`, `"left"]`}}},
 		{"empty event", with(`"inputs": [{"tick": 1}]`),
-			[]wantErr{{`inputs[0]: input event has no press, release, buttons, mouse or text`, `{"tick": 1}`}}},
+			[]wantErr{{`inputs[0]: input event has no press, release, buttons, mouse, stick or text`, `{"tick": 1}`}}},
+		{"stick out of range", with(`"inputs": [{"tick": 1, "stick": {"x": 1.5, "y": -2}}]`),
+			[]wantErr{{`inputs[0].stick: x 1.5 and y -2 must be in [-1, 1]`, `{"x": 1.5`}}},
+		{"stick unknown field", with(`"inputs": [{"tick": 1, "stick": {"x": 1, "z": 0}}]`),
+			[]wantErr{{`inputs[0].stick.z: unknown field`, `"z"`}}},
 		{"mixed expectation", with(`"expect": [{"tick": 1, "entity": "p", "path": "visible", "op": "==", "value": true, "trace": "x", "count_min": 1}]`),
 			[]wantErr{{`expect[0]: mixes an entity comparison`, `{"tick": 1, "entity"`}}},
 		{"empty expectation", with(`"expect": [{"tick": 1}]`),
