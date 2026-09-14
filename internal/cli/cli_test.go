@@ -69,7 +69,7 @@ func TestInitAndCommands(t *testing.T) {
 		t.Fatalf("build: %+v %v", b, err)
 	}
 	tr, err := s.Test(false)
-	if err != nil || !tr.OK || len(tr.Scenarios) != 3 {
+	if err != nil || !tr.OK || len(tr.Scenarios) != 4 {
 		t.Fatalf("test: %s %v", tr.Human(), err)
 	}
 	// Break the game: compile errors come back located.

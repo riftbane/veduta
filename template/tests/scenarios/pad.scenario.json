@@ -1,0 +1,23 @@
+{
+  "veduta": "scenario/1",
+  "scene": "main",
+  "seed": 3,
+  "ticks": 60,
+  "inputs": [
+    { "tick": 3, "press": ["ArrowUp"] },
+    { "tick": 23, "release": ["ArrowUp"] },
+    { "tick": 27, "press": ["ArrowRight"] },
+    { "tick": 37, "release": ["ArrowRight"] },
+    { "tick": 40, "press": ["Space"] },
+    { "tick": 41, "release": ["Space"] }
+  ],
+  "expect": [
+    { "tick": 20, "trace": "gem_collected", "count_min": 1 },
+    { "tick": 37, "entity": "player", "path": "position.x", "op": ">", "value": 1.9 },
+    { "tick": 42, "entity": "player", "path": "position.y", "op": ">", "value": 0.3 },
+    { "tick": 60, "trace": "jump", "count_min": 1, "count_max": 1 },
+    { "tick": 60, "entity": "player", "path": "state.on_ground", "op": "==", "value": true }
+  ],
+  "invariants": ["finite_positions", "within_bounds", "no_overlap:player,obstacle"],
+  "screenshots": [0, 20, 42]
+}

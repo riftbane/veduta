@@ -1,5 +1,6 @@
-// Package game is the Veduta demo: WASD moves the hero on the ground, Space jumps, gems
-// are collected on contact, KeyR resets the level, and the HUD shows score and tick.
+// Package game is the Veduta demo: WASD or the arrows (a gamepad's D-pad) move the hero
+// on the ground, Space (the pad's A) jumps, gems are collected on contact, KeyR (the pad's
+// Y) resets the level, and the HUD shows score and tick.
 package game
 
 import (

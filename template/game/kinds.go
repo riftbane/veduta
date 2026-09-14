@@ -40,11 +40,13 @@ func newPlayer(e *scene.Entity) veduta.Behaviour {
 	return veduta.BehaviourFunc(updatePlayer)
 }
 
-// updatePlayer moves the hero with WASD relative to the world (W = -Z), turns it to face
-// the direction of travel, and handles jumping.
+// updatePlayer moves the hero with WASD or the arrows relative to the world (up = -Z),
+// turns it to face the direction of travel, and handles jumping. A console's D-pad
+// arrives as the arrow keys and its A button as Space, so the same code plays on the pad.
 func updatePlayer(ctx *veduta.Context, e *scene.Entity, in veduta.Input) {
 	st := e.State.(*PlayerState)
-	dir := gmath.V3(in.Axis("KeyA", "KeyD"), 0, in.Axis("KeyW", "KeyS"))
+	dir := gmath.V3(in.Axis("KeyA", "KeyD")+in.Axis("ArrowLeft", "ArrowRight"), 0,
+		in.Axis("KeyW", "KeyS")+in.Axis("ArrowUp", "ArrowDown"))
 	if l := dir.Len(); l > 0 {
 		dir = dir.Scale(1 / l)
 		e.Transform.Position = e.Transform.Position.Add(dir.Scale(PlayerSpeed * ctx.DT))
