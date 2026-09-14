@@ -2,8 +2,12 @@ package platform
 
 import (
 	"encoding/binary"
+	"os"
+	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 // record builds one evdev record of the given size, as the kernel writes them.
@@ -180,6 +184,81 @@ func TestPadPartialRecord(t *testing.T) {
 	d.size = 24
 	if _, err := d.decode(make([]byte, 30), nil); err == nil {
 		t.Fatal("a partial record was accepted")
+	}
+}
+
+// TestEvdevSourceReadsWithoutWaiting reads a FIFO, which the Go runtime handles as it
+// handles an event device: registered with its poller and non-blocking. What was written
+// must come out of the next poll, and a poll with nothing to read must return at once
+// rather than wait for the player to press something. A source that gave each read a
+// deadline already in the past failed the first half: the runtime refuses such a read
+// without asking the kernel, so nothing was ever read from a real pad.
+func TestEvdevSourceReadsWithoutWaiting(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "event0")
+	if err := syscall.Mkfifo(path, 0o600); err != nil {
+		t.Skipf("cannot make a FIFO here: %v", err)
+	}
+	// The writing end first, and read-write, which on Linux opens a FIFO without waiting
+	// for the other end.
+	w, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	src, err := openEvdev(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer src.close()
+
+	poll := func() string {
+		t.Helper()
+		type result struct {
+			evs []Event
+			err error
+		}
+		done := make(chan result, 1)
+		go func() { evs, err := src.poll(); done <- result{append([]Event(nil), evs...), err} }()
+		select {
+		case r := <-done:
+			if r.err != nil {
+				t.Fatalf("poll: %v", r.err)
+			}
+			return describePad(r.evs)
+		case <-time.After(10 * time.Second):
+			t.Fatal("poll is waiting for input instead of returning")
+			return ""
+		}
+	}
+	write := func(recs ...[]byte) {
+		t.Helper()
+		var data []byte
+		for _, r := range recs {
+			data = append(data, r...)
+		}
+		if _, err := w.Write(data); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if got := poll(); got != "" {
+		t.Fatalf("nothing written, poll = %q", got)
+	}
+	write(record(eventSize, evKey, btnSouth, 1), record(eventSize, evAbs, absHat0X, -1))
+	if got, want := poll(), "down Space,down ArrowLeft"; got != want {
+		t.Fatalf("poll = %q, want %q", got, want)
+	}
+	// More than one read's worth: the source keeps reading until the kernel has no more.
+	var many [][]byte
+	for i := 0; i < 70; i++ {
+		many = append(many, record(eventSize, evKey, btnSouth+1, int32(1-i%2)))
+	}
+	write(many...)
+	if got := poll(); strings.Count(got, "down Escape") != 35 || strings.Count(got, "up Escape") != 35 {
+		t.Fatalf("70 records gave %q", got)
+	}
+	if n := testing.AllocsPerRun(100, func() { src.poll() }); n != 0 {
+		t.Errorf("an idle poll allocates %v times", n)
 	}
 }
 

@@ -4,10 +4,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
-	"time"
+	"syscall"
 )
 
 // Reading a pad needs no ioctl and no C: the kernel hands out fixed-size records on an
@@ -168,40 +167,59 @@ func sortedCodes(m map[uint16]string) []uint16 {
 	return codes
 }
 
-// evdevSource reads one pad device.
+// evdevSource reads one device node.
 type evdevSource struct {
-	f   *os.File
-	d   *padDecoder
-	buf []byte
-	out []Event
+	f    *os.File
+	raw  syscall.RawConn
+	d    *padDecoder
+	buf  []byte
+	out  []Event
+	n    int                   // what the last read returned
+	err  error                 // and its error
+	read func(fd uintptr) bool // one read(2) into buf, made once so a poll allocates nothing
 }
 
-// openEvdev opens a device node. Reads are kept from blocking by giving each one a
-// deadline that has already passed: it takes whatever the kernel has and returns at once,
-// so a frame is never held up by a player who is pressing nothing. Opening the file with
-// O_NONBLOCK would not do it — the runtime registers the descriptor with its poller and
-// waits anyway.
+// openEvdev opens a device node for reading without ever waiting. The descriptor is
+// non-blocking, and each poll calls read(2) on it directly until the kernel answers EAGAIN:
+// it takes whatever the kernel has and returns at once, so a frame is never held up by a
+// player who is pressing nothing.
+//
+// Neither of the obvious ways does this. A plain Read on the file waits, because the
+// runtime registers the descriptor with its poller and parks the goroutine on EAGAIN. A
+// read deadline that has already passed does not wait, but it does not read either: the
+// runtime refuses the call before asking the kernel, so a pad read that way never reports
+// a press.
 func openEvdev(path string) (*evdevSource, error) {
-	f, err := os.OpenFile(path, os.O_RDONLY, 0)
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil, err
 	}
-	if err := f.SetReadDeadline(time.Now()); err != nil {
+	raw, err := f.SyscallConn()
+	if err != nil {
 		f.Close()
-		return nil, fmt.Errorf("platform: %s cannot be read without waiting: %w", path, err)
+		return nil, fmt.Errorf("platform: %s: %w", path, err)
 	}
-	return &evdevSource{f: f, d: newPadDecoder(), buf: make([]byte, 64*eventSize)}, nil
+	s := &evdevSource{f: f, raw: raw, d: newPadDecoder(), buf: make([]byte, 64*eventSize)}
+	s.read = func(fd uintptr) bool {
+		for {
+			s.n, s.err = syscall.Read(int(fd), s.buf)
+			if !errors.Is(s.err, syscall.EINTR) {
+				return true // done, whatever the answer: never let the runtime wait for more
+			}
+		}
+	}
+	return s, nil
 }
 
 // poll returns the events since the last call. A pad that was unplugged reports every key
 // it had down and then the error, so a game never keeps walking into a wall.
 func (s *evdevSource) poll() ([]Event, error) {
 	s.out = s.out[:0]
-	if err := s.f.SetReadDeadline(time.Now()); err != nil {
-		return s.out, err
-	}
 	for {
-		n, err := s.f.Read(s.buf)
+		if err := s.raw.Read(s.read); err != nil {
+			return s.d.releaseAll(s.out), fmt.Errorf("platform: reading %s: %w", s.f.Name(), err)
+		}
+		n, err := s.n, s.err
 		if n > 0 {
 			var derr error
 			if s.out, derr = s.d.decode(s.buf[:n], s.out); derr != nil {
@@ -211,24 +229,15 @@ func (s *evdevSource) poll() ([]Event, error) {
 		switch {
 		case err == nil && n == len(s.buf):
 			continue // there may be more waiting
-		case err == nil, errors.Is(err, io.EOF):
-			return s.out, nil
-		case isWouldBlock(err):
-			return s.out, nil
+		case err == nil:
+			return s.out, nil // all there was, or the end of an ordinary file
+		case errors.Is(err, syscall.EAGAIN):
+			return s.out, nil // nothing more yet
 		default:
-			return s.d.releaseAll(s.out), err
+			// ENODEV once the device is gone.
+			return s.d.releaseAll(s.out), fmt.Errorf("platform: reading %s: %w", s.f.Name(), err)
 		}
 	}
 }
 
 func (s *evdevSource) close() error { return s.f.Close() }
-
-// isWouldBlock reports the "nothing to read yet" error of a non-blocking descriptor
-// without naming the syscall package's constant, which differs between platforms.
-func isWouldBlock(err error) bool {
-	var errno interface{ Timeout() bool }
-	if errors.As(err, &errno) && errno.Timeout() {
-		return true
-	}
-	return errors.Is(err, os.ErrDeadlineExceeded)
-}
