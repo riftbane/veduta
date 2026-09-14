@@ -20,6 +20,9 @@ type Check struct {
 	Warning bool   `json:"warning,omitempty"` // passes, but deserves attention
 	Detail  string `json:"detail"`
 	Fix     string `json:"fix,omitempty"`
+	// Sites lists every place a check found, when its Detail names only the first few (the
+	// arm64 check's fused lines).
+	Sites []string `json:"sites,omitempty"`
 }
 
 // DoctorReport is the result of doctor.

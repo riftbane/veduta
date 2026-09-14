@@ -236,6 +236,19 @@ func (s *Session) releaseTargetsConsole() (bool, string) {
 	return false, ".github/workflows/release.yml builds no " + targetOS + "/" + targetArch + " archive"
 }
 
+// fusedCheck is the arm64 warning for the places fusedSites found. The text names the
+// first ten; Sites carries every one, for --json and the agents that fix them all at once.
+func fusedCheck(sites []string) Check {
+	shown := sites
+	if len(shown) > 10 {
+		shown = append(shown[:10:10], fmt.Sprintf("and %d more (sites in the JSON report lists them all)", len(sites)-10))
+	}
+	return Check{Name: "arm64", OK: true, Warning: true, Sites: sites,
+		Detail: fmt.Sprintf("builds, but %d place(s) in the game's code compile to fused multiply-adds on arm64, so the console computes different bits than this machine and traces, goldens and scenarios can drift: %s", len(sites), strings.Join(shown, ", ")),
+		Fix: "wrap each product that feeds + or - in a conversion to its own type, float32(a*b) + c; gmath's Vec.Scale, Mul, Dot and matrix products already do. " +
+			"A line of another package inlined in a game function adds a product that function passes in: round it there, pos.Add(gmath.V3(float32(a*b), 0, 0)) (docs: api, Determinism rules)"}
+}
+
 // cardProblem compares card.json, the description the console lists, with the manifest.
 // It returns "" when they agree.
 func (s *Session) cardProblem() string {
@@ -299,14 +312,7 @@ func (s *Session) consoleChecks() []Check {
 		case serr != nil:
 			cs = append(cs, Check{Name: "arm64", OK: true, Warning: true, Detail: "builds for " + targetOS + "/" + targetArch + ", but its code could not be checked: " + serr.Error()})
 		case len(sites) > 0:
-			shown := sites
-			if len(shown) > 10 {
-				shown = append(shown[:10:10], fmt.Sprintf("and %d more", len(sites)-10))
-			}
-			cs = append(cs, Check{Name: "arm64", OK: true, Warning: true,
-				Detail: fmt.Sprintf("builds, but %d place(s) in the game's code compile to fused multiply-adds on arm64, so the console computes different bits than this machine and traces, goldens and scenarios can drift: %s", len(sites), strings.Join(shown, ", ")),
-				Fix: "wrap each product that feeds + or - in a conversion to its own type, float32(a*b) + c; gmath's Vec.Scale, Mul, Dot and matrix products already do. " +
-					"A line of another package inlined in a game function adds a product that function passes in: round it there, pos.Add(gmath.V3(float32(a*b), 0, 0)) (docs: api, Determinism rules)"})
+			cs = append(cs, fusedCheck(sites))
 		default:
 			cs = append(cs, Check{Name: "arm64", OK: true, Detail: "builds for " + targetOS + "/" + targetArch + " with no fused multiply-add in the game's code"})
 		}

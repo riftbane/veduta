@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -81,6 +84,22 @@ func TestModulePathAndEngineFile(t *testing.T) {
 	}
 }
 
+func TestFusedCheckListsEverySite(t *testing.T) {
+	var sites []string
+	for i := 1; i <= 12; i++ {
+		sites = append(sites, fmt.Sprintf("game/kinds.go:%d", i))
+	}
+	c := fusedCheck(sites)
+	if !c.OK || !c.Warning || !strings.Contains(c.Detail, "12 place(s)") || !strings.Contains(c.Detail, "game/kinds.go:10, and 2 more") || strings.Contains(c.Detail, "game/kinds.go:11") {
+		t.Fatalf("detail: %+v", c)
+	}
+	data, _ := json.Marshal(c)
+	var back struct{ Sites []string }
+	if json.Unmarshal(data, &back); !reflect.DeepEqual(back.Sites, sites) {
+		t.Fatalf("--json sites = %q, want all %d", back.Sites, len(sites))
+	}
+}
+
 // check returns the doctor check called name, failing when there is none.
 func check(t *testing.T, r *DoctorReport, name string) Check {
 	t.Helper()
@@ -147,6 +166,9 @@ func TestDoctorConsoleChecks(t *testing.T) {
 	c := check(t, r, "arm64")
 	if !c.OK || !c.Warning || !strings.Contains(c.Detail, "game/kinds.go:") || !strings.Contains(c.Detail, "gmath/vec.go:") || !strings.Contains(c.Detail, " inlined in demo/game.updatePlayer") {
 		t.Fatalf("arm64: %+v", c)
+	}
+	if len(c.Sites) != 2 || !strings.HasPrefix(c.Sites[0], "game/kinds.go:") || !strings.HasPrefix(c.Sites[1], "gmath/vec.go:") {
+		t.Fatalf("arm64 sites: %q", c.Sites)
 	}
 	if strings.Contains(c.Detail, from) || strings.Contains(c.Detail, "github.com/") {
 		t.Fatalf("arm64 lists full paths: %+v", c)

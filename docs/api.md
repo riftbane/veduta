@@ -167,7 +167,8 @@ default); there is no interpolation and the player renders once per tick.
   the game's code where a fusion happened, and every line of another package that fused
   after it was inlined into a function of the game, such as
   `gmath/vec.go:105 inlined in demo/game.updatePlayer`: there the product to round is the
-  one that function passes in, `pos.Add(gmath.V3(float32(a*b), 0, 0))`.
+  one that function passes in, `pos.Add(gmath.V3(float32(a*b), 0, 0))`. The text names the
+  first ten places; `veduta doctor --json` lists all of them in the check's `sites`.
 - Use `gmath`'s trigonometry, never `math.Sin`, `math.Exp`, `math.Pow` or `math.Log`: those
   are not the same on every architecture. `math.Sqrt`, `Abs`, `Floor`, `Ceil`, `Trunc`
   and `Mod` are exact everywhere.
