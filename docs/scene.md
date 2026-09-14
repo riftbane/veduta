@@ -51,6 +51,9 @@ The camera's up direction is +Y. When the camera looks straight up or down (the 
 direction is within about 0.8° of the Y axis), up becomes −Z instead, so the top of the
 image points toward −Z (north on a top-down view).
 
+A 2D game uses an orthographic camera looking down −Z, sprites as thin quads, `hitbox` and
+`layer`: the `2d` docs topic is the recipe.
+
 ## Light
 
 | Field | Type | Default | Meaning |

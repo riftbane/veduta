@@ -111,7 +111,8 @@ may replace it during `Update`.
   far 200, so z from −100 to 99.9 is visible and a larger z is nearer the camera. Follow a
   hero with `p := hero.WorldPosition(); ctx.Scene.Camera = scene.Camera2D(gmath.V2(p.X, p.Y), 12)`.
   It is the same camera as a scene file's `"type": "orthographic", "size": 12,
-  "position": [x, y, 100], "look_at": [x, y, 0]`.
+  "position": [x, y, 100], "look_at": [x, y, 0]`. The `2d` docs topic is the recipe for a
+  2D game: camera, sprites, layers, hitboxes, HUD, pad input and the traps.
 - `Camera.LookFrom(eye, yawDeg, pitchDeg)` places a camera at `eye` looking along yaw and
   pitch, keeping the projection.
 
