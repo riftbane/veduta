@@ -315,8 +315,10 @@ One backend, Linux only, pure Go, no ioctl and no mmap for drawing:
 
 - **Framebuffer.** The panel is found by reading `/sys/class/graphics/fbN/{name,
   bits_per_pixel, virtual_size, stride}`, never by assuming a device number: a 16-bit
-  framebuffer is the panel; a 32-bit one (an emulator, a PC text console, HDMI) is used when
-  there is no 16-bit one. `VEDUTA_FB` names one (node `fb1` or part of the driver name).
+  framebuffer is the panel, and among several (a Raspberry Pi's HDMI framebuffer is 16-bit
+  too) the board's own, `vc4drmfb`, `BCM2708 FB` and `simpledrmdrmfb`, are passed over and
+  then the smallest wins; a 32-bit one (an emulator, a PC text console) is used when there
+  is no 16-bit one. `VEDUTA_FB` names one (node `fb1` or part of the driver name).
   Frames are packed to RGB565 or XRGB8888 honouring a padded stride and written with one
   `WriteAt`; packing allocates nothing. `VEDUTA_SCALE` (1–8) divides the panel: the game
   renders panel ÷ scale pixels and each is repeated scale×scale times.

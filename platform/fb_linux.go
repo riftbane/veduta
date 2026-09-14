@@ -35,10 +35,14 @@ func (f fbInfo) String() string {
 }
 
 // findFramebuffer picks the panel among the framebuffers in sysfs. A small SPI panel is
-// the 16-bit one; the HDMI framebuffer of the same board is 32-bit, so depth alone
-// separates them on every board this runs on. want overrides the choice: it matches a node
-// name ("fb1") or any part of a driver name ("mi0283qt"), which is what VEDUTA_FB carries.
-// The device number is never assumed: it depends on probe order.
+// 16-bit, but depth alone does not single it out: a Raspberry Pi's HDMI framebuffer is
+// 16-bit too, whether it comes from the KMS driver (vc4drmfb) or the firmware. Among
+// several 16-bit framebuffers the board's own are passed over, and then the smallest wins;
+// only two panels of one size are left in doubt. A 32-bit framebuffer is what an emulator
+// or a PC at a text console offers, and it will do when there is no 16-bit one. want
+// overrides the choice: it matches a node name ("fb1") or any part of a driver name
+// ("mi0283qt"), which is what VEDUTA_FB carries. The device number is never assumed: it
+// depends on probe order.
 func findFramebuffer(want string) (fbInfo, error) {
 	dir := filepath.Join(sysRoot, "sys", "class", "graphics")
 	entries, err := os.ReadDir(dir)
@@ -67,10 +71,7 @@ func findFramebuffer(want string) (fbInfo, error) {
 		}
 	}
 	if want == "" {
-		// A small panel is the 16-bit one, and on a board with HDMI attached that is how
-		// it is told from the other. A 32-bit framebuffer is what an emulator or a PC in
-		// text mode offers, and it will do when there is no panel.
-		if matching = panels; len(matching) == 0 {
+		if matching = choosePanel(panels); len(matching) == 0 {
 			matching = others
 		}
 	}
@@ -86,6 +87,39 @@ func findFramebuffer(want string) (fbInfo, error) {
 	default:
 		return fbInfo{}, fmt.Errorf("platform: several framebuffers match (%s); set VEDUTA_FB to one of them", describeFBs(matching))
 	}
+}
+
+// boardFramebuffers are the framebuffers of a Raspberry Pi itself rather than of a panel
+// attached to it: HDMI through the KMS driver, the firmware's framebuffer, and simpledrm's
+// version of the firmware's. All of them can be 16-bit, as the panel is.
+var boardFramebuffers = map[string]bool{"vc4drmfb": true, "BCM2708 FB": true, "simpledrmdrmfb": true}
+
+// choosePanel narrows the 16-bit framebuffers to the panel: the board's own framebuffers
+// are dropped when anything else is left, and of the rest only the smallest remain. More
+// than one comes back only when panels of the same size tie.
+func choosePanel(list []fbInfo) []fbInfo {
+	if len(list) < 2 {
+		return list
+	}
+	var attached []fbInfo
+	for _, f := range list {
+		if !boardFramebuffers[f.Name] {
+			attached = append(attached, f)
+		}
+	}
+	if len(attached) > 0 {
+		list = attached
+	}
+	var smallest []fbInfo
+	for _, f := range list {
+		switch {
+		case len(smallest) == 0 || f.W*f.H < smallest[0].W*smallest[0].H:
+			smallest = append(smallest[:0], f)
+		case f.W*f.H == smallest[0].W*smallest[0].H:
+			smallest = append(smallest, f)
+		}
+	}
+	return smallest
 }
 
 func describeFBs(list []fbInfo) string {

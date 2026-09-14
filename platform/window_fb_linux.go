@@ -32,7 +32,7 @@ type events interface {
 
 var errFBClosed = errors.New("platform: the panel is closed")
 
-// openFB opens the panel named by VEDUTA_FB (or the only 16-bit framebuffer) and renders
+// openFB opens the panel named by VEDUTA_FB (or the one findFramebuffer picks) and renders
 // at its size divided by VEDUTA_SCALE, which lets a slower board draw a quarter of the
 // pixels and still fill the glass.
 func openFB(o Options) (Window, error) {
@@ -41,7 +41,7 @@ func openFB(o Options) (Window, error) {
 		return nil, err
 	}
 	switch info.Bits {
-	case 16, 32: // the panel's RGB565, or the 32-bit framebuffer of an emulator or a PC
+	case 16, 32: // RGB565 (the panel, or a Raspberry Pi's HDMI), or the 32 bits of an emulator or a PC
 	default:
 		return nil, fmt.Errorf("platform: %s is %d bits per pixel; 16 (RGB565) and 32 are supported", info, info.Bits)
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 // fakeSys builds a sysfs tree of framebuffers and points sysRoot at it. Each entry is
-// "node name WxH bpp[ stride]".
+// "node name WxH bpp[ stride]", where a + in the name stands for a space ("BCM2708+FB").
 func fakeSys(t *testing.T, entries ...string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -29,7 +29,7 @@ func fakeSys(t *testing.T, entries ...string) string {
 				t.Fatal(err)
 			}
 		}
-		write("name", f[1])
+		write("name", strings.ReplaceAll(f[1], "+", " "))
 		write("virtual_size", size)
 		write("bits_per_pixel", f[3])
 		if len(f) > 4 {
@@ -49,17 +49,50 @@ func TestFindFramebuffer(t *testing.T) {
 		want    string
 		node    string
 		errHas  string
+		errNot  string
 	}{
 		{
-			// The panel is the 16-bit one; HDMI on the same board is 32-bit.
+			// The panel is 16-bit, and so is a Raspberry Pi's HDMI framebuffer: the
+			// board's own framebuffer is passed over.
 			name:    "panel beside HDMI",
-			entries: []string{"fb0 vc4drmfb 1920x1080 32", "fb1 mi0283qtdrmfb 320x240 16"},
+			entries: []string{"fb0 vc4drmfb 1920x1080 16", "fb1 mi0283qtdrmfb 320x240 16"},
 			node:    "fb1",
 		},
 		{
 			// Probe order is not fixed: the panel can come first.
 			name:    "panel first",
-			entries: []string{"fb0 mi0283qtdrmfb 320x240 16", "fb1 vc4drmfb 1920x1080 32"},
+			entries: []string{"fb0 ili9341drmfb 320x240 16", "fb1 vc4drmfb 1920x1080 16"},
+			node:    "fb0",
+		},
+		{
+			// With no display attached, vc4 makes up a 1024x768 framebuffer.
+			name:    "panel beside HDMI with nothing plugged in",
+			entries: []string{"fb0 vc4drmfb 1024x768 16", "fb1 ili9341drmfb 320x240 16"},
+			node:    "fb1",
+		},
+		{
+			// The firmware's framebuffer (a Pi without the KMS driver), and simpledrm's
+			// version of it, are the board's own too.
+			name:    "panel beside the firmware framebuffer",
+			entries: []string{"fb0 BCM2708+FB 1024x768 16", "fb1 simpledrmdrmfb 656x416 16", "fb2 mi0283qtdrmfb 320x240 16"},
+			node:    "fb2",
+		},
+		{
+			// The board's framebuffer loses even at the panel's size.
+			name:    "HDMI as small as the panel",
+			entries: []string{"fb0 vc4drmfb 320x240 16", "fb1 ili9341drmfb 320x240 16"},
+			node:    "fb1",
+		},
+		{
+			// An HDMI driver this does not know by name is still larger than the panel.
+			name:    "the smaller of two unknown framebuffers",
+			entries: []string{"fb0 otherhdmidrmfb 1920x1080 16", "fb1 paneldrmfb 480x320 16"},
+			node:    "fb1",
+		},
+		{
+			// A board with HDMI and no panel plays on HDMI.
+			name:    "HDMI alone",
+			entries: []string{"fb0 vc4drmfb 1920x1080 16"},
 			node:    "fb0",
 		},
 		{
@@ -75,21 +108,30 @@ func TestFindFramebuffer(t *testing.T) {
 			node:    "fb1",
 		},
 		{
+			// Two panels of one size: nothing tells them apart.
 			name:    "ambiguous without a choice",
-			entries: []string{"fb0 mi0283qtdrmfb 320x240 16", "fb1 otherdrmfb 320x240 16"},
+			entries: []string{"fb0 mi0283qtdrmfb 320x240 16", "fb1 otherdrmfb 320x240 16", "fb2 vc4drmfb 1920x1080 16"},
 			errHas:  "several framebuffers match",
+			errNot:  "vc4drmfb", // the error names only what is really in doubt
 		},
 		{
 			// No panel, but an ordinary framebuffer: an emulator, or a PC in text mode.
 			name:    "a 32-bit framebuffer will do",
-			entries: []string{"fb0 vc4drmfb 1920x1080 32"},
+			entries: []string{"fb0 virtio_gpudrmfb 1280x800 32"},
 			node:    "fb0",
 		},
 		{
 			// The panel still wins when both are there.
 			name:    "the panel is preferred",
-			entries: []string{"fb0 vc4drmfb 1920x1080 32", "fb1 paneldrmfb 320x240 16"},
+			entries: []string{"fb0 i915drmfb 1920x1080 32", "fb1 paneldrmfb 320x240 16"},
 			node:    "fb1",
+		},
+		{
+			// Two 32-bit framebuffers are not narrowed by size: there is no panel among
+			// them to find.
+			name:    "two 32-bit framebuffers",
+			entries: []string{"fb0 virtio_gpudrmfb 1280x800 32", "fb1 ramfbdrmfb 1024x768 32"},
+			errHas:  "several framebuffers match",
 		},
 		{
 			name:    "nothing usable",
@@ -98,7 +140,7 @@ func TestFindFramebuffer(t *testing.T) {
 		},
 		{
 			name:    "the choice matches nothing",
-			entries: []string{"fb0 vc4drmfb 1920x1080 32"},
+			entries: []string{"fb0 vc4drmfb 1920x1080 16"},
 			want:    "fb9",
 			errHas:  "no framebuffer matches",
 		},
@@ -114,6 +156,9 @@ func TestFindFramebuffer(t *testing.T) {
 			if c.errHas != "" {
 				if err == nil || !strings.Contains(err.Error(), c.errHas) {
 					t.Fatalf("err = %v, want one containing %q", err, c.errHas)
+				}
+				if c.errNot != "" && strings.Contains(err.Error(), c.errNot) {
+					t.Fatalf("err = %v, want one not naming %q", err, c.errNot)
 				}
 				return
 			}
