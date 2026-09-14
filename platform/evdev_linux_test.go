@@ -123,21 +123,52 @@ func TestPadDroppedEvents(t *testing.T) {
 }
 
 // TestPadExitChord: Select and Start together close the window, which is the only way off
-// a console with no keyboard, and it releases what was held first.
+// a console with no keyboard, and it releases what was held first. It has to work on both
+// kinds of pad the table knows: a gamepad, whose buttons start at BTN_SOUTH, and a
+// joystick-style pad, whose buttons start at BTN_TRIGGER.
 func TestPadExitChord(t *testing.T) {
 	const size = 24
-	got := describePad(decodeAll(t, size,
-		record(size, evKey, btnSouth, 1),
-		record(size, evKey, exitChord[0], 1),
-		record(size, evKey, exitChord[1], 1),
-	))
-	if want := "down Space,down Tab,up Space,up Tab,close"; got != want {
-		t.Fatalf("chord: %s\n want: %s", got, want)
+	for _, c := range []struct {
+		name          string
+		a, sel, start uint16
+	}{
+		{"gamepad", btnSouth, 0x13a, 0x13b},                                // BTN_SELECT, BTN_START
+		{"joystick-style pad", btnTrigger, btnTrigger + 6, btnTrigger + 7}, // what the table calls Select and Start
+	} {
+		got := describePad(decodeAll(t, size,
+			record(size, evKey, c.a, 1),
+			record(size, evKey, c.sel, 1),
+			record(size, evKey, c.start, 1),
+		))
+		if want := "down Space,down Tab,up Space,up Tab,close"; got != want {
+			t.Errorf("%s chord: %s\n want: %s", c.name, got, want)
+		}
+		// One of the two alone is an ordinary button.
+		got = describePad(decodeAll(t, size, record(size, evKey, c.start, 1)))
+		if want := "down Enter"; got != want {
+			t.Errorf("%s start alone: %s, want %s", c.name, got, want)
+		}
 	}
-	// One of the two alone is an ordinary button.
-	got = describePad(decodeAll(t, size, record(size, evKey, exitChord[1], 1)))
-	if want := "down Enter"; got != want {
-		t.Fatalf("start alone: %s, want %s", got, want)
+}
+
+// TestPadExitChordsFollowTheTable: the chords are the buttons the table turns into Tab and
+// Enter, so a table corrected against a real pad cannot leave the exit behind. Every
+// button called Select or Start belongs to a chord, and every chord is two real buttons.
+func TestPadExitChordsFollowTheTable(t *testing.T) {
+	inChord := map[uint16]bool{}
+	for _, c := range padExitChords {
+		if c[0] == 0 || c[1] == 0 || c[0] == c[1] {
+			t.Errorf("exit chord %#x is not two buttons", c)
+		}
+		if padButtons[c[0]] != "Tab" || padButtons[c[1]] != "Enter" {
+			t.Errorf("exit chord %#x is %q+%q, want Tab+Enter", c, padButtons[c[0]], padButtons[c[1]])
+		}
+		inChord[c[0]], inChord[c[1]] = true, true
+	}
+	for code, name := range padButtons {
+		if (name == "Tab" || name == "Enter") && !inChord[code] {
+			t.Errorf("button %#x is %s but in no exit chord", code, name)
+		}
 	}
 }
 

@@ -49,9 +49,27 @@ var padButtons = map[uint16]string{
 	btnTrigger + 7: "Enter",
 }
 
-// exitChord closes the window when held together: on a console with no keyboard there has
-// to be a way back to the dashboard that no game can swallow.
-var exitChord = [2]uint16{0x13a, 0x13b} // Select and Start
+// padExitChords close the window when both buttons of one are held: Select and Start, on a
+// gamepad and on a joystick-style pad. On a console with no keyboard there has to be a way
+// back to the dashboard that no game can swallow. The buttons are the ones the table above
+// turns into Tab and Enter, so correcting the table against a real pad moves the chord
+// with it instead of leaving a pad that cannot be left.
+var padExitChords = [...][2]uint16{selectStart(btnSouth), selectStart(btnTrigger)}
+
+// selectStart returns the buttons the table calls Select (Tab) and Start (Enter) among the
+// sixteen codes from base, in code order so the answer never depends on the map's.
+func selectStart(base uint16) [2]uint16 {
+	var chord [2]uint16
+	for code := base; code < base+16; code++ {
+		switch padButtons[code] {
+		case "Tab":
+			chord[0] = code
+		case "Enter":
+			chord[1] = code
+		}
+	}
+	return chord
+}
 
 // directions are the four keys a D-pad produces, whether it arrives as a hat, as a stick
 // or as buttons.

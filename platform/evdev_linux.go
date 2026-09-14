@@ -25,9 +25,10 @@ type padDecoder struct {
 	quit bool                     // a chord was closed: emit Close once
 }
 
-// exitChords close the player: the pad's Select and Start, and a keyboard's Ctrl (either
-// one) and Q. A console has no other way back, and a game must not be able to swallow it.
-var exitChords = [3][2]uint16{exitChord, keyboardExit[0], keyboardExit[1]}
+// exitChords close the player: Select and Start on either kind of pad, and a keyboard's
+// Ctrl (either one) and Q. A console has no other way back, and a game must not be able to
+// swallow it. The array is as long as its contents, and so is the state kept for it.
+var exitChords = [...][2]uint16{padExitChords[0], padExitChords[1], keyboardExit[0], keyboardExit[1]}
 
 func newPadDecoder() *padDecoder {
 	return &padDecoder{size: eventSize, held: map[uint16]string{}, axis: map[uint16]string{}}
