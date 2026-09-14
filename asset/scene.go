@@ -218,7 +218,7 @@ func compileHitbox(c *Checker, path string, v [][]float32) *gmath.AABB {
 	for k := 0; k < 3; k++ {
 		if lo.Get(k) > hi.Get(k) {
 			axis := string("xyz"[k])
-			c.Errorf(Path(Path(path, 1), k), "max %s (%v) is less than min %s (%v)", axis, hi.Get(k), axis, lo.Get(k))
+			c.Errorf(Path(Path(path, 1), k), "max %s (%v) must be at least min %s (%v)", axis, hi.Get(k), axis, lo.Get(k))
 		}
 	}
 	if len(c.Errs) != before {

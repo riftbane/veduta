@@ -370,7 +370,7 @@ func TestParseSceneErrors(t *testing.T) {
 		{"hitbox null vector", ents(`{"name": "a", "kind": "static", "hitbox": [null, [1, 1, 1]]}`),
 			[]wantErr{{`entities[0].hitbox[0]: is required`, `null`}}},
 		{"hitbox min above max", ents(`{"name": "a", "kind": "static", "hitbox": [[-1, 2, 0.5], [1, 1, -0.5]]}`),
-			[]wantErr{{`entities[0].hitbox[1][1]: max y (1) is less than min y (2)`, `1, -0.5]]`}, {`entities[0].hitbox[1][2]: max z (-0.5) is less than min z (0.5)`, `-0.5]]`}}},
+			[]wantErr{{`entities[0].hitbox[1][1]: max y (1) must be at least min y (2)`, `1, -0.5]]`}, {`entities[0].hitbox[1][2]: max z (-0.5) must be at least min z (0.5)`, `-0.5]]`}}},
 		{"hitbox out of float range", ents(`{"name": "a", "kind": "static", "hitbox": [[0, 0, 0], [1e39, 1, 1]]}`),
 			[]wantErr{{`entities[0].hitbox[1][0]:`, `1e39`}}},
 		{"layer above range", ents(`{"name": "a", "kind": "static", "layer": 1001}`),

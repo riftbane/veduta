@@ -102,7 +102,7 @@ main.scene.json:4:31: camera.look_at: must differ from camera.position {0 5 10}
 main.scene.json:9:62: entities[1].scale[1]: must be non-zero
 main.scene.json:12:45: entities[3].name: duplicate entity name "gem" (first used by entities[2])
 main.scene.json:14:20: entities[4].parent: parent cycle: arm -> hand -> arm
-main.scene.json:16:52: entities[5].hitbox[1][1]: max y (0) is less than min y (0.5)
+main.scene.json:16:52: entities[5].hitbox[1][1]: max y (0) must be at least min y (0.5)
 ```
 
 ## Full example
