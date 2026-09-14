@@ -13,6 +13,41 @@ All notable changes to this project are documented here. The format follows
   (`{ "x": …, "y": … }`) of scenario and input-script events, introduced in this release
   (older tools reject a file that uses it). Traces of games that do not read the stick are
   unchanged.
+- The player reads the console's final controls, and a keyboard and mouse stand in for them
+  until they exist (`docs/api.md`, "The console's controls"): a pad's `ABS_X`/`ABS_Y` move
+  `Input.Stick` (15% dead zone, `+Y` up); Home (`BTN_MODE`) closes the player on its own, as
+  Select+Start does; a keyboard's W, A, S and D press the arrows as well as their own codes;
+  a mouse moves the stick and stays where it is left (400 counts to the end, any button
+  recentres it); an absolute pointer such as QEMU's `usb-tablet` is the stick directly.
+  Mice and tablets are found through `/sys/class/input` after pads and keyboards.
+
+### Changed
+
+- On a pad whose D-pad is four `BTN_DPAD_*` buttons, `ABS_X`/`ABS_Y` only move the stick and
+  no longer press the arrows. Every other pad keeps getting the arrows from them.
+
+### Decisions
+
+- **The console's controls extend `SPEC-v1.0.0.md` §5.1 and §6.6 at the user's request
+  (2026-09-14).** The final handheld has a D-pad, an analog stick, A/B/X/Y, Select, Start and
+  Home. Buttons stay key codes, as the spec's design wants, so no game, scenario or golden
+  changes; only the stick, which a key cannot carry, is new API (`Input.Stick`). The spec
+  file is not edited, as `SPEC-v0.1.0.md` was not for v0.2.0; this entry and `docs/` are the
+  record.
+- **The stick presses the arrows unless the D-pad is buttons.** A game on the console must
+  tell the D-pad from the stick, but many cheap pads (perhaps the test pad) report their
+  D-pad on `ABS_X`/`ABS_Y` with a hat capability they do not use, so hats cannot decide.
+  `BTN_DPAD_*` can: the handheld's D-pad must report them (natural for `gpio-keys`).
+- **Mouse as a held stick, not a velocity.** QEMU's `usb-tablet` reports a position, which
+  can only be read as "where the stick is"; a relative mouse is read the same way, so both
+  behave alike, and a click recentres because a mouse has no spring. Several devices add up,
+  clamped, as held keys are counted across devices.
+- **Home is a one-button exit chord** (`{BTN_MODE, BTN_MODE}`), so dropped events, the
+  release wait on close and "no game can swallow it" apply to it unchanged. Its keyboard
+  stand-in stays Ctrl+Q; the `Home` key remains a key a game may read.
+- **W, A, S, D press both codes.** Replacing `KeyW` with `ArrowUp` would break games that
+  read WASD; pressing both is what "held while anything holds it" already allows, and a
+  game summing WASD and the arrows before normalising (the template) is unaffected.
 
 ## v1.0.0 — 2026-09-14
 

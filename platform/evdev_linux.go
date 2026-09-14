@@ -26,6 +26,11 @@ type padDecoder struct {
 	quit   bool                     // a chord was closed: emit Close once
 	down   map[uint16]bool          // keys physically down, whatever was reported for them
 	ranges [absHat0Y + 1]axisRange  // what the device says each axis reports; zero when unknown
+
+	stickArrows bool       // ABS_X and ABS_Y press the arrows as well as moving the stick
+	stick       [2]float32 // the stick as last reported, each axis -1…1, +Y up
+	mouse       [2]int64   // a mouse's movement from rest, in counts, each within ±mouseReach
+	relative    bool       // the stick follows a mouse, so a click brings it back to rest
 }
 
 // axisRange is the least and the greatest value an axis reports, as EVIOCGABS gives them.
@@ -39,13 +44,16 @@ func (d *padDecoder) setRange(code uint16, lo, hi int32) {
 	}
 }
 
-// exitChords close the player: Select and Start on either kind of pad, and a keyboard's
-// Ctrl (either one) and Q. A console has no other way back, and a game must not be able to
-// swallow it. The array is as long as its contents, and so is the state kept for it.
-var exitChords = [...][2]uint16{padExitChords[0], padExitChords[1], keyboardExit[0], keyboardExit[1]}
+// exitChords close the player: Select and Start on either kind of pad, Home, and a
+// keyboard's Ctrl (either one) and Q. A console has no other way back, and a game must not
+// be able to swallow it. The array is as long as its contents, and so is the state kept for
+// it.
+var exitChords = [...][2]uint16{padExitChords[0], padExitChords[1], padHome, keyboardExit[0], keyboardExit[1]}
 
+// newPadDecoder returns a decoder whose ABS_X and ABS_Y press the arrows as well as moving
+// the stick, as they must on a pad whose D-pad they may be.
 func newPadDecoder() *padDecoder {
-	return &padDecoder{size: eventSize, held: map[uint16]string{}, axis: map[uint16]string{}, down: map[uint16]bool{}}
+	return &padDecoder{size: eventSize, held: map[uint16]string{}, axis: map[uint16]string{}, down: map[uint16]bool{}, stickArrows: true}
 }
 
 // pressed reports whether any key or button is physically down: a chord that closed the
@@ -111,6 +119,12 @@ func (d *padDecoder) event(out []Event, typ, code uint16, value int32) []Event {
 			out = d.releaseAll(out)
 			return append(out, Event{Kind: Close})
 		}
+		if code >= btnLeft && code < btnLeft+8 { // a mouse button
+			if down {
+				out = d.recentre(out)
+			}
+			return out
+		}
 		name, ok := padButtons[code]
 		if !ok {
 			if name, ok = padDPad[code]; !ok {
@@ -122,12 +136,26 @@ func (d *padDecoder) event(out []Event, typ, code uint16, value int32) []Event {
 			}
 		}
 		out = d.set(out, code, name, down)
+	case evRel:
+		if code == relX || code == relY {
+			out = d.moveMouse(out, code, value)
+		}
 	case evAbs:
 		switch code {
-		case absHat0X, absX:
+		case absHat0X:
 			out = d.direction(out, code, value, dirLeft, dirRight)
-		case absHat0Y, absY:
+		case absHat0Y:
 			out = d.direction(out, code, value, dirUp, dirDown)
+		case absX:
+			if d.stickArrows {
+				out = d.direction(out, code, value, dirLeft, dirRight)
+			}
+			out = d.moveStick(out, code, value)
+		case absY:
+			if d.stickArrows {
+				out = d.direction(out, code, value, dirUp, dirDown)
+			}
+			out = d.moveStick(out, code, value)
 		}
 	}
 	return out
@@ -176,32 +204,43 @@ func (d *padDecoder) direction(out []Event, code uint16, value int32, neg, pos s
 	return out
 }
 
-// set reports a button, ignoring a press of something already down.
+// set reports a button, ignoring a press of something already down. A keyboard's W, A, S
+// and D press their arrow as well (keyboardDPad).
 func (d *padDecoder) set(out []Event, code uint16, name string, down bool) []Event {
 	_, was := d.held[code]
+	kind := KeyDown
 	switch {
 	case down && !was:
 		d.held[code] = name
-		return append(out, Event{Kind: KeyDown, Code: name})
 	case !down && was:
 		delete(d.held, code)
-		return append(out, Event{Kind: KeyUp, Code: name})
+		kind = KeyUp
+	default:
+		return out
+	}
+	out = append(out, Event{Kind: kind, Code: name})
+	if arrow, ok := keyboardDPad[code]; ok {
+		out = append(out, Event{Kind: kind, Code: arrow})
 	}
 	return out
 }
 
 // releaseAll reports every key it had said was down, in a fixed order so a replay of the
-// same session gives the same events.
+// same session gives the same events, and then the stick back at rest.
 func (d *padDecoder) releaseAll(out []Event) []Event {
 	for _, code := range sortedCodes(d.held) {
 		out = append(out, Event{Kind: KeyUp, Code: d.held[code]})
+		if arrow, ok := keyboardDPad[code]; ok {
+			out = append(out, Event{Kind: KeyUp, Code: arrow})
+		}
 		delete(d.held, code)
 	}
 	for _, code := range sortedCodes(d.axis) {
 		out = append(out, Event{Kind: KeyUp, Code: d.axis[code]})
 		delete(d.axis, code)
 	}
-	return out
+	d.mouse = [2]int64{}
+	return d.setStick(out, [2]float32{})
 }
 
 func sortedCodes(m map[uint16]string) []uint16 {

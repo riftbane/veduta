@@ -2,6 +2,7 @@ package platform
 
 import (
 	"encoding/binary"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,7 +35,14 @@ func decodeAll(t *testing.T, size int, recs ...[]byte) []Event {
 	return out
 }
 
-func describePad(evs []Event) string {
+// describePad describes keys and closing, leaving out the stick, whose moves tests of keys
+// do not care about.
+func describePad(evs []Event) string { return describe(evs, false) }
+
+// describeAll describes the stick's moves as well, as "stick x,y".
+func describeAll(evs []Event) string { return describe(evs, true) }
+
+func describe(evs []Event, sticks bool) string {
 	var s []string
 	for _, e := range evs {
 		switch e.Kind {
@@ -44,6 +52,10 @@ func describePad(evs []Event) string {
 			s = append(s, "up "+e.Code)
 		case Close:
 			s = append(s, "close")
+		case Stick:
+			if sticks {
+				s = append(s, fmt.Sprintf("stick %g,%g", e.X, e.Y))
+			}
 		default:
 			s = append(s, "other")
 		}
@@ -268,9 +280,47 @@ func TestKeyboardKeys(t *testing.T) {
 		record(size, evKey, 17, 1),  // KEY_W
 		record(size, evKey, 190, 1), // a key with no W3C name: ignored, not guessed
 	))
-	want := "down ArrowUp,up ArrowUp,down Enter,down Space,down Escape,down KeyW"
+	want := "down ArrowUp,up ArrowUp,down Enter,down Space,down Escape,down KeyW,down ArrowUp"
 	if got != want {
 		t.Fatalf("keyboard: %s\n     want: %s", got, want)
+	}
+}
+
+// TestKeyboardDPad: until the console has its own controls, a keyboard stands in for them
+// with W, A, S and D as the D-pad. They press the arrows as well as their own codes, so a
+// game reading either sees them, and letting go or losing events releases both.
+func TestKeyboardDPad(t *testing.T) {
+	const size = 24
+	got := describePad(decodeAll(t, size,
+		record(size, evKey, 17, 1),  // KEY_W
+		record(size, evKey, 103, 1), // KEY_UP as well: the game counts the holds
+		record(size, evKey, 17, 0),
+		record(size, evKey, 30, 1), // KEY_A
+		record(size, evKey, 31, 1), // KEY_S
+		record(size, evKey, 32, 1), // KEY_D
+		record(size, evSyn, synDropped, 0),
+	))
+	want := "down KeyW,down ArrowUp,down ArrowUp,up KeyW,up ArrowUp," +
+		"down KeyA,down ArrowLeft,down KeyS,down ArrowDown,down KeyD,down ArrowRight," +
+		"up KeyA,up ArrowLeft,up KeyS,up ArrowDown,up KeyD,up ArrowRight,up ArrowUp"
+	if got != want {
+		t.Fatalf("WASD: %s\n want: %s", got, want)
+	}
+}
+
+// TestPadHome: Home closes the player on its own, as Select and Start do together, and
+// never reaches the game.
+func TestPadHome(t *testing.T) {
+	const size = 24
+	got := describePad(decodeAll(t, size,
+		record(size, evKey, btnSouth, 1),
+		record(size, evKey, btnMode, 1),
+		record(size, evKey, btnMode, 2), // auto-repeat
+		record(size, evKey, btnMode, 0),
+		record(size, evKey, btnMode, 1), // pressed again: closes again
+	))
+	if want := "down Space,up Space,close,close"; got != want {
+		t.Fatalf("Home: %s\n want: %s", got, want)
 	}
 }
 
@@ -288,12 +338,12 @@ func TestKeyboardExit(t *testing.T) {
 			record(size, evKey, 17, 1), // something held, to be released first
 			record(size, evKey, keyLeftCtrl, 1),
 			record(size, evKey, keyQ, 1),
-		}, "down KeyW,down ControlLeft,up KeyW,up ControlLeft,close"},
+		}, "down KeyW,down ArrowUp,down ControlLeft,up KeyW,up ArrowUp,up ControlLeft,close"},
 		{"right Ctrl+Q", [][]byte{
 			record(size, evKey, 17, 1),
 			record(size, evKey, keyRightCtrl, 1),
 			record(size, evKey, keyQ, 1),
-		}, "down KeyW,down ControlRight,up KeyW,up ControlRight,close"},
+		}, "down KeyW,down ArrowUp,down ControlRight,up KeyW,up ArrowUp,up ControlRight,close"},
 		{"Q, then Ctrl", [][]byte{
 			record(size, evKey, keyQ, 1),
 			record(size, evKey, keyRightCtrl, 1),

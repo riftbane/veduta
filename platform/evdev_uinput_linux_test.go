@@ -32,6 +32,7 @@ const (
 	uiDevDestroy = 0x5502     // _IO('U', 2)
 	uiSetEvBit   = 0x40045564 // _IOW('U', 100, int)
 	uiSetKeyBit  = 0x40045565 // _IOW('U', 101, int)
+	uiSetRelBit  = 0x40045566 // _IOW('U', 102, int)
 	uiSetAbsBit  = 0x40045567 // _IOW('U', 103, int)
 
 	uinputMaxName = 80   // UINPUT_MAX_NAME_SIZE
@@ -62,6 +63,7 @@ type padSpec struct {
 	kind string
 	keys []uintptr
 	axes []axisSpec
+	rels []uintptr // relative axes, for a mouse
 }
 
 type axisSpec struct {
@@ -84,6 +86,17 @@ var (
 		keys: []uintptr{btnTrigger, btnTrigger + 1, btnTrigger + 2, btnTrigger + 3, btnTrigger + 4, btnTrigger + 5, btnTrigger + 6, btnTrigger + 7},
 		axes: []axisSpec{{absX, 0, 255}, {absY, 0, 255}, {absHat0X, -1, 1}},
 	}
+	// consolePad has the console's controls: A, B, X, Y, Select, Start, Home, a D-pad of
+	// four buttons and an analog stick.
+	consolePad = padSpec{
+		kind: "console pad",
+		keys: []uintptr{btnSouth, btnEast, btnSouth + 3, btnSouth + 4, btnSelect, btnStart, btnMode, btnDPadUp, btnDPadUp + 1, btnDPadUp + 2, btnDPadUp + 3},
+		axes: []axisSpec{{absX, -32768, 32767}, {absY, -32768, 32767}},
+	}
+	// virtualMouse moves by counts and has two buttons.
+	virtualMouse = padSpec{kind: "mouse", keys: []uintptr{btnLeft, btnLeft + 1}, rels: []uintptr{relX, relY}}
+	// virtualTablet reports where its pointer is, as QEMU's usb-tablet does.
+	virtualTablet = padSpec{kind: "tablet", keys: []uintptr{btnLeft}, axes: []axisSpec{{absX, 0, 32767}, {absY, 0, 32767}}}
 )
 
 var virtualPads int
@@ -114,6 +127,12 @@ func newVirtualPad(t *testing.T, spec padSpec) *virtualPad {
 
 	p.ioctl(uiSetEvBit, evKey, "UI_SET_EVBIT EV_KEY")
 	p.ioctl(uiSetEvBit, evAbs, "UI_SET_EVBIT EV_ABS")
+	if len(spec.rels) > 0 {
+		p.ioctl(uiSetEvBit, evRel, "UI_SET_EVBIT EV_REL")
+	}
+	for _, r := range spec.rels {
+		p.ioctl(uiSetRelBit, r, fmt.Sprintf("UI_SET_RELBIT %#x", r))
+	}
 	for _, b := range spec.keys {
 		p.ioctl(uiSetKeyBit, b, fmt.Sprintf("UI_SET_KEYBIT %#x", b))
 	}
@@ -225,6 +244,165 @@ func collect(t *testing.T, src *inputSource, want string) string {
 		t.Fatalf("poll: %v", err)
 	}
 	return describePad(append(got, evs...))
+}
+
+// collectAll is collect for steps that move the stick: it describes the stick's moves as
+// well. A step should change one axis, which the source reports in one poll.
+func collectAll(t *testing.T, src *inputSource, want string) string {
+	t.Helper()
+	n, wait := 0, 100*time.Millisecond
+	if want != "" {
+		n, wait = strings.Count(want, ",")+1-strings.Count(want, "stick "), 5*time.Second
+	}
+	var got []Event
+	deadline := time.Now().Add(wait)
+	for {
+		evs, err := src.poll()
+		if err != nil {
+			t.Fatalf("poll: %v", err)
+		}
+		got = append(got, evs...)
+		if (n > 0 && len(got) >= n) || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	evs, err := src.poll()
+	if err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	return describeAll(append(got, evs...))
+}
+
+// TestEvdevUinputConsole drives a pad with the console's controls: its D-pad is four
+// buttons, so its stick is only the stick; Home closes the player on its own; and a pad
+// unplugged with the stick pushed lets the stick go back to rest.
+func TestEvdevUinputConsole(t *testing.T) {
+	old := sysRoot
+	sysRoot = "/"
+	t.Cleanup(func() { sysRoot = old })
+
+	pad := newVirtualPad(t, consolePad)
+	dev := pad.find()
+	if dev.stickArrows() {
+		t.Fatalf("%s has D-pad buttons, but its stick would press the arrows", dev.Node)
+	}
+	probe, err := openEvdev(dev.Dev)
+	if errors.Is(err, os.ErrPermission) {
+		t.Skipf("%s was made but cannot be read: %v", dev.Dev, err)
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	probe.close()
+
+	src := newInputSource(pad.name)
+	t.Cleanup(func() { src.close() })
+	if got := collectAll(t, src, ""); got != "" {
+		t.Fatalf("before anything was pressed: %s", got)
+	}
+	for _, step := range []struct {
+		name string
+		send func()
+		want string
+	}{
+		{"D-pad up", func() { pad.emit(evKey, btnDPadUp, 1); pad.emit(evKey, btnDPadUp, 0) }, "down ArrowUp,up ArrowUp"},
+		{"D-pad right", func() { pad.emit(evKey, btnDPadUp+3, 1); pad.emit(evKey, btnDPadUp+3, 0) }, "down ArrowRight,up ArrowRight"},
+		{"stick inside the dead zone", func() { pad.emit(evAbs, absX, 2000) }, ""},
+		{"stick right", func() { pad.emit(evAbs, absX, 32767) }, "stick 1,0"},
+		{"stick up", func() { pad.emit(evAbs, absY, -32768) }, "stick 1,1"},
+		{"stick x back", func() { pad.emit(evAbs, absX, 0) }, "stick 0,1"},
+		{"stick y back", func() { pad.emit(evAbs, absY, 0) }, "stick 0,0"},
+		{"X", func() { pad.emit(evKey, btnSouth+3, 1); pad.emit(evKey, btnSouth+3, 0) }, "down KeyF,up KeyF"},
+		{"Y", func() { pad.emit(evKey, btnSouth+4, 1); pad.emit(evKey, btnSouth+4, 0) }, "down KeyR,up KeyR"},
+		{"Home", func() { pad.emit(evKey, btnMode, 1) }, "close"},
+		{"letting go of Home", func() { pad.emit(evKey, btnMode, 0) }, ""},
+		{"stick left", func() { pad.emit(evAbs, absX, -32768) }, "stick -1,0"},
+	} {
+		step.send()
+		if got := collectAll(t, src, step.want); got != step.want {
+			t.Fatalf("%s: got %q, want %q", step.name, got, step.want)
+		}
+	}
+	pad.destroy()
+	if got := collectAll(t, src, "stick 0,0"); got != "stick 0,0" {
+		t.Fatalf("unplugged with the stick pushed: got %q", got)
+	}
+}
+
+// TestEvdevUinputPointers: a mouse and a tablet the kernel made stand in for the stick. A
+// mouse's movement adds up and a click brings it back to rest; a tablet's position is the
+// stick's.
+func TestEvdevUinputPointers(t *testing.T) {
+	old := sysRoot
+	sysRoot = "/"
+	t.Cleanup(func() { sysRoot = old })
+
+	for _, c := range []struct {
+		spec  padSpec
+		steps []struct {
+			name string
+			typ  uint16
+			code uint16
+			val  int32
+			want string
+		}
+	}{
+		{virtualMouse, []struct {
+			name string
+			typ  uint16
+			code uint16
+			val  int32
+			want string
+		}{
+			{"right", evRel, relX, mouseReach, "stick 1,0"},
+			{"down, to the end", evRel, relY, 3 * mouseReach, "stick 1,-1"},
+			{"a click", evKey, btnLeft + 1, 1, "stick 0,0"},
+			{"letting go", evKey, btnLeft + 1, 0, ""},
+			{"left from rest", evRel, relX, -mouseReach, "stick -1,0"},
+		}},
+		{virtualTablet, []struct {
+			name string
+			typ  uint16
+			code uint16
+			val  int32
+			want string
+		}{
+			{"the middle", evAbs, absY, 16384, ""},
+			{"the right edge", evAbs, absX, 32767, "stick 1,0"},
+			{"the top edge", evAbs, absY, 0, "stick 1,1"},
+			{"a click moves nothing", evKey, btnLeft, 1, ""},
+		}},
+	} {
+		t.Run(c.spec.kind, func(t *testing.T) {
+			dev := newVirtualPad(t, c.spec)
+			found := dev.find()
+			if found.stickArrows() {
+				t.Fatalf("the %s %s would press the arrows", c.spec.kind, found.Node)
+			}
+			all, err := findInputs("")
+			if err != nil {
+				t.Fatal(err)
+			}
+			listed := false
+			for _, d := range all {
+				listed = listed || d.Node == found.Node
+			}
+			if !listed {
+				t.Fatalf("discovery without a name found %s, not the %s %s", describeInputs(all), c.spec.kind, found.Node)
+			}
+			src := newInputSource(dev.name)
+			t.Cleanup(func() { src.close() })
+			if got := collectAll(t, src, ""); got != "" {
+				t.Fatalf("before anything moved: %s", got)
+			}
+			for _, step := range c.steps {
+				dev.emit(step.typ, step.code, step.val)
+				if got := collectAll(t, src, step.want); got != step.want {
+					t.Fatalf("%s: got %q, want %q", step.name, got, step.want)
+				}
+			}
+		})
+	}
 }
 
 // TestEvdevUinput drives the whole pad path with a device the kernel made: discovery reads

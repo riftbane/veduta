@@ -55,6 +55,16 @@ var evdevKeys = map[uint16]string{
 	125: "MetaLeft", 126: "MetaRight",
 }
 
+// keyboardDPad is the D-pad of a keyboard standing in for the console's controls: W, A, S
+// and D press the arrows as well as their own codes, so a game written for the pad plays
+// from the left hand while the right holds the mouse, which stands in for the stick.
+var keyboardDPad = map[uint16]string{
+	17: dirUp,    // KEY_W
+	30: dirLeft,  // KEY_A
+	31: dirDown,  // KEY_S
+	32: dirRight, // KEY_D
+}
+
 // keyboardExit closes the player from a keyboard, as Select and Start do from a pad: Ctrl+Q,
 // with either Ctrl. It is not Escape: the dashboard already gives Escape its own meaning,
 // and a game may too.

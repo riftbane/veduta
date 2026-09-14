@@ -13,9 +13,13 @@ package platform
 const (
 	evSyn = 0x00
 	evKey = 0x01
+	evRel = 0x02
 	evAbs = 0x03
 
 	synDropped = 0x03 // the kernel dropped events: what is held is no longer known
+
+	relX = 0x00
+	relY = 0x01
 
 	absX     = 0x00
 	absY     = 0x01
@@ -25,6 +29,10 @@ const (
 	// Gamepads report buttons from BTN_SOUTH, joystick-style pads from BTN_TRIGGER.
 	btnSouth   = 0x130
 	btnTrigger = 0x120
+
+	btnMode   = 0x13c // BTN_MODE: Home
+	btnDPadUp = 0x220 // BTN_DPAD_UP, then DOWN, LEFT and RIGHT
+	btnLeft   = 0x110 // BTN_LEFT, the first of a mouse's eight buttons
 )
 
 // padButtons maps a button code to a W3C key code. Both bases are listed because both
@@ -56,6 +64,10 @@ var padButtons = map[uint16]string{
 // with it instead of leaving a pad that cannot be left.
 var padExitChords = [...][2]uint16{selectStart(btnSouth), selectStart(btnTrigger)}
 
+// padHome is the Home button, which closes the player on its own: a chord of one button,
+// so that it is forgotten after lost events and waited for on closing as the others are.
+var padHome = [2]uint16{btnMode, btnMode}
+
 // selectStart returns the buttons the table calls Select (Tab) and Start (Enter) among the
 // sixteen codes from base, in code order so the answer never depends on the map's.
 func selectStart(base uint16) [2]uint16 {
@@ -82,8 +94,8 @@ const (
 
 // padDPad maps the D-pad-as-buttons encoding some pads use.
 var padDPad = map[uint16]string{
-	0x220: dirUp,    // BTN_DPAD_UP
-	0x221: dirDown,  // BTN_DPAD_DOWN
-	0x222: dirLeft,  // BTN_DPAD_LEFT
-	0x223: dirRight, // BTN_DPAD_RIGHT
+	btnDPadUp:     dirUp,
+	btnDPadUp + 1: dirDown,
+	btnDPadUp + 2: dirLeft,
+	btnDPadUp + 3: dirRight,
 }

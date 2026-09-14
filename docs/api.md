@@ -84,19 +84,46 @@ type StateCodec interface {
 | `MouseDelta gmath.Vec2` | how far the cursor moved during this tick, in pixels (mouse look) |
 | `Buttons`, `ButtonsPressed`, `ButtonsReleased`, `Button(name)` | mouse buttons `left`, `middle`, `right` |
 | `Text string` | characters typed during the tick |
+| `Stick gmath.Vec2` | the analog stick: each axis −1…1, +X right, +Y up, (0, 0) at rest |
 
 A key pressed and released within one tick appears in `Pressed` and `Released` but not
 in `Held`.
 
-### Mouse
+### The console's controls
 
-`Mouse`, `MouseDelta` and the buttons are filled from a scenario's `mouse` and `buttons`
-entries (`MouseDelta` is the difference between consecutive positions), so logic that
-reads them can be simulated and tested. The console has no mouse: its player reads a
-gamepad and a keyboard, and no player backend produces mouse movement or honours
-`ctx.LockPointer`. A game meant to be played should be driven by keys, which is what the
-pad produces (D-pad → `ArrowUp`/`ArrowDown`/`ArrowLeft`/`ArrowRight`, A → `Space`,
-B → `Escape`, Start → `Enter`). `Camera.LookFrom(eye, yawDeg, pitchDeg)` still builds an
+The console has a D-pad, an analog stick, A, B, X, Y, Select, Start and Home. The buttons
+arrive as key codes, so a game written for the keyboard plays on the pad and scenarios
+script it with `press` and `release`; the stick arrives as `Stick` (scenario field
+`stick`). Until the console's own controls exist, a keyboard and a mouse stand in for them:
+
+| Control | Game sees | Keyboard and mouse |
+|---------|-----------|--------------------|
+| D-pad | `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight` | the arrows, or W A S D (which also press `KeyW`, `KeyA`, `KeyS`, `KeyD`) |
+| Stick | `Stick` | the mouse |
+| A | `Space` | Space |
+| B | `Escape` | Escape |
+| X | `KeyF` | F |
+| Y | `KeyR` | R |
+| Select | `Tab` | Tab |
+| Start | `Enter` | Enter |
+| Home | nothing: it closes the game | Ctrl+Q |
+
+Home, and Select with Start held together, close the game and return to the dashboard; no
+game can see or swallow them, so do not give the Select+Start pair a meaning.
+
+`Stick` reads 0 inside a dead zone of 15% of the travel around rest and grows to ±1 at the
+end, each axis on its own, so a push to a corner is (±1, ±1): clamp its length when a
+direction must not be faster diagonally. On a pad the stick is `ABS_X`/`ABS_Y`; a pad
+whose D-pad is not four `BTN_DPAD_*` buttons also gets the arrows from it, because many
+cheap pads report their D-pad there. A mouse is a stick that stays where it is left: 400
+counts from rest is the end of the travel, and any mouse button brings it back to rest.
+An absolute pointer (a tablet, such as QEMU's `usb-tablet`) is the stick directly: the
+middle of its area is rest and its edges are the ends.
+
+`Mouse`, `MouseDelta` and the mouse buttons are filled only by a scenario's `mouse` and
+`buttons` entries (`MouseDelta` is the difference between consecutive positions), so logic
+that reads them can be simulated and tested; on the console the mouse is the stick, and no
+player backend honours `ctx.LockPointer`. `Camera.LookFrom(eye, yawDeg, pitchDeg)` still builds an
 eye camera from the scene camera, keeping its projection; yaw 0 looks along −Z and grows
 counter-clockwise seen from above, positive pitch looks up.
 

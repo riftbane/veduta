@@ -12,7 +12,7 @@ import (
 
 // runPlayer puts the game on the framebuffer and runs it: one tick per 1/tick_rate
 // seconds, one rendered frame per tick (no interpolation), input from the pad and the
-// keyboard. It returns when the player quits (Select+Start, or Ctrl+Q).
+// keyboard. It returns when the player quits (Home, Select+Start, or Ctrl+Q).
 func runPlayer(g Game, p *asset.Project, a *Assets) error {
 	win, err := platform.Open(platform.Options{Title: p.Name, Width: p.Resolution[0], Height: p.Resolution[1]})
 	if err != nil {
@@ -49,6 +49,8 @@ func runPlayer(g Game, p *asset.Project, a *Assets) error {
 				input.ButtonUp(ev.Button)
 			case platform.Text:
 				input.TypeText(ev.Text)
+			case platform.Stick:
+				input.SetStick(ev.X, ev.Y)
 			case platform.FocusLost:
 				input.ReleaseAll()
 			case platform.Close:
