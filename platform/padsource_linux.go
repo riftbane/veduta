@@ -12,7 +12,8 @@ import (
 
 // Finding what the player holds, and surviving it being unplugged. Discovery is reading
 // sysfs, so it is testable anywhere; opening a device is behind openPad so a test can hand
-// back a fake that is unplugged on cue.
+// back a fake that is unplugged on cue. TestEvdevUinput runs the real discovery and the real
+// device through a virtual pad, where the kernel lets the test make one.
 var openPad = func(path string) (events, error) { return openEvdev(path) }
 
 // padEnv names a device to use instead of searching: an event node ("event3") or part of a
