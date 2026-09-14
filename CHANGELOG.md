@@ -20,6 +20,10 @@ All notable changes to this project are documented here. The format follows
   a mouse moves the stick and stays where it is left (400 counts to the end, any button
   recentres it); an absolute pointer such as QEMU's `usb-tablet` is the stick directly.
   Mice and tablets are found through `/sys/class/input` after pads and keyboards.
+- The template demo walks with the stick as fast as it is pushed, and a fifth scenario,
+  `stick`, covers it; the trace hashes of the other four are unchanged. `fuzz` players move
+  the stick too, from a random stream of their own, so the keys and mouse of a seed are
+  those of v1.0.0.
 
 ### Changed
 

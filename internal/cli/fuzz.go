@@ -91,8 +91,14 @@ type hold struct {
 
 // fuzzGame is the random input of one game.
 type fuzzGame struct {
-	holds []hold
-	mouse []mouseEv
+	holds  []hold
+	mouse  []mouseEv
+	sticks []stickEv
+}
+
+type stickEv struct {
+	Tick int
+	X, Y float32
 }
 
 type mouseEv struct {
@@ -109,7 +115,8 @@ func gameSeed(seed uint64, i int) uint64 {
 	return z ^ z>>31
 }
 
-// genGame draws a random player: keys held for random durations, mouse moves and clicks.
+// genGame draws a random player: keys held for random durations, mouse moves and clicks
+// (the stick is drawn by genSticks, from a stream of its own).
 func genGame(rng *sim.RNG, ticks int, keys []string, w, h int) fuzzGame {
 	var g fuzzGame
 	held := map[string]int{} // key → index into g.holds (lookup only)
@@ -138,7 +145,26 @@ func genGame(rng *sim.RNG, ticks int, keys []string, w, h int) fuzzGame {
 	return g
 }
 
-// events turns holds and mouse events (up to tick limit) into scenario input events.
+// stickSalt separates the stick's random stream from the keys' and the mouse's, so adding
+// the stick did not change the games an older tool played for the same seed.
+const stickSalt = 0x57_1c_4a_5e_57_1c_4a_5e
+
+// stickPositions are where a random player puts the stick: rest, halfway and the ends,
+// numbers a repro scenario shows as written.
+var stickPositions = []float32{-1, -0.5, 0, 0.5, 1}
+
+// genSticks draws a random player's stick moves.
+func genSticks(rng *sim.RNG, ticks int) []stickEv {
+	var out []stickEv
+	for t := 1; t <= ticks; t++ {
+		if rng.Chance(0.03) {
+			out = append(out, stickEv{Tick: t, X: stickPositions[rng.Intn(len(stickPositions))], Y: stickPositions[rng.Intn(len(stickPositions))]})
+		}
+	}
+	return out
+}
+
+// events turns holds, mouse and stick events (up to tick limit) into scenario input events.
 func (g fuzzGame) events(limit int) []asset.InputSource {
 	byTick := map[int]*asset.InputSource{}
 	get := func(t int) *asset.InputSource {
@@ -166,6 +192,11 @@ func (g fuzzGame) events(limit int) []asset.InputSource {
 		e.Mouse = &asset.MouseSource{X: m.X, Y: m.Y}
 		if m.Buttons != nil {
 			e.Buttons = m.Buttons
+		}
+	}
+	for _, st := range g.sticks {
+		if st.Tick <= limit {
+			get(st.Tick).Stick = &asset.StickSource{X: st.X, Y: st.Y}
 		}
 	}
 	ticks := make([]int, 0, len(byTick))
@@ -222,6 +253,7 @@ func (s *Session) Fuzz(o FuzzOptions) (*FuzzReport, error) {
 	w, h := s.Project.Resolution[0], s.Project.Resolution[1]
 	for i := range games {
 		games[i] = genGame(sim.NewRNG(gameSeed(o.Seed, i)), o.Ticks, o.Keys, w, h)
+		games[i].sticks = genSticks(sim.NewRNG(gameSeed(o.Seed, i)^stickSalt), o.Ticks)
 	}
 	var wg sync.WaitGroup
 	next := make(chan int)
@@ -300,7 +332,7 @@ func (s *Session) playGame(bin, dir, name string, o FuzzOptions, seed uint64, g 
 }
 
 // minimize shrinks the first violating game (earliest violation) with delta debugging
-// over key holds and mouse events, keeping the same invariant violated, then writes the
+// over key holds, mouse and stick events, keeping the same invariant violated, then writes the
 // repro scenario.
 func (s *Session) minimize(bin, dir string, o FuzzOptions, games []fuzzGame, r *FuzzReport) error {
 	first := r.Violations[0]
@@ -321,10 +353,11 @@ func (s *Session) minimize(bin, dir string, o FuzzOptions, games []fuzzGame, r *
 	}
 	// Only inputs before the violation matter.
 	g = trimGame(g, ticks)
-	// ddmin on the combined list of holds and mouse events.
+	// ddmin on the combined list of holds, mouse and stick events.
 	type item struct {
-		h *hold
-		m *mouseEv
+		h  *hold
+		m  *mouseEv
+		st *stickEv
 	}
 	items := func(c fuzzGame) []item {
 		var out []item
@@ -334,15 +367,21 @@ func (s *Session) minimize(bin, dir string, o FuzzOptions, games []fuzzGame, r *
 		for i := range c.mouse {
 			out = append(out, item{m: &c.mouse[i]})
 		}
+		for i := range c.sticks {
+			out = append(out, item{st: &c.sticks[i]})
+		}
 		return out
 	}
 	build := func(its []item) fuzzGame {
 		var c fuzzGame
 		for _, it := range its {
-			if it.h != nil {
+			switch {
+			case it.h != nil:
 				c.holds = append(c.holds, *it.h)
-			} else {
+			case it.m != nil:
 				c.mouse = append(c.mouse, *it.m)
+			default:
+				c.sticks = append(c.sticks, *it.st)
 			}
 		}
 		return c
@@ -413,6 +452,11 @@ func trimGame(g fuzzGame, limit int) fuzzGame {
 	for _, m := range g.mouse {
 		if m.Tick <= limit {
 			out.mouse = append(out.mouse, m)
+		}
+	}
+	for _, st := range g.sticks {
+		if st.Tick <= limit {
+			out.sticks = append(out.sticks, st)
 		}
 	}
 	return out

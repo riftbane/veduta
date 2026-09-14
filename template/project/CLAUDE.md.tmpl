@@ -12,8 +12,9 @@ Rules
 - Every feature gets a scenario in tests/scenarios. Every bug fix gets a regression scenario.
 - Keep the game deterministic: randomness only via ctx.RNG; no time.Now in game code.
 - The game plays on a console: linux/arm64, a 320x240 panel at 20 Hz, a gamepad (D-pad =
-  arrow keys, A = Space, B = Escape, Start = Enter). Drive the game with those keys; there
-  is no mouse on the console.
+  arrow keys, A = Space, B = Escape, X = KeyF, Y = KeyR, Select = Tab, Start = Enter,
+  analog stick = `in.Stick`, scenario field `stick`; Home leaves the game). Drive the game
+  with those; the console's mouse is only a stand-in for the stick, never `in.Mouse`.
 - Round every float product that feeds + or -: `y += float32(v * ctx.DT)`. On arm64 the
   compiler fuses a*b+c into one rounding and the console's traces drift from the goldens.
   `doctor` lists the lines where it happened; gmath's own operations are already safe.
