@@ -38,7 +38,8 @@ release candidates as well as releases; to keep following it afterwards, run
 
 Releases carry the tool for linux/amd64, linux/arm64 and windows/amd64 (on Windows, unzip
 `veduta_<tag>_windows_amd64.zip` from GitHub Releases). On macOS, build it from source with
-Go ≥ 1.25, naming the version so `veduta update` and `veduta upgrade` know it:
+Go ≥ 1.25, naming the version so `veduta upgrade` and the update checks know it (a macOS
+build cannot update itself, since no macOS archive is published):
 
 ```sh
 go install -ldflags "-X main.version=vX.Y.Z" github.com/riftbane/veduta/cmd/veduta@vX.Y.Z
