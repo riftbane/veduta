@@ -2,6 +2,8 @@ package veduta
 
 import (
 	"bytes"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -197,5 +199,78 @@ func TestSnapshotKeepsHitboxAndLayer(t *testing.T) {
 	}
 	if l := e2.ctx.Scene.Find("hero").Layer; l != 3 {
 		t.Fatalf("restored hero layer %d, want 3", l)
+	}
+}
+
+// twodProject is the 2D fixture: an orthographic camera 12 m tall at x = y = 0, sprites
+// drawn as quads with hitboxes and layers, and two planes that show which rotation makes a
+// plane face the camera.
+var twodProject = filepath.Join("testdata", "twod")
+
+// twodPixel maps a world point of the fixture's scene to the pixel of its 320×240 frame
+// that contains it.
+func twodPixel(x, y float32) string {
+	const ppm = 240.0 / 12 // pixels per meter
+	return strconv.Itoa(int(160+x*ppm)) + "," + strconv.Itoa(int(120-y*ppm))
+}
+
+// The 2D fixture renders through the real headless path (compiled from the sources on
+// disk), answers queries at pixels, and simulates a collision between two sprites.
+func TestTwoDFixture(t *testing.T) {
+	dir := t.TempDir()
+	code, rep := runCmd(t, "-project", twodProject, "-headless", "render", "--bundle", "--out", filepath.Join(dir, "twod.png"))
+	if code != exitOK {
+		t.Fatalf("render: %d %v", code, rep)
+	}
+	seen := map[string]float64{}
+	for _, e := range rep["entities"].([]any) {
+		m := e.(map[string]any)
+		seen[m["name"].(string)] = m["pixels"].(float64)
+	}
+	for _, name := range []string{"coin", "hero", "sky", "plane_facing_camera"} {
+		if seen[name] == 0 {
+			t.Errorf("%s is not visible: %v", name, seen)
+		}
+	}
+	// A plane faces +Y: rotated -90° about X it faces away from a camera looking down -Z
+	// and is culled (+90° faces the camera). A blended sprite never owns id pixels.
+	for _, name := range []string{"plane_facing_away", "shade"} {
+		if seen[name] != 0 {
+			t.Errorf("%s owns %v pixels", name, seen[name])
+		}
+	}
+
+	bundle := rep["bundle"].(string)
+	query := func(at string) (entity, color string) {
+		t.Helper()
+		code, rep := runCmd(t, "-project", twodProject, "-headless", "query", "--frame", bundle, "--at", at)
+		if code != exitOK {
+			t.Fatalf("query %s: %d %v", at, code, rep)
+		}
+		px := rep["pixel"].(map[string]any)
+		if e, ok := px["entity"].(map[string]any); ok {
+			entity = e["name"].(string)
+		}
+		return entity, px["color"].(string)
+	}
+	// The coin's center is its texel color exactly: unlit, nearest filtering.
+	if e, c := query(twodPixel(0, -3)); e != "coin" || c != "#f2c230" {
+		t.Errorf("coin center: %s %s", e, c)
+	}
+	// Its corner is a transparent texel: cutout discards it and the sky shows through.
+	if e, c := query(twodPixel(0.45, -2.55)); e != "sky" || c != "#3060a0" {
+		t.Errorf("coin corner: %s %s", e, c)
+	}
+	// The blended shade (layer 1) darkens the sky without owning the pixel.
+	if e, c := query(twodPixel(4, 0)); e != "sky" || c == "#3060a0" {
+		t.Errorf("under the shade: %s %s", e, c)
+	}
+
+	code, sim := runCmd(t, "-project", twodProject, "-headless", "simulate", "--scene", "main", "--ticks", "12", "--out", filepath.Join(dir, "run"))
+	if code != exitOK || sim["verdict"] != "pass" {
+		t.Fatalf("simulate: %d %v", code, sim)
+	}
+	if ev := sim["events"].(map[string]any); ev["collision"] != 1.0 {
+		t.Fatalf("hero and coin collided %v times, want 1: %v", ev["collision"], ev)
 	}
 }

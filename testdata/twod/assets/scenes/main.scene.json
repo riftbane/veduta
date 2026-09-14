@@ -1,0 +1,18 @@
+{
+  "veduta": "scene/1",
+  "camera": { "type": "orthographic", "size": 12, "position": [0, 0, 100], "look_at": [0, 0, 0] },
+  "background": "#101018",
+  "entities": [
+    { "name": "coin", "kind": "static", "model": "quad", "material": "coin", "position": [0, -3, 1],
+      "hitbox": [[-0.3, -0.3, -0.5], [0.3, 0.3, 0.5]], "tags": ["coin"] },
+    { "name": "hero", "kind": "tslide", "model": "quad", "material": "hero", "position": [-4, -3, 1],
+      "hitbox": [[-0.4, -0.5, -0.5], [0.4, 0.5, 0.5]], "tags": ["hero"] },
+    { "name": "sky", "kind": "static", "model": "quad", "material": "sky", "scale": [16, 12, 1], "layer": -1 },
+    { "name": "shade", "kind": "static", "model": "quad", "material": "shade", "position": [4, 0, 2],
+      "scale": [4, 12, 1], "layer": 1 },
+    { "name": "plane_facing_camera", "kind": "static", "model": "plane", "material": "hero",
+      "position": [-5, 3, 1], "rotation_deg": [90, 0, 0] },
+    { "name": "plane_facing_away", "kind": "static", "model": "plane", "material": "hero",
+      "position": [5, 3, 1], "rotation_deg": [-90, 0, 0] }
+  ]
+}

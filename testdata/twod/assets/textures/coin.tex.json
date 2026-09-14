@@ -1,0 +1,7 @@
+{
+  "veduta": "texture/1",
+  "size": [16, 16],
+  "layers": [
+    { "type": "circle", "center": [8, 8], "radius": 6, "color": "#f2c230" }
+  ]
+}

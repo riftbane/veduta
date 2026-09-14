@@ -1,0 +1,6 @@
+{
+  "veduta": "model/1",
+  "parts": [
+    { "shape": "plane", "size": [1, 1] }
+  ]
+}

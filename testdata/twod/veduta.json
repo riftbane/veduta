@@ -1,0 +1,11 @@
+{
+  "veduta": "project/1",
+  "name": "twod",
+  "engine": "v0.2.0",
+  "resolution": [320, 240],
+  "inspect_resolution": [320, 240],
+  "tick_rate": 20,
+  "default_scene": "main",
+  "invariants": ["finite_positions", "within_bounds"],
+  "bounds": [[-20, -20, -20], [20, 20, 20]]
+}
