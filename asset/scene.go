@@ -20,6 +20,12 @@ var (
 	defaultBackground = uint32(0xff202830) // #202830
 )
 
+// MinLayer and MaxLayer bound an entity's "layer".
+const (
+	MinLayer = -1000
+	MaxLayer = 1000
+)
+
 // BuiltinKinds are the entity kinds the engine provides without registration.
 var BuiltinKinds = []string{"camera", "light", "static"}
 
@@ -172,6 +178,7 @@ func compileEntities(c *Checker, src []EntitySource) []Entity {
 			}
 		}
 		ent.Hitbox = compileHitbox(c, Path(p, "hitbox"), e.Hitbox)
+		ent.Layer = c.Int(Path(p, "layer"), e.Layer, MinLayer, MaxLayer, 0)
 		if len(e.Tags) > 0 {
 			ent.Tags = make([]string, 0, len(e.Tags))
 			for k, tag := range e.Tags {

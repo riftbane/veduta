@@ -267,16 +267,20 @@ func TestParseSceneFull(t *testing.T) {
 	}
 }
 
-// A hitbox compiles to a local-space box; a flat one (min == max on an axis) is allowed.
-func TestParseSceneHitbox(t *testing.T) {
+// A hitbox compiles to a local-space box (a flat one, min == max on an axis, is allowed)
+// and a layer to an int.
+func TestParseSceneHitboxAndLayer(t *testing.T) {
 	src := `{"veduta": "scene/1", "camera": {"position": [0, 0, 10], "look_at": [0, 0, 0]}, "entities": [
-    {"name": "coin", "kind": "static", "model": "quad", "hitbox": [[-0.25, -0.25, -0.5], [0.25, 0.25, 0.5]]},
-    {"name": "trigger", "kind": "static", "hitbox": [[0, 0, 0], [2, 1, 0]]},
-    {"name": "plain", "kind": "static", "model": "quad"}
+    {"name": "coin", "kind": "static", "model": "quad", "hitbox": [[-0.25, -0.25, -0.5], [0.25, 0.25, 0.5]], "layer": 2},
+    {"name": "trigger", "kind": "static", "hitbox": [[0, 0, 0], [2, 1, 0]], "layer": -1000},
+    {"name": "plain", "kind": "static", "model": "quad", "layer": 0}
   ]}`
 	s, err := ParseScene("twod.scene.json", []byte(src))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if l := [3]int{s.Entities[0].Layer, s.Entities[1].Layer, s.Entities[2].Layer}; l != [3]int{2, -1000, 0} {
+		t.Errorf("layers %v", l)
 	}
 	want := []*gmath.AABB{
 		{Min: gmath.V3(-0.25, -0.25, -0.5), Max: gmath.V3(0.25, 0.25, 0.5)},
@@ -369,6 +373,12 @@ func TestParseSceneErrors(t *testing.T) {
 			[]wantErr{{`entities[0].hitbox[1][1]: max y (1) is less than min y (2)`, `1, -0.5]]`}, {`entities[0].hitbox[1][2]: max z (-0.5) is less than min z (0.5)`, `-0.5]]`}}},
 		{"hitbox out of float range", ents(`{"name": "a", "kind": "static", "hitbox": [[0, 0, 0], [1e39, 1, 1]]}`),
 			[]wantErr{{`entities[0].hitbox[1][0]:`, `1e39`}}},
+		{"layer above range", ents(`{"name": "a", "kind": "static", "layer": 1001}`),
+			[]wantErr{{`entities[0].layer: 1001 out of range [-1000, 1000]`, `1001`}}},
+		{"layer below range", ents(`{"name": "a", "kind": "static", "layer": -5000}`),
+			[]wantErr{{`entities[0].layer: -5000 out of range [-1000, 1000]`, `-5000`}}},
+		{"layer not an integer", ents(`{"name": "a", "kind": "static", "layer": 1.5}`),
+			[]wantErr{{`entities[0].layer: cannot use JSON number 1.5 as int`, `1.5`}}},
 		{"hitbox wrong type", ents(`{"name": "a", "kind": "static", "hitbox": [0, 0, 0]}`),
 			[]wantErr{{`entities[0].hitbox[0]: cannot use JSON number`, `0, 0, 0]}]`}}},
 	}

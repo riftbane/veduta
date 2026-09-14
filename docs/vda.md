@@ -151,7 +151,8 @@ are 1 to 16777216 when levels > 0 and both 0 when levels = 0; wrap is 0 or 1.
 entity = `str` name, `str` kind, `str` model (`""` for none), `str` material (`""` for
 none), `vec3` position, `vec3` rotation_deg, `vec3` scale, `list<str>` tags, `str` parent
 (`""` for none), `bool` visible, `bool` has_hitbox, then only when has_hitbox is true
-`aabb` hitbox (local space, min <= max on every axis; readers reject any other box).
+`aabb` hitbox (local space, min <= max on every axis; readers reject any other box), then
+`i64` layer (in [-1000, 1000]).
 
 ## Determinism
 

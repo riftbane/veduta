@@ -125,6 +125,7 @@ type EntitySource struct {
 	Visible     *bool     `json:"visible,omitempty"` // default true
 	// Hitbox is [[minx, miny, minz], [maxx, maxy, maxz]] in the entity's local space.
 	Hitbox [][]float32 `json:"hitbox,omitempty"`
+	Layer  int         `json:"layer,omitempty"` // draw order, -1000..1000, default 0
 }
 
 // ScenarioSource is tests/scenarios/<name>.scenario.json.

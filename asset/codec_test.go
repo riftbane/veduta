@@ -142,6 +142,7 @@ func (g *gen) scene() *Scene {
 				lo := g.v3()
 				s.Entities[i].Hitbox = &gmath.AABB{Min: lo, Max: lo.Add(gmath.V3(1, 0, 2))}
 			}
+			s.Entities[i].Layer = g.n(MaxLayer-MinLayer) + MinLayer
 		}
 	}
 	return s
@@ -320,11 +321,12 @@ func TestDecodeMaterialValidation(t *testing.T) {
 	}
 }
 
-// Scene entities round-trip their hitbox; a box with min above max is rejected.
-func TestSceneCodecHitbox(t *testing.T) {
+// Scene entities round-trip their hitbox and layer; a box with min above max and a layer
+// out of range are rejected.
+func TestSceneCodecHitboxAndLayer(t *testing.T) {
 	s := &Scene{Name: "twod", Camera: Camera{Ortho: true, Size: 12, Near: 0.1, Far: 200, Position: gmath.V3(0, 0, 100)},
 		Entities: []Entity{
-			{Name: "coin", Kind: "static", Model: "quad", Scale: gmath.One3, Visible: true,
+			{Name: "coin", Kind: "static", Model: "quad", Scale: gmath.One3, Visible: true, Layer: -7,
 				Hitbox: &gmath.AABB{Min: gmath.V3(-0.25, -0.25, -0.5), Max: gmath.V3(0.25, 0.25, 0.5)}},
 			{Name: "plain", Kind: "static", Scale: gmath.One3, Visible: true},
 		}}
@@ -336,6 +338,11 @@ func TestSceneCodecHitbox(t *testing.T) {
 	if again := EncodeScene(got); !bytes.Equal(again.Data, c.Data) {
 		t.Fatal("re-encoding changed the bytes")
 	}
+	s.Entities[1].Layer = MaxLayer + 1
+	if _, err := DecodeScene(EncodeScene(s)); err == nil || !strings.Contains(err.Error(), "layer") {
+		t.Fatalf("layer out of range: %v", err)
+	}
+	s.Entities[1].Layer = 0
 	s.Entities[0].Hitbox.Min.Y = 1
 	if _, err := DecodeScene(EncodeScene(s)); err == nil || !strings.Contains(err.Error(), "hitbox") {
 		t.Fatalf("inverted hitbox: %v", err)

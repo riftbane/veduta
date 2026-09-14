@@ -22,7 +22,8 @@ func init() {
 }
 
 // flatAssets is a 2D world: a hero sliding right into a coin, both drawn with a model that
-// has no thickness along Z (an XY quad), optionally with a hitbox on each.
+// has no thickness along Z (an XY quad), optionally with a hitbox on each (and the hero
+// on layer 3).
 func flatAssets(hitbox bool) (*asset.Project, *Assets) {
 	p, a := testAssets()
 	quad := cube()
@@ -30,14 +31,16 @@ func flatAssets(hitbox bool) (*asset.Project, *Assets) {
 	quad.Mesh.Bounds = gmath.AABB{Min: gmath.V3(-0.5, -0.5, 0), Max: gmath.V3(0.5, 0.5, 0)}
 	a.Models["flat"] = quad
 	var box *gmath.AABB
+	layer := 0
 	if hitbox {
 		box = &gmath.AABB{Min: gmath.V3(-0.5, -0.5, -0.5), Max: gmath.V3(0.5, 0.5, 0.5)}
+		layer = 3
 	}
 	a.Scenes["flat"] = &asset.Scene{Name: "flat",
 		Camera: asset.Camera{Ortho: true, Size: 10, Near: 0.1, Far: 200, Position: gmath.V3(0, 0, 100)},
 		Light:  gfx.DefaultLight, Background: 0xff202830,
 		Entities: []asset.Entity{
-			{Name: "hero", Kind: "tslide", Model: "flat", Position: gmath.V3(-3, 0, 0), Scale: gmath.One3, Tags: []string{"hero"}, Visible: true, Hitbox: box},
+			{Name: "hero", Kind: "tslide", Model: "flat", Position: gmath.V3(-3, 0, 0), Scale: gmath.One3, Tags: []string{"hero"}, Visible: true, Hitbox: box, Layer: layer},
 			{Name: "coin", Kind: "static", Model: "flat", Scale: gmath.One3, Tags: []string{"coin"}, Visible: true, Hitbox: box},
 		}}
 	return p, a
@@ -95,8 +98,8 @@ func TestHitboxMakesCoplanarQuadsCollide(t *testing.T) {
 	}
 }
 
-// Snapshots carry hitboxes: a run restored mid-way reports the same collision.
-func TestSnapshotKeepsHitbox(t *testing.T) {
+// Snapshots carry hitboxes and layers: a run restored mid-way reports the same collision.
+func TestSnapshotKeepsHitboxAndLayer(t *testing.T) {
 	full, e := runFlat(t, true, 8)
 	e.close()
 	want := strings.Split(strings.TrimSpace(full), "\n")[4:]
@@ -128,5 +131,8 @@ func TestSnapshotKeepsHitbox(t *testing.T) {
 	}
 	if e2.rec.Count(sim.EventCollision) != 1 {
 		t.Fatal("the restored hitboxes did not collide")
+	}
+	if l := e2.ctx.Scene.Find("hero").Layer; l != 3 {
+		t.Fatalf("restored hero layer %d, want 3", l)
 	}
 }

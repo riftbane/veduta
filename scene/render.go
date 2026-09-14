@@ -90,6 +90,7 @@ type DrawOptions struct {
 
 type pending struct {
 	cmd   gfx.DrawCmd
+	layer int
 	blend bool
 	dist  float32
 	id    uint32
@@ -97,8 +98,9 @@ type pending struct {
 }
 
 // Draw appends the scene to dl: clear to the background, one view for the camera, one
-// command per visible model part (opaque first in id order, then blended parts back to
-// front), and in collision mode the AABB of every entity as debug lines.
+// command per visible model part, and in collision mode the AABB of every entity as debug
+// lines. Parts are ordered by entity Layer (lower first); within a layer opaque parts come
+// first in id order, then blended parts back to front.
 func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 	dl.Clear = true
 	dl.ClearColor = s.Background
@@ -141,11 +143,14 @@ func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 			if mat.Texture != "" {
 				cmd.Texture = res.Textures[mat.Texture]
 			}
-			cmds = append(cmds, pending{cmd: cmd, blend: mat.Alpha == "blend", dist: dist, id: e.ID, part: pi})
+			cmds = append(cmds, pending{cmd: cmd, layer: e.Layer, blend: mat.Alpha == "blend", dist: dist, id: e.ID, part: pi})
 		}
 	}
 	sort.SliceStable(cmds, func(i, j int) bool {
 		a, b := &cmds[i], &cmds[j]
+		if a.layer != b.layer {
+			return a.layer < b.layer
+		}
 		if a.blend != b.blend {
 			return !a.blend
 		}

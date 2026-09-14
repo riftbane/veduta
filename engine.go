@@ -292,6 +292,7 @@ type snapEntity struct {
 	Visible   bool
 	Parent    uint32
 	Hitbox    *gmath.AABB
+	Layer     int
 	State     []byte
 }
 
@@ -316,7 +317,7 @@ func (e *engine) snapshot() ([]byte, error) {
 			continue
 		}
 		se := snapEntity{ID: ent.ID, Name: ent.Name, Kind: ent.Kind, Transform: ent.Transform, Model: ent.Model,
-			Material: ent.Material, Tags: ent.Tags, Visible: ent.Visible, Parent: ent.Parent, Hitbox: ent.Hitbox}
+			Material: ent.Material, Tags: ent.Tags, Visible: ent.Visible, Parent: ent.Parent, Hitbox: ent.Hitbox, Layer: ent.Layer}
 		if ent.State != nil {
 			var buf bytes.Buffer
 			gob.Register(ent.State)
@@ -361,7 +362,7 @@ func (e *engine) restore(data []byte, trace io.Writer) error {
 	ents := make([]scene.Entity, len(snap.Entities))
 	for i, se := range snap.Entities {
 		ents[i] = scene.Entity{ID: se.ID, Name: se.Name, Kind: se.Kind, Transform: se.Transform, Model: se.Model,
-			Material: se.Material, Tags: se.Tags, Visible: se.Visible, Parent: se.Parent, Hitbox: se.Hitbox}
+			Material: se.Material, Tags: se.Tags, Visible: se.Visible, Parent: se.Parent, Hitbox: se.Hitbox, Layer: se.Layer}
 	}
 	if err := s.Restore(ents, snap.NextID); err != nil {
 		return fmt.Errorf("restore: %w", err)

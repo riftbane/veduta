@@ -247,4 +247,5 @@ type Entity struct {
 	Parent      string
 	Visible     bool
 	Hitbox      *gmath.AABB // local-space collision box replacing the model bounds; nil for none
+	Layer       int         // draw order: lower layers are drawn first
 }

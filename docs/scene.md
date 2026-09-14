@@ -80,6 +80,7 @@ all three defaults apply; inside `light`, each field is optional.
 | `parent` | string | none | Name of another entity of this scene. The entity's `position`, `rotation_deg` and `scale` are then relative to the parent (world = parent world × local, applied scale, then rotation, then translation). The parent may appear before or after the child in the list. An entity cannot be its own parent and parent chains must not form cycles. |
 | `visible` | boolean | `true` | `false` keeps the entity in the simulation but does not draw it. |
 | `hitbox` | `[[minx, miny, minz], [maxx, maxy, maxz]]` | none | A box in the entity's local space (before its scale, rotation and translation) that replaces the model's bounds as the entity's AABB: collisions, `ctx.Overlapping`, `no_overlap` invariants and the trace's `aabb` all use it. Two vectors of finite numbers with min ≤ max on every axis. An entity without a model gets an AABB from its hitbox alone (a trigger zone). Use it to give a flat sprite some thickness, or to make a collision box smaller than the drawing. |
+| `layer` | integer | `0` | Draw order, in [-1000, 1000]: entities on lower layers are drawn first. Within a layer, opaque parts are drawn in id order, then blended parts back to front. Drawing order never overrides the depth test: it decides which blended surface covers which (a translucent overlay on a high layer is drawn over everything below it), not which opaque surface is in front — for that, place it nearer the camera. |
 
 `model` and `material` are references by name: the scene compiles even if the assets do
 not exist yet; `inspect scene` reports `SCENE_MISSING_ASSET` for missing ones.
@@ -91,7 +92,7 @@ orthographic, `Size` — 0 for perspective, `Near`, `Far`, `Position`, `LookAt`)
 (`Dir` as written; `Color` and `Ambient` as linear RGB in [0, 1], each channel = byte / 255),
 `Background` (packed `0xAARRGGBB`) and `Entities` in file order with every default filled
 in (`Parent` is the parent's name, `Tags` nil when empty, `Hitbox` a `*gmath.AABB`, nil
-when absent). The binary layout in `.vda`
+when absent, `Layer` an int). The binary layout in `.vda`
 files is in `docs/vda.md` (chunk `SCEN`).
 
 ## Errors (examples)

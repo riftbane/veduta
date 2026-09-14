@@ -485,6 +485,7 @@ func EncodeScene(s *Scene) Chunk {
 			w.vec3(e.Hitbox.Min)
 			w.vec3(e.Hitbox.Max)
 		}
+		w.i64(e.Layer)
 	}
 	return Chunk{Type: ChunkScene, Data: w.b}
 }
@@ -513,7 +514,7 @@ func DecodeScene(c Chunk) (*Scene, error) {
 	s.Light.Ambient = r.vec3()
 	s.Background = r.u32()
 	r.field = "entities"
-	if n := r.count(4*4 + 36 + 4 + 4 + 1 + 1); n > 0 {
+	if n := r.count(4*4 + 36 + 4 + 4 + 1 + 1 + 8); n > 0 {
 		s.Entities = make([]Entity, n)
 		for i := range s.Entities {
 			r.field = fmt.Sprintf("entity %d", i)
@@ -535,6 +536,9 @@ func DecodeScene(c Chunk) (*Scene, error) {
 					r.failf("hitbox min %v exceeds max %v", b.Min, b.Max)
 				}
 				e.Hitbox = &b
+			}
+			if e.Layer = r.i64(); r.err == nil && (e.Layer < MinLayer || e.Layer > MaxLayer) {
+				r.failf("layer %d out of range [%d, %d]", e.Layer, MinLayer, MaxLayer)
 			}
 		}
 	}
