@@ -54,8 +54,13 @@ func (d *padDecoder) event(out []Event, typ, code uint16, value int32) []Event {
 	switch typ {
 	case evSyn:
 		if code == synDropped {
-			// Whatever was held may have been released while we were not looking.
+			// Whatever was held may have been released while we were not looking, the
+			// buttons of an exit chord included: half a chord kept from before the drop
+			// would let the other half alone quit the game. After lost events a chord has
+			// to be pressed again in full.
 			out = d.releaseAll(out)
+			d.exit = [len(exitChords)][2]bool{}
+			d.quit = false
 		}
 	case evKey:
 		if value == 2 {

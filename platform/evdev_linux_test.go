@@ -120,6 +120,37 @@ func TestPadDroppedEvents(t *testing.T) {
 	if want := "down Space,down ArrowLeft,up Space,up ArrowLeft"; got != want {
 		t.Fatalf("dropped: %s\n   want: %s", got, want)
 	}
+	// Half of an exit chord is forgotten too: its release may be among the lost events, and
+	// the other button alone must not then quit the game.
+	for _, c := range []struct {
+		name  string
+		first uint16
+		then  uint16
+		want  string
+	}{
+		{"Select, then Start", padExitChords[0][0], padExitChords[0][1], "down Tab,up Tab,down Enter"},
+		{"Ctrl, then Q", keyLeftCtrl, keyQ, "down ControlLeft,up ControlLeft,down KeyQ"},
+	} {
+		got := describePad(decodeAll(t, size,
+			record(size, evKey, c.first, 1),
+			record(size, evSyn, synDropped, 0),
+			record(size, evKey, c.then, 1),
+		))
+		if got != c.want {
+			t.Errorf("%s across dropped events: %s\n  want: %s", c.name, got, c.want)
+		}
+	}
+	// After the drop a chord pressed again in full still closes, and only once.
+	got = describePad(decodeAll(t, size,
+		record(size, evKey, keyLeftCtrl, 1),
+		record(size, evKey, keyQ, 1),
+		record(size, evSyn, synDropped, 0),
+		record(size, evKey, keyLeftCtrl, 1),
+		record(size, evKey, keyQ, 1),
+	))
+	if want := "down ControlLeft,up ControlLeft,close,down ControlLeft,up ControlLeft,close"; got != want {
+		t.Errorf("a chord pressed again after the drop: %s\n  want: %s", got, want)
+	}
 }
 
 // TestPadExitChord: Select and Start together close the window, which is the only way off
