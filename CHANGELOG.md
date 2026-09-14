@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## v1.0.0 — 2026-09-14
+
 The first stable release, and a breaking one: Veduta now makes games for the Veduta
 console — a linux/arm64 board with a 320×240 panel refreshed at 20 Hz and a gamepad — and
 the machines that author them no longer open a window. `SPEC-v1.0.0.md` describes the
