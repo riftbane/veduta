@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -109,6 +110,20 @@ var scnFixtures = map[string]string{
 		{"name": "hero", "kind": "static", "model": "quad", "material": "flat", "position": [4, -3, 1]},
 		{"name": "coin", "kind": "static", "model": "quad", "material": "flat", "position": [4.9, -3, 1],
 			"hitbox": [[0.3, -0.3, -0.5], [0.5, 0.3, 0.5]]}]}`,
+	// Important sprites under overlays, as docs/2d.md recommends: hero behind translucent
+	// water, the translucent wisp behind translucent fog on a higher layer, and crate
+	// behind the translucent, important spirit, both under haze, are all seen; guard behind
+	// an opaque wall is hidden.
+	"veiled": `{"veduta": "scene/1", "camera": {"type": "orthographic", "size": 12, "position": [0, 0, 100], "look_at": [0, 0, 0]}, "entities": [
+		{"name": "hero", "kind": "player", "model": "quad", "material": "flat", "position": [-4, 0, 1], "tags": ["important"]},
+		{"name": "water", "kind": "static", "model": "quad", "material": "water", "position": [-4, 0, 2], "scale": [3, 3, 1]},
+		{"name": "wisp", "kind": "collectible", "model": "quad", "material": "mist", "position": [0, 0, 1], "tags": ["important"]},
+		{"name": "fog", "kind": "static", "model": "quad", "material": "mist", "position": [0, 0, 2], "scale": [3, 3, 1], "layer": 1},
+		{"name": "guard", "kind": "collectible", "model": "quad", "material": "flat", "position": [4, 0, 1], "tags": ["important"]},
+		{"name": "wall", "kind": "static", "model": "quad", "material": "flat", "position": [4, 0, 2], "scale": [3, 3, 1]},
+		{"name": "crate", "kind": "collectible", "model": "quad", "material": "flat", "position": [0, -4, 1], "tags": ["important"]},
+		{"name": "spirit", "kind": "collectible", "model": "quad", "material": "mist", "position": [0, -4, 2], "scale": [2, 2, 1], "tags": ["important"]},
+		{"name": "haze", "kind": "static", "model": "quad", "material": "mist", "position": [0, -4, 3], "scale": [3, 3, 1], "layer": 1}]}`,
 	"dark": `{"veduta": "scene/1", "camera": {"position": [0, 9, 11], "look_at": [0, 0, -1]},
 		"light": {"direction": [-0.4, -1, -0.3], "color": "#202020", "ambient": "#101010"}, "entities": [
 		{"name": "ground", "kind": "static", "model": "ground"},
@@ -580,6 +595,24 @@ func TestSceneSprites2D(t *testing.T) {
 	}
 	if s := r.Summary; s.Errors != 0 || s.Warnings != 5 {
 		t.Errorf("summary %+v: %v", s, scnCodes(r))
+	}
+
+	// Translucent overlays write no ids in the real render, so they hide no important
+	// sprite and are never listed as occluders; an opaque sprite in front still hides one.
+	r = scnInspect(t, ir, "veiled", Options{Focus: "SCENE_ENTITY_OFFSCREEN"})
+	if len(r.Issues) != 1 {
+		t.Fatalf("want 1 SCENE_ENTITY_OFFSCREEN (guard), got %+v", r.Issues)
+	}
+	w := r.Issues[0].Where
+	if w["entity"] != "guard" || w["reason"] != "occluded" {
+		t.Errorf("where %+v", w)
+	}
+	b, err := json.Marshal(w["occluders"])
+	if err != nil || string(b) != `[{"entity":"wall","id":6,"pixels":`+strconv.Itoa(w["projected_pixels"].(int))+`}]` {
+		t.Errorf("occluders %s (projected %v)", b, w["projected_pixels"])
+	}
+	if !strings.Contains(r.Issues[0].Hint, `covered by "wall" (entities[5])`) {
+		t.Errorf("hint %q", r.Issues[0].Hint)
 	}
 }
 

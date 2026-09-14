@@ -101,9 +101,14 @@ const (
 //     entity. The where explains why (distance to the drawn entities vs near/far, angle
 //     off the view direction, entities whose drawing's bounds contain the camera).
 //   - SCENE_ENTITY_OFFSCREEN (warning): an entity tagged "important" has no visible
-//     pixel. The entity is rendered alone to tell "occluded" (projected pixels > 0, the
+//     pixel. Alpha-blended parts never count as occluders here: an entity without a
+//     pixel in the render above is rendered again with the scene's own pipeline states,
+//     where alpha-blended parts write no ids, and only its own parts forced to write them;
+//     owning a pixel there (seen through water or mist) is not an issue. The entity is
+//     rendered alone to tell "occluded" (projected pixels > 0, the opaque or cutout
 //     occluders are listed) from "outside_view"; "hidden" (visible: false), "no_model" and
-//     "missing_model" need no render.
+//     "missing_model" need no render. At most 16 entities are measured; the rest have
+//     reason "not_measured".
 //   - SCENE_UNLIT: warning when light.color and light.ambient have every channel ≤ 0.05
 //     while lit materials are drawn, or (otherwise) when the mean luminance of entity
 //     pixels is below 32/255; info when every drawn part uses an unlit material (the
@@ -884,12 +889,45 @@ func (a *scnAnalysis) checkSeesNothing() {
 // SCENE_ENTITY_OFFSCREEN
 
 func (a *scnAnalysis) checkOffscreen() error {
+	// The coverage render lets translucent parts cover what is behind them, so an important
+	// entity seen through water or mist has no pixel there. Such entities are rendered again
+	// with the scene's own pipeline states, in which only opaque and cutout parts write ids,
+	// and with their own parts forced to write them (a translucent part writes none
+	// otherwise). An entity owning a pixel of that render is visible.
+	cover := make([]bool, len(a.ents))
+	candidates := 0
+	for k, e := range a.ents {
+		if e.HasTag(scnImportant) && a.pixels[k] == 0 && a.drawn[k] {
+			cover[k] = true
+			candidates++
+		}
+	}
+	var seen []uint32 // ids of that render
+	var seenPix []int // pixels per entity index in it
+	var forced []bool // entities whose parts it had to force
+	forcedCount := 0
+	if candidates > 0 {
+		var err error
+		if seen, forced, err = a.renderCovering(cover); err != nil {
+			return err
+		}
+		seenPix = make([]int, len(a.ents))
+		for _, id := range seen {
+			if k := a.idx(id); k >= 0 {
+				seenPix[k]++
+			}
+		}
+		for _, f := range forced {
+			if f {
+				forcedCount++
+			}
+		}
+	}
 	rendered := 0
 	for k, e := range a.ents {
-		if !e.HasTag(scnImportant) || a.pixels[k] > 0 {
+		if !e.HasTag(scnImportant) || a.pixels[k] > 0 || (cover[k] && seenPix[k] > 0) {
 			continue
 		}
-		a.hidden = append(a.hidden, k)
 		tagNote := fmt.Sprintf(" (or remove %q from entities[%d].tags)", scnImportant, k)
 		where := map[string]any{"entity": e.Name, "id": e.ID, "visible_pixels": 0}
 		var hint string
@@ -903,26 +941,63 @@ func (a *scnAnalysis) checkOffscreen() error {
 		case !e.Visible:
 			where["reason"] = "hidden"
 			hint = fmt.Sprintf("Entity %s is tagged %q but not drawn: set entities[%d].visible to true%s.", a.ref(k), scnImportant, k, tagNote)
+		case rendered >= scnIssueMax:
+			where["reason"] = "not_measured"
+			hint = fmt.Sprintf("Entity %s is tagged %q and has no visible pixel from the scene camera.", a.ref(k), scnImportant)
 		default:
-			if rendered >= scnIssueMax {
-				where["reason"] = "not_measured"
-				hint = fmt.Sprintf("Entity %s is tagged %q and has no visible pixel from the scene camera.", a.ref(k), scnImportant)
-				break
-			}
 			rendered++
+			ids := seen
+			if forcedCount > 1 || (forcedCount == 1 && !forced[k]) {
+				// Translucent parts of other entities were forced to write ids too and may
+				// cover k there: force k's parts alone.
+				only := make([]bool, len(a.ents))
+				only[k] = true
+				var err error
+				if ids, _, err = a.renderCovering(only); err != nil {
+					return err
+				}
+				if slices.Contains(ids, e.ID) {
+					continue
+				}
+			}
 			var err error
-			if hint, err = a.offscreenDetail(k, where); err != nil {
+			if hint, err = a.offscreenDetail(k, ids, where); err != nil {
 				return err
 			}
 		}
+		a.hidden = append(a.hidden, k)
 		a.add(Warning, scnOffscreen, 1, where, hint)
 	}
 	return nil
 }
 
+// renderCovering renders the entity ids seen by the scene camera with the pipeline states
+// the scene builds, except that the parts of the entities marked in cover write depth and
+// ids even when alpha-blended. It returns the ID buffer and, per entity index, whether one
+// of its parts had to be forced.
+func (a *scnAnalysis) renderCovering(cover []bool) ([]uint32, []bool, error) {
+	forced := make([]bool, len(a.ents))
+	hook := func(dl *gfx.DrawList, _ int) {
+		for i := range dl.Cmds {
+			c := &dl.Cmds[i]
+			if k := a.idx(c.ID); k >= 0 && cover[k] && !c.State.DepthWrite {
+				c.State.DepthWrite = true
+				forced[k] = true
+			}
+		}
+	}
+	fb, err := a.ir.RenderScene(a.s, a.s.Camera, a.w, a.h, gfx.ModeIDs, false, hook)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fb.ID, forced, nil
+}
+
 // offscreenDetail renders entity k alone to count its projected pixels and fills where
-// with the reason and occluders; it returns the hint.
-func (a *scnAnalysis) offscreenDetail(k int, where map[string]any) (string, error) {
+// with the reason and the occluders: the owners of those pixels in seen, an ID buffer from
+// renderCovering in which translucent parts of other entities own no pixel. It returns the
+// hint.
+func (a *scnAnalysis) offscreenDetail(k int, seen []uint32, where map[string]any) (string, error) {
 	e := a.ents[k]
 	vis := make([]bool, len(a.ents))
 	for i, o := range a.ents {
@@ -943,7 +1018,7 @@ func (a *scnAnalysis) offscreenDetail(k int, where map[string]any) (string, erro
 			continue
 		}
 		projected++
-		if o := a.idx(a.fb.ID[i]); o >= 0 {
+		if o := a.idx(seen[i]); o >= 0 {
 			occ[o]++
 		}
 	}
