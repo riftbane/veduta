@@ -19,6 +19,69 @@ func init() {
 			e.Transform.Position.X += 0.5
 		})
 	})
+	// tlift climbs a quarter meter per tick: up the screen of a 2D game.
+	RegisterKind("tlift", func(e *scene.Entity) Behaviour {
+		return BehaviourFunc(func(ctx *Context, e *scene.Entity, in Input) {
+			e.Transform.Position.Y += 0.25
+		})
+	})
+}
+
+// The trajectory tile of a 2D game (orthographic camera looking down -Z) is drawn in the
+// XY plane, where the game moves; seen from the top, as for a 3D game, a climb collapses
+// onto a single point.
+func TestTrajectoryTileOf2DGame(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		cam   asset.Camera
+		label string
+		rows  func(n int) bool
+	}{
+		{"2d", asset.Camera{Ortho: true, Size: 10, Near: 0.1, Far: 200, Position: gmath.V3(0, 0, 100)}, "trajectories (xy)",
+			func(n int) bool { return n > 40 }},
+		{"3d", asset.Camera{FovDeg: 60, Near: 0.1, Far: 200, Position: gmath.V3(0, 6, 10)}, "trajectories (top)",
+			func(n int) bool { return n <= 2 }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p, a := flatAssets(true)
+			src := a.Scenes["flat"]
+			src.Camera = tc.cam
+			src.Entities = append(src.Entities, asset.Entity{Name: "lift", Kind: "tlift", Model: "flat", Position: gmath.V3(3, -2, 0), Scale: gmath.One3, Visible: true})
+			e := newEngine(&testGame{}, p, a)
+			defer e.close()
+			if err := e.start(runOptions{Scene: "flat", Seed: 1, Headless: true}); err != nil {
+				t.Fatal(err)
+			}
+			trail := newTrails()
+			trail.record(e.ctx.Scene)
+			for tick := 1; tick <= 20; tick++ {
+				if err := e.step(Input{}); err != nil {
+					t.Fatal(err)
+				}
+				trail.record(e.ctx.Scene)
+			}
+			img, label, err := trail.render(e, 160, 120)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if label != tc.label {
+				t.Errorf("label %q, want %q", label, tc.label)
+			}
+			lift := e.ctx.Scene.Find("lift")
+			color := gfx.IDColor(lift.ID)
+			rows := map[int]bool{}
+			for y := 0; y < img.H; y++ {
+				for x := 0; x < img.W; x++ {
+					if img.At(x, y) == color {
+						rows[y] = true
+					}
+				}
+			}
+			if !tc.rows(len(rows)) {
+				t.Errorf("the lift's 5 m climb covers %d rows of the tile", len(rows))
+			}
+		})
+	}
 }
 
 // flatAssets is a 2D world: a hero sliding right into a coin, both drawn with a model that

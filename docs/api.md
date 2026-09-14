@@ -126,8 +126,8 @@ bounds as the source of `AABB`, so collisions, `Overlapping`, `no_overlap` and t
 the first key of the draw order, lower layers drawn first; within a layer opaque parts in
 id order, then blended parts back to front by depth along the view axis; it never
 overrides the depth test). Useful methods: `WorldPosition()`, `World()`, `HasTag(t)`,
-`Alive()`. Use `gmath` for math: its
-`Sin/Cos/Atan2` are deterministic on every platform; never use `math.Sin` in game logic.
+`Alive()`. Use `gmath` for math: its `Sin/Cos/Atan2` are deterministic on every platform;
+never use `math.Sin` in game logic.
 
 Coordinates: right-handed, Y up, −Z forward, meters. Angles are degrees in files and
 radians in code. `rotation_deg: [x, y, z]` means R = Ry·Rx·Rz.
@@ -218,8 +218,9 @@ game -headless describe
   the name of a `camera` entity. Render modes: `color`, `wireframe`, `normals`, `depth`,
   `ids`, `silhouette`, `overdraw`, `uv_checker`, `collision`.
 - `simulate` writes `trace.jsonl`, `result.json` and one `sheet.png` (screenshots at the
-  requested ticks plus a top-down trajectory tile) into the output directory. The verdict
-  is `fail` when an expectation fails or an invariant is violated.
+  requested ticks plus a trajectory tile: seen from the top, or in the XY plane when the
+  scene camera is orthographic and looks along −Z, as a 2D game's does) into the output
+  directory. The verdict is `fail` when an expectation fails or an invariant is violated.
 - An input file (`--input`) is a JSON array of input events or an object with an
   `inputs` array (a scenario file works).
 - `describe` lists registered kinds with their state fields, game invariants, whether a

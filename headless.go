@@ -521,12 +521,12 @@ func (h *headless) runScenario(spec *scenarioSpec, dir string, tileW int, withSh
 	}
 	sheetPath := ""
 	if withSheet {
-		traj, err := trail.render(e, tw, th)
+		traj, label, err := trail.render(e, tw, th)
 		if err != nil {
 			return nil, err
 		}
 		tiles = append(tiles, traj)
-		labels = append(labels, "trajectories (top)")
+		labels = append(labels, label)
 		sheetPath = filepath.Join(dir, "sheet.png")
 		if err := writePNG(sheetPath, sheet.Grid(tiles, labels, cols, 4)); err != nil {
 			return nil, err
@@ -600,7 +600,7 @@ func sheetLayout(n, tileW int, p *asset.Project) (cols, w, h int) {
 	return cols, w, h
 }
 
-// trails records the XZ path of every non-static entity for the trajectory tile.
+// trails records the path of every non-static entity for the trajectory tile.
 type trails struct {
 	paths map[uint32][]gmath.Vec3
 	names map[uint32]string
@@ -624,9 +624,12 @@ func (t *trails) record(s *scene.Scene) {
 	}
 }
 
-// render draws the final state from the top with every recorded path as a polyline in
-// the entity's id color.
-func (t *trails) render(e *engine, w, h int) (*gfx.Image, error) {
+// render draws the final state with every recorded path as a polyline in the entity's id
+// color, and returns the tile with its label. A 3D game is seen from the top, its paths
+// flattened onto XZ. A 2D game, whose scene camera is orthographic and looks along -Z
+// (scene.Camera2D), moves in XY, which the top view would collapse onto a line: it is seen
+// from the front instead, its paths flattened onto XY.
+func (t *trails) render(e *engine, w, h int) (*gfx.Image, string, error) {
 	b := e.ctx.Scene.Bounds()
 	for _, ps := range t.paths {
 		for _, p := range ps {
@@ -636,27 +639,36 @@ func (t *trails) render(e *engine, w, h int) (*gfx.Image, error) {
 	if b.IsEmpty() {
 		b = gmath.AABB{Min: gmath.V3(-1, -1, -1), Max: gmath.V3(1, 1, 1)}
 	}
-	cam := scene.FrameOrtho(b, gmath.V3(0, -1, 0), float32(w)/float32(h))
+	flat, dir, label := 1, gmath.V3(0, -1, 0), "trajectories (top)"
+	if looksDownZ(e.ctx.Scene.Camera) {
+		flat, dir, label = 2, gmath.V3(0, 0, -1), "trajectories (xy)"
+	}
+	cam := scene.FrameOrtho(b, dir, float32(w)/float32(h))
 	ids := make([]uint32, 0, len(t.paths))
 	for id := range t.paths {
 		ids = append(ids, id)
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	f, err := e.renderWith(cam, w, h, gfx.ModeColor, false, func(dl *gfx.DrawList, view int) {
-		top := b.Max.Y + 0.01
+		near := b.Max.Get(flat) + 0.01 // in front of everything, seen along -dir
 		for _, id := range ids {
 			ps := t.paths[id]
 			for i := 1; i < len(ps); i++ {
-				a, c := ps[i-1], ps[i]
-				a.Y, c.Y = top, top
+				a, c := ps[i-1].With(flat, near), ps[i].With(flat, near)
 				dl.AddLine(gfx.DebugLine{A: a, B: c, Color: gfx.IDColor(id), View: view})
 			}
 		}
 	})
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return f.FB.Image().Clone(), nil
+	return f.FB.Image().Clone(), label, nil
+}
+
+// looksDownZ reports whether c is the camera of a 2D game: orthographic and looking along
+// -Z to within about a degree, as scene.Camera2D does.
+func looksDownZ(c scene.Camera) bool {
+	return c.Ortho && c.Target.Sub(c.Position).Normalize().Z < -0.9998
 }
 
 func (h *headless) snapshot(args []string) error {

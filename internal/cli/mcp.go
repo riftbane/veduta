@@ -260,7 +260,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 		},
 		{
 			Name:        "simulate",
-			Description: "Run ticks through the game: a scenario file, or a scene with ticks/seed/inputs. Returns the verdict, the expectations table, invariant violations with their tick, trace event counts, the run_id (for trace) and exactly one contact sheet (screenshots + top-down trajectories).",
+			Description: "Run ticks through the game: a scenario file, or a scene with ticks/seed/inputs. Returns the verdict, the expectations table, invariant violations with their tick, trace event counts, the run_id (for trace) and exactly one contact sheet (screenshots + trajectories: top-down, or in the XY plane for a 2D game whose scene camera is orthographic looking along -Z).",
 			InputSchema: schema(map[string]any{
 				"scenario":    str("scenario name (\"move\" = tests/scenarios/move.scenario.json) or file path"),
 				"scene":       str("scene (without scenario)"),
