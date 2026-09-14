@@ -283,6 +283,78 @@ func TestInputSourceReadsPadAndKeyboard(t *testing.T) {
 	}
 }
 
+// TestInputSourcePicksUpALatePad: a console is often switched on with only a keyboard, or
+// some other device that reads as one, and the pad plugged in afterwards. The pad has to
+// be found at the next rescan while the keyboard is being read, not only once nothing is,
+// and what is already open is neither opened twice nor moved behind the newcomer.
+func TestInputSourcePicksUpALatePad(t *testing.T) {
+	fakeInputs(t, "event0 AT Keyboard|"+keyboardBits)
+	keyboard := &fakePad{batches: [][]Event{{{Kind: KeyDown, Code: "ArrowDown"}}}}
+	pad := &fakePad{batches: [][]Event{{{Kind: KeyDown, Code: "Space"}}}}
+	byNode := map[string]*fakePad{"event0": keyboard, "event1": pad}
+	opened := map[string]int{}
+	old := openPad
+	openPad = func(path string) (events, error) {
+		node := filepath.Base(path)
+		opened[node]++
+		return byNode[node], nil
+	}
+	t.Cleanup(func() { openPad = old })
+
+	now := time.Now()
+	p := newInputSource("")
+	p.now = func() time.Time { return now }
+	codes := func() string {
+		t.Helper()
+		evs, err := p.poll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var s []string
+		for _, e := range evs {
+			s = append(s, e.Code)
+		}
+		return strings.Join(s, ",")
+	}
+
+	if got := codes(); got != "ArrowDown" || p.Devices() != "event0" {
+		t.Fatalf("keyboard alone: events %q, reading %q", got, p.Devices())
+	}
+	fakeInputs(t, "event1 Rii Gamepad|"+padBits)
+	// Not before the rescan: sysfs is not read on every frame.
+	if got := codes(); got != "" || p.Devices() != "event0" {
+		t.Fatalf("before the rescan: events %q, reading %q", got, p.Devices())
+	}
+	now = now.Add(2 * padRescan)
+	if got := codes(); got != "Space" {
+		t.Fatalf("after the rescan: events %q, want the pad's", got)
+	}
+	if p.Devices() != "event1,event0" {
+		t.Fatalf("reading %q, want the pad first", p.Devices())
+	}
+	// Later rescans find both again and open neither a second time.
+	now = now.Add(2 * padRescan)
+	codes()
+	if opened["event0"] != 1 || opened["event1"] != 1 || keyboard.closed != 0 || pad.closed != 0 {
+		t.Fatalf("opened %v, closed keyboard %d pad %d", opened, keyboard.closed, pad.closed)
+	}
+	// Gone from sysfs before its read fails: it is kept, not dropped with keys still down,
+	// and let go when the read does fail.
+	if err := os.RemoveAll(filepath.Join(sysRoot, "sys", "class", "input", "event1")); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(2 * padRescan)
+	codes()
+	if p.Devices() != "event0,event1" || pad.closed != 0 {
+		t.Fatalf("unlisted but still open: reading %q, pad closed %d", p.Devices(), pad.closed)
+	}
+	pad.err = errors.New("device removed")
+	codes()
+	if p.Devices() != "event0" || pad.closed != 1 {
+		t.Fatalf("after the failed read: reading %q, pad closed %d", p.Devices(), pad.closed)
+	}
+}
+
 // TestInputSourceWithNothingToRead: a console with no pad and no keyboard runs and waits,
 // rather than failing to start.
 func TestInputSourceWithNothingToRead(t *testing.T) {

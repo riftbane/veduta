@@ -20,8 +20,8 @@ var openPad = func(path string) (events, error) { return openEvdev(path) }
 // device name ("Rii").
 const padEnv = "VEDUTA_PAD"
 
-// padRescan is how long to wait before looking again after finding nothing or losing a
-// device. A console is usually switched on before the pad is plugged in.
+// padRescan is how often the input devices are looked for again, whether or not some are
+// already being read. A console is usually switched on before the pad is plugged in.
 const padRescan = time.Second
 
 // inputDevice is one /dev/input/eventN and what sysfs says about it.
@@ -197,10 +197,16 @@ func (p *inputSource) poll() ([]Event, error) {
 	return out, nil
 }
 
-// attach opens whatever is there, at most once per rescan interval. Finding nothing is a
-// console waiting for a pad to be plugged in, not a failure.
+// attach looks for devices at most once per rescan interval, whether or not something is
+// already being read, and opens the ones not yet open. Finding nothing is a console waiting
+// for a pad to be plugged in, not a failure.
+//
+// The open devices end up in discovery's order, pads first, so a pad plugged in after a
+// keyboard is read before it as it would have been at start-up. One still open that
+// discovery no longer lists has most likely just been unplugged: it is kept until its next
+// read says so, which is what releases the keys it had down.
 func (p *inputSource) attach() {
-	if len(p.open) > 0 || (p.tried && p.now().Before(p.next)) {
+	if p.tried && p.now().Before(p.next) {
 		return
 	}
 	p.tried = true
@@ -209,13 +215,30 @@ func (p *inputSource) attach() {
 	if err != nil {
 		return
 	}
+	kept := make([]bool, len(p.open))
+	list := make([]openDevice, 0, len(devices)+len(p.open))
 	for _, d := range devices {
+		i := 0
+		for i < len(p.open) && p.open[i].node != d.Node {
+			i++
+		}
+		if i < len(p.open) {
+			kept[i] = true
+			list = append(list, p.open[i])
+			continue
+		}
 		src, err := openPad(d.Dev)
 		if err != nil {
 			continue // a device that will not open is one we do without
 		}
-		p.open = append(p.open, openDevice{node: d.Node, src: src})
+		list = append(list, openDevice{node: d.Node, src: src})
 	}
+	for i, d := range p.open {
+		if !kept[i] {
+			list = append(list, d)
+		}
+	}
+	p.open = list
 }
 
 func (p *inputSource) close() error {
