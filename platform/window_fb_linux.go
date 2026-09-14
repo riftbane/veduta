@@ -40,8 +40,10 @@ func openFB(o Options) (Window, error) {
 	if err != nil {
 		return nil, err
 	}
-	if info.Bits != 16 {
-		return nil, fmt.Errorf("platform: %s is %d bits per pixel; only 16 (RGB565) is supported", info, info.Bits)
+	switch info.Bits {
+	case 16, 32: // the panel's RGB565, or the 32-bit framebuffer of an emulator or a PC
+	default:
+		return nil, fmt.Errorf("platform: %s is %d bits per pixel; 16 (RGB565) and 32 are supported", info, info.Bits)
 	}
 	scale := 1
 	if s := os.Getenv("VEDUTA_SCALE"); s != "" {
@@ -89,7 +91,11 @@ func (w *fbWindow) Present(img *gfx.Image) error {
 	if img.W != w.w || img.H != w.h {
 		return fmt.Errorf("platform: the panel takes %dx%d frames, got %dx%d", w.w, w.h, img.W, img.H)
 	}
-	if err := packRGB565(w.buf, img, w.info.Stride, w.scale); err != nil {
+	pack := packRGB565
+	if w.info.Bits == 32 {
+		pack = packXRGB
+	}
+	if err := pack(w.buf, img, w.info.Stride, w.scale); err != nil {
 		return err
 	}
 	if _, err := w.file.WriteAt(w.buf, 0); err != nil {

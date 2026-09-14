@@ -80,9 +80,21 @@ func TestFindFramebuffer(t *testing.T) {
 			errHas:  "several framebuffers match",
 		},
 		{
-			name:    "no panel",
+			// No panel, but an ordinary framebuffer: an emulator, or a PC in text mode.
+			name:    "a 32-bit framebuffer will do",
 			entries: []string{"fb0 vc4drmfb 1920x1080 32"},
-			errHas:  "no 16-bit framebuffer",
+			node:    "fb0",
+		},
+		{
+			// The panel still wins when both are there.
+			name:    "the panel is preferred",
+			entries: []string{"fb0 vc4drmfb 1920x1080 32", "fb1 paneldrmfb 320x240 16"},
+			node:    "fb1",
+		},
+		{
+			name:    "nothing usable",
+			entries: []string{"fb0 ancientfb 640x480 8"},
+			errHas:  "16 or 32 bits per pixel",
 		},
 		{
 			name:    "the choice matches nothing",
@@ -181,6 +193,47 @@ func TestPackRGB565StrideAndScale(t *testing.T) {
 	row := []byte{0x00, 0xf8, 0x00, 0xf8, 0x1f, 0x00, 0x1f, 0x00}
 	if string(dst[:8]) != string(row) || string(dst[8:]) != string(row) {
 		t.Fatalf("doubled % x, want the row % x twice", dst, row)
+	}
+}
+
+func TestPackXRGB(t *testing.T) {
+	img := image(2, 1, 0xffff0000, 0xff0000ff) // red, blue
+	dst := make([]byte, 2*4)
+	if err := packXRGB(dst, img, 8, 1); err != nil {
+		t.Fatal(err)
+	}
+	// 0xAARRGGBB stored low byte first: blue, green, red, alpha.
+	want := []byte{0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0xff}
+	if string(dst) != string(want) {
+		t.Fatalf("packed % x, want % x", dst, want)
+	}
+	// A padded line leaves the bytes past the picture alone.
+	dst = []byte{9, 9, 9, 9, 9, 9, 9, 9, 9, 9}
+	if err := packXRGB(dst, image(1, 1, 0xff00ff00), 10, 1); err != nil {
+		t.Fatal(err)
+	}
+	if string(dst[:4]) != string([]byte{0x00, 0xff, 0x00, 0xff}) || dst[4] != 9 {
+		t.Fatalf("padded line % x", dst)
+	}
+	// Doubling covers two by two.
+	dst = make([]byte, 2*16)
+	if err := packXRGB(dst, image(2, 1, 0xffff0000, 0xff0000ff), 16, 2); err != nil {
+		t.Fatal(err)
+	}
+	if string(dst[:16]) != string(dst[16:]) {
+		t.Fatal("the doubled row differs from the first")
+	}
+	if err := packXRGB(make([]byte, 4), image(2, 1, 0, 0), 8, 1); err == nil {
+		t.Fatal("a buffer too small was accepted")
+	}
+	big := gfx.NewImage(320, 240)
+	buf := make([]byte, 320*240*4)
+	if n := testing.AllocsPerRun(20, func() {
+		if err := packXRGB(buf, big, 320*4, 1); err != nil {
+			t.Fatal(err)
+		}
+	}); n != 0 {
+		t.Fatalf("packXRGB allocates %v times per frame", n)
 	}
 }
 

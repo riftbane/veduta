@@ -45,7 +45,7 @@ func findFramebuffer(want string) (fbInfo, error) {
 	if err != nil {
 		return fbInfo{}, fmt.Errorf("platform: no framebuffers in %s: %w", dir, err)
 	}
-	var all, matching []fbInfo
+	var all, matching, panels, others []fbInfo
 	for _, e := range entries {
 		if !strings.HasPrefix(e.Name(), "fb") || strings.Contains(e.Name(), "con") {
 			continue // fbcon is not a device
@@ -61,7 +61,17 @@ func findFramebuffer(want string) (fbInfo, error) {
 				matching = append(matching, info)
 			}
 		case info.Bits == 16:
-			matching = append(matching, info)
+			panels = append(panels, info)
+		case info.Bits == 32:
+			others = append(others, info)
+		}
+	}
+	if want == "" {
+		// A small panel is the 16-bit one, and on a board with HDMI attached that is how
+		// it is told from the other. A 32-bit framebuffer is what an emulator or a PC in
+		// text mode offers, and it will do when there is no panel.
+		if matching = panels; len(matching) == 0 {
+			matching = others
 		}
 	}
 	sort.Slice(matching, func(i, j int) bool { return matching[i].Node < matching[j].Node })
@@ -72,7 +82,7 @@ func findFramebuffer(want string) (fbInfo, error) {
 		if want != "" {
 			return fbInfo{}, fmt.Errorf("platform: no framebuffer matches %q (found %s)", want, describeFBs(all))
 		}
-		return fbInfo{}, fmt.Errorf("platform: no 16-bit framebuffer for the panel (found %s); set VEDUTA_FB to choose one", describeFBs(all))
+		return fbInfo{}, fmt.Errorf("platform: no framebuffer with 16 or 32 bits per pixel (found %s); set VEDUTA_FB to choose one", describeFBs(all))
 	default:
 		return fbInfo{}, fmt.Errorf("platform: several framebuffers match (%s); set VEDUTA_FB to one of them", describeFBs(matching))
 	}
@@ -135,6 +145,36 @@ func readFBInfo(dir, node string) (fbInfo, error) {
 		return fbInfo{}, fmt.Errorf("%s describes itself as %dx%d at %d bpp", node, info.W, info.H, info.Bits)
 	}
 	return info, nil
+}
+
+// packXRGB writes img into dst as 32-bit pixels, the format of an ordinary framebuffer —
+// an emulated one, or a PC in text mode. The engine's own pixels are already 0xAARRGGBB,
+// so each one is stored as it stands, low byte first. Like the 16-bit packer it honours a
+// padded stride and an integer scale, and allocates nothing.
+func packXRGB(dst []byte, img *gfx.Image, stride, scale int) error {
+	if scale < 1 {
+		scale = 1
+	}
+	w, h := img.W*scale, img.H*scale
+	if need := stride*(h-1) + w*4; len(dst) < need {
+		return fmt.Errorf("platform: the framebuffer holds %d bytes, a %dx%d frame needs %d", len(dst), w, h, need)
+	}
+	for y := 0; y < img.H; y++ {
+		src := img.Pix[y*img.W : y*img.W+img.W]
+		line := dst[y*scale*stride:]
+		for x, c := range src {
+			b0, b1, b2, b3 := byte(c), byte(c>>8), byte(c>>16), byte(c>>24)
+			for i := 0; i < scale; i++ {
+				o := (x*scale + i) * 4
+				line[o], line[o+1], line[o+2], line[o+3] = b0, b1, b2, b3
+			}
+		}
+		first := line[:w*4]
+		for i := 1; i < scale; i++ {
+			copy(dst[(y*scale+i)*stride:][:w*4], first)
+		}
+	}
+	return nil
 }
 
 // packRGB565 writes img into dst as RGB565, the format of these panels: five bits of red
