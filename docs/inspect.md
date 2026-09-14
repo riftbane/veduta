@@ -100,7 +100,7 @@ texture on every part of the model, lit, iso view). `all` writes every sheet exc
 ## Scene (`inspect scene NAME`)
 
 The scene is loaded with the library's model bounds. The project supplies the bounds and
-the analysis resolution (`inspect_resolution`, 640×360 by default). Pixel counts come
+the analysis resolution (`inspect_resolution`, 320×240 by default). Pixel counts come
 from one render of the scene camera in which every drawn part, alpha-blended ones
 included, writes the entity-id buffer. Entity index `i` is the position in `entities`.
 At most 16 issues are listed per code; one more issue with `where.omitted` counts the

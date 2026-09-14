@@ -76,7 +76,7 @@ const (
 // Scene inspects scene name of ir.Lib (spec §9.3) and returns its report, subject
 // "scene:<name>". The scene is loaded with scene.Load and the library's model bounds; the
 // project (ir.Lib.Project, defaults when nil) supplies the bounds and the analysis
-// resolution (inspect_resolution, 640×360 by default). Pixel numbers come from one render
+// resolution (inspect_resolution, 320×240 by default). Pixel numbers come from one render
 // of the scene camera at that resolution in which every drawn part writes the ID buffer
 // (alpha-blended parts too, so a pane of glass counts as covering what is behind it).
 // Entity index i below is the entity's position in the scene file (its id is i+1).
