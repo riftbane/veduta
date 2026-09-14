@@ -1,12 +1,19 @@
 # [[.Name]]
 
-A game made with [Veduta](https://github.com/riftbane/veduta) [[.Engine]].
+A game made with [Veduta](https://github.com/riftbane/veduta) [[.Engine]] for the Veduta
+console: a 64-bit ARM board (Raspberry Pi Zero 2 W or Pi 5) with a 320×240 panel and a
+gamepad.
 
 ## Play
 
-Download the archive for your system from the project's GitHub Releases, unpack it and
-run `[[.Name]]` (`[[.Name]].exe` on Windows). WASD moves the hero, Space jumps, R resets
-the level. Collect every gem.
+Download `[[.Name]]_<version>_linux_arm64.tar.gz` from the project's GitHub Releases and
+unpack it onto the console's card: the `[[.Name]]` folder it contains is the game, with its
+`card.json`, and the console lists it by that. The `linux_amd64` archive runs on any other
+Linux machine with a framebuffer (a text console, not a desktop session).
+
+On the pad the D-pad moves the hero, A jumps and Y resets the level; on a keyboard, WASD or
+the arrows move, Space jumps and R resets. Collect every gem. Select and Start together
+(Ctrl+Q on a keyboard) leave the game and go back to the console's list.
 
 ## Develop
 
@@ -15,12 +22,15 @@ veduta test                      # go test + every scenario in tests/scenarios
 veduta simulate --scenario tests/scenarios/collect.scenario.json
 veduta render --scene main --out out/main.png
 veduta inspect model hero
-veduta release v0.1.0            # tag; GitHub Actions builds linux and windows archives
+veduta doctor                    # also checks the game against the console
+veduta release v0.1.0            # tag; GitHub Actions builds the console archives
 ```
 
-The project is set up for Claude Code: `claude` in this directory connects to the
-`veduta` MCP server (see `.mcp.json`) and follows `CLAUDE.md`.
+No window opens on the machine you develop on: the game is seen through `render`,
+`simulate` and `inspect`, and played on the console. The project is set up for Claude
+Code: `claude` in this directory connects to the `veduta` MCP server (see `.mcp.json`) and
+follows `CLAUDE.md`.
 
-Layout: `veduta.json` (manifest), `cmd/game` (entry point), `game/` (game logic and entity
-kinds), `assets/` (JSON sources for models, textures, materials and scenes),
-`tests/scenarios/` (deterministic scenario tests).
+Layout: `veduta.json` (manifest), `card.json` (what the console lists), `cmd/game` (entry
+point), `game/` (game logic and entity kinds), `assets/` (JSON sources for models,
+textures, materials and scenes), `tests/scenarios/` (deterministic scenario tests).
