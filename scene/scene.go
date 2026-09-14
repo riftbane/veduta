@@ -57,9 +57,12 @@ type Entity struct {
 	// aabb). An entity without a model gets an AABB from its hitbox alone.
 	Hitbox *gmath.AABB
 	// Layer is the first key of the draw order: lower layers are drawn first. Within a
-	// layer, opaque parts are drawn in id order, then blended parts back to front. Drawing
-	// order never overrides the depth test: it decides which blended surface covers
-	// which, not which opaque surface is in front.
+	// layer, opaque parts are drawn in id order, then blended parts back to front. Opaque
+	// and cutout parts write depth, so among them the nearest is in front whatever the
+	// layer. Blended parts write none: the layer decides which blended surface covers
+	// which, and an opaque or cutout part on a higher layer is drawn over a blended part
+	// on a lower one whatever their depth. A translucent overlay must be nearer the
+	// camera than what it covers and on a layer at least as high.
 	Layer int
 
 	world gmath.Mat4

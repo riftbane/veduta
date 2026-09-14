@@ -125,8 +125,10 @@ hitbox, else of the model, recomputed after every tick), `Visible`, `State`, `Pa
 bounds as the source of `AABB`, so collisions, `Overlapping`, `no_overlap` and the trace's
 `aabb` use it; nil for none; `Spawn` copies it), `Layer int` (the scene file's `layer`:
 the first key of the draw order, lower layers drawn first; within a layer opaque parts in
-id order, then blended parts back to front by depth along the view axis; it never
-overrides the depth test). Useful methods: `WorldPosition()`, `World()`, `HasTag(t)`,
+id order, then blended parts back to front by depth along the view axis; opaque and cutout
+parts write depth, so among them the nearest is in front whatever the layer, while blended
+parts write none, so an opaque part on a higher layer is drawn over a blended part on a
+lower one whatever their depth). Useful methods: `WorldPosition()`, `World()`, `HasTag(t)`,
 `Alive()`. Use `gmath` for math: its `Sin/Cos/Atan2` are deterministic on every platform;
 never use `math.Sin` in game logic.
 
