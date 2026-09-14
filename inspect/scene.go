@@ -91,9 +91,11 @@ const (
 //     is not inside the project bounds (boundary included; non-finite values are
 //     outside). One per entity; where: position, aabb, bounds, sides, outside_by.
 //   - SCENE_OVERLAP (warning): the AABBs of two "static" entities intersect by more than
-//     1 mm on every axis. Touching boxes (a crate on the ground) and parent/descendant
-//     pairs do not count; visibility is ignored (AABBs are collision volumes). One per
-//     pair; where: a, b, ids, overlap (depth per axis) and box (the intersection).
+//     1 mm on every axis. Touching boxes (a crate on the ground), parent/descendant pairs
+//     and pairs whose models are both drawn only with alpha-blended materials (water and
+//     mist stacked by layer) do not count; visibility is ignored (AABBs are collision
+//     volumes). One per pair; where: a, b, ids, overlap (depth per axis) and box (the
+//     intersection).
 //   - SCENE_CAMERA_SEES_NOTHING (error): no pixel of the camera render belongs to an
 //     entity. The where explains why (distance to the drawn entities vs near/far, angle
 //     off the view direction, entities whose AABB contains the camera).
@@ -110,9 +112,11 @@ const (
 //     0.1% of the smaller triangle, with every vertex of the overlap within 1 mm of both
 //     planes. Faces must face the same way, or either must be double-sided (cull
 //     "none"): a crate resting on the ground (bottom face down, ground face up) is not a
-//     risk. Only entity pairs whose AABBs touch are compared, triangles are bucketed by
-//     plane; at most 2^24 triangle pairs are tested (metric zfight_truncated). One issue
-//     per entity pair; count = overlapping triangle pairs; where: normal, point, area.
+//     risk. Two alpha-blended triangles are not a risk either: neither writes depth, so
+//     the draw order (layer, then depth) decides which covers which. Only entity pairs
+//     whose AABBs touch are compared, triangles are bucketed by plane; at most 2^24
+//     triangle pairs are tested (metric zfight_truncated). One issue per entity pair;
+//     count = overlapping triangle pairs; where: normal, point, area.
 //
 // At most 16 issues are listed per code; one more issue with where.omitted counts the
 // rest.
@@ -185,6 +189,7 @@ type scnAnalysis struct {
 	w, h   int             // analysis resolution
 
 	drawn      []bool // visible, with a model in the library
+	glass      []bool // every part of the model is alpha-blended (writes no depth)
 	drawnCount int
 	triangles  int
 	litParts   int
@@ -239,6 +244,7 @@ func scnAnalyze(ir *Renderer, name string, src *asset.Scene) (*scnAnalysis, erro
 	a.file = path.Join(a.assets, "scenes", name+".scene.json")
 	n := len(a.ents)
 	a.drawn = make([]bool, n)
+	a.glass = make([]bool, n)
 	a.pixels = make([]int, n)
 	a.bbox = make([][4]int, n)
 	a.lumaEnt = make([]int64, n)
@@ -329,6 +335,19 @@ func (a *scnAnalysis) model(e *scene.Entity) *asset.Model {
 func (a *scnAnalysis) prepare() {
 	for k, e := range a.ents {
 		m := a.model(e)
+		if m != nil {
+			blended, other := 0, 0
+			for _, part := range m.Mesh.Parts {
+				switch {
+				case part.Count <= 0:
+				case a.ir.res.Material(scnPartMaterial(m, part), e.Material).Alpha == "blend":
+					blended++
+				default:
+					other++
+				}
+			}
+			a.glass[k] = blended > 0 && other == 0
+		}
 		if !e.Visible || m == nil {
 			continue
 		}
@@ -688,7 +707,7 @@ func (a *scnAnalysis) checkOverlap() {
 			d := scnDepth(A, B)
 			if d.X > scnOverlapMin && d.Y > scnOverlapMin && d.Z > scnOverlapMin {
 				i, j := min(st[x], st[y]), max(st[x], st[y])
-				if !a.related(i, j) {
+				if !a.related(i, j) && !(a.glass[i] && a.glass[j]) {
 					pairs = append(pairs, scnPair{i: i, j: j, box: gmath.AABB{Min: A.Min.Max(B.Min), Max: A.Max.Min(B.Max)}})
 				}
 			}
@@ -1087,6 +1106,7 @@ type scnTri struct {
 	tri      int // mesh triangle index (Mesh.Indices[3·tri:])
 	part     int
 	twoSided bool
+	blend    bool // alpha-blended: depth tested but never writes depth
 }
 
 func (a *scnAnalysis) worldTris(k int) []scnTri {
@@ -1126,7 +1146,7 @@ func (a *scnAnalysis) worldTris(k int) []scnTri {
 			t.n = n.mul(1 / l)
 			t.area = float64(l / 2)
 			t.d = t.n.dot(t.p[0])
-			t.tri, t.part, t.twoSided = o/3, pi, mat.Cull == gfx.CullNone
+			t.tri, t.part, t.twoSided, t.blend = o/3, pi, mat.Cull == gfx.CullNone, mat.Alpha == "blend"
 			for c := 0; c < 3; c++ {
 				t.lo[c] = min(t.p[0][c], t.p[1][c], t.p[2][c])
 				t.hi[c] = max(t.p[0][c], t.p[1][c], t.p[2][c])
@@ -1269,12 +1289,15 @@ func (a *scnAnalysis) zPair(i, j int) *scnZPair {
 		slices.Sort(found)
 		found = slices.Compact(found)
 		for _, u := range found {
+			B := &tj[u]
+			if A.blend && B.blend { // neither writes depth: the draw order decides, not the depth test
+				continue
+			}
 			if a.zTests >= scnZBudget {
 				a.zTrunc = true
 				return z
 			}
 			a.zTests++
-			B := &tj[u]
 			area, poly, same, ok := scnCoplanarOverlap(A, B)
 			if !ok {
 				continue

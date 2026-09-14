@@ -30,6 +30,8 @@ var scnFixtureMaterials = []*asset.Material{
 	{Name: "painted", Albedo: 0xffffffff, Texture: "paint", Alpha: "opaque", Cutoff: 0.5},
 	{Name: "flat", Albedo: 0xffe0a040, Unlit: true, Alpha: "opaque", Cutoff: 0.5},
 	{Name: "twosided", Albedo: 0xffd04060, Alpha: "opaque", Cutoff: 0.5, Cull: gfx.CullNone},
+	{Name: "water", Albedo: 0x802060c0, Unlit: true, Alpha: "blend", Cutoff: 0.5},
+	{Name: "mist", Albedo: 0x80e0e0e0, Unlit: true, Alpha: "blend", Cutoff: 0.5},
 }
 
 // Crafted scenes, each exercising one check.
@@ -87,6 +89,16 @@ var scnFixtures = map[string]string{
 		{"name": "crate", "kind": "static", "model": "crate", "position": [-2, 0, 0]},
 		{"name": "raised", "kind": "static", "model": "decal", "material": "gem", "position": [-1, 0.01, 3]},
 		{"name": "flipped", "kind": "static", "model": "decal", "material": "twosided", "position": [0, 0, -2.5], "rotation_deg": [180, 0, 0]}]}`,
+	// A 2D scene of the template's quads under an orthographic camera: translucent water
+	// and mist overlap at the same z (ordered by layer); two opaque tiles overlap at the
+	// same z; translucent pool overlaps opaque rock at the same z.
+	"sprites": `{"veduta": "scene/1", "camera": {"type": "orthographic", "size": 12, "position": [0, 0, 100], "look_at": [0, 0, 0]}, "entities": [
+		{"name": "water", "kind": "static", "model": "quad", "material": "water", "position": [-4, 3, 2], "scale": [4, 1, 1]},
+		{"name": "mist", "kind": "static", "model": "quad", "material": "mist", "position": [-4, 3.5, 2], "scale": [6, 2, 1], "layer": 1},
+		{"name": "tile_a", "kind": "static", "model": "quad", "material": "flat", "position": [4, 3, 1]},
+		{"name": "tile_b", "kind": "static", "model": "quad", "material": "flat", "position": [4.5, 3, 1]},
+		{"name": "pool", "kind": "static", "model": "quad", "material": "water", "position": [-4, -3, 1]},
+		{"name": "rock", "kind": "static", "model": "quad", "material": "flat", "position": [-3.5, -3, 1]}]}`,
 	"dark": `{"veduta": "scene/1", "camera": {"position": [0, 9, 11], "look_at": [0, 0, -1]},
 		"light": {"direction": [-0.4, -1, -0.3], "color": "#202020", "ambient": "#101010"}, "entities": [
 		{"name": "ground", "kind": "static", "model": "ground"},
@@ -509,6 +521,30 @@ func TestSceneZFight(t *testing.T) {
 		t.Errorf("truncated")
 	}
 	golden.Image(t, "inspect_scene_zfight_camera", scnSheet(t, r, "camera"))
+}
+
+// Translucent parts write no depth, so two of them in one plane cannot z-fight and do not
+// count as interpenetrating static entities; a translucent part coplanar with an opaque one
+// still does.
+func TestSceneSprites2D(t *testing.T) {
+	ir := scnRenderer(t, scnLibrary(t))
+	r := scnInspect(t, ir, "sprites", Options{})
+	pairs := func(code string) []string {
+		var out []string
+		for _, is := range scnFind(r, code) {
+			out = append(out, is.Where["a"].(string)+"/"+is.Where["b"].(string))
+		}
+		return out
+	}
+	if got, want := pairs("SCENE_OVERLAP"), []string{"tile_a/tile_b", "pool/rock"}; !equalStrings(got, want) {
+		t.Errorf("SCENE_OVERLAP %v, want %v", got, want)
+	}
+	if got, want := pairs("SCENE_ZFIGHT_RISK"), []string{"tile_a/tile_b", "pool/rock"}; !equalStrings(got, want) {
+		t.Errorf("SCENE_ZFIGHT_RISK %v, want %v", got, want)
+	}
+	if s := r.Summary; s.Errors != 0 || s.Warnings != 4 {
+		t.Errorf("summary %+v: %v", s, scnCodes(r))
+	}
 }
 
 func TestSceneUnlit(t *testing.T) {
