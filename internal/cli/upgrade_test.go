@@ -137,6 +137,24 @@ func TestUpgradePinsTheV0Defaults(t *testing.T) {
 			changelog:  "- Upgrade the Veduta engine from v0.2.0 to v1.0.0 (`veduta upgrade`), pinning the defaults `veduta.json` relied on before v1.0.0 so the game keeps its size and tick rate: `\"resolution\": [1280, 720]`, `\"inspect_resolution\": [640, 360]`, `\"tick_rate\": 60`.\n",
 		},
 		{
+			// A blank line that groups the fields stays in front of the field it was in
+			// front of; the new keys join the group of the field they follow.
+			name:       "blank lines between groups",
+			to:         "v1.0.0",
+			in:         "{\n\n  \"veduta\": \"project/1\",\n  \"name\": \"mygame\",\n  \"engine\": \"v0.2.0\",\n\n  \"default_seed\": 3\n\n}\n",
+			want:       "{\n\n  \"veduta\": \"project/1\",\n  \"name\": \"mygame\",\n  \"engine\": \"v1.0.0\",\n  \"resolution\": [1280, 720],\n  \"inspect_resolution\": [640, 360],\n  \"tick_rate\": 60,\n\n  \"default_seed\": 3\n\n}\n",
+			migrations: []string{pinResolution, pinInspectResolution, pinTickRate},
+			changelog:  "- Upgrade the Veduta engine from v0.2.0 to v1.0.0 (`veduta upgrade`), pinning the defaults `veduta.json` relied on before v1.0.0 so the game keeps its size and tick rate: `\"resolution\": [1280, 720]`, `\"inspect_resolution\": [640, 360]`, `\"tick_rate\": 60`.\n",
+		},
+		{
+			name:       "blank line before the last field, windows line endings",
+			to:         "v1.0.0",
+			in:         "{\r\n  \"veduta\": \"project/1\",\r\n  \"name\": \"mygame\",\r\n\r\n  \"engine\": \"v0.2.0\"\r\n}\r\n",
+			want:       "{\r\n  \"veduta\": \"project/1\",\r\n  \"name\": \"mygame\",\r\n\r\n  \"engine\": \"v1.0.0\",\r\n  \"resolution\": [1280, 720],\r\n  \"inspect_resolution\": [640, 360],\r\n  \"tick_rate\": 60\r\n}\r\n",
+			migrations: []string{pinResolution, pinInspectResolution, pinTickRate},
+			changelog:  "- Upgrade the Veduta engine from v0.2.0 to v1.0.0 (`veduta upgrade`), pinning the defaults `veduta.json` relied on before v1.0.0 so the game keeps its size and tick rate: `\"resolution\": [1280, 720]`, `\"inspect_resolution\": [640, 360]`, `\"tick_rate\": 60`.\n",
+		},
+		{
 			name:       "keys in another order",
 			to:         "v1.0.0",
 			in:         "{\"engine\": \"v0.2.0\", \"name\": \"mygame\", \"veduta\": \"project/1\"}",

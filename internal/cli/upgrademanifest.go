@@ -169,7 +169,7 @@ func upgradeManifest(data []byte, to string, pin bool) (out []byte, pinned []str
 			if a+1 < len(fields) {
 				lead = fields[a+1].lead
 			}
-			text := "," + lead + strconv.Quote(d.key) + fields[a].colon + d.value
+			text := "," + lineLead(lead) + strconv.Quote(d.key) + fields[a].colon + d.value
 			if e, ok := inserts[a]; ok { // after the keys already inserted there
 				edits[e].text += text
 				continue
@@ -202,6 +202,21 @@ func upgradeManifest(data []byte, to string, pin bool) (out []byte, pinned []str
 		}
 	}
 	return b.Bytes(), pinned, nil
+}
+
+// lineLead is the part of a separator an inserted key copies: from its last line break
+// ("\n" or "\r\n") on, which is the indentation of one line. A blank line that groups the
+// file's fields stays once, in front of the field it was in front of, instead of being
+// repeated above every new key. A separator without a line break is copied whole.
+func lineLead(lead string) string {
+	i := strings.LastIndexByte(lead, '\n')
+	if i < 0 {
+		return lead
+	}
+	if i > 0 && lead[i-1] == '\r' {
+		i--
+	}
+	return lead[i:]
 }
 
 func indexOf(list []string, s string) int {
