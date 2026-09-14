@@ -5,48 +5,31 @@ import (
 	"os"
 )
 
-// Backends of the player window on Linux. A desktop has a display server; an appliance has
-// a panel and nothing else, and the same binary has to serve both.
+// Backends of the player on Linux. There is one: the panel's framebuffer, with input from
+// the kernel's event devices. The names stay so VEDUTA_BACKEND keeps its meaning.
 const (
-	BackendX11   = "x11"
 	BackendFB    = "fbdev"
 	BackendAuto  = "auto"
 	backendEnv   = "VEDUTA_BACKEND"
-	displayEnv   = "DISPLAY"
-	waylandEnv   = "WAYLAND_DISPLAY"
 	fbDeviceEnv  = "VEDUTA_FB"
 	renderScaleE = "VEDUTA_SCALE"
 )
 
-// open picks the backend. VEDUTA_BACKEND forces one; by default the X11 window is used
-// when a display server is there and the panel's framebuffer when it is not, so one
-// binary runs on a developer's desktop and on the console.
+// backendX11 is the value VEDUTA_BACKEND had for the X11 window, recognised only to say
+// that it is gone.
+const backendX11 = "x11"
+
+// open picks the backend. Only the framebuffer is left, so auto and fbdev are the same
+// choice; x11 is named in its own error, because a script or a service file written for an
+// older version should learn what happened rather than read that the value is unknown.
 func open(o Options) (Window, error) {
 	switch b := os.Getenv(backendEnv); b {
-	case "", BackendAuto:
-		if os.Getenv(displayEnv) != "" || os.Getenv(waylandEnv) != "" {
-			return openX11Window(o)
-		}
-		w, err := openFB(o)
-		if err != nil {
-			return nil, fmt.Errorf("%w (no %s or %s either; set %s=x11 to force the display server, or %s to name a framebuffer)",
-				err, displayEnv, waylandEnv, backendEnv, fbDeviceEnv)
-		}
-		return w, nil
-	case BackendX11:
-		return openX11Window(o)
-	case BackendFB:
+	case "", BackendAuto, BackendFB:
 		return openFB(o)
+	case backendX11:
+		return nil, fmt.Errorf("platform: %s=%s: the X11 window was removed in v1.0.0; the player draws on a framebuffer (unset %s, or set it to %s)",
+			backendEnv, b, backendEnv, BackendFB)
 	default:
-		return nil, fmt.Errorf("platform: %s %q (want %s, %s or %s)", backendEnv, b, BackendAuto, BackendX11, BackendFB)
+		return nil, fmt.Errorf("platform: %s %q (want %s or %s)", backendEnv, b, BackendAuto, BackendFB)
 	}
-}
-
-// openX11Window connects to the X server named by $DISPLAY.
-func openX11Window(o Options) (Window, error) {
-	w, err := openX11(o, os.Getenv(displayEnv), xauthPath())
-	if err != nil {
-		return nil, err
-	}
-	return w, nil
 }

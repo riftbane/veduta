@@ -66,16 +66,6 @@ jobs:
             echo "cmd/veduta imports platform"; exit 1
           fi
 
-      - name: player window smoke test (Xvfb)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get install -y -qq xvfb >/dev/null
-          VEDUTA_DISPLAY_TEST=1 xvfb-run -a -s "-screen 0 1280x720x24" go test ./platform/ -run TestDisplaySmoke -count=1 -v
-
-      - name: player window smoke test (Win32)
-        if: runner.os == 'Windows'
-        run: VEDUTA_DISPLAY_TEST=1 go test ./platform/ -run TestDisplaySmoke -count=1 -v
-
       - name: install.sh installs from both channels
         if: runner.os == 'Linux'
         env:
@@ -95,6 +85,9 @@ jobs:
 
       - name: cross-compile windows/amd64
         run: GOOS=windows GOARCH=amd64 go build ./...
+
+      - name: cross-compile darwin/arm64
+        run: GOOS=darwin GOARCH=arm64 go build ./...
 
       - name: cross-compile linux/amd64
         run: GOOS=linux GOARCH=amd64 go build ./...

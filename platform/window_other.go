@@ -1,4 +1,4 @@
-//go:build !linux && !windows
+//go:build !linux
 
 package platform
 
@@ -7,8 +7,9 @@ import (
 	"runtime"
 )
 
-// open fails on platforms without a window implementation (macOS needs cgo and is
-// deferred; see the spec's non-goals).
+// open fails everywhere but Linux. The player draws on a Linux framebuffer, the console's
+// panel; Windows and macOS are machines to build, test and cross-compile on, and no window
+// opens there. Headless mode works everywhere.
 func open(o Options) (Window, error) {
-	return nil, fmt.Errorf("platform: no player window on %s/%s in this version (headless mode works everywhere)", runtime.GOOS, runtime.GOARCH)
+	return nil, fmt.Errorf("platform: the player needs a Linux framebuffer, and this is %s/%s", runtime.GOOS, runtime.GOARCH)
 }

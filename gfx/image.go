@@ -12,7 +12,8 @@ import (
 )
 
 // Colors are BGRA8 packed in a uint32 as 0xAARRGGBB, which is B, G, R, A in little-endian
-// memory: the layout of Windows DIBs and X11 32-bit ZPixmaps.
+// memory: the layout of a 32-bit Linux framebuffer, so the player stores such a pixel as
+// it stands (the console's 16-bit panel is packed to RGB565 instead).
 
 // RGBA packs 8-bit channels into a color.
 func RGBA(r, g, b, a uint8) uint32 {

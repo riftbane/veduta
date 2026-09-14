@@ -1,5 +1,5 @@
-// Command game is the demo game. On a desktop it opens the player window; the veduta
-// tool runs it with -headless to render, simulate and query.
+// Command game is the demo game. On a console it plays on the panel's framebuffer; the
+// veduta tool runs it with -headless to render, simulate and query.
 package main
 
 import (

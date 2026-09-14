@@ -36,7 +36,7 @@ var errFBClosed = errors.New("platform: the panel is closed")
 // at its size divided by VEDUTA_SCALE, which lets a slower board draw a quarter of the
 // pixels and still fill the glass.
 func openFB(o Options) (Window, error) {
-	info, err := findFramebuffer(os.Getenv("VEDUTA_FB"))
+	info, err := findFramebuffer(os.Getenv(fbDeviceEnv))
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func openFB(o Options) (Window, error) {
 		return nil, fmt.Errorf("platform: %s is %d bits per pixel; 16 (RGB565) and 32 are supported", info, info.Bits)
 	}
 	scale := 1
-	if s := os.Getenv("VEDUTA_SCALE"); s != "" {
+	if s := os.Getenv(renderScaleE); s != "" {
 		if scale, err = strconv.Atoi(s); err != nil || scale < 1 || scale > 8 {
 			return nil, fmt.Errorf("platform: VEDUTA_SCALE %q (want 1 to 8)", s)
 		}

@@ -31,8 +31,8 @@ const (
 )
 
 // Run is the entry point of every game: it parses the command line, loads veduta.json
-// and the project's assets, and runs the player window, or with -headless one of the
-// subcommands the veduta tool delegates to:
+// and the project's assets, and runs the player on the framebuffer, or with -headless
+// one of the subcommands the veduta tool delegates to:
 //
 //	game -headless render   --scene S --tick T --seed N --camera P --mode M --out F [--bundle]
 //	game -headless simulate --scenario F | --scene S --ticks N --seed N --input F --out DIR

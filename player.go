@@ -10,13 +10,13 @@ import (
 	"github.com/riftbane/veduta/sim"
 )
 
-// runPlayer opens the game window and runs the game: one tick per 1/tick_rate seconds,
-// one rendered frame per tick (no interpolation), input from the window. It returns when
-// the window is closed.
+// runPlayer puts the game on the framebuffer and runs it: one tick per 1/tick_rate
+// seconds, one rendered frame per tick (no interpolation), input from the pad and the
+// keyboard. It returns when the player quits (Select+Start, or Ctrl+Q).
 func runPlayer(g Game, p *asset.Project, a *Assets) error {
 	win, err := platform.Open(platform.Options{Title: p.Name, Width: p.Resolution[0], Height: p.Resolution[1]})
 	if err != nil {
-		return fmt.Errorf("%w (use -headless on machines without a display)", err)
+		return fmt.Errorf("%w (the player draws on a framebuffer: it runs on a console or at a Linux text console; use -headless to render and simulate)", err)
 	}
 	defer win.Close()
 	e := newEngine(g, p, a)
@@ -60,8 +60,8 @@ func runPlayer(g Game, p *asset.Project, a *Assets) error {
 		}
 		if want := e.ctx.PointerLocked(); want != pointerLocked {
 			pointerLocked = want
-			// A window that cannot lock the pointer still plays: the game only loses the
-			// mouse look once the cursor reaches the edge of the screen.
+			// No backend implements pointer lock (the framebuffer accepts the request and
+			// does nothing), so its answer does not matter: the game plays either way.
 			_ = win.SetPointerLock(want)
 		}
 		w, h := win.Size()

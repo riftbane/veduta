@@ -109,7 +109,7 @@ type Context struct {
 	Tick     uint64   // 0 during Init, then 1, 2, … in Update
 	RNG      *sim.RNG // the only allowed source of randomness
 	DT       float32  // seconds per tick (1 / tick_rate)
-	Headless bool     // true when run by the tool, false in the player window
+	Headless bool     // true when run by the tool, false in the player
 	Project  *asset.Project
 
 	// Width and Height are the size of the frame being drawn (valid in Draw).
@@ -122,13 +122,15 @@ type Context struct {
 	pointerLock bool
 }
 
-// LockPointer asks the player window to hide the cursor and keep it inside the window.
-// The cursor then never reaches the edge of the screen, so Input.MouseDelta keeps
-// reporting movement however far the player looks around; it is what a first-person
-// camera needs. Headless runs have no window and ignore it.
+// LockPointer records a request to hide the cursor and keep it inside the frame, as mouse
+// look would need. No player backend implements pointer lock: the console has no mouse, and
+// its framebuffer player accepts the request and does nothing. Headless runs ignore it too.
+// It is kept for API compatibility and because scenarios and games may still set it;
+// PointerLocked reports the request.
 func (c *Context) LockPointer(on bool) { c.pointerLock = on }
 
-// PointerLocked reports the last LockPointer request (the player loop applies it).
+// PointerLocked reports the last LockPointer request. The player loop passes it on to the
+// platform layer, where no backend acts on it.
 func (c *Context) PointerLocked() bool { return c.pointerLock }
 
 // Trace emits a structured game event into the current tick's trace. Field values must

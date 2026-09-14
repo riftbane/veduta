@@ -149,24 +149,27 @@ func TestBackendChoice(t *testing.T) {
 	fakePanel(t, 320, 240, 640)
 	// An unknown backend is refused by name.
 	t.Setenv(backendEnv, "wayland")
-	if _, err := Open(Options{}); err == nil || !strings.Contains(err.Error(), "want auto, x11 or fbdev") {
+	if _, err := Open(Options{}); err == nil || !strings.Contains(err.Error(), "want auto or fbdev") {
 		t.Fatalf("unknown backend: %v", err)
 	}
-	// Without a display server, auto lands on the panel.
-	t.Setenv(backendEnv, "")
-	t.Setenv(displayEnv, "")
-	t.Setenv(waylandEnv, "")
-	win, err := Open(Options{})
-	if err != nil {
-		t.Fatalf("auto without a display server: %v", err)
+	// The X11 window is gone, and asking for it says so rather than calling it unknown.
+	t.Setenv(backendEnv, "x11")
+	if _, err := Open(Options{}); err == nil || !strings.Contains(err.Error(), "X11 window was removed") ||
+		!strings.Contains(err.Error(), "framebuffer") {
+		t.Fatalf("x11: %v, want an error saying the X11 window was removed", err)
 	}
-	if _, ok := win.(*fbWindow); !ok {
-		t.Errorf("auto chose %T, want the panel", win)
-	}
-	win.Close()
-	// With one, auto tries X11 — which fails here, but the error must come from X11.
-	t.Setenv(displayEnv, ":99")
-	if _, err := Open(Options{}); err == nil || strings.Contains(err.Error(), "framebuffer") {
-		t.Fatalf("auto with a display server: %v, want an X11 error", err)
+	// Unset, auto and fbdev all land on the panel, whatever display server is around.
+	t.Setenv("DISPLAY", ":0")
+	t.Setenv("WAYLAND_DISPLAY", "wayland-0")
+	for _, b := range []string{"", BackendAuto, BackendFB} {
+		t.Setenv(backendEnv, b)
+		win, err := Open(Options{})
+		if err != nil {
+			t.Fatalf("%s=%q: %v", backendEnv, b, err)
+		}
+		if _, ok := win.(*fbWindow); !ok {
+			t.Errorf("%s=%q chose %T, want the panel", backendEnv, b, win)
+		}
+		win.Close()
 	}
 }
