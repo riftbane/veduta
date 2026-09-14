@@ -1,6 +1,6 @@
 # Progress log
 
-Factual log for the human reviewer. One section per phase of `SPEC-v0.1.0.md` §16.
+Factual log for the human reviewer. One section per step of `SPEC-v1.0.0.md` §16.
 
 ## Phase 0 — repository skeleton (2026-09-11)
 

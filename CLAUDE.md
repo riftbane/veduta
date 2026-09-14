@@ -44,8 +44,9 @@ operation, and record the decision in `CHANGELOG.md` under "Decisions".
   looked at the new image and written why it changed in the commit message.
 - Commit after each coherent step. Imperative mood, one topic per commit, body explains
   why. Never commit `out/`, `bin/`, or cooked assets.
-- Keep `CHANGELOG.md` current under an `Unreleased` heading. Tag `v0.1.0` only when every
-  item in spec §15 is checked in the changelog with the command used to verify it.
+- Keep `CHANGELOG.md` current under an `Unreleased` heading. Tag a stable release (now
+  `v1.0.0`) only when every item in §15 of the current spec (`SPEC-v1.0.0.md`) is checked
+  in the changelog with the command used to verify it.
 
 ## Code conventions
 
