@@ -180,7 +180,7 @@ func init() {
 				}
 				var imgs [][]byte
 				for _, p := range rep.Sheets {
-					imgs = append(imgs, fitPNG(readPNG(s, p), mcpMaxW, mcpMaxH))
+					imgs = append(imgs, fitPNG(readPNG(s, p), mcpSheetMaxW, mcpSheetMaxH))
 				}
 				return textResult(rep, imgs...), nil
 			},

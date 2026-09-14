@@ -17,11 +17,30 @@ import (
 	"github.com/riftbane/veduta/mcp"
 )
 
-// Image size limits of MCP results (spec §11).
+// Image size limits of MCP results (spec §11), sized after the 320×240 console panel.
 const (
-	mcpDefaultW, mcpDefaultH = 640, 360
-	mcpMaxW, mcpMaxH         = 1280, 720
+	// A render without width/height is one panel frame; a render asking for one side
+	// gets the other at the same 4:3 aspect.
+	mcpDefaultW, mcpDefaultH = 320, 240
+	// The largest render: two panel pixels per image pixel.
+	mcpMaxW, mcpMaxH = 640, 480
+	// Sheets (simulate contact sheets, inspect sheets) tile several views into one
+	// image: they keep the render width limit, so their tiles stay legible, but may be
+	// taller than a render, because 4:3 tiles stack higher than 640×480 (a 2×2 grid is
+	// 640×482, a 3×3 or 4×4 grid 640×484, a texture summary 524×524, a scene ids view
+	// with its legend 640×520). mcpSheetMaxH must stay >= 482. Larger sheets are scaled
+	// down to fit.
+	mcpSheetMaxW, mcpSheetMaxH = mcpMaxW, 720
 )
+
+// mcpAspect is the aspect ratio of mcpDefaultW×mcpDefaultH in lowest terms ("4:3").
+func mcpAspect() string {
+	a, b := mcpDefaultW, mcpDefaultH
+	for b != 0 {
+		a, b = b, a%b
+	}
+	return fmt.Sprintf("%d:%d", mcpDefaultW/a, mcpDefaultH/a)
+}
 
 // mcpServer holds the state of one `veduta mcp` process.
 type mcpServer struct {
@@ -204,16 +223,17 @@ func (m *mcpServer) tools() []mcp.Tool {
 			}),
 		},
 		{
-			Name:        "render",
-			Description: "Render one frame headless through the game at a tick. Returns the image (640×360 unless width/height are given, max 1280×720) and camera/frame metadata with per-entity visible pixels. bundle writes a .vframe for query/diff.",
+			Name: "render",
+			Description: fmt.Sprintf("Render one frame headless through the game at a tick. Returns the image (%d×%d, the console panel, unless width/height are given; max %d×%d; one side alone gets the other at %s) and camera/frame metadata with per-entity visible pixels. bundle writes a .vframe for query/diff.",
+				mcpDefaultW, mcpDefaultH, mcpMaxW, mcpMaxH, mcpAspect()),
 			InputSchema: schema(map[string]any{
 				"scene":  str("scene name (default: the project's default scene)"),
 				"tick":   num("ticks to simulate before the frame (default 0)"),
 				"seed":   num("RNG seed (default: the project's)"),
 				"camera": str("camera preset: scene, top, front, back, left, right, iso, orbit:<deg>, or a camera entity name"),
 				"mode":   enum("render mode", modeList()...),
-				"width":  num("image width (max 1280)"),
-				"height": num("image height (max 720)"),
+				"width":  num(fmt.Sprintf("image width (default %d, max %d)", mcpDefaultW, mcpMaxW)),
+				"height": num(fmt.Sprintf("image height (default %d, max %d)", mcpDefaultH, mcpMaxH)),
 				"bundle": boolean("also write a frame bundle (.vframe) for query and diff"),
 			}),
 			Handler: withSession(func(ctx context.Context, s *Session, args json.RawMessage) (*mcp.Result, error) {
@@ -277,7 +297,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 				// Keep the text small: drop per-run paths the agent does not need.
 				delete(rep, "trace")
 				delete(rep, "out")
-				res := textResult(rep, fitPNG(readPNG(s, fmt.Sprint(rep["sheet"])), mcpDefaultW, 720))
+				res := textResult(rep, fitPNG(readPNG(s, fmt.Sprint(rep["sheet"])), mcpSheetMaxW, mcpSheetMaxH))
 				return res, nil
 			}),
 		},
@@ -459,15 +479,18 @@ func modeList() []string {
 	return out
 }
 
+// clampSize returns the render size for the requested width and height (≤ 0 = not
+// given): mcpDefaultW×mcpDefaultH when neither is given, the missing side at the default
+// aspect (4:3) when one is, and each side clamped to [16, mcpMaxW] and [16, mcpMaxH].
 func clampSize(w, h int) (int, int) {
 	if w <= 0 && h <= 0 {
 		return mcpDefaultW, mcpDefaultH
 	}
 	if w <= 0 {
-		w = h * 16 / 9
+		w = h * mcpDefaultW / mcpDefaultH
 	}
 	if h <= 0 {
-		h = w * 9 / 16
+		h = w * mcpDefaultH / mcpDefaultW
 	}
 	return min(max(w, 16), mcpMaxW), min(max(h, 16), mcpMaxH)
 }

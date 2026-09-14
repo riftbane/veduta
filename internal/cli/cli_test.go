@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"image"
+	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -97,10 +100,11 @@ func TestInitAndCommands(t *testing.T) {
 
 // mcpClient drives ServeMCP over pipes.
 type mcpClient struct {
-	t   *testing.T
-	in  io.WriteCloser
-	out *bufio.Scanner
-	id  int
+	t     *testing.T
+	in    io.WriteCloser
+	out   *bufio.Scanner
+	id    int
+	sizes []image.Point // sizes of the image blocks of the last tool call
 }
 
 func (c *mcpClient) call(method string, params any) map[string]any {
@@ -131,6 +135,7 @@ func (c *mcpClient) tool(name string, args map[string]any) (map[string]any, int,
 	res := c.call("tools/call", map[string]any{"name": name, "arguments": args})
 	var text map[string]any
 	images := 0
+	c.sizes = nil
 	for _, b := range res["content"].([]any) {
 		m := b.(map[string]any)
 		switch m["type"] {
@@ -143,10 +148,75 @@ func (c *mcpClient) tool(name string, args map[string]any) (map[string]any, int,
 			if m["mimeType"] != "image/png" || len(m["data"].(string)) < 100 {
 				c.t.Fatalf("%s: bad image block", name)
 			}
+			data, err := base64.StdEncoding.DecodeString(m["data"].(string))
+			if err != nil {
+				c.t.Fatalf("%s: image block: %v", name, err)
+			}
+			cfg, err := png.DecodeConfig(bytes.NewReader(data))
+			if err != nil {
+				c.t.Fatalf("%s: image block: %v", name, err)
+			}
+			c.sizes = append(c.sizes, image.Pt(cfg.Width, cfg.Height))
 			images++
 		}
 	}
 	return text, images, res["isError"] == true
+}
+
+// TestMCPImageSizes pins the MCP image limits to the 320×240 console panel: renders
+// default to one panel frame, at most two panel pixels per image pixel, a missing side
+// follows at 4:3, and sheets are fitted inside 640 pixels wide without shrinking a
+// two-row 4:3 contact sheet.
+func TestMCPImageSizes(t *testing.T) {
+	for _, c := range []struct{ w, h, wantW, wantH int }{
+		{0, 0, 320, 240},
+		{-5, 0, 320, 240},
+		{640, 0, 640, 480},
+		{0, 480, 640, 480},
+		{200, 0, 200, 150},
+		{0, 150, 200, 150},
+		{0, 600, 640, 480},
+		{2000, 0, 640, 480},
+		{1280, 720, 640, 480},
+		{240, 320, 240, 320},
+		{400, 900, 400, 480},
+		{4, 4, 16, 16},
+	} {
+		if w, h := clampSize(c.w, c.h); w != c.wantW || h != c.wantH {
+			t.Errorf("clampSize(%d, %d) = %dx%d, want %dx%d", c.w, c.h, w, h, c.wantW, c.wantH)
+		}
+	}
+	if mcpSheetMaxW != 640 || mcpSheetMaxH < 482 {
+		t.Errorf("sheet limit %dx%d cannot hold a 640x482 contact sheet unscaled", mcpSheetMaxW, mcpSheetMaxH)
+	}
+
+	encode := func(w, h int) []byte {
+		var b bytes.Buffer
+		if err := png.Encode(&b, image.NewGray(image.Rect(0, 0, w, h))); err != nil {
+			t.Fatal(err)
+		}
+		return b.Bytes()
+	}
+	size := func(data []byte) image.Point {
+		cfg, err := png.DecodeConfig(bytes.NewReader(data))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return image.Pt(cfg.Width, cfg.Height)
+	}
+	for _, c := range []struct {
+		w, h int
+		want image.Point
+	}{
+		{640, 482, image.Pt(640, 482)},  // 2×2 simulate sheet or scene summary: unscaled
+		{524, 524, image.Pt(524, 524)},  // texture summary: unscaled
+		{640, 1440, image.Pt(320, 720)}, // too tall: scaled to fit
+		{1280, 482, image.Pt(640, 241)}, // too wide: scaled to fit
+	} {
+		if got := size(fitPNG(encode(c.w, c.h), mcpSheetMaxW, mcpSheetMaxH)); got != c.want {
+			t.Errorf("fitPNG %dx%d into the sheet limit = %v, want %v", c.w, c.h, got, c.want)
+		}
+	}
 }
 
 func TestMCPEndToEnd(t *testing.T) {
@@ -172,6 +242,18 @@ func TestMCPEndToEnd(t *testing.T) {
 		if m["inputSchema"].(map[string]any)["additionalProperties"] != false {
 			t.Errorf("tool %s allows additional properties", m["name"])
 		}
+		if m["name"] == "render" {
+			// The agent sizes its requests from these strings: they must state the
+			// panel-sized default and the limit that clampSize enforces.
+			props := m["inputSchema"].(map[string]any)["properties"].(map[string]any)
+			desc := m["description"].(string)
+			wDesc := props["width"].(map[string]any)["description"].(string)
+			hDesc := props["height"].(map[string]any)["description"].(string)
+			if !strings.Contains(desc, "320×240") || !strings.Contains(desc, "640×480") || !strings.Contains(desc, "4:3") ||
+				!strings.Contains(wDesc, "max 640") || !strings.Contains(hDesc, "max 480") {
+				t.Errorf("render tool does not state its image sizes: %q, width %q, height %q", desc, wDesc, hDesc)
+			}
+		}
 	}
 	for _, want := range []string{"status", "build", "cook", "render", "simulate", "trace", "query", "diff", "test", "fuzz", "docs"} {
 		if !names[want] {
@@ -187,13 +269,20 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Fatalf("build: %v", b)
 	}
 	r, imgs, isErr := c.tool("render", map[string]any{"scene": "main", "tick": 10, "bundle": true})
-	if isErr || imgs != 1 || r["width"].(float64) != 640 {
-		t.Fatalf("render: %v images=%d", r, imgs)
+	if isErr || imgs != 1 || r["width"].(float64) != 320 || r["height"].(float64) != 240 || c.sizes[0] != image.Pt(320, 240) {
+		t.Fatalf("render: %v images=%d %v", r, imgs, c.sizes)
 	}
 	bundle := r["bundle"].(string)
-	q, imgs, isErr := c.tool("query", map[string]any{"frame": bundle, "at": "320,180"})
-	if isErr || imgs != 1 || q["pixel"] == nil {
-		t.Fatalf("query: %v", q)
+	q, imgs, isErr := c.tool("query", map[string]any{"frame": bundle, "at": "160,120"})
+	if isErr || imgs != 1 || q["pixel"] == nil || c.sizes[0] != image.Pt(320, 240) {
+		t.Fatalf("query: %v %v", q, c.sizes)
+	}
+	if r, imgs, isErr := c.tool("render", map[string]any{"scene": "main", "width": 2000}); isErr || imgs != 1 || c.sizes[0] != image.Pt(640, 480) {
+		t.Fatalf("render at the size limit: %v images=%d %v", r, imgs, c.sizes)
+	}
+	// Sheets keep the render width limit, so a 4:3 summary (640×482) arrives unscaled.
+	if in, imgs, isErr := c.tool("inspect", map[string]any{"kind": "scene", "name": "main"}); isErr || imgs != 1 || c.sizes[0] != image.Pt(640, 482) {
+		t.Fatalf("inspect: %v images=%d %v", in, imgs, c.sizes)
 	}
 	if q, imgs, isErr := c.tool("query", map[string]any{"frame": bundle, "coverage": true}); isErr || imgs != 1 || q["coverage"] == nil {
 		t.Fatalf("coverage: %v", q)
@@ -205,6 +294,9 @@ func TestMCPEndToEnd(t *testing.T) {
 	sim, imgs, isErr := c.tool("simulate", map[string]any{"scenario": "collect"}) // a bare name resolves under tests/scenarios
 	if isErr || imgs != 1 || sim["verdict"] != "pass" {
 		t.Fatalf("simulate: %v images=%d", sim, imgs)
+	}
+	if sz := c.sizes[0]; sz.X != mcpSheetMaxW || sz.Y > mcpSheetMaxH {
+		t.Errorf("simulate sheet is %v, want %d wide and at most %d tall", sz, mcpSheetMaxW, mcpSheetMaxH)
 	}
 	sim2, imgs, _ := c.tool("simulate", map[string]any{"scene": "main", "ticks": 90, "inputs": []any{map[string]any{"tick": 5, "press": []string{"KeyW"}}}})
 	if imgs != 1 || sim2["verdict"] != "pass" {

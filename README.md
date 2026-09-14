@@ -8,7 +8,7 @@ server with no display: every feature exists to let that agent see, measure and 
 it is building. Humans download the resulting game builds and play them.
 
 - **Numbers before pixels.** Every inspection produces a JSON report ranked by severity;
-  small images (640×360, contact sheets) only confirm.
+  small images (320×240, contact sheets) only confirm.
 - **Declarative sources.** Models, textures, materials, scenes and test scenarios are
   strict JSON with located errors (`file:line:col`).
 - **Headless everywhere except the player build.** The toolchain never opens a window.
@@ -73,7 +73,9 @@ its report as JSON with `--json`.
 2024-11-05). Tools: `status`, `build`, `cook`, `render`, `simulate`, `trace`, `inspect`,
 `query`, `diff`, `test`, `fuzz`, `release`, `docs`. Reports come back as JSON text;
 `render`, `simulate`, `inspect`, `query` and `diff` also return PNG images inline
-(640×360 by default, at most 1280×720; `simulate` returns exactly one contact sheet).
+sized after the 320×240 console panel: renders are 320×240 by default and at most
+640×480 (a single side gets the other at 4:3); sheets are at most 640×720, and
+`simulate` returns exactly one contact sheet.
 `veduta init` writes `.mcp.json`; the equivalent command is
 `claude mcp add --scope project veduta -- veduta mcp`.
 
