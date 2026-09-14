@@ -172,9 +172,10 @@ func (e *engine) registerInvariant(name string, pred func() bool) {
 }
 
 // tickSize sets ctx.Width and ctx.Height for Init and Update: the project resolution, in
-// every mode. It is the size the console player renders at, and no render or screenshot
-// size can change it, so game logic that reads it gives the same trace in the player, in
-// simulate and before render --tick. Draw then sees the size of the frame being drawn.
+// every mode. It is the frame the game is designed for (spec §5.2), and no panel, render
+// or screenshot size can change it, so game logic that reads it gives the same trace in
+// the player, in simulate and before render --tick. Draw then sees the size of the frame
+// being drawn: in the player, the panel's size divided by VEDUTA_SCALE.
 func (e *engine) tickSize() {
 	e.ctx.Width, e.ctx.Height = e.project.Resolution[0], e.project.Resolution[1]
 }

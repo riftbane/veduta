@@ -51,7 +51,7 @@ func RegisterKind(name string, ctor func(*scene.Entity) veduta.Behaviour)
 | `DT float32` | seconds per tick (`1 / tick_rate`, 1/20 by default) |
 | `Headless bool` | true when run by the tool |
 | `Project *asset.Project` | the parsed `veduta.json` |
-| `Width, Height int` | a frame size in pixels, never 0 once `Init` runs. In `Draw`: the size of the frame being drawn (the panel in the player, `--width`×`--height` in `render`, the screenshot tile in `simulate`). In `Init`, `Update` and behaviours: the project's `resolution` in every mode (player, `render`, `simulate`, `snapshot`), so logic that reads them gives the same trace everywhere and `HUD` layout can be computed during `Update`. |
+| `Width, Height int` | a frame size in pixels, never 0 once `Init` runs. In `Draw`: the size of the frame being drawn (the panel's size divided by `VEDUTA_SCALE` in the player, `--width`×`--height` in `render`, the screenshot tile in `simulate`). In `Init`, `Update` and behaviours: the project's `resolution` (the frame the game is designed for) in every mode (player, `render`, `simulate`, `snapshot`), so logic that reads them gives the same trace everywhere and `HUD` layout can be computed during `Update`; in the player it can differ from the frame `Draw` receives. |
 | `Font`, `FontTexture` | built-in 8×8 font for HUD text |
 | `Trace(event, fields)` | emit a game event into the current tick's trace |
 | `Invariant(name, pred)` | register a predicate checked after every tick when listed |
