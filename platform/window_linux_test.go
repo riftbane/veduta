@@ -85,10 +85,26 @@ func TestDisplaySmoke(t *testing.T) {
 	}
 }
 
+// TestOpenWithoutDisplay covers both ways out when no display server is running: asking
+// for X11 still says plainly that it is not there, while the default falls through to the
+// panel's framebuffer — and on a machine with neither, as this one is, the error has to
+// name both paths rather than only the one it tried last.
 func TestOpenWithoutDisplay(t *testing.T) {
-	t.Setenv("DISPLAY", "")
+	t.Setenv(displayEnv, "")
+	t.Setenv(waylandEnv, "")
+	t.Setenv(backendEnv, BackendX11)
+	if _, err := Open(Options{}); err == nil || !strings.Contains(err.Error(), "$DISPLAY is not set") {
+		t.Fatalf("forcing x11 without DISPLAY: %v", err)
+	}
+	t.Setenv(backendEnv, "")
+	t.Setenv(fbDeviceEnv, "")
 	_, err := Open(Options{})
-	if err == nil || !strings.Contains(err.Error(), "$DISPLAY is not set") {
-		t.Fatalf("Open without DISPLAY: %v", err)
+	if err == nil {
+		t.Fatal("Open succeeded with no display server and no framebuffer")
+	}
+	for _, want := range []string{"framebuffer", backendEnv, displayEnv} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error does not mention %s: %v", want, err)
+		}
 	}
 }

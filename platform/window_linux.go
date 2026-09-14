@@ -41,15 +41,6 @@ const (
 
 var errClosed = errors.New("platform: X11 window is closed")
 
-// open connects to the X server named by $DISPLAY.
-func open(o Options) (Window, error) {
-	w, err := openX11(o, os.Getenv("DISPLAY"), xauthPath())
-	if err != nil {
-		return nil, err
-	}
-	return w, nil
-}
-
 // x11Window is a Window on an X server. Poll, Present and Size must be called from one
 // goroutine (the main one); Close may be called from any goroutine, any number of times.
 type x11Window struct {
