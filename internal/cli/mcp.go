@@ -509,6 +509,7 @@ func (m *mcpServer) status(s *Session) map[string]any {
 	out := map[string]any{
 		"tool":    versionInfo(m.env),
 		"project": map[string]any{"name": s.Project.Name, "root": s.Root, "engine": s.Project.Engine, "entry": s.Project.Entry, "default_scene": s.Project.DefaultScene, "tick_rate": s.Project.TickRate},
+		"target":  targetLine(),
 	}
 	if c := s.engineCheck(m.env); true {
 		out["engine_check"] = c

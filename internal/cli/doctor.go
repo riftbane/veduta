@@ -15,10 +15,11 @@ import (
 
 // Check is one doctor finding.
 type Check struct {
-	Name   string `json:"name"`
-	OK     bool   `json:"ok"`
-	Detail string `json:"detail"`
-	Fix    string `json:"fix,omitempty"`
+	Name    string `json:"name"`
+	OK      bool   `json:"ok"`
+	Warning bool   `json:"warning,omitempty"` // passes, but deserves attention
+	Detail  string `json:"detail"`
+	Fix     string `json:"fix,omitempty"`
 }
 
 // DoctorReport is the result of doctor.
@@ -40,11 +41,14 @@ func (r *DoctorReport) Human() string {
 	var b strings.Builder
 	for _, c := range r.Checks {
 		mark := "ok  "
-		if !c.OK {
+		switch {
+		case !c.OK:
 			mark = "FAIL"
+		case c.Warning:
+			mark = "warn"
 		}
 		fmt.Fprintf(&b, "%s %-8s %s\n", mark, c.Name, c.Detail)
-		if !c.OK && c.Fix != "" {
+		if (!c.OK || c.Warning) && c.Fix != "" {
 			fmt.Fprintf(&b, "     fix: %s\n", c.Fix)
 		}
 	}
@@ -98,6 +102,9 @@ func Doctor(env *Env, projectDir string) *DoctorReport {
 			if cr.Failed > 0 {
 				c.Fix = "run veduta cook to see the located errors"
 			}
+			add(c)
+		}
+		for _, c := range s.consoleChecks() {
 			add(c)
 		}
 	}

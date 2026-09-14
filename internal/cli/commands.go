@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -134,15 +135,6 @@ func versionInfo(env *Env) VersionInfo {
 	return v
 }
 
-// hasDisplay reports whether a window can be opened on this machine.
-func hasDisplay() bool {
-	switch runtime.GOOS {
-	case "windows", "darwin":
-		return true
-	}
-	return os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != ""
-}
-
 func init() {
 	register(command{
 		name: "cook", usage: "cook [--force]", summary: "compile changed asset sources to .vda", project: true,
@@ -201,13 +193,13 @@ func init() {
 		},
 	})
 	register(command{
-		name: "run", usage: "run", summary: "build and run the player window (refuses without a display)", project: true,
+		name: "run", usage: "run", summary: "build and run the player on this machine's framebuffer (a console or a Linux text console; refuses anywhere else)", project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) {
 			if len(args) > 0 {
 				return nil, usagef("run takes no arguments")
 			}
-			if !hasDisplay() {
-				return nil, fmt.Errorf("run: no display on this machine; use render and simulate (or download a release build to play)")
+			if why := runRefusal(); why != "" {
+				return nil, errors.New(why)
 			}
 			bin, err := s.ensureGame()
 			if err != nil {

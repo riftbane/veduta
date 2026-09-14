@@ -88,6 +88,17 @@ func TestReleaseProjectFlow(t *testing.T) {
 	}
 	os.Remove(filepath.Join(dir, "scratch.txt"))
 
+	// A release the console cannot install is refused.
+	wf := filepath.Join(dir, ".github", "workflows", "release.yml")
+	w, _ := os.ReadFile(wf)
+	os.WriteFile(wf, []byte(strings.ReplaceAll(string(w), "linux/arm64 ", "")), 0o644)
+	git(dir, "commit", "-q", "-am", "Build no console archive")
+	r, err = Release(env, dir, ReleaseOptions{Version: "v0.1.0", DryRun: true})
+	if last := r.Steps[len(r.Steps)-1]; err != nil || r.OK || last.Name != "console" || !strings.Contains(last.Detail, "no linux/arm64") {
+		t.Fatalf("release without a console build: %s %v", r.Human(), err)
+	}
+	git(dir, "reset", "-q", "--hard", "HEAD~1")
+
 	r, err = Release(env, dir, ReleaseOptions{Version: "v0.1.0"})
 	if err != nil || !r.OK || !r.Pushed {
 		t.Fatalf("release: %s %v", r.Human(), err)

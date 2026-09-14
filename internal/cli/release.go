@@ -147,6 +147,11 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 		if !step("smoke", err == nil, "render %v", renderDetail(rep, err)) {
 			return finish(r), nil
 		}
+		// A release nobody can install on the console is not a release.
+		why := s.consoleReady()
+		if !step("console", why == "", "%s", okOr("builds for "+targetOS+"/"+targetArch+" and the release workflow publishes it", errorOrNil(why))) {
+			return finish(r), nil
+		}
 	} else {
 		out, err := runIn(root, "go", "vet", "./...")
 		if !step("vet", err == nil, "go vet ./... %s", okOr(out, err)) {
