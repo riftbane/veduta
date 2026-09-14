@@ -207,11 +207,136 @@ func TestSnapshotKeepsHitboxAndLayer(t *testing.T) {
 // plane face the camera.
 var twodProject = filepath.Join("testdata", "twod")
 
-// twodPixel maps a world point of the fixture's scene to the pixel of its 320×240 frame
-// that contains it.
-func twodPixel(x, y float32) string {
+// twodXY maps a world point of the fixture's scene to the pixel of its 320×240 frame that
+// contains it; twodPixel formats it for query --at.
+func twodXY(x, y float32) (int, int) {
 	const ppm = 240.0 / 12 // pixels per meter
-	return strconv.Itoa(int(160+x*ppm)) + "," + strconv.Itoa(int(120-y*ppm))
+	// Rounded explicitly so arm64 cannot fuse the products into a multiply-add.
+	return int(160 + float32(x*ppm)), int(120 - float32(y*ppm))
+}
+
+func twodPixel(x, y float32) string {
+	px, py := twodXY(x, y)
+	return strconv.Itoa(px) + "," + strconv.Itoa(py)
+}
+
+// The three settings of a sprite material, each checked against the alternative on the
+// fixture's coin (a yellow disc on transparent texels):
+//   - unlit: lit, a quad facing the camera takes the light at a grazing angle and comes
+//     out dark;
+//   - cutout: opaque draws the transparent texels as a black square; blend draws the disc
+//     but owns no id pixel, so query --at and the ids buffer never see the sprite;
+//   - nearest: magnified with bilinear filtering, the disc's edge mixes with the black of
+//     the transparent texels into a dark fringe.
+func TestSpriteMaterialTraps(t *testing.T) {
+	const yellow, sky, black = 0xfff2c230, 0xff3060a0, 0xff000000
+	// render draws the fixture's first frame with the coin's material changed and the
+	// coin scaled by zoom (about its center) over the sky alone.
+	render := func(t *testing.T, zoom float32, change func(m *asset.Material)) (*gfx.Framebuffer, uint32) {
+		t.Helper()
+		p, a, err := loadProject(twodProject)
+		if err != nil {
+			t.Fatal(err)
+		}
+		coin := *a.Materials["coin"]
+		change(&coin)
+		a.Materials["coin"] = &coin
+		e := newEngine(&testGame{}, p, a)
+		t.Cleanup(e.close)
+		if err := e.start(runOptions{Scene: "main", Seed: 1, Headless: true}); err != nil {
+			t.Fatal(err)
+		}
+		for _, o := range e.ctx.Scene.Entities() {
+			o.Visible = o.Name == "coin" || o.Name == "sky"
+		}
+		ent := e.ctx.Scene.Find("coin")
+		ent.Transform.Scale = gmath.V3(zoom, zoom, 1)
+		e.ctx.Scene.Update()
+		f, err := e.render(e.ctx.Scene.Camera, 320, 240, gfx.ModeColor, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f.FB, ent.ID
+	}
+	at := func(fb *gfx.Framebuffer, x, y float32) (color, id uint32) {
+		px, py := twodXY(x, y)
+		return fb.Color[py*fb.W+px], fb.ID[py*fb.W+px]
+	}
+	// fringe counts the coin's pixels whose color is not the disc's.
+	fringe := func(fb *gfx.Framebuffer, id uint32) (n int) {
+		for i, v := range fb.ID {
+			if v == id && fb.Color[i] != yellow {
+				n++
+			}
+		}
+		return n
+	}
+	keep := func(*asset.Material) {}
+
+	fb, id := render(t, 1, keep)
+	if c, v := at(fb, 0, -3); c != yellow || v != id {
+		t.Fatalf("sprite material: center %08x id %d", c, v)
+	}
+	if c, v := at(fb, 0.45, -2.55); c != sky || v == id {
+		t.Fatalf("sprite material: corner %08x id %d", c, v)
+	}
+	if fb, id := render(t, 8, keep); fringe(fb, id) != 0 {
+		t.Fatalf("sprite material magnified: %d coin pixels are not the disc's color", fringe(fb, id))
+	}
+
+	t.Run("lit", func(t *testing.T) {
+		fb, _ := render(t, 1, func(m *asset.Material) { m.Unlit = false })
+		c, _ := at(fb, 0, -3)
+		if r, g, _, _ := gfx.UnpackRGBA(c); r > 0xf2*3/4 || g > 0xc2*3/4 {
+			t.Errorf("lit center %08x: want it clearly darker than the texel %08x", c, uint32(yellow))
+		}
+	})
+	t.Run("opaque", func(t *testing.T) {
+		fb, id := render(t, 1, func(m *asset.Material) { m.Alpha = "opaque" })
+		if c, v := at(fb, 0.45, -2.55); c != black || v != id {
+			t.Errorf("opaque corner %08x id %d: want the black of a transparent texel, owned by the coin", c, v)
+		}
+	})
+	t.Run("blend", func(t *testing.T) {
+		fb, id := render(t, 1, func(m *asset.Material) { m.Alpha = "blend" })
+		if c, v := at(fb, 0, -3); c != yellow || v == id {
+			t.Errorf("blend center %08x id %d: want the disc drawn and the pixel owned by the sky", c, v)
+		}
+	})
+	t.Run("bilinear", func(t *testing.T) {
+		fb, id := render(t, 8, func(m *asset.Material) { m.Filter = gfx.FilterBilinear })
+		if n := fringe(fb, id); n < 20 {
+			t.Errorf("bilinear filtering left %d fringe pixels on the magnified disc's edge", n)
+		}
+	})
+}
+
+// A plane model turned to face the camera has no thickness along Z: its AABB is flat at
+// z = 1, and at z = 0 only the rounding of the 90° rotation leaves a few 1e-8 m, so
+// whether two such quads overlap depends on where they stand. A thin box does not.
+func TestRotatedPlaneAABBIsFlat(t *testing.T) {
+	p, a, err := loadProject(twodProject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := newEngine(&testGame{}, p, a)
+	defer e.close()
+	if err := e.start(runOptions{Scene: "main", Seed: 1, Headless: true}); err != nil {
+		t.Fatal(err)
+	}
+	plane := e.ctx.Scene.Find("plane_facing_camera") // at z = 1
+	if d := plane.AABB.Size().Z; d != 0 {
+		t.Errorf("plane at z = 1: AABB depth %g, want 0", d)
+	}
+	plane.Transform.Position.Z = 0
+	e.ctx.Scene.Update()
+	if d := plane.AABB.Size().Z; d == 0 || d > 1e-7 {
+		t.Errorf("plane at z = 0: AABB depth %g, want a rounding residue in (0, 1e-7]", d)
+	}
+	quad := e.ctx.Scene.Find("sky") // the template's thin box, no hitbox
+	if d := quad.AABB.Size().Z; d < 0.019 || d > 0.021 {
+		t.Errorf("quad AABB depth %g, want 0.02", d)
+	}
 }
 
 // The 2D fixture renders through the real headless path (compiled from the sources on
