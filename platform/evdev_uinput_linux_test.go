@@ -46,9 +46,9 @@ const (
 
 var uinputArches = []string{"386", "amd64", "arm", "arm64", "loong64", "riscv64"}
 
-// virtualPad is a gamepad the kernel believes in: A, B, Select, Start and a hat. It has no
-// keyboard keys on purpose, so the console's keyboard handler does not attach to it and
-// nothing it sends can reach a terminal on the machine running the test.
+// virtualPad is a pad the kernel believes in. It has no keyboard keys on purpose, so the
+// console's keyboard handler does not attach to it and nothing it sends can reach a
+// terminal on the machine running the test.
 type virtualPad struct {
 	t       *testing.T
 	fd      int
@@ -56,13 +56,43 @@ type virtualPad struct {
 	created bool
 }
 
+// padSpec describes a virtual pad: what to call it, its buttons, and its axes with the
+// ranges they report.
+type padSpec struct {
+	kind string
+	keys []uintptr
+	axes []axisSpec
+}
+
+type axisSpec struct {
+	code     int
+	min, max int32
+}
+
+var (
+	// gamepad is the common kind: A, B, Select, Start and a hat.
+	gamepad = padSpec{
+		kind: "gamepad",
+		keys: []uintptr{btnSouth, btnEast, btnSelect, btnStart},
+		axes: []axisSpec{{absHat0X, -1, 1}, {absHat0Y, -1, 1}},
+	}
+	// joystickPad is the other kind the table knows: buttons from BTN_TRIGGER, Select and
+	// Start among them, a stick from 0 to 255 as many cheap pads report their D-pad, and a
+	// hat as well.
+	joystickPad = padSpec{
+		kind: "joystick-style pad",
+		keys: []uintptr{btnTrigger, btnTrigger + 1, btnTrigger + 2, btnTrigger + 3, btnTrigger + 4, btnTrigger + 5, btnTrigger + 6, btnTrigger + 7},
+		axes: []axisSpec{{absX, 0, 255}, {absY, 0, 255}, {absHat0X, -1, 1}},
+	}
+)
+
 var virtualPads int
 
 // newVirtualPad creates the device, or skips the test where the kernel will not make one
 // for this process: no uinput module, no permission (it takes root, or a udev rule), or an
 // emulator such as qemu-user that does not pass these ioctls through. It is destroyed when
-// the test ends. The test never grabs it (EVIOCGRAB), so nothing is left holding it.
-func newVirtualPad(t *testing.T) *virtualPad {
+// the test ends.
+func newVirtualPad(t *testing.T, spec padSpec) *virtualPad {
 	t.Helper()
 	supported := false
 	for _, a := range uinputArches {
@@ -76,7 +106,7 @@ func newVirtualPad(t *testing.T) *virtualPad {
 		t.Skipf("%s cannot be opened for writing (%v): a real device needs the uinput module and root", uinputPath, err)
 	}
 	virtualPads++
-	p := &virtualPad{t: t, fd: fd, name: fmt.Sprintf("Veduta test pad (pid %d, pad %d)", os.Getpid(), virtualPads)}
+	p := &virtualPad{t: t, fd: fd, name: fmt.Sprintf("Veduta test %s (pid %d, pad %d)", spec.kind, os.Getpid(), virtualPads)}
 	t.Cleanup(func() {
 		p.destroy()
 		syscall.Close(fd)
@@ -84,11 +114,11 @@ func newVirtualPad(t *testing.T) *virtualPad {
 
 	p.ioctl(uiSetEvBit, evKey, "UI_SET_EVBIT EV_KEY")
 	p.ioctl(uiSetEvBit, evAbs, "UI_SET_EVBIT EV_ABS")
-	for _, b := range []uintptr{btnSouth, btnEast, btnSelect, btnStart} {
+	for _, b := range spec.keys {
 		p.ioctl(uiSetKeyBit, b, fmt.Sprintf("UI_SET_KEYBIT %#x", b))
 	}
-	for _, a := range []uintptr{absHat0X, absHat0Y} {
-		p.ioctl(uiSetAbsBit, a, fmt.Sprintf("UI_SET_ABSBIT %#x", a))
+	for _, a := range spec.axes {
+		p.ioctl(uiSetAbsBit, uintptr(a.code), fmt.Sprintf("UI_SET_ABSBIT %#x", a.code))
 	}
 
 	// struct uinput_user_dev: the name, struct input_id, ff_effects_max, then absmax,
@@ -101,9 +131,9 @@ func newVirtualPad(t *testing.T) *virtualPad {
 	binary.LittleEndian.PutUint16(dev[uinputMaxName+4:], 0x7665) // product
 	binary.LittleEndian.PutUint16(dev[uinputMaxName+6:], 1)      // version
 	absMax, absMin := uinputMaxName+12, uinputMaxName+12+4*absCount
-	for _, a := range []int{absHat0X, absHat0Y} {
-		binary.LittleEndian.PutUint32(dev[absMax+4*a:], 1)
-		binary.LittleEndian.PutUint32(dev[absMin+4*a:], ^uint32(0)) // -1
+	for _, a := range spec.axes {
+		binary.LittleEndian.PutUint32(dev[absMax+4*a.code:], uint32(a.max))
+		binary.LittleEndian.PutUint32(dev[absMin+4*a.code:], uint32(a.min))
 	}
 	if _, err := syscall.Write(fd, dev); err != nil {
 		t.Fatalf("%s: describing the device: %v", uinputPath, err)
@@ -208,7 +238,7 @@ func TestEvdevUinput(t *testing.T) {
 	sysRoot = "/"
 	t.Cleanup(func() { sysRoot = old })
 
-	pad := newVirtualPad(t)
+	pad := newVirtualPad(t, gamepad)
 	dev := pad.find()
 	t.Logf("the kernel made %s for %q", dev.Dev, dev.Name)
 
@@ -287,5 +317,67 @@ func TestEvdevUinput(t *testing.T) {
 	}
 	if src.Devices() != "" {
 		t.Fatalf("still reading %q after the pad was unplugged", src.Devices())
+	}
+}
+
+// TestEvdevUinputJoystick drives a joystick-style pad the kernel made: its buttons start at
+// BTN_TRIGGER and its stick reports 0 to 255, resting in the middle. The source has to ask
+// the device for that range, or left and right are dead and a push nearly full left comes
+// out as right; and Select+Start has to close the player on this kind of pad too.
+func TestEvdevUinputJoystick(t *testing.T) {
+	old := sysRoot
+	sysRoot = "/"
+	t.Cleanup(func() { sysRoot = old })
+
+	pad := newVirtualPad(t, joystickPad)
+	dev := pad.find()
+	t.Logf("the kernel made %s for %q", dev.Dev, dev.Name)
+	if keys := readAttr(filepath.Join(sysRoot, "sys", "class", "input"), dev.Node, "device/capabilities/key"); !hasPadButtons(keys) {
+		t.Fatalf("%s's key capabilities %q do not read as a pad", dev.Node, keys)
+	}
+
+	probe, err := openEvdev(dev.Dev)
+	if errors.Is(err, os.ErrPermission) {
+		t.Skipf("%s was made but cannot be read: %v", dev.Dev, err)
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	ranges := probe.d.ranges
+	probe.close()
+	for _, a := range joystickPad.axes {
+		if got := ranges[a.code]; got != (axisRange{a.min, a.max}) {
+			t.Fatalf("axis %#x: asked for its range, the device gave %+v, want %d..%d", a.code, got, a.min, a.max)
+		}
+	}
+	if got := ranges[absHat0Y]; got != (axisRange{}) {
+		t.Fatalf("ABS_HAT0Y, which this pad does not have, has the range %+v", got)
+	}
+
+	src := newInputSource(pad.name)
+	t.Cleanup(func() { src.close() })
+	if got := collect(t, src, ""); got != "" {
+		t.Fatalf("before anything was pressed: %s", got)
+	}
+	for _, step := range []struct {
+		name string
+		send func()
+		want string
+	}{
+		// The kernel starts every axis at 0 and passes on only changes, so the stick is
+		// brought to rest first; at rest it is no direction at all.
+		{"stick at rest", func() { pad.emit(evAbs, absX, 127); pad.emit(evAbs, absY, 128) }, ""},
+		{"stick left", func() { pad.emit(evAbs, absX, 0); pad.emit(evAbs, absX, 127) }, "down ArrowLeft,up ArrowLeft"},
+		{"stick right", func() { pad.emit(evAbs, absX, 255); pad.emit(evAbs, absX, 128) }, "down ArrowRight,up ArrowRight"},
+		{"stick nearly full left", func() { pad.emit(evAbs, absX, 1); pad.emit(evAbs, absX, 127) }, "down ArrowLeft,up ArrowLeft"},
+		{"stick up", func() { pad.emit(evAbs, absY, 0); pad.emit(evAbs, absY, 128) }, "down ArrowUp,up ArrowUp"},
+		{"first button", func() { pad.emit(evKey, btnTrigger, 1); pad.emit(evKey, btnTrigger, 0) }, "down Space,up Space"},
+		{"Start alone", func() { pad.emit(evKey, btnTrigger+7, 1); pad.emit(evKey, btnTrigger+7, 0) }, "down Enter,up Enter"},
+		{"Select+Start", func() { pad.emit(evKey, btnTrigger+6, 1); pad.emit(evKey, btnTrigger+7, 1) }, "down Tab,up Tab,close"},
+		{"letting go of the chord", func() { pad.emit(evKey, btnTrigger+7, 0); pad.emit(evKey, btnTrigger+6, 0) }, ""},
+	} {
+		step.send()
+		if got := collect(t, src, step.want); got != step.want {
+			t.Fatalf("%s: got %q, want %q", step.name, got, step.want)
+		}
 	}
 }

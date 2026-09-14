@@ -9,20 +9,33 @@ import (
 	"syscall"
 )
 
-// Reading a pad needs no ioctl and no C: the kernel hands out fixed-size records on an
-// ordinary file descriptor. Only their size varies, because the timestamp is two C longs,
-// so it is computed rather than assumed — 24 bytes on a 64-bit kernel, 16 on a 32-bit one
-// such as an ARMv6 board.
+// Reading a pad needs no C: the kernel hands out fixed-size records on an ordinary file
+// descriptor. Only their size varies, because the timestamp is two C longs, so it is
+// computed rather than assumed — 24 bytes on a 64-bit kernel, 16 on a 32-bit one such as an
+// ARMv6 board. The one thing the records do not say is the range of an axis, which is asked
+// once, with an ioctl, when the device is opened (ioctl_linux.go).
 var eventSize = 2*(strconv.IntSize/8) + 8
 
 // padDecoder turns evdev records into platform events, keeping just enough state to
 // release what is held when the pad goes away or the kernel drops events.
 type padDecoder struct {
-	size int                      // bytes per record, eventSize unless a test says otherwise
-	held map[uint16]string        // evdev code → the W3C code reported down for it
-	axis map[uint16]string        // axis → the direction currently down for it
-	exit [len(exitChords)][2]bool // the two members of each exit chord, held or not
-	quit bool                     // a chord was closed: emit Close once
+	size   int                      // bytes per record, eventSize unless a test says otherwise
+	held   map[uint16]string        // evdev code → the W3C code reported down for it
+	axis   map[uint16]string        // axis → the direction currently down for it
+	exit   [len(exitChords)][2]bool // the two members of each exit chord, held or not
+	quit   bool                     // a chord was closed: emit Close once
+	ranges [absHat0Y + 1]axisRange  // what the device says each axis reports; zero when unknown
+}
+
+// axisRange is the least and the greatest value an axis reports, as EVIOCGABS gives them.
+type axisRange struct{ min, max int32 }
+
+// setRange tells the decoder what an axis reports. A range with nothing in it (zeros, for
+// an axis the device does not have) leaves the axis read as if no range were known.
+func (d *padDecoder) setRange(code uint16, lo, hi int32) {
+	if int(code) < len(d.ranges) {
+		d.ranges[code] = axisRange{lo, hi}
+	}
 }
 
 // exitChords close the player: Select and Start on either kind of pad, and a keyboard's
@@ -110,15 +123,31 @@ func (d *padDecoder) event(out []Event, typ, code uint16, value int32) []Event {
 }
 
 // direction turns an axis into the two keys it stands for. A stick rests near the middle
-// of its range, so anything inside the dead zone counts as released.
+// of its range, so a value counts as a direction only once it is a quarter of the way from
+// the middle to an end (and at least one step away). The range is the device's own: 0 to
+// 255 resting at 127, -128 to 127, -32768 to 32767, or -1 to 1 for a hat, where any value
+// but the rest is a direction. An axis whose range is not known is read as a hat (-1, 0, 1)
+// or a stick centred on zero with a range of thousands.
 func (d *padDecoder) direction(out []Event, code uint16, value int32, neg, pos string) []Event {
-	const deadZone = 8192 // a hat reports -1, 0, 1; a stick reports thousands
 	want := ""
-	switch {
-	case value <= -1 && (value <= -deadZone || value == -1):
-		want = neg
-	case value >= 1 && (value >= deadZone || value == 1):
-		want = pos
+	if r := d.ranges[code]; r.max > r.min {
+		lo, hi, v := int64(r.min), int64(r.max), int64(value)
+		mid, half := (lo+hi)/2, (hi-lo)/2
+		dead := max(half/4, 1)
+		switch {
+		case v <= mid-dead:
+			want = neg
+		case v >= mid+dead:
+			want = pos
+		}
+	} else {
+		const deadZone = 8192 // a hat reports -1, 0, 1; a stick reports thousands
+		switch {
+		case value <= -1 && (value <= -deadZone || value == -1):
+			want = neg
+		case value >= 1 && (value >= deadZone || value == 1):
+			want = pos
+		}
 	}
 	if now := d.axis[code]; now != want {
 		if now != "" {
@@ -210,6 +239,16 @@ func openEvdev(path string) (*evdevSource, error) {
 		return nil, fmt.Errorf("platform: %s: %w", path, err)
 	}
 	s := &evdevSource{f: f, raw: raw, d: newPadDecoder(), buf: make([]byte, 64*eventSize)}
+	// A stick is read against the range its device reports. Where the device will not say
+	// (not an event device, or one with no axes) the decoder falls back to a hat or a stick
+	// centred on zero.
+	raw.Control(func(fd uintptr) {
+		for _, code := range [...]uint16{absX, absY, absHat0X, absHat0Y} {
+			if r, ok := readAxisRange(fd, code); ok {
+				s.d.setRange(code, r.min, r.max)
+			}
+		}
+	})
 	s.read = func(fd uintptr) bool {
 		for {
 			s.n, s.err = syscall.Read(int(fd), s.buf)

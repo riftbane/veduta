@@ -108,6 +108,57 @@ func TestPadDPad(t *testing.T) {
 	}
 }
 
+// TestPadAxisRanges: a stick is read against the range its device reports (EVIOCGABS), not
+// against one assumed centred on zero. Many pads report the D-pad on ABS_X and ABS_Y from 0
+// to 255 and rest at 127 or 128: read as ±32767, left and right were dead and a push to 1,
+// nearly full left, came out as right.
+func TestPadAxisRanges(t *testing.T) {
+	const size = 24
+	for _, c := range []struct {
+		name     string
+		min, max int32
+		values   []int32
+		want     string
+	}{
+		{"0..255 at rest", 0, 255, []int32{127, 128, 110, 150}, ""},
+		{"0..255 left and right", 0, 255, []int32{0, 127, 255, 128}, "down ArrowLeft,up ArrowLeft,down ArrowRight,up ArrowRight"},
+		{"0..255 nearly full left", 0, 255, []int32{1, 127}, "down ArrowLeft,up ArrowLeft"},
+		{"0..255 straight across", 0, 255, []int32{0, 255, 127}, "down ArrowLeft,up ArrowLeft,down ArrowRight,up ArrowRight"},
+		{"-128..127", -128, 127, []int32{-128, 0, 127, 10, -127, -20}, "down ArrowLeft,up ArrowLeft,down ArrowRight,up ArrowRight,down ArrowLeft,up ArrowLeft"},
+		{"-32768..32767", -32768, 32767, []int32{300, 30000, 0, -1, 0, -32768, 0}, "down ArrowRight,up ArrowRight,down ArrowLeft,up ArrowLeft"},
+		{"a hat, -1..1", -1, 1, []int32{-1, 0, 1, 0}, "down ArrowLeft,up ArrowLeft,down ArrowRight,up ArrowRight"},
+	} {
+		d := newPadDecoder()
+		d.size = size
+		d.setRange(absX, c.min, c.max)
+		var data []byte
+		for _, v := range c.values {
+			data = append(data, record(size, evAbs, absX, v)...)
+		}
+		out, err := d.decode(data, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := describePad(out); got != c.want {
+			t.Errorf("%s: %v gave %q\n  want %q", c.name, c.values, got, c.want)
+		}
+	}
+	// A range that says nothing (a device that answered zeros for the axis, or none at
+	// all) is ignored, and the axis is read as it was before ranges were known.
+	d := newPadDecoder()
+	d.size = size
+	d.setRange(absY, 0, 0)
+	d.setRange(absHat0Y, 5, -5)
+	out, err := d.decode(append(append(record(size, evAbs, absY, 30000), record(size, evAbs, absY, 0)...),
+		append(record(size, evAbs, absHat0Y, -1), record(size, evAbs, absHat0Y, 0)...)...), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := describePad(out), "down ArrowDown,up ArrowDown,down ArrowUp,up ArrowUp"; got != want {
+		t.Errorf("no usable range: %q, want %q", got, want)
+	}
+}
+
 // TestPadDroppedEvents: after SYN_DROPPED what is held is no longer known, so everything
 // is released rather than left stuck down.
 func TestPadDroppedEvents(t *testing.T) {
