@@ -18,16 +18,16 @@ var eventSize = 2*(strconv.IntSize/8) + 8
 // padDecoder turns evdev records into platform events, keeping just enough state to
 // release what is held when the pad goes away or the kernel drops events.
 type padDecoder struct {
-	size int               // bytes per record, eventSize unless a test says otherwise
-	held map[uint16]string // evdev code → the W3C code reported down for it
-	axis map[uint16]string // axis → the direction currently down for it
-	exit [2][2]bool        // the two members of each exit chord, held or not
-	quit bool              // a chord was closed: emit Close once
+	size int                      // bytes per record, eventSize unless a test says otherwise
+	held map[uint16]string        // evdev code → the W3C code reported down for it
+	axis map[uint16]string        // axis → the direction currently down for it
+	exit [len(exitChords)][2]bool // the two members of each exit chord, held or not
+	quit bool                     // a chord was closed: emit Close once
 }
 
-// exitChords close the window: the pad's Select and Start, and a keyboard's Ctrl and Q.
-// A console has no other way back, and a game must not be able to swallow it.
-var exitChords = [2][2]uint16{exitChord, keyboardExit}
+// exitChords close the player: the pad's Select and Start, and a keyboard's Ctrl (either
+// one) and Q. A console has no other way back, and a game must not be able to swallow it.
+var exitChords = [3][2]uint16{exitChord, keyboardExit[0], keyboardExit[1]}
 
 func newPadDecoder() *padDecoder {
 	return &padDecoder{size: eventSize, held: map[uint16]string{}, axis: map[uint16]string{}}
@@ -61,21 +61,25 @@ func (d *padDecoder) event(out []Event, typ, code uint16, value int32) []Event {
 			return out // auto-repeat: the engine reports a key once
 		}
 		down := value != 0
+		// Every chord a key belongs to learns of it before any closes: Q is in two, and
+		// stopping at the first would leave the other thinking Q is up.
+		closed := false
 		for ci, chord := range exitChords {
 			for i, c := range chord {
 				if c != code {
 					continue
 				}
 				d.exit[ci][i] = down
-				if d.exit[ci][0] && d.exit[ci][1] && !d.quit {
-					d.quit = true
-					out = d.releaseAll(out)
-					return append(out, Event{Kind: Close})
-				}
+				closed = closed || (d.exit[ci][0] && d.exit[ci][1])
 				if !down {
 					d.quit = false
 				}
 			}
+		}
+		if closed && !d.quit {
+			d.quit = true
+			out = d.releaseAll(out)
+			return append(out, Event{Kind: Close})
 		}
 		name, ok := padButtons[code]
 		if !ok {

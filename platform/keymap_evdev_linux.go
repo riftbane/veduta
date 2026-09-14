@@ -55,6 +55,7 @@ var evdevKeys = map[uint16]string{
 	125: "MetaLeft", 126: "MetaRight",
 }
 
-// keyboardExit closes the window from a keyboard, as Select and Start do from a pad. It is
-// not Escape: the dashboard already gives Escape its own meaning, and a game may too.
-var keyboardExit = [2]uint16{keyLeftCtrl, keyQ}
+// keyboardExit closes the player from a keyboard, as Select and Start do from a pad: Ctrl+Q,
+// with either Ctrl. It is not Escape: the dashboard already gives Escape its own meaning,
+// and a game may too.
+var keyboardExit = [2][2]uint16{{keyLeftCtrl, keyQ}, {keyRightCtrl, keyQ}}

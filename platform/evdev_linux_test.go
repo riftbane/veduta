@@ -162,18 +162,43 @@ func TestKeyboardKeys(t *testing.T) {
 }
 
 // TestKeyboardExit: a keyboard needs its own way out, since the pad's chord does not exist
-// on one — and it must not be Escape, which the dashboard and games already use.
+// on one — and it must not be Escape, which the dashboard and games already use. Either
+// Ctrl will do, as it does for Ctrl+Q anywhere else, and in either order.
 func TestKeyboardExit(t *testing.T) {
 	const size = 24
-	got := describePad(decodeAll(t, size,
-		record(size, evKey, 17, 1), // something held, to be released first
-		record(size, evKey, keyboardExit[0], 1),
-		record(size, evKey, keyboardExit[1], 1),
-	))
-	if want := "down KeyW,down ControlLeft,up KeyW,up ControlLeft,close"; got != want {
-		t.Fatalf("Ctrl+Q: %s\n  want: %s", got, want)
+	for _, c := range []struct {
+		name string
+		recs [][]byte
+		want string
+	}{
+		{"left Ctrl+Q", [][]byte{
+			record(size, evKey, 17, 1), // something held, to be released first
+			record(size, evKey, keyLeftCtrl, 1),
+			record(size, evKey, keyQ, 1),
+		}, "down KeyW,down ControlLeft,up KeyW,up ControlLeft,close"},
+		{"right Ctrl+Q", [][]byte{
+			record(size, evKey, 17, 1),
+			record(size, evKey, keyRightCtrl, 1),
+			record(size, evKey, keyQ, 1),
+		}, "down KeyW,down ControlRight,up KeyW,up ControlRight,close"},
+		{"Q, then Ctrl", [][]byte{
+			record(size, evKey, keyQ, 1),
+			record(size, evKey, keyRightCtrl, 1),
+		}, "down KeyQ,up KeyQ,close"},
+		// Q belongs to both chords, so holding it through a change of Ctrl has to count
+		// for the second one too, as letting go of Start and pressing it again does on a pad.
+		{"Q held from one Ctrl to the other", [][]byte{
+			record(size, evKey, keyLeftCtrl, 1),
+			record(size, evKey, keyQ, 1),
+			record(size, evKey, keyLeftCtrl, 0),
+			record(size, evKey, keyRightCtrl, 1),
+		}, "down ControlLeft,up ControlLeft,close,close"},
+	} {
+		if got := describePad(decodeAll(t, size, c.recs...)); got != c.want {
+			t.Errorf("%s: %s\n  want: %s", c.name, got, c.want)
+		}
 	}
-	// Escape alone is an ordinary key, not a way out of the window.
+	// Escape alone is an ordinary key, not a way out of the player.
 	if got := describePad(decodeAll(t, size, record(size, evKey, keyEsc, 1))); got != "down Escape" {
 		t.Fatalf("Escape: %s", got)
 	}
