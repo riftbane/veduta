@@ -117,6 +117,26 @@ func TestUpgradePinsTheV0Defaults(t *testing.T) {
 			changelog:  "- Upgrade the Veduta engine from v0.2.0 to v1.0.0 (`veduta upgrade`), pinning the defaults `veduta.json` relied on before v1.0.0 so the game keeps its size and tick rate: `\"resolution\": [1280, 720]`, `\"inspect_resolution\": [640, 360]`, `\"tick_rate\": 60`.\n",
 		},
 		{
+			// The decoder also reads a key spelled in another case: that is the field the
+			// game ran with, so its value is the one replaced, and a lowercase key added
+			// before it would lose to it.
+			name:       "keys in another case",
+			to:         "v1.0.0",
+			in:         "{\n  \"veduta\": \"project/1\",\n  \"name\": \"mygame\",\n  \"Engine\": \"v0.2.0\",\n  \"Tick_Rate\": 0,\n  \"Resolution\": null\n}\n",
+			want:       "{\n  \"veduta\": \"project/1\",\n  \"name\": \"mygame\",\n  \"Engine\": \"v1.0.0\",\n  \"Tick_Rate\": 60,\n  \"Resolution\": [1280, 720],\n  \"inspect_resolution\": [640, 360]\n}\n",
+			migrations: []string{pinResolution, pinInspectResolution, pinTickRate},
+			changelog:  "- Upgrade the Veduta engine from v0.2.0 to v1.0.0 (`veduta upgrade`), pinning the defaults `veduta.json` relied on before v1.0.0 so the game keeps its size and tick rate: `\"resolution\": [1280, 720]`, `\"inspect_resolution\": [640, 360]`, `\"tick_rate\": 60`.\n",
+		},
+		{
+			// Of a field given twice, the decoder keeps the last value.
+			name:       "a field given twice",
+			to:         "v1.0.0",
+			in:         "{\n  \"veduta\": \"project/1\",\n  \"name\": \"mygame\",\n  \"engine\": \"v0.2.0\",\n  \"tick_rate\": 30,\n  \"TICK_RATE\": 0\n}\n",
+			want:       "{\n  \"veduta\": \"project/1\",\n  \"name\": \"mygame\",\n  \"engine\": \"v1.0.0\",\n  \"resolution\": [1280, 720],\n  \"inspect_resolution\": [640, 360],\n  \"tick_rate\": 30,\n  \"TICK_RATE\": 60\n}\n",
+			migrations: []string{pinResolution, pinInspectResolution, pinTickRate},
+			changelog:  "- Upgrade the Veduta engine from v0.2.0 to v1.0.0 (`veduta upgrade`), pinning the defaults `veduta.json` relied on before v1.0.0 so the game keeps its size and tick rate: `\"resolution\": [1280, 720]`, `\"inspect_resolution\": [640, 360]`, `\"tick_rate\": 60`.\n",
+		},
+		{
 			name:       "keys in another order",
 			to:         "v1.0.0",
 			in:         "{\"engine\": \"v0.2.0\", \"name\": \"mygame\", \"veduta\": \"project/1\"}",
@@ -186,6 +206,15 @@ func TestUpgradePinsTheV0Defaults(t *testing.T) {
 				t.Errorf("the changelog still says there are no migrations: %q", log)
 			}
 		})
+	}
+}
+
+// TestUpgradeManifestChecksItsEdit checks that a rewrite that does not set the engine is
+// an error, not a manifest reported as upgraded.
+func TestUpgradeManifestChecksItsEdit(t *testing.T) {
+	in := `{"veduta": "project/1", "name": "mygame"}`
+	if out, _, err := upgradeManifest([]byte(in), "v1.0.0", true); err == nil || !strings.Contains(err.Error(), "engine") {
+		t.Fatalf("manifest without engine: err %v, out %q", err, out)
 	}
 }
 

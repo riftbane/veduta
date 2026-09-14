@@ -90,6 +90,19 @@ func manifestFields(data []byte) ([]manifestField, error) {
 	return fields, nil
 }
 
+// findField returns the index of the field the manifest decoder takes name from, or -1.
+// Like encoding/json, that is the last key equal to name under Unicode case folding: the
+// decoder also reads "Tick_Rate", and of a field given twice it keeps the later value.
+func findField(fields []manifestField, name string) int {
+	at := -1
+	for i, f := range fields {
+		if strings.EqualFold(f.key, name) {
+			at = i
+		}
+	}
+	return at
+}
+
 // manifestKeyOrder is the order in which veduta.json documents its fields.
 func manifestKeyOrder() []string {
 	t := reflect.TypeOf(asset.ProjectSource{})
@@ -106,22 +119,21 @@ func manifestKeyOrder() []string {
 // those as `"key": value`, in key order. The text is edited in place, so formatting, key
 // order and every other byte stay as they are: a zero value is replaced where it stands,
 // and a missing field goes after the nearest field that precedes it in the documented key
-// order, in the file's own indentation and key spacing.
+// order, in the file's own indentation and key spacing. A key the decoder reads in another
+// case (findField) is the one edited. The result is decoded again and must hold to and the
+// pinned values, so a wrong edit is an error rather than a report of a pin that did not
+// happen.
 func upgradeManifest(data []byte, to string, pin bool) (out []byte, pinned []string, err error) {
 	fields, err := manifestFields(data)
 	if err != nil {
 		return nil, nil, err
-	}
-	at := make(map[string]int, len(fields)) // key → index in fields; lookups only
-	for i, f := range fields {
-		at[f.key] = i
 	}
 	type edit struct {
 		start, end int // replaced bytes; start == end inserts
 		text       string
 	}
 	var edits []edit
-	if i, ok := at["engine"]; ok {
+	if i := findField(fields, "engine"); i >= 0 {
 		edits = append(edits, edit{fields[i].valStart, fields[i].valEnd, strconv.Quote(to)})
 	}
 	if pin {
@@ -137,18 +149,19 @@ func upgradeManifest(data []byte, to string, pin bool) (out []byte, pinned []str
 				continue
 			}
 			pinned = append(pinned, strconv.Quote(d.key)+": "+d.value)
-			if i, ok := at[d.key]; ok { // present, with its zero value
+			if i := findField(fields, d.key); i >= 0 { // present, with its zero value
 				edits = append(edits, edit{fields[i].valStart, fields[i].valEnd, d.value})
 				continue
 			}
 			a := len(fields) - 1 // after the last field when nothing precedes it
-		walk:
 			for k := indexOf(order, d.key) - 1; k >= 0; k-- {
-				for _, m := range []map[string]int{at, anchors} {
-					if i, ok := m[order[k]]; ok {
-						a = i
-						break walk
-					}
+				if i := findField(fields, order[k]); i >= 0 {
+					a = i
+					break
+				}
+				if i, ok := anchors[order[k]]; ok {
+					a = i
+					break
 				}
 			}
 			anchors[d.key] = a
@@ -176,6 +189,18 @@ func upgradeManifest(data []byte, to string, pin bool) (out []byte, pinned []str
 		last = e.end
 	}
 	b.Write(data[last:])
+	var got asset.ProjectSource
+	if err := json.Unmarshal(b.Bytes(), &got); err != nil {
+		return nil, nil, fmt.Errorf("the rewritten manifest does not decode: %w", err)
+	}
+	if got.Engine != to {
+		return nil, nil, fmt.Errorf("the rewritten manifest has engine %q, want %q", got.Engine, to)
+	}
+	for _, d := range v0Defaults {
+		if pin && d.unset(&got) {
+			return nil, nil, fmt.Errorf("the rewritten manifest still leaves %q to the default", d.key)
+		}
+	}
 	return b.Bytes(), pinned, nil
 }
 
