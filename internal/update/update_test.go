@@ -139,6 +139,21 @@ func fakeCatalog(t *testing.T, tags ...string) *httptest.Server {
 	return srv
 }
 
+// TestWindowsRefusal checks the message a Windows user gets from veduta update: it names
+// the archive to download and no past release.
+func TestWindowsRefusal(t *testing.T) {
+	msg := windowsRefusal("v1.0.0").Error()
+	if !strings.Contains(msg, "veduta_v1.0.0_windows_amd64.zip") || strings.Contains(msg, "v0.1.0") {
+		t.Fatalf("windows refusal: %s", msg)
+	}
+	if runtime.GOOS == "windows" {
+		_, err := Apply(context.Background(), http.DefaultClient, &Release{Tag: "v1.0.0"}, "veduta.exe", "v0.2.0")
+		if err == nil || err.Error() != msg {
+			t.Fatalf("Apply on Windows: %v, want %s", err, msg)
+		}
+	}
+}
+
 func TestApplyReplacesAtomically(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("tool self-update is out of scope on Windows")

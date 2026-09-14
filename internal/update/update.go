@@ -457,12 +457,18 @@ type Result struct {
 	Verified bool   `json:"verified"`
 }
 
+// windowsRefusal is Apply's answer on Windows, where the running executable cannot be
+// replaced by a rename: it names the archive to download instead.
+func windowsRefusal(tag string) error {
+	return errors.New("update: replacing the tool is not supported on Windows; download " + ArchiveName(tag, "windows", "amd64") + " from GitHub Releases")
+}
+
 // Apply downloads the release archive for this platform, verifies its SHA-256 against
 // checksums.txt, extracts the tool, checks that it runs and reports rel.Tag, and replaces
 // exe atomically (temporary file next to it, then rename). exe is untouched on any error.
 func Apply(ctx context.Context, client *http.Client, rel *Release, exe, current string) (*Result, error) {
 	if runtime.GOOS == "windows" {
-		return nil, errors.New("update: replacing the tool on Windows is out of scope in v0.1.0; download the new archive from GitHub Releases")
+		return nil, windowsRefusal(rel.Tag)
 	}
 	name := ArchiveName(rel.Tag, runtime.GOOS, runtime.GOARCH)
 	url, ok := rel.Assets[name]
