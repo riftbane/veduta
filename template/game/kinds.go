@@ -53,7 +53,7 @@ func updatePlayer(ctx *veduta.Context, e *scene.Entity, in veduta.Input) {
 	if firstPerson {
 		// WASD moves relative to the view: W goes where the camera looks, D to its right.
 		sy, cy := gmath.SinCos(gmath.Radians(current.Yaw))
-		dir = gmath.V3(dir.X*cy+dir.Z*sy, 0, -dir.X*sy+dir.Z*cy)
+		dir = gmath.V3(float32(dir.X*cy)+float32(dir.Z*sy), 0, -float32(dir.X*sy)+float32(dir.Z*cy))
 	}
 	if l := dir.Len(); l > 0 {
 		dir = dir.Scale(1 / l)
@@ -72,8 +72,8 @@ func updatePlayer(ctx *veduta.Context, e *scene.Entity, in veduta.Input) {
 		ctx.Trace("jump", map[string]any{"at": e.Transform.Position})
 	}
 	if !st.OnGround {
-		st.VelY -= Gravity * ctx.DT
-		e.Transform.Position.Y += st.VelY * ctx.DT
+		st.VelY -= float32(Gravity * ctx.DT)
+		e.Transform.Position.Y += float32(st.VelY * ctx.DT)
 		if e.Transform.Position.Y <= 0 {
 			e.Transform.Position.Y = 0
 			st.VelY = 0
@@ -94,9 +94,9 @@ func newCollectible(e *scene.Entity) veduta.Behaviour {
 // updateCollectible spins and bobs the gem, and collects it when the hero touches it.
 func updateCollectible(ctx *veduta.Context, e *scene.Entity, in veduta.Input) {
 	st := e.State.(*GemState)
-	st.Spin = gmath.Wrap(st.Spin+GemSpin*ctx.DT, 360)
+	st.Spin = gmath.Wrap(st.Spin+float32(GemSpin*ctx.DT), 360)
 	e.Transform.Rotation = gmath.QuatEulerDeg(gmath.V3(0, st.Spin, 0))
-	e.Transform.Position.Y = st.BaseY + 0.1*gmath.Sin(float32(ctx.Tick)*ctx.DT*3)
+	e.Transform.Position.Y = st.BaseY + float32(0.1*gmath.Sin(float32(float32(ctx.Tick)*ctx.DT)*3))
 	for _, o := range ctx.Overlapping(e) {
 		if o.HasTag("player") && current != nil {
 			score := current.collect()

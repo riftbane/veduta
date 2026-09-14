@@ -55,8 +55,11 @@ func (g *Game) Update(ctx *veduta.Context, in veduta.Input) {
 		g.setView(ctx, !g.FirstPerson)
 	}
 	if g.FirstPerson {
-		g.Yaw = gmath.Wrap(g.Yaw-in.MouseDelta.X*MouseSensitivity, 360)
-		g.Pitch = min(MaxPitchDeg, max(-MaxPitchDeg, g.Pitch-in.MouseDelta.Y*MouseSensitivity))
+		// A product that feeds a sum is wrapped in float32(...). The explicit rounding keeps
+		// arm64 from fusing it into one multiply-add, so the trace hash and the goldens are
+		// the same on arm64 and amd64. The kinds follow the same rule.
+		g.Yaw = gmath.Wrap(g.Yaw-float32(in.MouseDelta.X*MouseSensitivity), 360)
+		g.Pitch = min(MaxPitchDeg, max(-MaxPitchDeg, g.Pitch-float32(in.MouseDelta.Y*MouseSensitivity)))
 		if p := ctx.Scene.Find("player"); p != nil {
 			eye := p.WorldPosition().Add(gmath.V3(0, EyeHeight, 0))
 			ctx.Scene.Camera = g.ThirdCam.LookFrom(eye, g.Yaw, g.Pitch)
@@ -103,10 +106,11 @@ func (g *Game) Draw(ctx *veduta.Context, dl *gfx.DrawList) {
 	}
 	ctx.Text(hud, float32(x), float32(y), scale, tick, 0xffa0b0c0)
 	if g.FirstPerson {
-		cx, cy := float32(ctx.Width)/2, float32(ctx.Height)/2
+		// Halving and doubling are products too: rounded explicitly, as in Update.
+		cx, cy := float32(float32(ctx.Width)/2), float32(float32(ctx.Height)/2)
 		arm, thick := float32(4*scale), float32(scale)
-		hud.Rect(gmath.R(cx-arm, cy-thick/2, 2*arm, thick), 0xfff4f0e0)
-		hud.Rect(gmath.R(cx-thick/2, cy-arm, thick, 2*arm), 0xfff4f0e0)
+		hud.Rect(gmath.R(cx-arm, cy-float32(thick/2), float32(2*arm), thick), 0xfff4f0e0)
+		hud.Rect(gmath.R(cx-float32(thick/2), cy-arm, thick, float32(2*arm)), 0xfff4f0e0)
 		// Bottom right: contact sheets label their tiles at the bottom left.
 		hint := "FIRST PERSON  F: BACK"
 		ctx.Text(hud, float32(ctx.Width-margin-len(hint)*cell), float32(ctx.Height-margin-cell), scale, hint, 0xff8090a0)
