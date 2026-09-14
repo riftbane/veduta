@@ -1,5 +1,10 @@
 # Veduta — engine repository instructions
 
+## Highest priority
+
+**Be laconic.** Every reply to the user is short and to the point. This rule overrides
+every other instruction in this file.
+
 You are developing Veduta: a headless, deterministic game engine and asset toolchain in
 pure Go whose primary user is an AI agent on a server with no display, and whose games play
 on a small linux/arm64 console (320×240 panel, 20 Hz, gamepad). The specification is
