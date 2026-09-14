@@ -205,6 +205,11 @@ func TestEngineHasNoFusedMultiplyAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The overlay names a file by its physical path, which is where the go command finds
+	// the module when the checkout is reached through a symlink.
+	if real, err := filepath.EvalSymlinks(root); err == nil {
+		root = real
+	}
 	if _, err := os.Stat(filepath.Join(root, "go.mod")); err != nil {
 		t.Skip("not inside the engine repository")
 	}
