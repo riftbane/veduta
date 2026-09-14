@@ -171,6 +171,7 @@ func compileEntities(c *Checker, src []EntitySource) []Entity {
 				c.Errorf(Path(Path(p, "scale"), k), "must be non-zero")
 			}
 		}
+		ent.Hitbox = compileHitbox(c, Path(p, "hitbox"), e.Hitbox)
 		if len(e.Tags) > 0 {
 			ent.Tags = make([]string, 0, len(e.Tags))
 			for k, tag := range e.Tags {
@@ -189,6 +190,34 @@ func compileEntities(c *Checker, src []EntitySource) []Entity {
 	}
 	checkParents(c, src, ents, byName)
 	return ents
+}
+
+// compileHitbox validates an optional [[minx, miny, minz], [maxx, maxy, maxz]] box: two
+// vectors of finite numbers with min <= max on every axis (nil yields nil).
+func compileHitbox(c *Checker, path string, v [][]float32) *gmath.AABB {
+	if v == nil {
+		return nil
+	}
+	if len(v) != 2 {
+		c.Errorf(path, "want [[minx, miny, minz], [maxx, maxy, maxz]], got %d vectors", len(v))
+		return nil
+	}
+	before := len(c.Errs)
+	lo := c.RequireVec3(Path(path, 0), v[0])
+	hi := c.RequireVec3(Path(path, 1), v[1])
+	if len(c.Errs) != before {
+		return nil
+	}
+	for k := 0; k < 3; k++ {
+		if lo.Get(k) > hi.Get(k) {
+			axis := string("xyz"[k])
+			c.Errorf(Path(Path(path, 1), k), "max %s (%v) is less than min %s (%v)", axis, hi.Get(k), axis, lo.Get(k))
+		}
+	}
+	if len(c.Errs) != before {
+		return nil
+	}
+	return &gmath.AABB{Min: lo, Max: hi}
 }
 
 // checkParents resolves parent names and reports unknown parents and cycles. Each cycle

@@ -139,7 +139,7 @@ func TestMetaCanonical(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"compiler":"veduta-asset/0.1.0","deps":["textures/src/a&b<c>.png","textures/src/b.png"],"kind":"material","name":"crate_wood","source":"materials/crate_wood.mat.json","source_hash":"` + testHash + `"}`
+	want := `{"compiler":"veduta-asset/0.2.0","deps":["textures/src/a&b<c>.png","textures/src/b.png"],"kind":"material","name":"crate_wood","source":"materials/crate_wood.mat.json","source_hash":"` + testHash + `"}`
 	if c.Type != ChunkMeta || string(c.Data) != want {
 		t.Fatalf("META = %s\nwant   %s", c.Data, want)
 	}

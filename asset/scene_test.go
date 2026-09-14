@@ -267,6 +267,29 @@ func TestParseSceneFull(t *testing.T) {
 	}
 }
 
+// A hitbox compiles to a local-space box; a flat one (min == max on an axis) is allowed.
+func TestParseSceneHitbox(t *testing.T) {
+	src := `{"veduta": "scene/1", "camera": {"position": [0, 0, 10], "look_at": [0, 0, 0]}, "entities": [
+    {"name": "coin", "kind": "static", "model": "quad", "hitbox": [[-0.25, -0.25, -0.5], [0.25, 0.25, 0.5]]},
+    {"name": "trigger", "kind": "static", "hitbox": [[0, 0, 0], [2, 1, 0]]},
+    {"name": "plain", "kind": "static", "model": "quad"}
+  ]}`
+	s, err := ParseScene("twod.scene.json", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []*gmath.AABB{
+		{Min: gmath.V3(-0.25, -0.25, -0.5), Max: gmath.V3(0.25, 0.25, 0.5)},
+		{Min: gmath.V3(0, 0, 0), Max: gmath.V3(2, 1, 0)},
+		nil,
+	}
+	for i, e := range s.Entities {
+		if !reflect.DeepEqual(e.Hitbox, want[i]) {
+			t.Errorf("%s: hitbox %v, want %v", e.Name, e.Hitbox, want[i])
+		}
+	}
+}
+
 func TestParseSceneErrors(t *testing.T) {
 	cam := `"camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]}`
 	ents := func(e string) string { return `{"veduta": "scene/1", ` + cam + `, "entities": [` + e + `]}` }
@@ -334,6 +357,20 @@ func TestParseSceneErrors(t *testing.T) {
 			[]wantErr{{`entities[0].parent: parent cycle: x -> z -> y -> x`, `"z"}`}}},
 		{"unknown field", ents(`{"name": "a", "kind": "static", "rotation": [0, 0, 0]}`),
 			[]wantErr{{`entities[0].rotation: unknown field`, `"rotation"`}}},
+		{"hitbox one vector", ents(`{"name": "a", "kind": "static", "hitbox": [[0, 0, 0]]}`),
+			[]wantErr{{`entities[0].hitbox: want [[minx, miny, minz], [maxx, maxy, maxz]], got 1 vectors`, `[[0, 0, 0]]`}}},
+		{"hitbox empty", ents(`{"name": "a", "kind": "static", "hitbox": []}`),
+			[]wantErr{{`entities[0].hitbox: want [[minx, miny, minz], [maxx, maxy, maxz]], got 0 vectors`, `[]}`}}},
+		{"hitbox vector length", ents(`{"name": "a", "kind": "static", "hitbox": [[0, 0], [1, 1, 1, 1]]}`),
+			[]wantErr{{`entities[0].hitbox[0]: want 3 numbers, got 2`, `[0, 0]`}, {`entities[0].hitbox[1]: want 3 numbers, got 4`, `[1, 1, 1, 1]`}}},
+		{"hitbox null vector", ents(`{"name": "a", "kind": "static", "hitbox": [null, [1, 1, 1]]}`),
+			[]wantErr{{`entities[0].hitbox[0]: is required`, `null`}}},
+		{"hitbox min above max", ents(`{"name": "a", "kind": "static", "hitbox": [[-1, 2, 0.5], [1, 1, -0.5]]}`),
+			[]wantErr{{`entities[0].hitbox[1][1]: max y (1) is less than min y (2)`, `1, -0.5]]`}, {`entities[0].hitbox[1][2]: max z (-0.5) is less than min z (0.5)`, `-0.5]]`}}},
+		{"hitbox out of float range", ents(`{"name": "a", "kind": "static", "hitbox": [[0, 0, 0], [1e39, 1, 1]]}`),
+			[]wantErr{{`entities[0].hitbox[1][0]:`, `1e39`}}},
+		{"hitbox wrong type", ents(`{"name": "a", "kind": "static", "hitbox": [0, 0, 0]}`),
+			[]wantErr{{`entities[0].hitbox[0]: cannot use JSON number`, `0, 0, 0]}]`}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

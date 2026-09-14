@@ -480,6 +480,11 @@ func EncodeScene(s *Scene) Chunk {
 		w.strs(e.Tags)
 		w.str(e.Parent)
 		w.bool(e.Visible)
+		w.bool(e.Hitbox != nil)
+		if e.Hitbox != nil {
+			w.vec3(e.Hitbox.Min)
+			w.vec3(e.Hitbox.Max)
+		}
 	}
 	return Chunk{Type: ChunkScene, Data: w.b}
 }
@@ -508,7 +513,7 @@ func DecodeScene(c Chunk) (*Scene, error) {
 	s.Light.Ambient = r.vec3()
 	s.Background = r.u32()
 	r.field = "entities"
-	if n := r.count(4*4 + 36 + 4 + 4 + 1); n > 0 {
+	if n := r.count(4*4 + 36 + 4 + 4 + 1 + 1); n > 0 {
 		s.Entities = make([]Entity, n)
 		for i := range s.Entities {
 			r.field = fmt.Sprintf("entity %d", i)
@@ -523,6 +528,14 @@ func DecodeScene(c Chunk) (*Scene, error) {
 			e.Tags = r.strs()
 			e.Parent = r.str()
 			e.Visible = r.bool()
+			if r.bool() {
+				b := gmath.AABB{Min: r.vec3(), Max: r.vec3()}
+				// Negated so a NaN component fails too.
+				if r.err == nil && !(b.Min.X <= b.Max.X && b.Min.Y <= b.Max.Y && b.Min.Z <= b.Max.Z) {
+					r.failf("hitbox min %v exceeds max %v", b.Min, b.Max)
+				}
+				e.Hitbox = &b
+			}
 		}
 	}
 	if err := r.done(); err != nil {

@@ -103,7 +103,10 @@ counter-clockwise seen from above, positive pitch looks up.
 
 `scene.Entity` fields: `ID`, `Name`, `Kind`, `Transform` (`Position`, `Rotation` quaternion,
 `Scale`, relative to `Parent`), `Model`, `Material`, `Tags`, `AABB` (world bounds of the
-model, recomputed after every tick), `Visible`, `State`, `Parent`. Useful methods:
+hitbox, else of the model, recomputed after every tick), `Visible`, `State`, `Parent`,
+`Hitbox *gmath.AABB` (the scene file's `hitbox`: a local-space box that replaces the model
+bounds as the source of `AABB`, so collisions, `Overlapping`, `no_overlap` and the trace's
+`aabb` use it; nil for none; `Spawn` copies it). Useful methods:
 `WorldPosition()`, `World()`, `HasTag(t)`, `Alive()`. Use `gmath` for math: its
 `Sin/Cos/Atan2` are deterministic on every platform; never use `math.Sin` in game logic.
 
@@ -158,7 +161,8 @@ values as float32), non-finite numbers are the strings `"NaN"`, `"+Inf"`, `"-Inf
 Entity summaries hold: `id`, `name`, `kind`, `position` (world), `rotation_deg` (local
 Euler angles, R = Ry·Rx·Rz, pitch in [-90, 90]), `scale` (local), `visible`, `tags`,
 `model`, `material`, `parent` (name, `""` for none), `aabb` (`{min, max}`, world; only
-entities with a model) and `state` (only when set). Scenario expectation paths address
+entities with a model or a hitbox, and the hitbox's bounds when one is set) and `state`
+(only when set). Scenario expectation paths address
 these keys (`position.z`, `aabb.max.y`, `state.score`). The trace hash is the SHA-256 of
 the file's bytes.
 

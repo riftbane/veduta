@@ -112,7 +112,7 @@ yield:
 | `position`, `position.x`, `position.y`, `position.z` | vector / number | Entity position in meters, relative to its parent if it has one (as in the scene file). |
 | `rotation_deg`, `rotation_deg.x` / `.y` / `.z` | vector / number | Entity rotation in degrees (as in the scene file). |
 | `scale`, `scale.x` / `.y` / `.z` | vector / number | Entity scale. |
-| `aabb.min`, `aabb.max`, `aabb.min.x` … `aabb.max.z` | vector / number | World-space axis-aligned bounding box of the entity's model. |
+| `aabb.min`, `aabb.max`, `aabb.min.x` … `aabb.max.z` | vector / number | World-space axis-aligned bounding box of the entity's hitbox when it has one, else of its model. |
 | `visible` | boolean | Whether the entity is drawn. |
 | `tags` | list of strings | The entity's tags. |
 | `kind`, `model`, `material`, `parent` | string | As in the scene file (`""` when unset). |

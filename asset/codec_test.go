@@ -137,6 +137,11 @@ func (g *gen) scene() *Scene {
 		for i := range s.Entities {
 			s.Entities[i] = Entity{Name: g.s(), Kind: g.s(), Model: g.s(), Material: g.s(), Position: g.v3(),
 				RotationDeg: g.v3(), Scale: g.v3(), Tags: g.strs(), Parent: g.s(), Visible: g.b()}
+			// Decoders reject hitboxes with min above max, and NaN is never ordered.
+			if !g.special && g.b() {
+				lo := g.v3()
+				s.Entities[i].Hitbox = &gmath.AABB{Min: lo, Max: lo.Add(gmath.V3(1, 0, 2))}
+			}
 		}
 	}
 	return s
@@ -312,6 +317,28 @@ func TestDecodeMaterialValidation(t *testing.T) {
 		if _, err := DecodeMaterial(EncodeMaterial(m)); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
+	}
+}
+
+// Scene entities round-trip their hitbox; a box with min above max is rejected.
+func TestSceneCodecHitbox(t *testing.T) {
+	s := &Scene{Name: "twod", Camera: Camera{Ortho: true, Size: 12, Near: 0.1, Far: 200, Position: gmath.V3(0, 0, 100)},
+		Entities: []Entity{
+			{Name: "coin", Kind: "static", Model: "quad", Scale: gmath.One3, Visible: true,
+				Hitbox: &gmath.AABB{Min: gmath.V3(-0.25, -0.25, -0.5), Max: gmath.V3(0.25, 0.25, 0.5)}},
+			{Name: "plain", Kind: "static", Scale: gmath.One3, Visible: true},
+		}}
+	c := EncodeScene(s)
+	got, err := DecodeScene(c)
+	if err != nil || !reflect.DeepEqual(got, s) {
+		t.Fatalf("decoded %+v, %v", got, err)
+	}
+	if again := EncodeScene(got); !bytes.Equal(again.Data, c.Data) {
+		t.Fatal("re-encoding changed the bytes")
+	}
+	s.Entities[0].Hitbox.Min.Y = 1
+	if _, err := DecodeScene(EncodeScene(s)); err == nil || !strings.Contains(err.Error(), "hitbox") {
+		t.Fatalf("inverted hitbox: %v", err)
 	}
 }
 

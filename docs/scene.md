@@ -79,6 +79,7 @@ all three defaults apply; inside `light`, each field is optional.
 | `tags` | array of strings | `[]` | Labels used by game code, invariants (`no_overlap:gem,wall`) and inspection (entities tagged `important` must be on screen). Valid names, no duplicates within an entity. |
 | `parent` | string | none | Name of another entity of this scene. The entity's `position`, `rotation_deg` and `scale` are then relative to the parent (world = parent world × local, applied scale, then rotation, then translation). The parent may appear before or after the child in the list. An entity cannot be its own parent and parent chains must not form cycles. |
 | `visible` | boolean | `true` | `false` keeps the entity in the simulation but does not draw it. |
+| `hitbox` | `[[minx, miny, minz], [maxx, maxy, maxz]]` | none | A box in the entity's local space (before its scale, rotation and translation) that replaces the model's bounds as the entity's AABB: collisions, `ctx.Overlapping`, `no_overlap` invariants and the trace's `aabb` all use it. Two vectors of finite numbers with min ≤ max on every axis. An entity without a model gets an AABB from its hitbox alone (a trigger zone). Use it to give a flat sprite some thickness, or to make a collision box smaller than the drawing. |
 
 `model` and `material` are references by name: the scene compiles even if the assets do
 not exist yet; `inspect scene` reports `SCENE_MISSING_ASSET` for missing ones.
@@ -89,7 +90,8 @@ The compiler produces `asset.Scene`: `Name`, `Camera` (`Ortho`, `FovDeg` — 0 f
 orthographic, `Size` — 0 for perspective, `Near`, `Far`, `Position`, `LookAt`), `Light`
 (`Dir` as written; `Color` and `Ambient` as linear RGB in [0, 1], each channel = byte / 255),
 `Background` (packed `0xAARRGGBB`) and `Entities` in file order with every default filled
-in (`Parent` is the parent's name, `Tags` nil when empty). The binary layout in `.vda`
+in (`Parent` is the parent's name, `Tags` nil when empty, `Hitbox` a `*gmath.AABB`, nil
+when absent). The binary layout in `.vda`
 files is in `docs/vda.md` (chunk `SCEN`).
 
 ## Errors (examples)
@@ -99,6 +101,7 @@ main.scene.json:4:31: camera.look_at: must differ from camera.position {0 5 10}
 main.scene.json:9:62: entities[1].scale[1]: must be non-zero
 main.scene.json:12:45: entities[3].name: duplicate entity name "gem" (first used by entities[2])
 main.scene.json:14:20: entities[4].parent: parent cycle: arm -> hand -> arm
+main.scene.json:16:52: entities[5].hitbox[1][1]: max y (0) is less than min y (0.5)
 ```
 
 ## Full example
@@ -118,6 +121,8 @@ main.scene.json:14:20: entities[4].parent: parent cycle: arm -> hand -> arm
       "position": [0, 1.8, 0], "scale": [1.1, 1, 1.1] },
     { "name": "gem_1", "kind": "collectible", "model": "gem", "material": "gem",
       "position": [3, 0.5, -2], "tags": ["gem"] },
+    { "name": "exit", "kind": "static", "position": [0, 0, -9],
+      "hitbox": [[-1, 0, -0.5], [1, 2, 0.5]], "tags": ["exit"] },
     { "name": "spawn_point", "kind": "static", "position": [0, 0, 8], "visible": false }
   ]
 }

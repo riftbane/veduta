@@ -63,6 +63,62 @@ func TestHierarchyAndAABB(t *testing.T) {
 	}
 }
 
+// A hitbox replaces the model bounds, follows the world transform (parents included),
+// gives an AABB to an entity without a model, and is copied by Load, Spawn and Restore.
+func TestHitboxAABB(t *testing.T) {
+	s := testScene(t)
+	box := gmath.AABB{Min: gmath.V3(-1, -0.25, -0.5), Max: gmath.V3(1, 0.25, 0.5)}
+	hat := s.Find("hat") // model "box", child of the player, scale 0.5
+	hat.Hitbox = &box
+	s.Update()
+	want := box.Transform(hat.World())
+	if hat.AABB != want {
+		t.Fatalf("hat AABB %v, want the hitbox in world space %v", hat.AABB, want)
+	}
+	if got := hat.AABB.Size(); got.Sub(gmath.V3(0.5, 0.25, 1)).Len() > 1e-5 { // scaled by 0.5, turned 90° with the player
+		t.Fatalf("hat AABB size %v", got)
+	}
+
+	trigger := s.Spawn(Entity{Name: "trigger", Kind: "static", Hitbox: &box,
+		Transform: Transform{Position: gmath.V3(4, 0, 0)}})
+	if trigger.AABB != box.Translate(gmath.V3(4, 0, 0)) {
+		t.Fatalf("model-less trigger AABB %v", trigger.AABB)
+	}
+	box.Max.X = 9 // the template's box; the spawned entity keeps its own copy
+	s.Update()
+	if trigger.AABB.Max.X != 5 {
+		t.Fatalf("hitbox shared with the template: trigger %v", trigger.AABB)
+	}
+
+	inverted := s.Spawn(Entity{Name: "none", Kind: "static", Model: "box", Hitbox: &gmath.AABB{Min: gmath.One3, Max: gmath.Zero3}})
+	if !inverted.AABB.IsEmpty() {
+		t.Fatalf("an empty hitbox must leave the AABB empty, not fall back to the model: %v", inverted.AABB)
+	}
+
+	var ents []Entity
+	for _, e := range s.Entities() {
+		ents = append(ents, *e)
+	}
+	r := New("copy", unitBounds)
+	if err := r.Restore(ents, s.NextID()); err != nil {
+		t.Fatal(err)
+	}
+	if rt := r.Find("trigger"); rt.Hitbox == nil || rt.Hitbox == trigger.Hitbox || rt.AABB != trigger.AABB {
+		t.Fatalf("restored trigger %+v", rt)
+	}
+
+	src := &asset.Scene{Name: "load", Camera: asset.Camera{FovDeg: 60, Near: 0.1, Far: 10, Position: gmath.V3(0, 0, 5)},
+		Entities: []asset.Entity{{Name: "zone", Kind: "static", Position: gmath.V3(0, 2, 0), Scale: gmath.V3(2, 2, 2),
+			Hitbox: &gmath.AABB{Min: gmath.V3(0, 0, 0), Max: gmath.V3(1, 1, 1)}}}}
+	l, err := Load(src, unitBounds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if z := l.Find("zone"); z.AABB != (gmath.AABB{Min: gmath.V3(0, 2, 0), Max: gmath.V3(2, 4, 2)}) || z.Hitbox == src.Entities[0].Hitbox {
+		t.Fatalf("loaded zone AABB %v (hitbox %p, source %p)", z.AABB, z.Hitbox, src.Entities[0].Hitbox)
+	}
+}
+
 func TestSpawnDespawnFlush(t *testing.T) {
 	s := testScene(t)
 	var events []string

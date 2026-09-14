@@ -123,6 +123,8 @@ type EntitySource struct {
 	Tags        []string  `json:"tags,omitempty"`
 	Parent      string    `json:"parent,omitempty"`
 	Visible     *bool     `json:"visible,omitempty"` // default true
+	// Hitbox is [[minx, miny, minz], [maxx, maxy, maxz]] in the entity's local space.
+	Hitbox [][]float32 `json:"hitbox,omitempty"`
 }
 
 // ScenarioSource is tests/scenarios/<name>.scenario.json.

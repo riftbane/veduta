@@ -38,7 +38,7 @@ func (t Transform) Matrix() gmath.Mat4 { return gmath.TRS(t.Position, t.Rotation
 func (t Transform) Forward() gmath.Vec3 { return t.Rotation.Rotate(gmath.Forward) }
 
 // Entity is one object of the world. Game code may change Transform, Visible, Tags,
-// Model, Material and State freely during Update; world matrices and AABBs are
+// Model, Material, Hitbox and State freely during Update; world matrices and AABBs are
 // recomputed by Scene.Update after every tick.
 type Entity struct {
 	ID        uint32
@@ -48,10 +48,14 @@ type Entity struct {
 	Model     string    // model name, "" for none
 	Material  string    // entity material, used by parts without their own
 	Tags      []string
-	AABB      gmath.AABB // world-space bounds of the model; empty without a model
+	AABB      gmath.AABB // world-space bounds of the hitbox, else of the model; empty without either
 	Visible   bool
 	State     any    // game state; exported fields appear in the trace as state.<field>
 	Parent    uint32 // 0 for none
+	// Hitbox, when set, is a box in the entity's local space that replaces the model's
+	// bounds as the source of AABB (collisions, Overlapping, no_overlap and the trace's
+	// aabb). An entity without a model gets an AABB from its hitbox alone.
+	Hitbox *gmath.AABB
 
 	world gmath.Mat4
 	stamp uint32
@@ -138,6 +142,7 @@ func Load(src *asset.Scene, bounds BoundsFunc) (*Scene, error) {
 			Material: a.Material,
 			Tags:     append([]string(nil), a.Tags...),
 			Visible:  a.Visible,
+			Hitbox:   cloneBox(a.Hitbox),
 		}
 		s.nextID++
 		s.add(e)
@@ -180,7 +185,8 @@ func (s *Scene) checkCycles() error {
 
 // Spawn adds a copy of tmpl to the scene with the next id and returns it. An empty name
 // becomes "<kind>_<id>"; a name already in use gets "#<id>" appended. Zero scale and
-// rotation default to identity.
+// rotation default to identity. Tags and Hitbox are copied, so changing them on the
+// template afterwards does not change the spawned entity.
 func (s *Scene) Spawn(tmpl Entity) *Entity {
 	e := tmpl
 	e.ID = s.nextID
@@ -200,6 +206,7 @@ func (s *Scene) Spawn(tmpl Entity) *Entity {
 		e.Transform.Rotation = gmath.QuatIdent()
 	}
 	e.Tags = append([]string(nil), tmpl.Tags...)
+	e.Hitbox = cloneBox(tmpl.Hitbox)
 	if e.Parent != 0 && s.Get(e.Parent) == nil {
 		e.Parent = 0
 	}
@@ -228,6 +235,7 @@ func (s *Scene) Restore(ents []Entity, nextID uint32) error {
 		prev = e.ID
 		e.dead, e.stamp = false, 0
 		e.Tags = append([]string(nil), e.Tags...)
+		e.Hitbox = cloneBox(e.Hitbox)
 		s.add(&e)
 	}
 	for _, e := range s.entities {
@@ -347,15 +355,27 @@ func (s *Scene) updateEntity(e *Entity) {
 	}
 	e.stamp = s.stamp
 	e.AABB = gmath.EmptyAABB()
-	if e.Model != "" && s.bounds != nil {
+	switch {
+	case e.Hitbox != nil:
+		e.AABB = e.Hitbox.Transform(e.world) // an empty (inverted) hitbox stays empty
+	case e.Model != "" && s.bounds != nil:
 		if b, ok := s.bounds(e.Model); ok && !b.IsEmpty() {
 			e.AABB = b.Transform(e.world)
 		}
 	}
 }
 
-// Bounds returns the union of all live entity AABBs and positions (entities without a
-// model contribute their position), or an empty box for an empty scene.
+// cloneBox returns a copy of *b, or nil.
+func cloneBox(b *gmath.AABB) *gmath.AABB {
+	if b == nil {
+		return nil
+	}
+	c := *b
+	return &c
+}
+
+// Bounds returns the union of all live entity AABBs and positions (entities without an
+// AABB contribute their position), or an empty box for an empty scene.
 func (s *Scene) Bounds() gmath.AABB {
 	b := gmath.EmptyAABB()
 	for _, e := range s.entities {

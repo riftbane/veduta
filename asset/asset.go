@@ -22,7 +22,7 @@ import (
 
 // CompilerVersion is stored in every .vda META chunk; changing it invalidates cooked
 // assets.
-const CompilerVersion = "veduta-asset/0.1.0"
+const CompilerVersion = "veduta-asset/0.2.0"
 
 // Source format headers (the value of the "veduta" field).
 const (
@@ -246,4 +246,5 @@ type Entity struct {
 	Tags        []string
 	Parent      string
 	Visible     bool
+	Hitbox      *gmath.AABB // local-space collision box replacing the model bounds; nil for none
 }
