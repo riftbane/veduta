@@ -133,7 +133,7 @@ func autoUpdate(env *Env) (*UpdateReport, error) {
 type UpgradeReport struct {
 	From    string   `json:"from"`
 	To      string   `json:"to"`
-	Changed []string `json:"changed"` // files written, in order
+	Changed []string `json:"changed"` // files changed, as applicable: veduta.json, go.mod, CHANGELOG.md
 	// Migrations describes each change made to keep the project's behaviour, one sentence
 	// each, such as `pin "tick_rate": 60 in veduta.json (the default before v1.0.0)`.
 	Migrations []string `json:"migrations"`
