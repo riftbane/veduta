@@ -24,6 +24,19 @@ jobs:
       - name: test
         run: go test ./...
 
+      # The tag triggers this workflow and ci.yml at the same time, so nothing here waits
+      # for CI's arm64 job: run the suite on the console's architecture before any archive
+      # exists, and a commit whose goldens fail on linux/arm64 is never published.
+      - name: install qemu-user
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-user-static >/dev/null
+
+      - name: test (linux/arm64 under qemu-user)
+        env:
+          GOARCH: arm64
+        run: go test -exec qemu-aarch64-static ./...
+
       - name: build archives
         run: |
           set -eu

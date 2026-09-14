@@ -691,8 +691,10 @@ Tag `vX.Y.Z` → `release.yml` builds `cmd/veduta` for `linux/amd64`, `linux/arm
 `windows/amd64` with `-trimpath -ldflags "-s -w -X main.version=$TAG"`, `CGO_ENABLED=0`,
 `GOAMD64=v1`; archives `veduta_<tag>_<os>_<arch>.tar.gz` (`.zip` on Windows); writes
 `checksums.txt` (sha256); publishes with `gh release create "$TAG" --generate-notes dist/*`
-(no third-party actions besides `actions/checkout` and `actions/setup-go`). A tag with a
-pre-release suffix is published as a pre-release.
+(no third-party actions besides `actions/checkout` and `actions/setup-go`). Before building,
+it runs `go test ./...` natively and for `GOARCH=arm64` under `qemu-aarch64-static`, so no
+archive is published from a commit whose goldens fail on the console's architecture. A tag
+with a pre-release suffix is published as a pre-release.
 
 A game's `release.yml` builds `linux/arm64` and `linux/amd64` archives
 `<name>_<tag>_linux_<arch>.tar.gz`, each unpacking to a folder `<name>/` holding the binary,

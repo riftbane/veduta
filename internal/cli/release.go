@@ -176,6 +176,14 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 		if !step("test", err == nil, "go test ./... %s", okOr(tail(out, 1500), err)) {
 			return finish(r), nil
 		}
+		// The tag publishes the module and triggers the release workflow as CI starts, so
+		// nothing waits for CI's arm64 job: run it here when this machine can.
+		skipped, out, err := arm64Suite(root)
+		if skipped {
+			step("arm64", true, "skipped: qemu-aarch64-static is not on PATH, so the suite did not run for linux/arm64 here (the release workflow runs it before building archives)")
+		} else if !step("arm64", err == nil, "GOARCH=arm64 go test -exec qemu-aarch64-static ./... %s", okOr(tail(out, 1500), err)) {
+			return finish(r), nil
+		}
 		bin := filepath.Join(os.TempDir(), fmt.Sprintf("veduta-release-smoke-%d", time.Now().UnixNano()))
 		out, err = runIn(root, "go", "build", "-o", bin, "./cmd/veduta")
 		if err == nil {
@@ -271,6 +279,21 @@ func runIn(dir, name string, args ...string) (string, error) {
 	cmd.Env = goEnv(os.Environ())
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
+}
+
+// arm64Suite runs the tests of the module at root for linux/arm64 under qemu-user, as CI's
+// arm64 job does: the console plays on arm64 and the goldens are recorded on amd64.
+// skipped is true, and nothing runs, when qemu-aarch64-static is not on PATH.
+func arm64Suite(root string) (skipped bool, out string, err error) {
+	qemu, lerr := exec.LookPath("qemu-aarch64-static")
+	if lerr != nil {
+		return true, "", nil
+	}
+	cmd := exec.Command("go", "test", "-exec", qemu, "./...")
+	cmd.Dir = root
+	cmd.Env = append(goEnv(os.Environ()), "GOOS=linux", "GOARCH=arm64")
+	b, err := cmd.CombinedOutput()
+	return false, strings.TrimSpace(string(b)), err
 }
 
 // isEngineRepo reports whether dir is (inside) the engine's own repository.
