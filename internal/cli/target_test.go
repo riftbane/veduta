@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/riftbane/veduta/asset"
 )
 
 // fakeGraphics builds a /sys/class/graphics under a temporary root and points sysRoot at
@@ -134,6 +137,43 @@ func TestBuildsConsole(t *testing.T) {
 	os.WriteFile(filepath.Join(wfs, "publish.yaml"), []byte("env:\n  GOOS: linux\n  GOARCH: arm64\n"), 0o644)
 	if ok, detail := s.releaseTargetsConsole(); !ok || detail != ".github/workflows/publish.yaml builds linux/arm64" {
 		t.Fatalf("publish.yaml: %v %q", ok, detail)
+	}
+}
+
+func TestConsoleBuildFailure(t *testing.T) {
+	s := &Session{Project: &asset.Project{Entry: "./cmd/game"}}
+	exit := errors.New("go build for linux/arm64: exit status 1")
+	for _, c := range []struct {
+		name       string
+		errs       []CompileError
+		err        error
+		detail     string
+		fixWords   string
+		notInFixes string
+	}{
+		{"located", []CompileError{{File: "game/uses.go", Line: 3, Col: 9, Msg: "undefined: onlyHere"}}, exit,
+			"go build for linux/arm64: exit status 1: game/uses.go:3:9: undefined: onlyHere", "fix the located error", "pure Go"},
+		{"cgo", []CompileError{{File: "game/c.go", Line: 3, Col: 8, Msg: `could not import C (cgo preprocessing failed)`}}, exit,
+			"go build for linux/arm64: exit status 1: game/c.go:3:8: could not import C (cgo preprocessing failed)", "pure Go", "go mod tidy"},
+		{"offline", []CompileError{{Msg: "go: github.com/riftbane/veduta@v1.0.0: Get \"https://proxy.golang.org/...\": dial tcp: lookup proxy.golang.org: no such host\nmore"}}, exit,
+			"go build for linux/arm64: exit status 1: go: github.com/riftbane/veduta@v1.0.0: Get \"https://proxy.golang.org/...\": dial tcp: lookup proxy.golang.org: no such host", "go mod tidy", "pure Go"},
+		{"go.sum", []CompileError{{File: "game/kinds.go", Line: 5, Col: 2, Msg: "missing go.sum entry for module providing package github.com/riftbane/veduta/gmath"}}, exit,
+			"go build for linux/arm64: exit status 1: game/kinds.go:5:2: missing go.sum entry for module providing package github.com/riftbane/veduta/gmath", "go mod tidy", "pure Go"},
+		{"no go", []CompileError{{Msg: `go build for linux/arm64: exec: "go": executable file not found in $PATH`}}, errors.New(`go build for linux/arm64: exec: "go": executable file not found in $PATH`),
+			`go build for linux/arm64: exec: "go": executable file not found in $PATH`, "install Go", "pure Go"},
+		{"nothing said", []CompileError{{Msg: ""}}, exit, "go build for linux/arm64: exit status 1", "GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./cmd/game", "pure Go"},
+	} {
+		detail, fix := s.consoleBuildFailure(c.errs, c.err)
+		if detail != c.detail || !strings.Contains(fix, c.fixWords) || strings.Contains(fix, c.notInFixes) || strings.Contains(detail, ":0:0:") {
+			t.Errorf("%s:\n detail %q\n   want %q\n fix %q (want %q, not %q)", c.name, detail, c.detail, fix, c.fixWords, c.notInFixes)
+		}
+	}
+
+	old := lookGo
+	lookGo = func() error { return errors.New("not found") }
+	defer func() { lookGo = old }()
+	if c := s.arm64Check(); !c.OK || !c.Warning || c.Detail != "not checked: go not found on PATH" {
+		t.Fatalf("arm64 without go: %+v", c)
 	}
 }
 

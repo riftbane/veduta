@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -364,26 +365,7 @@ func (s *Session) consoleChecks() []Check {
 			Fix: fmt.Sprintf(`set "resolution": [%d, %d] and "tick_rate": %d in veduta.json (this changes every trace hash)`, panelW, panelH, panelHz)})
 	}
 
-	bin, errs, err := s.consoleBuild()
-	if err != nil {
-		detail := err.Error()
-		if len(errs) > 0 {
-			e := errs[0]
-			detail = fmt.Sprintf("%s: %s:%d:%d: %s", detail, e.File, e.Line, e.Col, e.Msg)
-		}
-		cs = append(cs, Check{Name: "arm64", OK: false, Detail: detail, Fix: "the console runs " + targetOS + "/" + targetArch + ": keep the game pure Go with CGO_ENABLED=0"})
-	} else {
-		sites, serr := s.fusedSites(bin)
-		os.Remove(bin)
-		switch {
-		case serr != nil:
-			cs = append(cs, Check{Name: "arm64", OK: true, Warning: true, Detail: "builds for " + targetOS + "/" + targetArch + ", but its code could not be checked: " + serr.Error()})
-		case len(sites) > 0:
-			cs = append(cs, fusedCheck(sites))
-		default:
-			cs = append(cs, Check{Name: "arm64", OK: true, Detail: "builds for " + targetOS + "/" + targetArch + " with no fused multiply-add in the game's code"})
-		}
-	}
+	cs = append(cs, s.arm64Check())
 
 	if ok, detail := s.releaseTargetsConsole(); ok {
 		cs = append(cs, Check{Name: "release", OK: true, Detail: detail})
@@ -398,6 +380,77 @@ func (s *Session) consoleChecks() []Check {
 		cs = append(cs, Check{Name: "card", OK: true, Detail: "card.json agrees with veduta.json"})
 	}
 	return cs
+}
+
+// lookGo finds the go command. Tests replace it.
+var lookGo = func() error { _, err := exec.LookPath("go"); return err }
+
+// arm64Check builds the game for the console and scans the build for fused lines.
+func (s *Session) arm64Check() Check {
+	if err := lookGo(); err != nil {
+		// The go check already fails and says how to install Go.
+		return Check{Name: "arm64", OK: true, Warning: true, Detail: "not checked: go not found on PATH"}
+	}
+	bin, errs, err := s.consoleBuild()
+	if err != nil {
+		detail, fix := s.consoleBuildFailure(errs, err)
+		return Check{Name: "arm64", OK: false, Detail: detail, Fix: fix}
+	}
+	sites, serr := s.fusedSites(bin)
+	os.Remove(bin)
+	switch {
+	case serr != nil:
+		return Check{Name: "arm64", OK: true, Warning: true, Detail: "builds for " + targetOS + "/" + targetArch + ", but its code could not be checked: " + serr.Error()}
+	case len(sites) > 0:
+		return fusedCheck(sites)
+	}
+	return Check{Name: "arm64", OK: true, Detail: "builds for " + targetOS + "/" + targetArch + " with no fused multiply-add in the game's code"}
+}
+
+// consoleBuildFailure describes a failed console build: the error with the first compiler
+// error, located when the compiler gave a place, and a fix chosen from what failed. Only a
+// build that cgo broke gets the pure Go advice; modules that cannot be resolved (offline, a
+// missing go.sum entry, an unknown engine revision) and a missing go command get their own.
+func (s *Session) consoleBuildFailure(errs []CompileError, err error) (detail, fix string) {
+	detail = err.Error()
+	var text strings.Builder
+	text.WriteString(detail)
+	for _, e := range errs {
+		text.WriteString("\n" + e.Msg)
+	}
+	if len(errs) > 0 {
+		e := errs[0]
+		switch msg, _, _ := strings.Cut(strings.TrimSpace(e.Msg), "\n"); {
+		case e.File != "":
+			detail = fmt.Sprintf("%s: %s:%d:%d: %s", detail, e.File, e.Line, e.Col, e.Msg)
+		case msg != "" && !strings.Contains(detail, msg):
+			detail += ": " + msg
+		}
+	}
+	all := strings.ToLower(text.String())
+	has := func(words ...string) bool {
+		for _, w := range words {
+			if strings.Contains(all, w) {
+				return true
+			}
+		}
+		return false
+	}
+	build := fmt.Sprintf("GOOS=%s GOARCH=%s CGO_ENABLED=0 go build %s", targetOS, targetArch, s.Project.Entry)
+	switch {
+	case has("executable file not found"):
+		fix = "install Go 1.25 or newer (install.sh --with-go does it)"
+	case has(`import "c"`, "cgo", "c source files not allowed"):
+		fix = "the console runs " + targetOS + "/" + targetArch + " and every build is CGO_ENABLED=0: keep the game and its dependencies pure Go"
+	case has("go.sum", "go.mod", "unknown revision", "no required module", "cannot find module", "module lookup disabled",
+		"dial tcp", "no such host", "connection refused", "i/o timeout", "tls handshake", "proxy.golang.org", "goproxy"):
+		fix = "the modules could not be resolved: run go mod tidy (or go mod download) with a network connection, or point go.mod at a local engine checkout (veduta init --engine-dir)"
+	case len(errs) > 0 && errs[0].File != "":
+		fix = "fix the located error, which appears only when the game builds for " + targetOS + "/" + targetArch + " (" + build + "): code behind a build constraint that leaves out linux or arm64 does not reach the console"
+	default:
+		fix = "run " + build + " to see the whole output"
+	}
+	return detail, fix
 }
 
 // consoleReleasable is the first half of the release gate, a release nobody can install on
@@ -419,10 +472,8 @@ func (s *Session) consoleReleasable() string {
 func (s *Session) consoleBuilds() string {
 	bin, errs, err := s.consoleBuild()
 	if err != nil {
-		if len(errs) > 0 {
-			return fmt.Sprintf("%v: %s:%d: %s", err, errs[0].File, errs[0].Line, errs[0].Msg)
-		}
-		return err.Error()
+		detail, fix := s.consoleBuildFailure(errs, err)
+		return detail + "; fix: " + fix
 	}
 	os.Remove(bin)
 	return ""
