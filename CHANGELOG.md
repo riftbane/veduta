@@ -33,6 +33,9 @@ result and supersedes `SPEC-v0.1.0.md`, which stays as the record of v0.1.0.
   are recompiled once (the asset compiler version moved to `veduta-asset/0.2.0`).
 - MCP `render` images are 320×240 by default and at most 640×480 (were 640×360 and
   1280×720); inspection views are framed 4:3.
+- A tool configured with `"auto_update": "auto"` moves to v1.0.0 by itself the next time
+  `veduta mcp` starts. To stay on v0.x until a project is upgraded, set `auto_update` to
+  `check`, or reinstall with `install.sh --version v0.2.0`.
 
 ### Added
 
@@ -95,9 +98,10 @@ result and supersedes `SPEC-v0.1.0.md`, which stays as the record of v0.1.0.
   query image keeps its crosshair sharp at every frame size.
 - `inspect scene` views are framed 4:3 (640×480 single views, 317×238 summary tiles), a
   width given alone sets the height to 3/4 of it in every inspector, and the top view draws
-  the camera frustum at the aspect of the camera view on the same sheet. Overlap and
-  z-fighting are judged from the models that are drawn, not from hitboxes, and translucent
-  sprites stacked by layer are not reported.
+  the camera frustum at the aspect of the camera view on the same sheet. Z-fighting is
+  judged from the models that are drawn, not from hitboxes (`SCENE_OVERLAP` still compares
+  AABBs, the hitbox where one is set), and translucent sprites stacked by layer are
+  reported by neither.
 - `veduta run` refuses on a machine with no framebuffer (and off Linux), naming
   `VEDUTA_FB` and `VEDUTA_SCALE`, instead of deciding with `$DISPLAY`.
 - `veduta release` refuses a project that does not build for linux/arm64 or whose workflow
