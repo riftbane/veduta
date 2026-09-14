@@ -135,6 +135,12 @@ result and supersedes `SPEC-v0.1.0.md`, which stays as the record of v0.1.0.
 
 ### Fixed
 
+- Triangles of a pixel or less were drawn nearer and darker than they are: the rasterizer
+  weighed vertices with edge functions that still carried the top-left fill rule's bias,
+  so the weights summed to less than one. `query` reported 6.4 m at the demo hero's centre
+  pixel, which is 13.3 m away; depth tests at silhouettes were wrong and small geometry had
+  dark speckles. Older than v1.0.0. 28 golden images change by a few pixels each along
+  silhouettes and thin rims; no trace hash changes.
 - The goldens did not reproduce on linux/arm64: the compiler fused products into
   multiply-adds that round once where amd64 rounds twice. Every product that feeds an
   addition or subtraction in the engine and the demo is now rounded explicitly (133 fused
@@ -282,6 +288,66 @@ result and supersedes `SPEC-v0.1.0.md`, which stays as the record of v0.1.0.
 - **The benchmark keeps 10k triangles at 320×240**, several times what a level for a Pi Zero
   2 W should submit, so it measures the rasterizer under load; the 50 ms tick on the board
   is a target only hardware can check.
+
+### Acceptance (§15)
+
+Every criterion of `SPEC-v1.0.0.md` §15 with the command that verified it. Items that need
+a published release ran against the candidate `v1.0.0-rc.1` (commit c26b3aa), tagged by
+hand and published as a pre-release by `release.yml`; the only change after it is the
+rasterizer weight fix above, which touches drawing only and passed the same suites.
+
+1. **Fresh VPS → `veduta test` in under 5 minutes.**
+   `docker run --rm -v "$PWD/scripts/acceptance/fresh_vps.sh:/fresh_vps.sh:ro" ubuntu:24.04 sh /fresh_vps.sh v1.0.0-rc.1`:
+   install 10 s (Go included), `veduta init demo && cd demo && veduta test` 21 s, 31 s in
+   total; the tool and the project's engine are v1.0.0-rc.1, the four scenarios pass.
+2. **`claude` in a project lists every §11 tool; visual tools return images.** With the
+   candidate on PATH, `claude -p '<status, render, simulate, inspect, render --bundle,
+   query, diff, list tools>' --mcp-config .mcp.json --strict-mcp-config --allowedTools 'mcp__veduta__*'`
+   listed build, cook, diff, docs, fuzz, inspect, query, release, render, simulate, status,
+   test and trace; status reported the console target, render returned a 320×240 image,
+   simulate `collect` passed with one sheet, inspect `hero` returned no issues and a sheet,
+   query named the player, diff returned 0 changed pixels. It also questioned the distance
+   `query` reported, which led to the rasterizer fix. `go test ./internal/cli -run TestMCPEndToEnd`
+   exercises every tool.
+3. **A game release is a card for the console.** In a project from `veduta init`, the
+   `build archives` step of its `release.yml`, run as written with `GITHUB_REF_NAME=v0.1.0`
+   and a card that already had a version: `demo_v0.1.0_linux_arm64.tar.gz`,
+   `demo_v0.1.0_linux_amd64.tar.gz` and `checksums.txt`; the arm64 archive unpacks to
+   `demo/` with the binary, `veduta.json`, `README.md`, `assets/` and a `card.json` whose
+   version is `v0.1.0`, and `qemu-aarch64-static ./demo -project . -headless render --scene main`
+   renders 320×240. Publishing on GitHub is `gh release create`, unchanged since v0.1.0 and
+   exercised by the engine's own releases. On the console (for a person, see PROGRESS.md):
+   the dashboard starts the game, the D-pad moves, A jumps, Select+Start returns.
+   Emulated end to end: Debian arm64 in `qemu-system-aarch64` with a virtio framebuffer
+   and keyboard ran the demo with `VEDUTA_BACKEND=fbdev VEDUTA_SCALE=4`; arrows walked the
+   hero to a gem, Space jumped, R reset, Ctrl+Q exited with status 0.
+4. **Identical traces and frames across runs and architectures.** CI run 34879994794 on
+   c26b3aa: ubuntu-latest and windows-latest (Go stable and oldstable) and linux/arm64 under
+   qemu-user all pass the same goldens; `TestEngineHasNoFusedMultiplyAdd` passes. Locally,
+   `CGO_ENABLED=0 GOARCH=arm64 go test -exec qemu-aarch64-static ./...` passes. A v0.1.0
+   project (github.com/riftbane/veduta-demo) upgraded to the candidate produces
+   byte-identical traces and contact sheets to its v0.1.0 build for all three scenarios.
+5. **Flipped normals are reported and visible.** `go test ./inspect -run TestModelFlippedNormals`.
+6. **Fuzzing.** `veduta fuzz --games 200 --ticks 200 --seed 1` on the demo: 0 violations in
+   5.7 s. With `PlayerSpeed = 400.0`: every game violates `within_bounds`; minimized repro
+   `tests/scenarios/fuzz_cd96a0cd.scenario.json` (6 ticks, one input), which `veduta simulate`
+   reports as `fail`.
+7. **Update and upgrade.** A v0.2.0 tool from GitHub Releases, with a fresh configuration:
+   `veduta update --check --channel beta` → "v1.0.0-rc.1 is available", then
+   `veduta update --channel beta` → "updated v0.2.0 → v1.0.0-rc.1 … verified", and the
+   configuration follows beta. `veduta upgrade` of the v0.1.0 demo project moved `go.mod`
+   and `veduta.json` to the candidate, pinned nothing (its manifest is explicit) and listed
+   the console's missing workflow build and card; `doctor` then named the four unrounded
+   lines of its old game code. Pinning: `go test ./internal/cli -run TestUpgradePinsTheV0Defaults`.
+8. **Rasterizer.** `go test -bench . -benchmem -run '^$' ./gfx/soft`:
+   `BenchmarkDraw10kTriangles320x240` 2.9 ms/frame, 0 allocs/op; 31 ms/frame under
+   qemu-aarch64 (emulation). The Pi Zero 2 W budget is for a person with the board.
+9. **No third-party modules.** `go.sum` is empty (CI step "go.sum has no third-party modules").
+10. **The tool and the console.** On this VPS (no framebuffer) `veduta run` refuses with
+    "no framebuffer on this machine … Set VEDUTA_FB …"; `go list -deps ./cmd/veduta` holds no
+    `platform`; `CGO_ENABLED=0 GOOS=windows go build ./cmd/veduta` succeeds (CI cross-compiles).
+11. **2D.** `go test . -run TestTwoDFixture` renders the `testdata/twod` scene in layer order,
+    records the collision of two coplanar quads with hitboxes and answers `query --at`.
 
 ## v0.2.0 — 2026-09-12
 
