@@ -114,7 +114,7 @@ func firstNonEmpty(a, b string) string {
 // multiply-adds in the console binary at bin, as root-relative "file:line".
 func (s *Session) fusedSites(bin string) ([]string, error) {
 	root := filepath.ToSlash(s.Root) + "/"
-	sites, err := fused.Scan(bin, func(f string) bool { return strings.HasPrefix(filepath.ToSlash(f), root) })
+	sites, err := fused.Scan(bin, func(st fused.Site) bool { return strings.HasPrefix(filepath.ToSlash(st.File), root) })
 	if err != nil {
 		return nil, err
 	}
