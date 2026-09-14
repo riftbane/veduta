@@ -539,9 +539,10 @@ Sheets: `single`, `tiled_2x2`, `channels`, `mips`, `on_model:<model>`.
 ### 9.3 Scene issues
 `SCENE_MISSING_ASSET`, `SCENE_ENTITY_OUTSIDE_BOUNDS`, `SCENE_OVERLAP` (static AABBs),
 `SCENE_CAMERA_SEES_NOTHING`, `SCENE_ENTITY_OFFSCREEN` (tagged `important`),
-`SCENE_UNLIT`, `SCENE_ZFIGHT_RISK` (coplanar faces). Overlap and z-fighting are judged from
-what is drawn (the models), not from hitboxes, and translucent sprites stacked by layer are
-not reported.
+`SCENE_UNLIT`, `SCENE_ZFIGHT_RISK` (coplanar faces). Z-fighting is judged from what is
+drawn (the models), not from hitboxes; `SCENE_OVERLAP` compares the static entities' AABBs
+(the hitbox where one is set, so a model-less trigger counts). Translucent sprites stacked
+by layer are reported by neither.
 Sheets: `camera`, `top`, `ids` (entity id false-color with legend). Views are framed 4:3
 like the panel: 640×480 single views, 317×238 summary tiles.
 
