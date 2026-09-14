@@ -609,9 +609,10 @@ game -headless describe                                    # registered kinds, i
   every line of the game's own code that compiles to a fused multiply-add in its linux/arm64
   build (`file:line`), and every line of another package that does so once inlined into a
   function of the game (`file:line inlined in function`), the text naming the first ten and
-  the `sites` field of `--json` all of them; a release workflow that builds no linux/arm64
-  archive; a missing `card.json` or one whose title or name disagrees with `veduta.json`. A game that does not build for linux/arm64 fails the check, with the
-  located compiler error.
+  the `sites` field of `--json` all of them; no workflow in `.github/workflows` that builds
+  linux/arm64 (comments do not count); a `card.json` that is missing, unreadable or whose
+  title or name disagrees with `veduta.json`. A game that does not build for linux/arm64
+  fails the check, with the located compiler error.
 - `veduta release` refuses a project whose workflows publish no linux/arm64 archive, whose
   `card.json` the console cannot read (missing, not a JSON object, not `card/1`, or a field
   that is not a string), or that does not build for linux/arm64. The first two are checked
