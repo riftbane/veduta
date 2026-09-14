@@ -23,7 +23,7 @@ type Project struct {
 	Icon              string     // optional PNG at the project root, shown beside the title
 	Engine            string     // engine version the project targets, "vX.Y.Z[-pre][+build]"
 	Entry             string     // Go package of the game binary, "./cmd/game"
-	Resolution        [2]int     // player window and default render size (width, height)
+	Resolution        [2]int     // the frame the game is designed for: default player and render size (width, height)
 	InspectResolution [2]int     // default inspection image size
 	TickRate          int        // simulation ticks per second
 	DefaultScene      string     // scene used when a command names none
@@ -37,9 +37,9 @@ type Project struct {
 // DefaultProject holds the defaults of every optional manifest field (spec §5.2).
 var DefaultProject = Project{
 	Entry:             "./cmd/game",
-	Resolution:        [2]int{1280, 720},
-	InspectResolution: [2]int{640, 360},
-	TickRate:          60,
+	Resolution:        [2]int{320, 240},
+	InspectResolution: [2]int{320, 240},
+	TickRate:          20,
 	DefaultScene:      "main",
 	DefaultSeed:       1,
 	Assets:            "assets",

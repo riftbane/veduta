@@ -8,7 +8,7 @@
 // filter are merged into a single DrawCmd. Overlay views are drawn only in
 // gfx.ModeColor, so the HUD never pollutes the debug render modes.
 //
-//	b := sprite.Begin(dl, 1280, 720)
+//	b := sprite.Begin(dl, 320, 240)
 //	b.Rect(gmath.R(8, 8, 200, 24), 0xC0000000)
 //	b.Text(sprite.DefaultFont(), fontTex, 12, 16, 2, "SCORE 12", 0xFFFFFFFF)
 //	b.End()

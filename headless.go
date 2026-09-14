@@ -363,7 +363,7 @@ func (h *headless) simulate(args []string) (int, error) {
 	fs := h.flags("simulate")
 	scenario := fs.String("scenario", "", "scenario file (tests/scenarios/<name>.scenario.json)")
 	sceneName := fs.String("scene", h.project.DefaultScene, "scene (without --scenario)")
-	ticks := fs.Int("ticks", 600, "ticks to simulate (without --scenario)")
+	ticks := fs.Int("ticks", 200, "ticks to simulate (without --scenario)")
 	seed := fs.Uint64("seed", h.project.DefaultSeed, "RNG seed (without --scenario)")
 	input := fs.String("input", "", "input script file (without --scenario)")
 	shots := fs.String("screenshots", "", "comma-separated ticks to capture (default: 0 and the last tick)")

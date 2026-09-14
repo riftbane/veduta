@@ -8,7 +8,7 @@ import (
 	"github.com/riftbane/veduta/gmath"
 )
 
-// MaxTicks is the longest scenario, in ticks (about 4.6 hours at 60 Hz).
+// MaxTicks is the longest scenario, in ticks (about 13.9 hours at 20 Hz).
 const MaxTicks = 1_000_000
 
 // Scenario is a compiled scenario test (tests/scenarios/<name>.scenario.json): a scene

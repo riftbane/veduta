@@ -80,10 +80,10 @@ type Window interface {
 // example a Linux server without $DISPLAY) or is not supported.
 func Open(o Options) (Window, error) {
 	if o.Width <= 0 {
-		o.Width = 1280
+		o.Width = 320
 	}
 	if o.Height <= 0 {
-		o.Height = 720
+		o.Height = 240
 	}
 	if o.Title == "" {
 		o.Title = "Veduta"

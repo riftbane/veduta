@@ -26,7 +26,7 @@ type Game interface {
 	// Init is called once after the first scene is loaded. Register invariants and the
 	// state codec here, look up entities, spawn more.
 	Init(ctx *Context) error
-	// Update is called exactly once per tick (60 Hz by default), before entity
+	// Update is called exactly once per tick (20 Hz by default), before entity
 	// behaviours.
 	Update(ctx *Context, in Input)
 	// Draw is called once per rendered frame, after the engine has added the scene to

@@ -244,7 +244,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 			InputSchema: schema(map[string]any{
 				"scenario":    str("scenario name (\"move\" = tests/scenarios/move.scenario.json) or file path"),
 				"scene":       str("scene (without scenario)"),
-				"ticks":       num("ticks to simulate (without scenario, default 600)"),
+				"ticks":       num("ticks to simulate (without scenario, default 200)"),
 				"seed":        num("RNG seed (without scenario)"),
 				"inputs":      map[string]any{"type": "array", "description": "input events as in scenario files: {tick, press[], release[], mouse{x,y}, buttons[], text}", "items": map[string]any{"type": "object"}},
 				"screenshots": map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "description": "ticks to capture"},
@@ -394,7 +394,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 			InputSchema: schema(map[string]any{
 				"scene": str("scene (default: the project's)"),
 				"games": num("number of games (default 200)"),
-				"ticks": num("ticks per game (default 600)"),
+				"ticks": num("ticks per game (default 200)"),
 				"seed":  num("seed of the random players (default 1)"),
 			}),
 			Handler: withSession(func(ctx context.Context, s *Session, args json.RawMessage) (*mcp.Result, error) {
@@ -403,7 +403,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 					Games int    `json:"games"`
 					Ticks int    `json:"ticks"`
 					Seed  uint64 `json:"seed"`
-				}{Games: 200, Ticks: 600, Seed: 1}
+				}{Games: 200, Ticks: 200, Seed: 1}
 				if err := mcp.Strict(args, &a); err != nil {
 					return nil, err
 				}

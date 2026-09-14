@@ -44,7 +44,7 @@ func (g *Game) Update(ctx *veduta.Context, in veduta.Input) {
 // score when the frame is too narrow). Text scales with the frame height.
 func (g *Game) Draw(ctx *veduta.Context, dl *gfx.DrawList) {
 	hud := ctx.HUD(dl)
-	scale := max(1, ctx.Height/360)
+	scale := max(1, ctx.Height/240)
 	cell, margin := 8*scale, 6*scale
 	score := fmt.Sprintf("SCORE %d  GEMS %d", g.Score, len(ctx.Scene.Tagged("gem")))
 	tick := fmt.Sprintf("TICK %05d", ctx.Tick)

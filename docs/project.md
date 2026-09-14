@@ -26,9 +26,9 @@ default scene and seed, where assets live, project-wide invariants and world bou
 | `icon` | string | none | Optional PNG shown beside the title, relative to the project root and outside the assets directory (`"icon.png"`), so cooking never sees it. A console that finds none draws a placeholder. |
 | `engine` | string | required | Veduta version the project targets, `vMAJOR.MINOR.PATCH` with optional `-prerelease` and `+build` (for example `"v0.1.0"`, `"v0.2.0-rc.1"`). `doctor` and `status` warn when it differs from the tool's version by a minor version or more. |
 | `entry` | string | `"./cmd/game"` | Go package of the game binary, as given to `go build`: `"."` or a relative path starting with `./`. |
-| `resolution` | `[width, height]` | `[1280, 720]` | Player window size and default render size, in pixels; each 1 to 8192. |
-| `inspect_resolution` | `[width, height]` | `[640, 360]` | Default size of inspection and simulation images; each 1 to 8192. |
-| `tick_rate` | integer | `60` | Simulation ticks per second, 1 to 1000. |
+| `resolution` | `[width, height]` | `[320, 240]` | The frame the game is designed for, in pixels, each 1 to 8192: the default render size and the size a player asks for. On the console the frame actually drawn is the panel's size divided by `VEDUTA_SCALE` (320×240 on the reference panel), so design for that. |
+| `inspect_resolution` | `[width, height]` | `[320, 240]` | Default size of inspection and simulation images; each 1 to 8192. |
+| `tick_rate` | integer | `20` | Simulation ticks per second, 1 to 1000. The player renders exactly one frame per tick, and the console's panel shows 20 frames a second, so a higher rate only spends time on frames nobody sees. `ctx.DT` is `1 / tick_rate`, so changing it changes every trace hash. |
 | `default_scene` | string | `"main"` | Scene used when a command does not name one (`assets/scenes/<name>.scene.json`). |
 | `default_seed` | integer | `1` | Seed used when a command does not give one. `0` also means the default, so the default seed can never be 0 (scenarios can use seed 0). |
 | `assets` | string | `"assets"` | Directory of asset sources. |
@@ -55,9 +55,9 @@ veduta.json:14:33: bounds[1][1]: max y (-60) must be greater than min y (-50)
   "name": "mygame",
   "engine": "v0.1.0",
   "entry": "./cmd/game",
-  "resolution": [1280, 720],
-  "inspect_resolution": [640, 360],
-  "tick_rate": 60,
+  "resolution": [320, 240],
+  "inspect_resolution": [320, 240],
+  "tick_rate": 20,
   "default_scene": "main",
   "default_seed": 1,
   "assets": "assets",

@@ -2,21 +2,21 @@
   "veduta": "scenario/1",
   "scene": "main",
   "seed": 7,
-  "ticks": 300,
+  "ticks": 100,
   "inputs": [
-    { "tick": 10, "press": ["KeyW"] },
-    { "tick": 70, "release": ["KeyW"] },
-    { "tick": 80, "press": ["KeyD"] },
-    { "tick": 140, "release": ["KeyD"] },
-    { "tick": 150, "press": ["KeyR"] },
-    { "tick": 151, "release": ["KeyR"] }
+    { "tick": 3, "press": ["KeyW"] },
+    { "tick": 23, "release": ["KeyW"] },
+    { "tick": 27, "press": ["KeyD"] },
+    { "tick": 47, "release": ["KeyD"] },
+    { "tick": 50, "press": ["KeyR"] },
+    { "tick": 51, "release": ["KeyR"] }
   ],
   "expect": [
-    { "tick": 60, "trace": "gem_collected", "count_min": 1 },
-    { "tick": 140, "entity": "player", "path": "state.score", "op": ">=", "value": 2 },
-    { "tick": 200, "entity": "player", "path": "position", "op": "==", "value": [0, 0, 0] },
-    { "tick": 200, "entity": "gem_1", "path": "visible", "op": "==", "value": true },
-    { "tick": 300, "trace": "reset", "count_min": 1, "count_max": 1 }
+    { "tick": 20, "trace": "gem_collected", "count_min": 1 },
+    { "tick": 47, "entity": "player", "path": "state.score", "op": ">=", "value": 2 },
+    { "tick": 67, "entity": "player", "path": "position", "op": "==", "value": [0, 0, 0] },
+    { "tick": 67, "entity": "gem_1", "path": "visible", "op": "==", "value": true },
+    { "tick": 100, "trace": "reset", "count_min": 1, "count_max": 1 }
   ],
-  "screenshots": [0, 60, 140, 300]
+  "screenshots": [0, 20, 47, 100]
 }

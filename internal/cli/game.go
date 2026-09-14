@@ -424,7 +424,7 @@ func init() {
 			var shots, invs string
 			fs.StringVar(&o.Scenario, "scenario", "", "scenario name (tests/scenarios/<name>.scenario.json) or file")
 			fs.StringVar(&o.Scene, "scene", "", "scene")
-			fs.IntVar(&o.Ticks, "ticks", 600, "ticks")
+			fs.IntVar(&o.Ticks, "ticks", 200, "ticks")
 			fs.Uint64Var(&o.Seed, "seed", 0, "seed")
 			fs.StringVar(&o.Input, "input", "", "input script file")
 			fs.StringVar(&shots, "screenshots", "", "ticks to capture, comma-separated")

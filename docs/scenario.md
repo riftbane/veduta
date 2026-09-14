@@ -19,7 +19,7 @@ trace and the same frames, so a scenario is a regression test. Run one with
 
 ## Ticks
 
-The simulation runs at the project's `tick_rate` (60 Hz by default). Tick 0 is the scene
+The simulation runs at the project's `tick_rate` (20 Hz by default). Tick 0 is the scene
 just loaded, before any game update. Ticks 1, 2, …, `ticks` each run exactly one `Update`
 of the game and every entity behaviour. "The state at tick t" is the state after the
 update of tick t; at tick 0 it is the initial state. Every tick field in a scenario
@@ -32,7 +32,7 @@ update of tick t; at tick 0 it is the initial state. Every tick field in a scena
 | `veduta` | string | required | Must be exactly `"scenario/1"`. |
 | `scene` | string | required | Name of the scene to load (`assets/scenes/<scene>.scene.json`). |
 | `seed` | integer | `0` | Seed of the simulation's random number generator, 0 to 18446744073709551615. |
-| `ticks` | integer | required | Number of ticks to simulate, 1 to 1000000 (60 Hz: 60 ticks = 1 s). |
+| `ticks` | integer | required | Number of ticks to simulate, 1 to 1000000 (20 Hz: 20 ticks = 1 s). |
 | `inputs` | array of objects | `[]` | Scripted input events; see Inputs. |
 | `expect` | array of objects | `[]` | Checks; see Expectations. A scenario passes when every expectation holds and no invariant is violated. |
 | `invariants` | array of strings | `[]` | Invariants checked after every tick, in addition to the project's `invariants` (`veduta.json`); see Invariants. No duplicates. |
@@ -51,7 +51,7 @@ first update (tick 1), because no update runs at tick 0.
 | `press` | array of key names | Keys that go down at this tick. A pressed key stays held until a later event releases it. A key that is already held cannot be pressed again. |
 | `release` | array of key names | Held keys that go up at this tick. Releasing a key that is not held is an error. A key cannot be pressed and released in the same event. |
 | `buttons` | array of button names | The complete set of mouse buttons held from this tick on: `left`, `right`, `middle`. `[]` releases all buttons; omitting the field leaves them unchanged. |
-| `mouse` | object `{ "x": number, "y": number }` | Mouse position in window pixels from this tick on (origin top-left, y down). Omitted: unchanged. The initial position is (0, 0). The game also sees the movement since the previous tick as `in.MouseDelta`, so mouse look is scripted by moving the cursor: a jump from `{ "x": 0 }` to `{ "x": 600 }` is a delta of 600 pixels in that tick and 0 in the next. |
+| `mouse` | object `{ "x": number, "y": number }` | Mouse position in window pixels from this tick on (origin top-left, y down). Omitted: unchanged. The initial position is (0, 0). The game also sees the movement since the previous tick as `in.MouseDelta`, so a jump from `{ "x": 0 }` to `{ "x": 600 }` is a delta of 600 pixels in that tick and 0 in the next. The console has no mouse, so this exists for logic tested in scenarios. |
 | `text` | string | Characters typed during this tick (for text entry). Text is not derived from `press`: pressing `KeyA` does not type "a". |
 
 Each event must set at least one of `press`, `release`, `buttons`, `mouse`, `text`.

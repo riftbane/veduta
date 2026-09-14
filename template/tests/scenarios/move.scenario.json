@@ -2,22 +2,22 @@
   "veduta": "scenario/1",
   "scene": "main",
   "seed": 42,
-  "ticks": 180,
+  "ticks": 60,
   "inputs": [
-    { "tick": 10, "press": ["KeyD"] },
-    { "tick": 40, "release": ["KeyD"] },
-    { "tick": 50, "press": ["KeyS"] },
-    { "tick": 80, "release": ["KeyS"] },
-    { "tick": 90, "press": ["Space"] },
-    { "tick": 91, "release": ["Space"] }
+    { "tick": 3, "press": ["KeyD"] },
+    { "tick": 13, "release": ["KeyD"] },
+    { "tick": 17, "press": ["KeyS"] },
+    { "tick": 27, "release": ["KeyS"] },
+    { "tick": 30, "press": ["Space"] },
+    { "tick": 31, "release": ["Space"] }
   ],
   "expect": [
-    { "tick": 40, "entity": "player", "path": "position.x", "op": ">", "value": 1.9 },
-    { "tick": 80, "entity": "player", "path": "position.z", "op": ">", "value": 1.9 },
-    { "tick": 100, "entity": "player", "path": "position.y", "op": ">", "value": 0.3 },
-    { "tick": 180, "entity": "player", "path": "state.on_ground", "op": "==", "value": true },
-    { "tick": 180, "trace": "jump", "count_min": 1, "count_max": 1 }
+    { "tick": 13, "entity": "player", "path": "position.x", "op": ">", "value": 1.9 },
+    { "tick": 27, "entity": "player", "path": "position.z", "op": ">", "value": 1.9 },
+    { "tick": 33, "entity": "player", "path": "position.y", "op": ">", "value": 0.3 },
+    { "tick": 60, "entity": "player", "path": "state.on_ground", "op": "==", "value": true },
+    { "tick": 60, "trace": "jump", "count_min": 1, "count_max": 1 }
   ],
   "invariants": ["finite_positions", "within_bounds", "no_overlap:player,obstacle"],
-  "screenshots": [0, 40, 100, 180]
+  "screenshots": [0, 13, 33, 60]
 }

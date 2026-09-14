@@ -48,7 +48,7 @@ func RegisterKind(name string, ctor func(*scene.Entity) veduta.Behaviour)
 | `Scene *scene.Scene` | the world: `Find(name)`, `Get(id)`, `Tagged(tag)`, `Entities()` (id order) |
 | `Tick uint64` | 0 during `Init`, then 1, 2, … during `Update` |
 | `RNG *sim.RNG` | seeded xoshiro256**: `Float32()`, `Range(lo, hi)`, `Intn(n)`, `Bool()`, `Chance(p)` — the only allowed randomness |
-| `DT float32` | seconds per tick (`1 / tick_rate`, 1/60 by default) |
+| `DT float32` | seconds per tick (`1 / tick_rate`, 1/20 by default) |
 | `Headless bool` | true when run by the tool |
 | `Project *asset.Project` | the parsed `veduta.json` |
 | `Width, Height int` | frame size during `Draw` |
@@ -120,8 +120,8 @@ radians in code. `rotation_deg: [x, y, z]` means R = Ry·Rx·Rz.
    is recorded.
 
 Input events of a script at tick t are part of the Input of tick t; events at tick 0 apply
-before the first update and appear in tick 1. The simulation runs at `tick_rate` (60 Hz);
-there is no interpolation and the player renders once per tick.
+before the first update and appear in tick 1. The simulation runs at `tick_rate` (20 Hz by
+default); there is no interpolation and the player renders once per tick.
 
 ## Determinism rules
 

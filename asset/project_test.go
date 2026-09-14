@@ -19,7 +19,7 @@ func TestParseProjectDefaults(t *testing.T) {
 	if !reflect.DeepEqual(*p, want) {
 		t.Fatalf("got  %+v\nwant %+v", *p, want)
 	}
-	if want.Resolution != [2]int{1280, 720} || want.InspectResolution != [2]int{640, 360} || want.TickRate != 60 ||
+	if want.Resolution != [2]int{320, 240} || want.InspectResolution != [2]int{320, 240} || want.TickRate != 20 ||
 		want.Assets != "assets" || want.Cooked != "assets/.cooked" || want.Entry != "./cmd/game" || want.DefaultSeed != 1 ||
 		want.Bounds != (gmath.AABB{Min: gmath.V3(-100, -50, -100), Max: gmath.V3(100, 100, 100)}) {
 		t.Fatalf("defaults drifted from spec §5.2: %+v", want)
@@ -30,7 +30,7 @@ func TestParseProjectDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.TickRate != 60 || p.DefaultSeed != 1 || p.Entry != "./cmd/game" || p.DefaultScene != "main" || p.Cooked != "assets/.cooked" {
+	if p.TickRate != 20 || p.DefaultSeed != 1 || p.Entry != "./cmd/game" || p.DefaultScene != "main" || p.Cooked != "assets/.cooked" {
 		t.Fatalf("zero values did not take defaults: %+v", p)
 	}
 }

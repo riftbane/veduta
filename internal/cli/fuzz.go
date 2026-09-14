@@ -430,7 +430,7 @@ func init() {
 			var keys, invs string
 			fs.StringVar(&o.Scene, "scene", "", "scene (default: the project's)")
 			fs.IntVar(&o.Games, "games", 200, "number of random games")
-			fs.IntVar(&o.Ticks, "ticks", 600, "ticks per game")
+			fs.IntVar(&o.Ticks, "ticks", 200, "ticks per game")
 			fs.Uint64Var(&o.Seed, "seed", 1, "seed of the random players")
 			fs.StringVar(&keys, "keys", "", "comma-separated keys the players use")
 			fs.StringVar(&invs, "invariants", "", "comma-separated invariants (default: the project's)")
