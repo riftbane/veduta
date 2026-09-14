@@ -127,7 +127,11 @@ whichever is newer: `veduta update --channel beta` installs one and follows beta
 on, `veduta update --check --channel beta` only previews it, and
 `veduta update --channel stable --force` goes back (`--force` because that is a
 downgrade). See [configuration](docs/config.md). Updating the tool never changes a
-project; `veduta upgrade` does, explicitly.
+project; `veduta upgrade` does, explicitly. Upgrading from a v0.x engine to v1.0.0 or
+later also pins the v0.x defaults: each of `resolution`, `inspect_resolution` and
+`tick_rate` that `veduta.json` leaves out or sets to its zero value is written into it as
+`[1280, 720]`, `[640, 360]` and `60`, so the game keeps its size and physics under the new
+defaults (see [the project manifest](docs/project.md#upgrading)).
 
 ## Status
 

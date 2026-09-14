@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/riftbane/veduta/asset"
 	"github.com/riftbane/veduta/internal/update"
 )
 
@@ -130,23 +131,32 @@ func autoUpdate(env *Env) (*UpdateReport, error) {
 
 // UpgradeReport is the result of upgrade.
 type UpgradeReport struct {
-	From       string   `json:"from"`
-	To         string   `json:"to"`
-	Changed    []string `json:"changed"`
+	From    string   `json:"from"`
+	To      string   `json:"to"`
+	Changed []string `json:"changed"` // files written, in order
+	// Migrations describes each change made to keep the project's behaviour, one sentence
+	// each, such as `pin "tick_rate": 60 in veduta.json (the default before v1.0.0)`.
 	Migrations []string `json:"migrations"`
 }
 
-// Human prints what changed.
+// Human prints what changed, then one line per migration.
 func (r *UpgradeReport) Human() string {
 	if len(r.Changed) == 0 {
 		return fmt.Sprintf("already on %s\n", r.To)
 	}
-	return fmt.Sprintf("upgraded %s → %s (%s)\n", r.From, r.To, strings.Join(r.Changed, ", "))
+	var b strings.Builder
+	fmt.Fprintf(&b, "upgraded %s → %s (%s)\n", r.From, r.To, strings.Join(r.Changed, ", "))
+	for _, m := range r.Migrations {
+		fmt.Fprintln(&b, "migration:", m)
+	}
+	return b.String()
 }
 
 // Upgrade moves the project to the tool's engine version: veduta.json, go.mod (go get +
-// go mod tidy), format migrations (none in v0.1.0) and an entry in the project's
-// CHANGELOG.md.
+// go mod tidy) and an entry in the project's CHANGELOG.md. A project that crosses from a
+// v0.x engine to v1.0.0 or later keeps the resolution, inspect_resolution and tick_rate it
+// ran with: every one its manifest left to the default is written out with the v0.x value
+// (v0Defaults), and the report and the changelog entry name them.
 func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 	to := env.Version
 	if !update.IsVersion(to) {
@@ -162,12 +172,21 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	re := regexp.MustCompile(`("engine"\s*:\s*)"[^"]*"`)
-	if next := re.ReplaceAll(data, []byte(`${1}"`+to+`"`)); string(next) != string(data) {
-		if err := os.WriteFile(manifest, next, 0o644); err != nil {
-			return nil, err
+	next, pinned, err := upgradeManifest(data, to, v0Engine(from) && !v0Engine(to))
+	if err != nil {
+		return nil, fmt.Errorf("upgrade %s: %w", manifest, err)
+	}
+	manifestChanged := string(next) != string(data)
+	if manifestChanged {
+		// The edit touches only the text of the fields it writes; a manifest that no
+		// longer parses would mean it went wrong, and is never written.
+		if _, err := asset.ParseProject(asset.ProjectFile, next); err != nil {
+			return nil, fmt.Errorf("upgrade %s: the rewritten manifest does not parse: %w", manifest, err)
 		}
 		r.Changed = append(r.Changed, "veduta.json")
+		for _, p := range pinned {
+			r.Migrations = append(r.Migrations, "pin "+p+" in veduta.json (the default before v1.0.0)")
+		}
 	}
 	mod, _ := os.ReadFile(filepath.Join(s.Root, "go.mod"))
 	if !goModRequires(mod, to) {
@@ -179,10 +198,21 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 		}
 		r.Changed = append(r.Changed, "go.mod")
 	}
+	// Written after go get, which is what fails in practice (the network): a run that stops
+	// there leaves veduta.json on the old engine, so the next one pins the same fields and
+	// still names them in the changelog.
+	if manifestChanged {
+		if err := os.WriteFile(manifest, next, 0o644); err != nil {
+			return nil, err
+		}
+	}
 	if len(r.Changed) == 0 {
 		return r, nil
 	}
-	entry := fmt.Sprintf("- Upgrade the Veduta engine from %s to %s (`veduta upgrade`; no format migrations).\n", from, to)
+	entry := fmt.Sprintf("- Upgrade the Veduta engine from %s to %s (`veduta upgrade`).\n", from, to)
+	if len(pinned) > 0 {
+		entry = fmt.Sprintf("- Upgrade the Veduta engine from %s to %s (`veduta upgrade`), pinning the defaults `veduta.json` relied on before v1.0.0 so the game keeps its size and tick rate: `%s`.\n", from, to, strings.Join(pinned, "`, `"))
+	}
 	if err := addChangelogEntry(filepath.Join(s.Root, "CHANGELOG.md"), entry); err != nil {
 		return nil, err
 	}

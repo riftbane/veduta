@@ -3,7 +3,7 @@
 Every game project has a `veduta.json` at its root. It names the game, pins the engine
 version, and sets the defaults the tools use: window and inspection sizes, tick rate,
 default scene and seed, where assets live, project-wide invariants and world bounds.
-`veduta init` writes it; `veduta upgrade` updates `engine`.
+`veduta init` writes it; `veduta upgrade` updates `engine` (see [Upgrading](#upgrading)).
 
 ## Format
 
@@ -46,6 +46,19 @@ veduta.json:4:13: engine: "0.1.0" is not a version like v0.1.0 (vMAJOR.MINOR.PAT
 veduta.json:7:17: tick_rate: -5 out of range [1, 1000]
 veduta.json:14:33: bounds[1][1]: max y (-60) must be greater than min y (-50)
 ```
+
+## Upgrading
+
+`veduta upgrade` sets `engine` to the tool's version, moves `go.mod` to the same engine
+version and adds a line to the project's `CHANGELOG.md`. Upgrading from a v0.x engine to
+v1.0.0 or later also pins the v0.x defaults: each of `resolution`, `inspect_resolution` and
+`tick_rate` that `veduta.json` leaves out or sets to its zero value is written into it as
+`[1280, 720]`, `[640, 360]` and `60`, so the game keeps its size and physics under the new
+defaults. The changelog line names the pinned fields, as does the `migrations` list of the
+JSON report (`pin "tick_rate": 60 in veduta.json (the default before v1.0.0)`). Only those
+fields are written: every other byte of the file, its formatting and its key order stay as
+they were. A project already on v1.0.0 or later, or moving between two v0.x versions, pins
+nothing.
 
 ## Full example
 
