@@ -87,25 +87,17 @@ type StateCodec interface {
 A key pressed and released within one tick appears in `Pressed` and `Released` but not
 in `Held`.
 
-### First person
+### Mouse
 
-`MouseDelta` is the movement of one tick, so a mouse-look camera is three lines:
-
-```go
-g.Yaw = gmath.Wrap(g.Yaw-in.MouseDelta.X*sensitivity, 360)       // degrees per pixel
-g.Pitch = min(89, max(-89, g.Pitch-in.MouseDelta.Y*sensitivity)) // never straight up
-eye := ctx.Scene.Find("player").WorldPosition().Add(gmath.V3(0, eyeHeight, 0))
-ctx.Scene.Camera = ctx.Scene.Camera.LookFrom(eye, g.Yaw, g.Pitch)
-```
-
-`Camera.LookFrom` keeps the scene camera's projection, so only the eye and the direction
-change; yaw 0 looks along −Z and grows counter-clockwise seen from above, positive pitch
-looks up. Hide the player's own model (`e.Visible = false`) while the camera sits inside
-it, and call `ctx.LockPointer(true)` so the player window hides the cursor and keeps it
-inside: without it the cursor reaches the edge of the screen and the view stops turning.
-Headless runs ignore `LockPointer`; scenarios drive the view by moving the mouse, since
-consecutive positions are exactly what `MouseDelta` reports. The demo in `template/` does
-all of this behind `KeyF`.
+`Mouse`, `MouseDelta` and the buttons are filled from a scenario's `mouse` and `buttons`
+entries (`MouseDelta` is the difference between consecutive positions), so logic that
+reads them can be simulated and tested. The console has no mouse: its player reads a
+gamepad and a keyboard, and no player backend produces mouse movement or honours
+`ctx.LockPointer`. A game meant to be played should be driven by keys, which is what the
+pad produces (D-pad → `ArrowUp`/`ArrowDown`/`ArrowLeft`/`ArrowRight`, A → `Space`,
+B → `Escape`, Start → `Enter`). `Camera.LookFrom(eye, yawDeg, pitchDeg)` still builds an
+eye camera from the scene camera, keeping its projection; yaw 0 looks along −Z and grows
+counter-clockwise seen from above, positive pitch looks up.
 
 ## Entities
 

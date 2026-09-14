@@ -13,10 +13,6 @@ const (
 	JumpSpeed   = 5.0  // initial vertical speed, m/s
 	Gravity     = 14.0 // m/s²
 	GemSpin     = 90.0 // degrees per second
-
-	MouseSensitivity = 0.15 // degrees of view per mouse pixel (first person)
-	EyeHeight        = 0.9  // eye height above the hero's origin, meters
-	MaxPitchDeg      = 89.0 // looking straight up or down is not allowed
 )
 
 // PlayerState is the hero's per-entity state (trace: state.score, state.vel_y, …).
@@ -49,21 +45,11 @@ func newPlayer(e *scene.Entity) veduta.Behaviour {
 func updatePlayer(ctx *veduta.Context, e *scene.Entity, in veduta.Input) {
 	st := e.State.(*PlayerState)
 	dir := gmath.V3(in.Axis("KeyA", "KeyD"), 0, in.Axis("KeyW", "KeyS"))
-	firstPerson := current != nil && current.FirstPerson
-	if firstPerson {
-		// WASD moves relative to the view: W goes where the camera looks, D to its right.
-		sy, cy := gmath.SinCos(gmath.Radians(current.Yaw))
-		dir = gmath.V3(float32(dir.X*cy)+float32(dir.Z*sy), 0, -float32(dir.X*sy)+float32(dir.Z*cy))
-	}
 	if l := dir.Len(); l > 0 {
 		dir = dir.Scale(1 / l)
 		e.Transform.Position = e.Transform.Position.Add(dir.Scale(PlayerSpeed * ctx.DT))
 		// Facing -Z is yaw 0; atan2(-x, -z) gives the yaw of the travel direction.
 		st.Heading = gmath.Degrees(gmath.Atan2(-dir.X, -dir.Z))
-		e.Transform.Rotation = gmath.QuatEulerDeg(gmath.V3(0, st.Heading, 0))
-	}
-	if firstPerson { // the body faces where the player looks, even standing still
-		st.Heading = current.Yaw
 		e.Transform.Rotation = gmath.QuatEulerDeg(gmath.V3(0, st.Heading, 0))
 	}
 	if st.OnGround && in.JustPressed("Space") {
