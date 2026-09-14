@@ -99,6 +99,22 @@ B → `Escape`, Start → `Enter`). `Camera.LookFrom(eye, yawDeg, pitchDeg)` sti
 eye camera from the scene camera, keeping its projection; yaw 0 looks along −Z and grows
 counter-clockwise seen from above, positive pitch looks up.
 
+## Cameras
+
+`ctx.Scene.Camera` is the camera the player and `render --camera scene` draw with; a game
+may replace it during `Update`.
+
+- `scene.Camera2D(center gmath.Vec2, height float32) scene.Camera` is the camera of a 2D
+  game played in the XY plane: orthographic, looking down −Z at `(center.X, center.Y, 0)`
+  from z = `scene.Camera2DDistance` (100), +X to the right and +Y up on screen, `height`
+  world units visible vertically (the width follows from the aspect ratio), near 0.1 and
+  far 200, so z from −100 to 99.9 is visible and a larger z is nearer the camera. Follow a
+  hero with `p := hero.WorldPosition(); ctx.Scene.Camera = scene.Camera2D(gmath.V2(p.X, p.Y), 12)`.
+  It is the same camera as a scene file's `"type": "orthographic", "size": 12,
+  "position": [x, y, 100], "look_at": [x, y, 0]`.
+- `Camera.LookFrom(eye, yawDeg, pitchDeg)` places a camera at `eye` looking along yaw and
+  pitch, keeping the projection.
+
 ## Entities
 
 `scene.Entity` fields: `ID`, `Name`, `Kind`, `Transform` (`Position`, `Rotation` quaternion,

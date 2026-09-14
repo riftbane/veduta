@@ -26,6 +26,23 @@ func DefaultCamera() Camera {
 	return Camera{FovDeg: 60, Near: 0.1, Far: 200, Position: gmath.V3(0, 5, 10)}
 }
 
+// Camera2DDistance is how far in front of the z = 0 plane a Camera2D sits.
+const Camera2DDistance = 100
+
+// Camera2D returns the camera of a 2D game played in the XY plane: orthographic, looking
+// down -Z at (center.X, center.Y, 0) from z = Camera2DDistance, +X to the right and +Y up
+// on screen, showing height world units vertically (the width follows from the aspect
+// ratio). Near and far are the scene defaults, 0.1 and 200, so everything with z in
+// [-100, 99.9] is visible and a larger z is nearer the camera. A game can follow its hero
+// with it:
+//
+//	p := hero.WorldPosition()
+//	ctx.Scene.Camera = scene.Camera2D(gmath.V2(p.X, p.Y), 12)
+func Camera2D(center gmath.Vec2, height float32) Camera {
+	return Camera{Ortho: true, Size: height, Near: 0.1, Far: 200,
+		Position: gmath.V3(center.X, center.Y, Camera2DDistance), Target: gmath.V3(center.X, center.Y, 0)}
+}
+
 // CameraFromAsset converts a compiled scene camera.
 func CameraFromAsset(c asset.Camera) Camera {
 	return Camera{Ortho: c.Ortho, FovDeg: c.FovDeg, Size: c.Size, Near: c.Near, Far: c.Far, Position: c.Position, Target: c.LookAt}
