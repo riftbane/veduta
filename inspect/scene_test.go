@@ -91,14 +91,18 @@ var scnFixtures = map[string]string{
 		{"name": "flipped", "kind": "static", "model": "decal", "material": "twosided", "position": [0, 0, -2.5], "rotation_deg": [180, 0, 0]}]}`,
 	// A 2D scene of the template's quads under an orthographic camera: translucent water
 	// and mist overlap at the same z (ordered by layer); two opaque tiles overlap at the
-	// same z; translucent pool overlaps opaque rock at the same z.
+	// same z; translucent pool overlaps opaque rock at the same z; coin's hitbox is far
+	// from hero, but its drawing overlaps hero's at the same z.
 	"sprites": `{"veduta": "scene/1", "camera": {"type": "orthographic", "size": 12, "position": [0, 0, 100], "look_at": [0, 0, 0]}, "entities": [
 		{"name": "water", "kind": "static", "model": "quad", "material": "water", "position": [-4, 3, 2], "scale": [4, 1, 1]},
 		{"name": "mist", "kind": "static", "model": "quad", "material": "mist", "position": [-4, 3.5, 2], "scale": [6, 2, 1], "layer": 1},
 		{"name": "tile_a", "kind": "static", "model": "quad", "material": "flat", "position": [4, 3, 1]},
 		{"name": "tile_b", "kind": "static", "model": "quad", "material": "flat", "position": [4.5, 3, 1]},
 		{"name": "pool", "kind": "static", "model": "quad", "material": "water", "position": [-4, -3, 1]},
-		{"name": "rock", "kind": "static", "model": "quad", "material": "flat", "position": [-3.5, -3, 1]}]}`,
+		{"name": "rock", "kind": "static", "model": "quad", "material": "flat", "position": [-3.5, -3, 1]},
+		{"name": "hero", "kind": "static", "model": "quad", "material": "flat", "position": [4, -3, 1]},
+		{"name": "coin", "kind": "static", "model": "quad", "material": "flat", "position": [4.9, -3, 1],
+			"hitbox": [[0.3, -0.3, -0.5], [0.5, 0.3, 0.5]]}]}`,
 	"dark": `{"veduta": "scene/1", "camera": {"position": [0, 9, 11], "look_at": [0, 0, -1]},
 		"light": {"direction": [-0.4, -1, -0.3], "color": "#202020", "ambient": "#101010"}, "entities": [
 		{"name": "ground", "kind": "static", "model": "ground"},
@@ -525,7 +529,7 @@ func TestSceneZFight(t *testing.T) {
 
 // Translucent parts write no depth, so two of them in one plane cannot z-fight and do not
 // count as interpenetrating static entities; a translucent part coplanar with an opaque one
-// still does.
+// still does. Coplanar faces are found from the drawings, not from hitboxes.
 func TestSceneSprites2D(t *testing.T) {
 	ir := scnRenderer(t, scnLibrary(t))
 	r := scnInspect(t, ir, "sprites", Options{})
@@ -539,10 +543,10 @@ func TestSceneSprites2D(t *testing.T) {
 	if got, want := pairs("SCENE_OVERLAP"), []string{"tile_a/tile_b", "pool/rock"}; !equalStrings(got, want) {
 		t.Errorf("SCENE_OVERLAP %v, want %v", got, want)
 	}
-	if got, want := pairs("SCENE_ZFIGHT_RISK"), []string{"tile_a/tile_b", "pool/rock"}; !equalStrings(got, want) {
+	if got, want := pairs("SCENE_ZFIGHT_RISK"), []string{"tile_a/tile_b", "pool/rock", "hero/coin"}; !equalStrings(got, want) {
 		t.Errorf("SCENE_ZFIGHT_RISK %v, want %v", got, want)
 	}
-	if s := r.Summary; s.Errors != 0 || s.Warnings != 4 {
+	if s := r.Summary; s.Errors != 0 || s.Warnings != 5 {
 		t.Errorf("summary %+v: %v", s, scnCodes(r))
 	}
 }

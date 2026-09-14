@@ -98,7 +98,7 @@ const (
 //     intersection).
 //   - SCENE_CAMERA_SEES_NOTHING (error): no pixel of the camera render belongs to an
 //     entity. The where explains why (distance to the drawn entities vs near/far, angle
-//     off the view direction, entities whose AABB contains the camera).
+//     off the view direction, entities whose drawing's bounds contain the camera).
 //   - SCENE_ENTITY_OFFSCREEN (warning): an entity tagged "important" has no visible
 //     pixel. The entity is rendered alone to tell "occluded" (projected pixels > 0, the
 //     occluders are listed) from "outside_view"; "hidden" (visible: false), "no_model" and
@@ -114,9 +114,10 @@ const (
 //     "none"): a crate resting on the ground (bottom face down, ground face up) is not a
 //     risk. Two alpha-blended triangles are not a risk either: neither writes depth, so
 //     the draw order (layer, then depth) decides which covers which. Only entity pairs
-//     whose AABBs touch are compared, triangles are bucketed by plane; at most 2^24
-//     triangle pairs are tested (metric zfight_truncated). One issue per entity pair;
-//     count = overlapping triangle pairs; where: normal, point, area.
+//     whose models' world bounds touch are compared (the drawings, not the hitboxes),
+//     triangles are bucketed by plane; at most 2^24 triangle pairs are tested (metric
+//     zfight_truncated). One issue per entity pair; count = overlapping triangle pairs;
+//     where: normal, point, area.
 //
 // At most 16 issues are listed per code; one more issue with where.omitted counts the
 // rest.
@@ -188,8 +189,9 @@ type scnAnalysis struct {
 	file   string          // scene source path
 	w, h   int             // analysis resolution
 
-	drawn      []bool // visible, with a model in the library
-	glass      []bool // every part of the model is alpha-blended (writes no depth)
+	drawn      []bool       // visible, with a model in the library
+	shape      []gmath.AABB // world bounds of the model (the drawing): AABB unless a hitbox replaces it
+	glass      []bool       // every part of the model is alpha-blended (writes no depth)
 	drawnCount int
 	triangles  int
 	litParts   int
@@ -244,6 +246,7 @@ func scnAnalyze(ir *Renderer, name string, src *asset.Scene) (*scnAnalysis, erro
 	a.file = path.Join(a.assets, "scenes", name+".scene.json")
 	n := len(a.ents)
 	a.drawn = make([]bool, n)
+	a.shape = make([]gmath.AABB, n)
 	a.glass = make([]bool, n)
 	a.pixels = make([]int, n)
 	a.bbox = make([][4]int, n)
@@ -335,6 +338,13 @@ func (a *scnAnalysis) model(e *scene.Entity) *asset.Model {
 func (a *scnAnalysis) prepare() {
 	for k, e := range a.ents {
 		m := a.model(e)
+		a.shape[k] = e.AABB
+		if m != nil && e.Hitbox != nil {
+			a.shape[k] = gmath.EmptyAABB()
+			if !m.Mesh.Bounds.IsEmpty() {
+				a.shape[k] = m.Mesh.Bounds.Transform(e.World())
+			}
+		}
 		if m != nil {
 			blended, other := 0, 0
 			for _, part := range m.Mesh.Parts {
@@ -767,9 +777,9 @@ func scnSign(f float32) string {
 
 func (a *scnAnalysis) drawnBox() gmath.AABB {
 	b := gmath.EmptyAABB()
-	for k, e := range a.ents {
-		if a.drawn[k] && scnFiniteBox(e.AABB) {
-			b = b.Union(e.AABB)
+	for k := range a.ents {
+		if a.drawn[k] && scnFiniteBox(a.shape[k]) {
+			b = b.Union(a.shape[k])
 		}
 	}
 	return b
@@ -829,7 +839,7 @@ func (a *scnAnalysis) checkSeesNothing() {
 	where["distance"] = []any{scnNum(dNear), scnNum(dFar)}
 	var inside []string
 	for k, e := range a.ents {
-		if a.drawn[k] && e.AABB.Contains(cam.Position) {
+		if a.drawn[k] && a.shape[k].Contains(cam.Position) {
 			inside = append(inside, e.Name)
 		}
 	}
@@ -848,7 +858,7 @@ func (a *scnAnalysis) checkSeesNothing() {
 	case !a.inView(c):
 		hint = fmt.Sprintf("%s: the drawn entities (center %s) are %s° off its view direction. Set camera.look_at to %s.", at, scnFV(c), scnF(math.Round(angle)), scnFV(c))
 	case len(inside) > 0:
-		hint = fmt.Sprintf("%s: it is inside the AABB of %q, whose faces point away from it and are culled. Move camera.position out of it, towards %s.", at, inside[0], scnFV(c))
+		hint = fmt.Sprintf("%s: it is inside the bounds of %q, whose faces point away from it and are culled. Move camera.position out of it, towards %s.", at, inside[0], scnFV(c))
 	default:
 		hint = fmt.Sprintf("%s although their center %s is in view: they are cut by camera.near (%s) / camera.far (%s) or too small. Set camera.look_at to %s and move camera.position towards it.",
 			at, scnFV(c), scnF(float64(cam.Near)), scnF(float64(cam.Far)), scnFV(c))
@@ -925,9 +935,9 @@ func (a *scnAnalysis) offscreenDetail(k int, where map[string]any) (string, erro
 	}
 	where["projected_pixels"] = projected
 	cam := a.s.Camera
-	center := e.AABB.Center()
+	center := a.shape[k].Center()
 	angle := scnAngle(cam.Target.Sub(cam.Position), center.Sub(cam.Position))
-	dNear, _ := scnBoxDist(cam.Position, e.AABB)
+	dNear, _ := scnBoxDist(cam.Position, a.shape[k])
 	where["angle_deg"] = scnNum(angle)
 	where["distance"] = scnNum(float64(cam.Position.Dist(center)))
 	if projected == 0 {
@@ -1176,17 +1186,17 @@ type scnZPair struct {
 
 func (a *scnAnalysis) checkZFight() {
 	var cand []int
-	for k, e := range a.ents {
-		if a.drawn[k] && scnFiniteBox(e.AABB) {
+	for k := range a.ents {
+		if a.drawn[k] && scnFiniteBox(a.shape[k]) {
 			cand = append(cand, k)
 		}
 	}
-	sort.SliceStable(cand, func(x, y int) bool { return a.ents[cand[x]].AABB.Min.X < a.ents[cand[y]].AABB.Min.X })
+	sort.SliceStable(cand, func(x, y int) bool { return a.shape[cand[x]].Min.X < a.shape[cand[y]].Min.X })
 	var pairs [][2]int
 	for x := range cand {
-		A := a.ents[cand[x]].AABB
+		A := a.shape[cand[x]]
 		for y := x + 1; y < len(cand); y++ {
-			B := a.ents[cand[y]].AABB
+			B := a.shape[cand[y]]
 			if float64(B.Min.X) > float64(A.Max.X)+scnZDist {
 				break
 			}
@@ -1222,9 +1232,10 @@ func (a *scnAnalysis) checkZFight() {
 
 type scnZKey [4]int64
 
-// zPair compares the triangles of entities i and j near the intersection of their AABBs.
+// zPair compares the triangles of entities i and j near the intersection of the bounds of
+// their drawings.
 func (a *scnAnalysis) zPair(i, j int) *scnZPair {
-	box := gmath.AABB{Min: a.ents[i].AABB.Min.Max(a.ents[j].AABB.Min), Max: a.ents[i].AABB.Max.Min(a.ents[j].AABB.Max)}
+	box := gmath.AABB{Min: a.shape[i].Min.Max(a.shape[j].Min), Max: a.shape[i].Max.Min(a.shape[j].Max)}
 	lo := scnV{float64(box.Min.X) - scnZDist, float64(box.Min.Y) - scnZDist, float64(box.Min.Z) - scnZDist}
 	hi := scnV{float64(box.Max.X) + scnZDist, float64(box.Max.Y) + scnZDist, float64(box.Max.Z) + scnZDist}
 	near := func(tris []scnTri) []int {
@@ -1469,7 +1480,7 @@ func scnSurface(b gmath.AABB) float64 {
 func (a *scnAnalysis) zIssue(z *scnZPair) {
 	ei, ej := a.ents[z.i], a.ents[z.j]
 	mover, dir := z.j, z.nj
-	if scnSurface(ei.AABB) < scnSurface(ej.AABB) {
+	if scnSurface(a.shape[z.i]) < scnSurface(a.shape[z.j]) {
 		mover, dir = z.i, z.normal
 	}
 	facing := "same"
