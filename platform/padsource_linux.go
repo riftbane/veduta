@@ -1,7 +1,10 @@
 package platform
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -170,10 +173,13 @@ type inputSource struct {
 	next  time.Time        // when to look again
 	now   func() time.Time // replaced in tests
 	tried bool
+
+	log     io.Writer // where a change in what can be read is reported: stderr
+	problem string    // why nothing is being read, as last reported; empty while something is
 }
 
 func newInputSource(want string) *inputSource {
-	return &inputSource{want: want, now: time.Now, down: map[string]int{}}
+	return &inputSource{want: want, now: time.Now, down: map[string]int{}, log: os.Stderr}
 }
 
 // Devices names what is being read, for diagnostics; empty when nothing is.
@@ -277,8 +283,10 @@ func (p *inputSource) attach() {
 	p.next = p.now().Add(padRescan)
 	devices, err := findInputs(p.want)
 	if err != nil {
+		p.report(err, nil)
 		return
 	}
+	var refused []error
 	kept := make([]bool, len(p.open))
 	list := make([]openDevice, 0, len(devices)+len(p.open))
 	for _, d := range devices {
@@ -291,9 +299,10 @@ func (p *inputSource) attach() {
 			list = append(list, p.open[i])
 			continue
 		}
-		src, err := openPad(d.Dev)
-		if err != nil {
-			continue // a device that will not open is one we do without
+		src, oerr := openPad(d.Dev)
+		if oerr != nil {
+			refused = append(refused, oerr) // a device that will not open is one we do without
+			continue
 		}
 		list = append(list, openDevice{node: d.Node, src: src, down: map[string]int{}})
 	}
@@ -303,6 +312,42 @@ func (p *inputSource) attach() {
 		}
 	}
 	p.open = list
+	p.report(nil, refused)
+}
+
+// report writes to the log what reading input has come to, once when it changes rather
+// than at every rescan: why nothing is being read, or, after such a message, what is read
+// again. A player reading nothing shows the game and answers nothing, and it cannot even be
+// left, since the exit chords arrive through the same input, so the reason has to be
+// somewhere a person looking at the log will find it. Some devices refusing while another
+// is read is not a problem worth a line.
+func (p *inputSource) report(findErr error, refused []error) {
+	problem := ""
+	switch {
+	case len(p.open) > 0:
+	case findErr != nil:
+		problem = findErr.Error()
+	case len(refused) > 0:
+		msgs := make([]string, len(refused))
+		denied := false
+		for i, err := range refused {
+			msgs[i] = err.Error()
+			denied = denied || errors.Is(err, fs.ErrPermission)
+		}
+		problem = "platform: no input device could be opened: " + strings.Join(msgs, "; ")
+		if denied {
+			problem += " (reading /dev/input takes root or membership of the input group)"
+		}
+	}
+	if problem == p.problem {
+		return
+	}
+	p.problem = problem
+	if problem != "" {
+		fmt.Fprintf(p.log, "%s; looking again every %v\n", problem, padRescan)
+	} else {
+		fmt.Fprintf(p.log, "platform: reading input from %s\n", p.Devices())
+	}
 }
 
 func (p *inputSource) close() error {

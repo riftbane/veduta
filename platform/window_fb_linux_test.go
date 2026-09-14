@@ -51,8 +51,22 @@ func TestFBWindow(t *testing.T) {
 	if w, h := win.Size(); w != 320 || h != 240 {
 		t.Fatalf("Size = %dx%d, want the panel's 320x240", w, h)
 	}
+	// With nothing to read the window still polls, and says once, on the player's stderr,
+	// why nothing will answer.
+	src, ok := win.(*fbWindow).source.(*inputSource)
+	if !ok {
+		t.Fatalf("the panel reads input from %T, want an input source", win.(*fbWindow).source)
+	}
+	if src.log != os.Stderr {
+		t.Fatalf("the input source logs to %v, want stderr", src.log)
+	}
+	var log strings.Builder
+	src.log = &log
 	if evs, err := win.Poll(); err != nil || len(evs) != 0 {
 		t.Fatalf("Poll without a pad = %v, %v", evs, err)
+	}
+	if !strings.Contains(log.String(), "no input devices in") {
+		t.Errorf("Poll with nothing to read logged %q", log.String())
 	}
 	if err := win.SetPointerLock(true); err != nil {
 		t.Errorf("SetPointerLock on a panel: %v", err)

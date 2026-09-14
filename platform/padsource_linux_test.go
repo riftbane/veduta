@@ -466,18 +466,83 @@ func TestInputSourceIdlePollAllocatesNothing(t *testing.T) {
 }
 
 // TestInputSourceWithNothingToRead: a console with no pad and no keyboard runs and waits,
-// rather than failing to start.
+// rather than failing to start, and says once why nothing answers.
 func TestInputSourceWithNothingToRead(t *testing.T) {
 	fakeInputs(t, "event0 Some Mouse|"+mouseBits)
 	p := newInputSource("")
+	var log strings.Builder
+	p.log = &log
 	now := time.Now()
 	p.now = func() time.Time { return now }
 	for i := 0; i < 3; i++ {
 		if evs, err := p.poll(); err != nil || len(evs) != 0 {
 			t.Fatalf("poll %d: %v %v", i, evs, err)
 		}
+		now = now.Add(2 * padRescan)
+	}
+	if got := log.String(); strings.Count(got, "\n") != 1 || !strings.Contains(got, "no gamepad or keyboard") {
+		t.Fatalf("logged %q, want the reason once", got)
 	}
 	if err := p.close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestInputSourceReportsProblems: a player that reads no input shows the game and answers
+// nothing, and cannot even be left, since the exit chords arrive through that input. The
+// reason goes to the log once when it appears or changes, not once per rescan, and the
+// log says so when input is read again.
+func TestInputSourceReportsProblems(t *testing.T) {
+	fakeInputs(t, "event0 AT Keyboard|"+keyboardBits, "event1 Rii Gamepad|"+padBits)
+	refuse := true
+	pad := &fakePad{}
+	old := openPad
+	openPad = func(path string) (events, error) {
+		if refuse {
+			return nil, &os.PathError{Op: "open", Path: path, Err: os.ErrPermission}
+		}
+		return pad, nil
+	}
+	t.Cleanup(func() { openPad = old })
+
+	p := newInputSource("")
+	var log strings.Builder
+	p.log = &log
+	now := time.Now()
+	p.now = func() time.Time { return now }
+	poll := func() string {
+		t.Helper()
+		before := log.Len()
+		if _, err := p.poll(); err != nil {
+			t.Fatal(err)
+		}
+		now = now.Add(2 * padRescan)
+		return log.String()[before:]
+	}
+
+	got := poll()
+	for _, want := range []string{"no input device could be opened", "event1: permission denied", "event0: permission denied", "input group"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("every device refused: logged %q, want it to say %q", got, want)
+		}
+	}
+	if got := poll(); got != "" {
+		t.Fatalf("the same refusal at the next rescan was logged again: %q", got)
+	}
+	refuse = false
+	if got := poll(); !strings.Contains(got, "reading input from event1,event0") {
+		t.Fatalf("once the devices open: logged %q", got)
+	}
+	if got := poll(); got != "" {
+		t.Fatalf("nothing changed, but logged %q", got)
+	}
+
+	// A VEDUTA_PAD that names nothing says what there is instead.
+	named := newInputSource("event9")
+	named.log = &log
+	before := log.Len()
+	named.poll()
+	if got := log.String()[before:]; !strings.Contains(got, `no input device matches "event9"`) || !strings.Contains(got, "Rii Gamepad") {
+		t.Fatalf("a name that matches nothing: logged %q", got)
 	}
 }
