@@ -56,7 +56,8 @@ func openFB(o Options) (Window, error) {
 	w := &fbWindow{
 		info: info, file: f, scale: scale,
 		w: info.W / scale, h: info.H / scale,
-		buf: make([]byte, info.Stride*info.H),
+		buf:    make([]byte, info.Stride*info.H),
+		source: newPadSource(os.Getenv(padEnv)),
 	}
 	if w.w <= 0 || w.h <= 0 {
 		f.Close()
