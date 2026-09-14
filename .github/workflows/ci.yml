@@ -78,6 +78,10 @@ jobs:
 
       - name: install.sh installs from both channels
         if: runner.os == 'Linux'
+        env:
+          # Runners share addresses, and the anonymous GitHub API refuses them with 403;
+          # install.sh sends this to the API only.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           sh -n install.sh
           # The installer exits non-zero here on purpose, and this step runs with

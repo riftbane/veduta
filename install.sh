@@ -63,12 +63,30 @@ aarch64|arm64) arch=arm64 ;;
 esac
 
 # Downloads with curl or wget.
+# A GitHub token, when the environment already holds one, only raises the API rate limit:
+# the releases themselves are public. Shared addresses — CI runners above all — are refused
+# without it. It is sent to the GitHub API and nowhere else, never to go.dev.
+gh_token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 if command -v curl >/dev/null 2>&1; then
 	fetch() { curl -fsSL --retry 3 -o "$2" "$1"; }
 	fetch_stdout() { curl -fsSL --retry 3 "$1"; }
+	api_get() {
+		if [ -n "$gh_token" ]; then
+			curl -fsSL --retry 3 -H "Authorization: Bearer $gh_token" "$1"
+		else
+			curl -fsSL --retry 3 "$1"
+		fi
+	}
 elif command -v wget >/dev/null 2>&1; then
 	fetch() { wget -q -O "$2" "$1"; }
 	fetch_stdout() { wget -q -O - "$1"; }
+	api_get() {
+		if [ -n "$gh_token" ]; then
+			wget -q -O - --header="Authorization: Bearer $gh_token" "$1"
+		else
+			wget -q -O - "$1"
+		fi
+	}
 else
 	die "curl or wget is required"
 fi
@@ -104,7 +122,7 @@ if [ -z "$version" ]; then
 	# where a greedy match would take the last tag_name instead of the first, and where
 	# the first field would still carry the opening [ and {. The anchor then keeps an
 	# escaped \"tag_name\" inside release notes from matching.
-	tags="$(fetch_stdout "$url" | tr ',{[' '\n\n\n' | sed -n 's/^[[:space:]]*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+	tags="$(api_get "$url" | tr ',{[' '\n\n\n' | sed -n 's/^[[:space:]]*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
 	if [ "$channel" = beta ]; then
 		# The list is not in version order, so take the highest version rather than the
 		# first: major, minor and patch as numbers, and a release ahead of its own
