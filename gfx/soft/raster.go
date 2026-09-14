@@ -134,14 +134,16 @@ func (c *core) rasterTri(t *tri, x0, y0, x1, y1 int) int64 {
 				frags++
 				continue
 			}
-			z := l0*t.z[0] + l1*t.z[1] + l2*t.z[2]
+			// Each product is rounded explicitly so arm64 cannot fuse it into a multiply-add
+			// (see gmath.m32); this includes products that reach the +0.5 inside unorm.
+			z := float32(l0*t.z[0]) + float32(l1*t.z[1]) + float32(l2*t.z[2])
 			if cs.state.DepthTest && !(z < fb.Depth[i]) {
 				continue
 			}
-			w := 1 / (l0*t.iw[0] + l1*t.iw[1] + l2*t.iw[2])
+			w := 1 / (float32(l0*t.iw[0]) + float32(l1*t.iw[1]) + float32(l2*t.iw[2]))
 			p0, p1, p2 := l0*w, l1*w, l2*w
-			u := p0*t.a[0][aU] + p1*t.a[1][aU] + p2*t.a[2][aU]
-			v := p0*t.a[0][aV] + p1*t.a[1][aV] + p2*t.a[2][aV]
+			u := float32(p0*t.a[0][aU]) + float32(p1*t.a[1][aU]) + float32(p2*t.a[2][aU])
+			v := float32(p0*t.a[0][aV]) + float32(p1*t.a[1][aV]) + float32(p2*t.a[2][aV])
 
 			switch mode {
 			case gfx.ModeColor, gfx.ModeCollision, gfx.ModeUVChecker:
@@ -155,15 +157,15 @@ func (c *core) rasterTri(t *tri, x0, y0, x1, y1 int) int64 {
 						texel = cs.tex.bilinear(t.level, u, v)
 					}
 				}
-				alpha := float32(texel>>24) * (cs.alpha * (1.0 / 255))
+				alpha := float32(float32(texel>>24) * (cs.alpha * (1.0 / 255)))
 				if alpha < cs.cutoff {
 					continue
 				}
-				r := float32(texel>>16&0xff) * (p0*t.a[0][aR] + p1*t.a[1][aR] + p2*t.a[2][aR])
-				g := float32(texel>>8&0xff) * (p0*t.a[0][aG] + p1*t.a[1][aG] + p2*t.a[2][aG])
-				b := float32(texel&0xff) * (p0*t.a[0][aB] + p1*t.a[1][aB] + p2*t.a[2][aB])
+				r := float32(float32(texel>>16&0xff) * (float32(p0*t.a[0][aR]) + float32(p1*t.a[1][aR]) + float32(p2*t.a[2][aR])))
+				g := float32(float32(texel>>8&0xff) * (float32(p0*t.a[0][aG]) + float32(p1*t.a[1][aG]) + float32(p2*t.a[2][aG])))
+				b := float32(float32(texel&0xff) * (float32(p0*t.a[0][aB]) + float32(p1*t.a[1][aB]) + float32(p2*t.a[2][aB])))
 				if mode == gfx.ModeCollision {
-					r, g, b = r*0.5, g*0.5, b*0.5
+					r, g, b = float32(r*0.5), float32(g*0.5), float32(b*0.5)
 				}
 				src := pack(r, g, b)
 				switch cs.state.Blend {
@@ -217,7 +219,8 @@ func (c *core) rasterTri(t *tri, x0, y0, x1, y1 int) int64 {
 // rasterTriOpaque is rasterTri specialized for cmdState.fast in ModeColor without a normal
 // target. Per-triangle values are hoisted into locals and each row is resliced, so the
 // pixel loop has no mode or blend switches and no framebuffer bounds checks. It must
-// produce exactly the bits of the generic path (same expressions, same order).
+// produce exactly the bits of the generic path (same expressions, same order, same
+// explicit rounding of every product).
 func (c *core) rasterTriOpaque(t *tri, cs *cmdState, x0, y0, x1, y1 int) int64 {
 	fb := c.target
 	lv := &cs.tex.levels[t.level]
@@ -271,18 +274,18 @@ func (c *core) rasterTriOpaque(t *tri, cs *cmdState, x0, y0, x1, y1 int) int64 {
 			e0 += dx0
 			e1 += dx1
 			e2 += dx2
-			z := l0*z0 + l1*z1 + l2*z2
+			z := float32(l0*z0) + float32(l1*z1) + float32(l2*z2)
 			if !(z < depths[k]) {
 				continue
 			}
-			w := 1 / (l0*w0 + l1*w1 + l2*w2)
+			w := 1 / (float32(l0*w0) + float32(l1*w1) + float32(l2*w2))
 			p0, p1, p2 := l0*w, l1*w, l2*w
-			u := p0*a0[aU] + p1*a1[aU] + p2*a2[aU]
-			v := p0*a0[aV] + p1*a1[aV] + p2*a2[aV]
+			u := float32(p0*a0[aU]) + float32(p1*a1[aU]) + float32(p2*a2[aU])
+			v := float32(p0*a0[aV]) + float32(p1*a1[aV]) + float32(p2*a2[aV])
 
 			// Bilinear sample, as texture.bilinear with the power-of-two mask wrap.
-			fu := bound(u*fw - 0.5)
-			fv := bound(v*fh - 0.5)
+			fu := bound(float32(u*fw) - 0.5)
+			fv := bound(float32(v*fh) - 0.5)
 			xf, xi := floorfi(fu)
 			yf, yi := floorfi(fv)
 			fx := min(uint32((fu-xf)*256), 255)
@@ -296,9 +299,9 @@ func (c *core) rasterTriOpaque(t *tri, cs *cmdState, x0, y0, x1, y1 int) int64 {
 			if alphaTest && float32(texel>>24)*alphaScale < cutoff {
 				continue
 			}
-			r := float32(texel>>16&0xff) * (p0*a0[aR] + p1*a1[aR] + p2*a2[aR])
-			g := float32(texel>>8&0xff) * (p0*a0[aG] + p1*a1[aG] + p2*a2[aG])
-			b := float32(texel&0xff) * (p0*a0[aB] + p1*a1[aB] + p2*a2[aB])
+			r := float32(float32(texel>>16&0xff) * (float32(p0*a0[aR]) + float32(p1*a1[aR]) + float32(p2*a2[aR])))
+			g := float32(float32(texel>>8&0xff) * (float32(p0*a0[aG]) + float32(p1*a1[aG]) + float32(p2*a2[aG])))
+			b := float32(float32(texel&0xff) * (float32(p0*a0[aB]) + float32(p1*a1[aB]) + float32(p2*a2[aB])))
 			colors[k] = 0xff000000 | pack(r, g, b)
 			if depthWrite {
 				depths[k] = z
@@ -339,14 +342,15 @@ const (
 // the fragment comes from a back-facing triangle or its normal points away from the
 // viewer, so flipped normals and inside-out parts are visibly wrong.
 func normalColor(t *tri, cs *cmdState, p0, p1, p2 float32, x, y int) uint32 {
-	nx := p0*t.a[0][aNX] + p1*t.a[1][aNX] + p2*t.a[2][aNX]
-	ny := p0*t.a[0][aNY] + p1*t.a[1][aNY] + p2*t.a[2][aNY]
-	nz := p0*t.a[0][aNZ] + p1*t.a[1][aNZ] + p2*t.a[2][aNZ]
+	// Products are rounded explicitly so arm64 cannot fuse them into a multiply-add.
+	nx := float32(p0*t.a[0][aNX]) + float32(p1*t.a[1][aNX]) + float32(p2*t.a[2][aNX])
+	ny := float32(p0*t.a[0][aNY]) + float32(p1*t.a[1][aNY]) + float32(p2*t.a[2][aNY])
+	nz := float32(p0*t.a[0][aNZ]) + float32(p1*t.a[1][aNZ]) + float32(p2*t.a[2][aNZ])
 	flag := uint32(0)
 	switch {
 	case t.back:
 		flag = hatchBack
-	case nx*cs.vz.X+ny*cs.vz.Y+nz*cs.vz.Z < awayCosine*sqrtf(nx*nx+ny*ny+nz*nz):
+	case float32(nx*cs.vz.X)+float32(ny*cs.vz.Y)+float32(nz*cs.vz.Z) < awayCosine*sqrtf(float32(nx*nx)+float32(ny*ny)+float32(nz*nz)):
 		flag = hatchAway
 	}
 	if flag != 0 {
@@ -362,7 +366,8 @@ func pack(r, g, b float32) uint32 {
 	return uint32(unorm(r))<<16 | uint32(unorm(g))<<8 | uint32(unorm(b))
 }
 
-// unorm rounds a channel value in [0, 255] (clamping) to an integer.
+// unorm rounds a channel value in [0, 255] (clamping) to an integer. The conversion of x
+// keeps a caller's unrounded product from fusing with the + 0.5 once this is inlined.
 func unorm(x float32) uint32 {
 	if !(x > 0) {
 		return 0
@@ -370,7 +375,7 @@ func unorm(x float32) uint32 {
 	if x >= 255 {
 		return 255
 	}
-	return uint32(x + 0.5)
+	return uint32(float32(x) + 0.5)
 }
 
 func blendAlpha(dst, src, a uint32) uint32 {
@@ -391,15 +396,20 @@ func blendAdd(dst, src, a uint32) uint32 {
 
 // packNormal interpolates and packs the world normal as 0xFFRRGGBB, n*0.5+0.5 per channel.
 func packNormal(t *tri, p0, p1, p2 float32) uint32 {
-	nx := p0*t.a[0][aNX] + p1*t.a[1][aNX] + p2*t.a[2][aNX]
-	ny := p0*t.a[0][aNY] + p1*t.a[1][aNY] + p2*t.a[2][aNY]
-	nz := p0*t.a[0][aNZ] + p1*t.a[1][aNZ] + p2*t.a[2][aNZ]
-	l := nx*nx + ny*ny + nz*nz
+	nx := float32(p0*t.a[0][aNX]) + float32(p1*t.a[1][aNX]) + float32(p2*t.a[2][aNX])
+	ny := float32(p0*t.a[0][aNY]) + float32(p1*t.a[1][aNY]) + float32(p2*t.a[2][aNY])
+	nz := float32(p0*t.a[0][aNZ]) + float32(p1*t.a[1][aNZ]) + float32(p2*t.a[2][aNZ])
+	l := float32(nx*nx) + float32(ny*ny) + float32(nz*nz)
 	if l > 0 {
 		s := 1 / sqrtf(l)
 		nx, ny, nz = nx*s, ny*s, nz*s
 	}
-	return 0xff000000 | pack((nx*0.5+0.5)*255, (ny*0.5+0.5)*255, (nz*0.5+0.5)*255)
+	// The outer products are rounded too: they reach the +0.5 inside the inlined unorm.
+	return 0xff000000 | pack(
+		float32((float32(nx*0.5)+0.5)*255),
+		float32((float32(ny*0.5)+0.5)*255),
+		float32((float32(nz*0.5)+0.5)*255),
+	)
 }
 
 // Wireframe colors: pixels whose center is within one pixel of an original edge (on the

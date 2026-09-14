@@ -57,13 +57,13 @@ func contactSheet(t *testing.T, m *asset.Model) *gfx.Image {
 	center := b.Center()
 	radius := max(b.Size().Len()/2, 0.05)
 	const fov = 35
-	dist := radius / gmath.Sin(gmath.Radians(fov/2)) * 1.05
+	dist := float32(radius / gmath.Sin(gmath.Radians(fov/2)) * 1.05)
 	sheet := gfx.NewImage(3*tileW, 2*tileH)
 	for i, v := range views {
 		eye := center.Add(v.dir.Normalize().Scale(dist))
 		fb := gfx.NewFramebuffer(tileW, tileH, false)
 		dl := gfx.DrawList{Clear: true, ClearColor: gfx.RGBA(0x20, 0x28, 0x30, 0xff), Mode: v.mode, Light: gfx.DefaultLight}
-		near, far := max(dist-2*radius, dist*0.01), dist+2*radius
+		near, far := max(dist-float32(2*radius), dist*0.01), dist+float32(2*radius)
 		view := dl.AddView(gfx.View{
 			View: gmath.LookAt(eye, center, gmath.Up),
 			Proj: gmath.Perspective(gmath.Radians(fov), float32(tileW)/tileH, near, far),

@@ -61,8 +61,10 @@ func newImagePainter(s *spec, l *layerSpec) *imagePainter {
 		if l.fit == "cover" {
 			k = max(W/iw, H/ih)
 		}
-		p.dw, p.dh = iw*k, ih*k
-		p.ox, p.oy = (W-p.dw)/2, (H-p.dh)/2
+		// Products and halves are rounded explicitly so arm64 cannot fuse them into a
+		// multiply-add (see gmath.m32).
+		p.dw, p.dh = float64(iw*k), float64(ih*k)
+		p.ox, p.oy = float64((W-p.dw)/2), float64((H-p.dh)/2)
 	}
 	p.fx, p.fy = iw/p.dw, ih/p.dh
 	p.kx = max(1, int(math.Ceil(p.fx)))
@@ -84,10 +86,10 @@ func (p *imagePainter) at(x, y int) ([3]float32, float32) {
 	var acc [4]float64
 	for j := 0; j < p.ky; j++ {
 		sy := min(max(fy+(float64(j)+0.5)/float64(p.ky), p.oy), p.oy+p.dh)
-		v := (sy-p.oy)*p.fy - 0.5
+		v := float64((sy-p.oy)*p.fy) - 0.5
 		for i := 0; i < p.kx; i++ {
 			sx := min(max(fx+(float64(i)+0.5)/float64(p.kx), p.ox), p.ox+p.dw)
-			u := (sx-p.ox)*p.fx - 0.5
+			u := float64((sx-p.ox)*p.fx) - 0.5
 			c := p.bilinear(u, v)
 			for k := range acc {
 				acc[k] += c[k]
@@ -110,9 +112,9 @@ func (p *imagePainter) bilinear(u, v float64) [4]float64 {
 	c11 := p.texel(i0+1, j0+1)
 	var out [4]float64
 	for k := range out {
-		top := c00[k] + (c10[k]-c00[k])*tu
-		bottom := c01[k] + (c11[k]-c01[k])*tu
-		out[k] = top + (bottom-top)*tv
+		top := c00[k] + float64((c10[k]-c00[k])*tu)
+		bottom := c01[k] + float64((c11[k]-c01[k])*tu)
+		out[k] = top + float64((bottom-top)*tv)
 	}
 	return out
 }
@@ -123,5 +125,5 @@ func (p *imagePainter) texel(i, j int) [4]float64 {
 	j = min(max(j, 0), p.img.H-1)
 	r, g, b, a8 := gfx.UnpackRGBA(p.img.Pix[j*p.img.W+i])
 	a := float64(a8) / 255
-	return [4]float64{float64(r) / 255 * a, float64(g) / 255 * a, float64(b) / 255 * a, a}
+	return [4]float64{float64(float64(r) / 255 * a), float64(float64(g) / 255 * a), float64(float64(b) / 255 * a), a}
 }

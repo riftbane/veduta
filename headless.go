@@ -596,7 +596,7 @@ func sheetLayout(n, tileW int, p *asset.Project) (cols, w, h int) {
 		w = (640 - (cols+1)*4) / cols
 	}
 	aspect := float32(p.Resolution[1]) / float32(p.Resolution[0])
-	h = max(int(float32(w)*aspect), 1)
+	h = max(int(min(float32(w)*aspect, asset.MaxResolution+1)), 1)
 	return cols, w, h
 }
 

@@ -156,11 +156,11 @@ func firstCrossing(pts []dvec2) (int, int, bool) {
 			c, d := pts[j], pts[(j+1)%n]
 			switch {
 			case j == i+1: // edges meet at b == c: bad only if d folds back onto a-b
-				if cross2(a, b, d) == 0 && (d[0]-b[0])*(a[0]-b[0])+(d[1]-b[1])*(a[1]-b[1]) > 0 {
+				if cross2(a, b, d) == 0 && float64((d[0]-b[0])*(a[0]-b[0]))+float64((d[1]-b[1])*(a[1]-b[1])) > 0 {
 					return i, j, true
 				}
 			case i == 0 && j == n-1: // edges meet at a == d
-				if cross2(c, a, b) == 0 && (c[0]-a[0])*(b[0]-a[0])+(c[1]-a[1])*(b[1]-a[1]) > 0 {
+				if cross2(c, a, b) == 0 && float64((c[0]-a[0])*(b[0]-a[0]))+float64((c[1]-a[1])*(b[1]-a[1])) > 0 {
 					return i, j, true
 				}
 			default:

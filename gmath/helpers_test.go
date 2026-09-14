@@ -22,8 +22,8 @@ func (r *testRNG) u64() uint64 {
 
 // f returns a uniform float32 in [lo, hi].
 func (r *testRNG) f(lo, hi float32) float32 {
-	u := float64(r.u64()>>11) / (1 << 53)
-	return float32(float64(lo) + u*float64(hi-lo))
+	u := float64(float64(r.u64()>>11) / (1 << 53))
+	return float32(float64(lo) + float64(u*float64(hi-lo)))
 }
 
 func (r *testRNG) vec3(lo, hi float32) Vec3 { return Vec3{r.f(lo, hi), r.f(lo, hi), r.f(lo, hi)} }
@@ -73,7 +73,8 @@ func approx(a, b, tol float32) bool {
 	if a == b {
 		return true
 	}
-	return Abs(a-b) <= tol*max(1, Abs(a), Abs(b))
+	// a or b is often a product inlined from the caller: round it before subtracting.
+	return Abs(float32(a)-float32(b)) <= tol*max(1, Abs(a), Abs(b))
 }
 
 // within reports whether |a-b| <= eps (exact equality also covers infinities).

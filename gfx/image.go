@@ -69,7 +69,7 @@ func unorm8(x float32) uint8 {
 	if x >= 1 {
 		return 255
 	}
-	return uint8(x*255 + 0.5)
+	return uint8(float32(x*255) + 0.5) // rounded explicitly: arm64 must not fuse a multiply-add
 }
 
 // Image is a BGRA8 image stored row-major, top row first.

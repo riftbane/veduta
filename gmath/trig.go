@@ -157,7 +157,7 @@ func Atan64(x float64) float64 {
 		}
 	case x < 0.6875:
 		id = 0
-		x = (2*x - 1) / (2 + x)
+		x = (m(2, x) - 1) / (2 + x)
 	case x < 1.1875:
 		id = 1
 		x = (x - 1) / (x + 1)

@@ -37,8 +37,9 @@ func (c Camera) View() gmath.Mat4 { return gmath.LookAt(c.Position, c.Target, gm
 // Proj returns the eye→clip matrix for the given aspect ratio (width / height).
 func (c Camera) Proj(aspect float32) gmath.Mat4 {
 	if c.Ortho {
-		h := c.Size / 2
-		w := h * aspect
+		// Rounded explicitly so arm64 cannot fuse them into a multiply-add (see gmath.m32).
+		h := float32(c.Size / 2)
+		w := float32(h * aspect)
 		return gmath.Orthographic(-w, w, -h, h, c.Near, c.Far)
 	}
 	return gmath.Perspective(gmath.Radians(c.FovDeg), aspect, c.Near, c.Far)
@@ -116,7 +117,9 @@ func (c Camera) LookFrom(eye gmath.Vec3, yawDeg, pitchDeg float32) Camera {
 func OrbitDir(yawDeg, pitchDeg float32) gmath.Vec3 {
 	sy, cy := gmath.SinCos(gmath.Radians(yawDeg))
 	sp, cp := gmath.SinCos(gmath.Radians(pitchDeg))
-	return gmath.V3(-sy*cp, -sp, -cy*cp)
+	// Callers add the direction to a position: round each product explicitly so arm64
+	// cannot fuse it into a multiply-add (see gmath.m32).
+	return gmath.V3(float32(-sy*cp), -sp, float32(-cy*cp))
 }
 
 // FrameOrtho returns an orthographic camera looking along dir that fits box b with a
@@ -140,7 +143,7 @@ func FrameOrtho(b gmath.AABB, dir gmath.Vec3, aspect float32) Camera {
 	if size == 0 {
 		size = 1
 	}
-	return Camera{Ortho: true, Size: size, Near: 0.01, Far: radius * 4, Position: c.Sub(dir.Scale(radius * 2)), Target: c}
+	return Camera{Ortho: true, Size: size, Near: 0.01, Far: float32(radius * 4), Position: c.Sub(dir.Scale(radius * 2)), Target: c}
 }
 
 // FramePerspective returns a perspective camera looking along dir that fits the bounding
@@ -156,6 +159,8 @@ func FramePerspective(b gmath.AABB, dir gmath.Vec3, fovDeg, aspect float32) Came
 	if aspect < 1 {
 		half = gmath.Atan(gmath.Tan(half) * aspect)
 	}
-	dist := radius / gmath.Sin(half) * 1.05
-	return Camera{FovDeg: fovDeg, Near: max(dist-radius*1.5, dist*0.01), Far: dist + radius*1.5, Position: c.Sub(dir.Scale(dist)), Target: c}
+	// Each product is rounded explicitly so arm64 cannot fuse it into a multiply-add (see
+	// gmath.m32).
+	dist := float32(radius / gmath.Sin(half) * 1.05)
+	return Camera{FovDeg: fovDeg, Near: max(dist-float32(radius*1.5), float32(dist*0.01)), Far: dist + float32(radius*1.5), Position: c.Sub(dir.Scale(dist)), Target: c}
 }

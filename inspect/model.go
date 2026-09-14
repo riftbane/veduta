@@ -105,20 +105,30 @@ func mdlContains(list []string, s string) bool {
 	return false
 }
 
-// Geometry in float64.
+// Geometry in float64. Each product that feeds an addition or subtraction is rounded
+// explicitly so arm64 cannot fuse it into a multiply-add (see gmath.m32); the helpers are
+// inlined, so rounding inside them also protects their callers.
 
 type mdlVec [3]float64
 
 func mdlV(v gmath.Vec3) mdlVec { return mdlVec{float64(v.X), float64(v.Y), float64(v.Z)} }
 
-func (a mdlVec) add(b mdlVec) mdlVec    { return mdlVec{a[0] + b[0], a[1] + b[1], a[2] + b[2]} }
-func (a mdlVec) sub(b mdlVec) mdlVec    { return mdlVec{a[0] - b[0], a[1] - b[1], a[2] - b[2]} }
-func (a mdlVec) scale(s float64) mdlVec { return mdlVec{a[0] * s, a[1] * s, a[2] * s} }
-func (a mdlVec) dot(b mdlVec) float64   { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2] }
-func (a mdlVec) len() float64           { return math.Sqrt(a.dot(a)) }
-func (a mdlVec) mid(b mdlVec) mdlVec    { return a.add(b).scale(0.5) }
+func (a mdlVec) add(b mdlVec) mdlVec { return mdlVec{a[0] + b[0], a[1] + b[1], a[2] + b[2]} }
+func (a mdlVec) sub(b mdlVec) mdlVec { return mdlVec{a[0] - b[0], a[1] - b[1], a[2] - b[2]} }
+func (a mdlVec) scale(s float64) mdlVec {
+	return mdlVec{float64(a[0] * s), float64(a[1] * s), float64(a[2] * s)}
+}
+func (a mdlVec) dot(b mdlVec) float64 {
+	return float64(a[0]*b[0]) + float64(a[1]*b[1]) + float64(a[2]*b[2])
+}
+func (a mdlVec) len() float64        { return math.Sqrt(a.dot(a)) }
+func (a mdlVec) mid(b mdlVec) mdlVec { return a.add(b).scale(0.5) }
 func (a mdlVec) cross(b mdlVec) mdlVec {
-	return mdlVec{a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]}
+	return mdlVec{
+		float64(a[1]*b[2]) - float64(a[2]*b[1]),
+		float64(a[2]*b[0]) - float64(a[0]*b[2]),
+		float64(a[0]*b[1]) - float64(a[1]*b[0]),
+	}
 }
 
 func (a mdlVec) finite() bool {
@@ -356,11 +366,11 @@ func (a *mdlAnalysis) tri(o int) mdlTri {
 		t.bad = "zero_area"
 		return t
 	}
-	t.area = l / 2
+	t.area = float64(l / 2)
 	t.n = c.scale(1 / l)
 	vs := a.m.Mesh.Vertices
 	u0, u1, u2 := vs[t.v[0]].UV, vs[t.v[1]].UV, vs[t.v[2]].UV
-	t.uvA = math.Abs(float64(u1.X-u0.X)*float64(u2.Y-u0.Y)-float64(u1.Y-u0.Y)*float64(u2.X-u0.X)) / 2
+	t.uvA = math.Abs(float64(float64(u1.X-u0.X)*float64(u2.Y-u0.Y))-float64(float64(u1.Y-u0.Y)*float64(u2.X-u0.X))) / 2
 	if math.IsNaN(t.uvA) || math.IsInf(t.uvA, 0) {
 		t.uvA = 0
 	}
@@ -712,7 +722,7 @@ func mdlUVOverlap(tris []mdlTri, vs []gfx.Vertex) ([]int, float64) {
 		if !ok {
 			continue
 		}
-		ar := (ut.p[1][0]-ut.p[0][0])*(ut.p[2][1]-ut.p[0][1]) - (ut.p[1][1]-ut.p[0][1])*(ut.p[2][0]-ut.p[0][0])
+		ar := float64((ut.p[1][0]-ut.p[0][0])*(ut.p[2][1]-ut.p[0][1])) - float64((ut.p[1][1]-ut.p[0][1])*(ut.p[2][0]-ut.p[0][0]))
 		if ar == 0 {
 			continue
 		}
@@ -747,7 +757,7 @@ func mdlUVOverlap(tris []mdlTri, vs []gfx.Vertex) ([]int, float64) {
 		j1 := min(nv-1, int(math.Floor((mxv-lo[1])/cell-0.5)))
 		for j := j0; j <= j1; j++ {
 			for i := i0; i <= i1; i++ {
-				c := [2]float64{lo[0] + (float64(i)+0.5)*cell, lo[1] + (float64(j)+0.5)*cell}
+				c := [2]float64{lo[0] + float64((float64(i)+0.5)*cell), lo[1] + float64((float64(j)+0.5)*cell)}
 				if mdlUVInside(ut.p, c) {
 					f(j*nu + i)
 				}
@@ -792,9 +802,9 @@ func mdlUVOverlap(tris []mdlTri, vs []gfx.Vertex) ([]int, float64) {
 // smaller end so that the reversed edge gives exactly the negated value.
 func mdlEdgeFn(a, b, c [2]float64) float64 {
 	if a[0] < b[0] || (a[0] == b[0] && a[1] < b[1]) {
-		return (b[0]-a[0])*(c[1]-a[1]) - (b[1]-a[1])*(c[0]-a[0])
+		return float64((b[0]-a[0])*(c[1]-a[1])) - float64((b[1]-a[1])*(c[0]-a[0]))
 	}
-	return -((a[0]-b[0])*(c[1]-b[1]) - (a[1]-b[1])*(c[0]-b[0]))
+	return -(float64((a[0]-b[0])*(c[1]-b[1])) - float64((a[1]-b[1])*(c[0]-b[0])))
 }
 
 // mdlUVInside reports whether c is inside the counter-clockwise triangle p; points on
@@ -850,7 +860,7 @@ func (a *mdlAnalysis) texelDensity() {
 		}
 		for _, t := range p.tris {
 			d := t.uvA/t.area - a.densMean
-			sv += t.area * d * d
+			sv += float64(t.area * d * d)
 		}
 	}
 	a.cv = math.Sqrt(sv/sa) / a.densMean
@@ -894,7 +904,11 @@ func (a *mdlAnalysis) symGrid() *mdlTriGrid {
 		}
 	}
 	// Cells along the diagonal: twice the cube root of the triangle count, 8–128.
-	cells := min(128, max(8, int(math.Ceil(2*math.Cbrt(float64(len(g.tris)))))))
+	// Counted in integers (c³ ≥ 8n) rather than with math.Cbrt, which is not exact.
+	cells := 8
+	for cells < 128 && cells*cells*cells < 8*len(g.tris) {
+		cells++
+	}
 	for {
 		g.h = max(a.diag/float64(cells), 2*eps)
 		for k := range 3 {
@@ -982,7 +996,7 @@ func mdlClosest(p, a, b, c mdlVec) mdlVec {
 	if d3 >= 0 && d4 <= d3 {
 		return b
 	}
-	vc := d1*d4 - d3*d2
+	vc := float64(d1*d4) - float64(d3*d2)
 	if vc <= 0 && d1 >= 0 && d3 <= 0 {
 		return a.add(ab.scale(d1 / (d1 - d3)))
 	}
@@ -991,11 +1005,11 @@ func mdlClosest(p, a, b, c mdlVec) mdlVec {
 	if d6 >= 0 && d5 <= d6 {
 		return c
 	}
-	vb := d5*d2 - d1*d6
+	vb := float64(d5*d2) - float64(d1*d6)
 	if vb <= 0 && d2 >= 0 && d6 <= 0 {
 		return a.add(ac.scale(d2 / (d2 - d6)))
 	}
-	va := d3*d6 - d5*d4
+	va := float64(d3*d6) - float64(d5*d4)
 	if va <= 0 && d4-d3 >= 0 && d5-d6 >= 0 {
 		return b.add(c.sub(b).scale((d4 - d3) / ((d4 - d3) + (d5 - d6))))
 	}
@@ -1041,7 +1055,7 @@ func (a *mdlAnalysis) computeSymmetry(axis int) (float64, []int32) {
 	var bad []int32
 	for _, id := range ids {
 		q := a.wpos[id]
-		q[axis] = 2*c - q[axis]
+		q[axis] = float64(2*c) - q[axis]
 		inside := true
 		for k := range 3 {
 			if q[k] < a.bmin[k]-eps || q[k] > a.bmax[k]+eps {
@@ -1410,9 +1424,12 @@ func (a *mdlAnalysis) modelIssues(r *Report) {
 			}
 			d := su / sa
 			dens = append(dens, mdlR(d))
+			// The part furthest from the mean in ratio, |log(d/mean)| ranked as
+			// max(r, 1/r): math.Log is assembly on amd64 and portable Go on arm64.
 			x := math.Inf(1)
 			if d > 0 {
-				x = math.Abs(math.Log(d / a.densMean))
+				r := d / a.densMean
+				x = max(r, 1/r)
 			}
 			if x > dev {
 				worst, dev = len(dens)-1, x

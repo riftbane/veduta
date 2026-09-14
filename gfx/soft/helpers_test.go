@@ -98,7 +98,7 @@ type lcg uint64
 
 func (l *lcg) float() float32 {
 	*l = *l*6364136223846793005 + 1442695040888963407
-	return float32(uint32(*l>>40)) / float32(1<<24)
+	return float32(float32(uint32(*l>>40)) / float32(1<<24))
 }
 
 // white is an opaque white color multiplier.

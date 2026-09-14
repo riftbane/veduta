@@ -25,6 +25,13 @@ func Radians(deg float32) float32 { return float32(float64(deg) * Deg2Rad) }
 // Degrees converts radians to degrees.
 func Degrees(rad float32) float32 { return float32(float64(rad) * Rad2Deg) }
 
+// m32 rounds a float32 product explicitly. A conversion is a rounding point the compiler
+// may not fuse into a multiply-add, and the Go specification allows fusion across
+// statements, so splitting an expression into temporaries protects nothing: only this
+// does. Without it a*b + c*d rounds twice on amd64 and once on arm64 (a fused FMADDS),
+// and the two differ in the last bit for about a quarter of all inputs.
+func m32(a, b float32) float32 { return float32(a * b) }
+
 // Abs returns |x|.
 func Abs(x float32) float32 { return math.Float32frombits(math.Float32bits(x) &^ (1 << 31)) }
 
@@ -86,7 +93,8 @@ func Smoothstep(e0, e1, x float32) float32 {
 		return 1
 	}
 	t := Clamp01((x - e0) / (e1 - e0))
-	return float32(t*t) * (3 - 2*t)
+	// The result is rounded too: inlined, it is often an operand of the caller's sum.
+	return m32(m32(t, t), 3-m32(2, t))
 }
 
 // Wrap returns x modulo m in [0, m) for m > 0. The result is always strictly below m:

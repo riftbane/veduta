@@ -26,7 +26,7 @@ func renderScene(t *testing.T, s *Scene, mats map[string]*Material, w, h int) *g
 	aspect := float32(w) / float32(h)
 	proj := gmath.Perspective(gmath.Radians(cam.FovDeg), aspect, cam.Near, cam.Far)
 	if cam.Ortho {
-		hw, hh := cam.Size*aspect/2, cam.Size/2
+		hw, hh := float32(cam.Size*aspect/2), float32(cam.Size/2)
 		proj = gmath.Orthographic(-hw, hw, -hh, hh, cam.Near, cam.Far)
 	}
 	dl := gfx.DrawList{Clear: true, ClearColor: s.Background, Light: s.Light}

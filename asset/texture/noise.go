@@ -61,15 +61,17 @@ func (f *noiseField) at(x, y int) float32 {
 			i0, i1 = wrapInt(i0, f.px[o]), wrapInt(i1, f.px[o])
 			j0, j1 = wrapInt(j0, f.py[o]), wrapInt(j1, f.py[o])
 		}
-		su := tu * tu * (3 - 2*tu)
-		sv := tv * tv * (3 - 2*tv)
+		// Products that feed a sum are rounded explicitly so arm64 cannot fuse them into a
+		// multiply-add (see gmath.m32).
+		su := tu * tu * (3 - float64(2*tu))
+		sv := tv * tv * (3 - float64(2*tv))
 		v00 := f.lattice(o, i0, j0)
 		v10 := f.lattice(o, i1, j0)
 		v01 := f.lattice(o, i0, j1)
 		v11 := f.lattice(o, i1, j1)
-		top := v00 + (v10-v00)*su
-		bottom := v01 + (v11-v01)*su
-		sum += weight * (top + (bottom-top)*sv)
+		top := v00 + float64((v10-v00)*su)
+		bottom := v01 + float64((v11-v01)*su)
+		sum += float64(weight * (top + float64((bottom-top)*sv)))
 		weight /= 2
 	}
 	return float32(sum * f.norm)
@@ -81,7 +83,7 @@ func (f *noiseField) lattice(o int, i, j int64) float64 {
 	h := mix64(f.seed ^ 0x9e3779b97f4a7c15*uint64(o+1))
 	h = mix64(h ^ uint64(i))
 	h = mix64(h ^ uint64(j))
-	return float64(h>>11) / (1 << 53)
+	return float64(float64(h>>11) / (1 << 53))
 }
 
 // mix64 is the SplitMix64 output function, a bijective 64-bit hash.

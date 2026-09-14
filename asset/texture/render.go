@@ -68,7 +68,7 @@ func render(s *spec, skip []bool) *gfx.Image {
 					for i := range passes {
 						ps := &passes[i]
 						rgb, a := ps.p.at(x, y)
-						composite(&px, rgb, a*ps.opacity, ps.blend)
+						composite(&px, rgb, float32(a*ps.opacity), ps.blend)
 					}
 					row[x] = pack(px)
 				}
@@ -106,13 +106,13 @@ func composite(d *[4]float32, s [3]float32, a float32, mode blendMode) {
 	}
 	if da == 1 {
 		for i := 0; i < 3; i++ {
-			d[i] += (b[i] - d[i]) * a
+			d[i] += float32((b[i] - d[i]) * a)
 		}
 		return
 	}
-	ao := a + da*(1-a)
+	ao := a + float32(da*(1-a))
 	for i := 0; i < 3; i++ {
-		co := a*(1-da)*s[i] + a*da*b[i] + (1-a)*da*d[i]
+		co := float32(float32(a*(1-da))*s[i]) + float32(float32(a*da)*b[i]) + float32(float32((1-a)*da)*d[i])
 		d[i] = co / ao
 	}
 	d[3] = min(ao, 1)
@@ -124,7 +124,7 @@ func blendFn(mode blendMode, d, s float32) float32 {
 	case blendMultiply:
 		return d * s
 	case blendScreen:
-		return 1 - (1-d)*(1-s)
+		return 1 - float32((1-d)*(1-s))
 	case blendAdd:
 		return min(1, d+s)
 	}
@@ -144,7 +144,7 @@ func q8(x float32) uint8 {
 	if x >= 1 {
 		return 255
 	}
-	return uint8(x*255 + 0.5)
+	return uint8(float32(x*255) + 0.5)
 }
 
 // newPainter builds the painter of a validated layer.
@@ -158,7 +158,8 @@ func newPainter(s *spec, l *layerSpec) painter {
 		cos, sin := direction(l.angle)
 		return &stripes{colors: l.colors, cos: cos, sin: sin, width: l.width}
 	case "rect":
-		hx, hy := l.size[0]/2, l.size[1]/2
+		// The halves are rounded explicitly so arm64 cannot fuse them into the sums below.
+		hx, hy := float64(l.size[0]/2), float64(l.size[1]/2)
 		r := min(l.corner, hx, hy)
 		sh := &shape{rgb: rgbOf(l.color), a: l.color[3],
 			outer: roundRect{cx: l.xy[0] + hx, cy: l.xy[1] + hy, hx: hx, hy: hy, r: r}}
@@ -252,7 +253,9 @@ type stripes struct {
 	width    float64
 }
 
-func (p *stripes) band(x, y float64) float64 { return math.Floor((x*p.cos + y*p.sin) / p.width) }
+func (p *stripes) band(x, y float64) float64 {
+	return math.Floor((float64(x*p.cos) + float64(y*p.sin)) / p.width)
+}
 
 func (p *stripes) color(k float64) rgba {
 	n := float64(len(p.colors))
@@ -276,18 +279,18 @@ func (p *stripes) at(x, y int) ([3]float32, float32) {
 	var acc [4]float64
 	first, same := rgba{}, true
 	for j := 0; j < ss; j++ {
-		sy := fy + (float64(j)+0.5)/ss
+		sy := fy + float64((float64(j)+0.5)/ss)
 		for i := 0; i < ss; i++ {
-			c := p.color(p.band(fx+(float64(i)+0.5)/ss, sy))
+			c := p.color(p.band(fx+float64((float64(i)+0.5)/ss), sy))
 			if i == 0 && j == 0 {
 				first = c
 			} else if c != first {
 				same = false
 			}
 			a := float64(c[3])
-			acc[0] += a * float64(c[0])
-			acc[1] += a * float64(c[1])
-			acc[2] += a * float64(c[2])
+			acc[0] += float64(a * float64(c[0]))
+			acc[1] += float64(a * float64(c[1]))
+			acc[2] += float64(a * float64(c[2]))
 			acc[3] += a
 		}
 	}
@@ -307,7 +310,7 @@ func (s *roundRect) dist(x, y float64) float64 {
 	qx := math.Abs(x-s.cx) - (s.hx - s.r)
 	qy := math.Abs(y-s.cy) - (s.hy - s.r)
 	ox, oy := max(qx, 0), max(qy, 0)
-	return math.Sqrt(ox*ox+oy*oy) + min(max(qx, qy), 0) - s.r
+	return math.Sqrt(float64(ox*ox)+float64(oy*oy)) + min(max(qx, qy), 0) - s.r
 }
 
 // shape is a filled or outlined rectangle or circle with ss×ss supersampled coverage. A
@@ -343,9 +346,9 @@ func (p *shape) at(x, y int) ([3]float32, float32) {
 	}
 	n := 0
 	for j := 0; j < ss; j++ {
-		sy := fy + (float64(j)+0.5)/ss
+		sy := fy + float64((float64(j)+0.5)/ss)
 		for i := 0; i < ss; i++ {
-			if p.covered(fx+(float64(i)+0.5)/ss, sy) {
+			if p.covered(fx+float64((float64(i)+0.5)/ss), sy) {
 				n++
 			}
 		}
@@ -367,7 +370,7 @@ func newGradient(s *spec, l *layerSpec) *gradient {
 	g := &gradient{from: l.from, to: l.to, cos: cos, sin: sin}
 	lo, hi := math.Inf(1), math.Inf(-1)
 	for _, c := range [4][2]float64{{0.5, 0.5}, {float64(s.w) - 0.5, 0.5}, {0.5, float64(s.h) - 0.5}, {float64(s.w) - 0.5, float64(s.h) - 0.5}} {
-		t := c[0]*cos + c[1]*sin
+		t := float64(c[0]*cos) + float64(c[1]*sin)
 		lo, hi = min(lo, t), max(hi, t)
 	}
 	g.t0, g.span = lo, hi-lo
@@ -377,20 +380,24 @@ func newGradient(s *spec, l *layerSpec) *gradient {
 func (p *gradient) at(x, y int) ([3]float32, float32) {
 	var t float32
 	if p.span > 0 {
-		t = clamp01(((float64(x)+0.5)*p.cos + (float64(y)+0.5)*p.sin - p.t0) / p.span)
+		t = clamp01((float64((float64(x)+0.5)*p.cos) + float64((float64(y)+0.5)*p.sin) - p.t0) / p.span)
 	}
 	u := 1 - t
 	c0, c1 := p.from, p.to
 	if c0[3] == c1[3] {
-		return [3]float32{c0[0]*u + c1[0]*t, c0[1]*u + c1[1]*t, c0[2]*u + c1[2]*t}, c0[3]
+		return [3]float32{
+			float32(c0[0]*u) + float32(c1[0]*t),
+			float32(c0[1]*u) + float32(c1[1]*t),
+			float32(c0[2]*u) + float32(c1[2]*t),
+		}, c0[3]
 	}
-	a := c0[3]*u + c1[3]*t
+	a := float32(c0[3]*u) + float32(c1[3]*t)
 	if !(a > 0) {
 		return [3]float32{}, 0
 	}
 	var rgb [3]float32
 	for i := 0; i < 3; i++ {
-		rgb[i] = min((c0[i]*c0[3]*u+c1[i]*c1[3]*t)/a, 1)
+		rgb[i] = min((float32(float32(c0[i]*c0[3])*u)+float32(float32(c1[i]*c1[3])*t))/a, 1)
 	}
 	return rgb, a
 }

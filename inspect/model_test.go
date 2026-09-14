@@ -132,8 +132,8 @@ func mdlTestRect(m *asset.Model, part int, cam scene.Camera, w, h int) (x0, y0, 
 	pi := m.Parts[part]
 	for _, vi := range m.Mesh.Indices[pi.First : pi.First+pi.Count] {
 		c := vp.MulVec4(m.Mesh.Vertices[vi].Pos.Vec4(1))
-		x := float64((c.X/c.W*0.5 + 0.5) * float32(w))
-		y := float64((0.5 - c.Y/c.W*0.5) * float32(h))
+		x := float64((float32(c.X/c.W*0.5) + 0.5) * float32(w))
+		y := float64((0.5 - float32(c.Y/c.W*0.5)) * float32(h))
 		fx0, fy0, fx1, fy1 = min(fx0, x), min(fy0, y), max(fx1, x), max(fy1, y)
 	}
 	return int(fx0), int(fy0), int(math.Ceil(fx1)), int(math.Ceil(fy1))

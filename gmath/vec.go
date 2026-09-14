@@ -55,16 +55,16 @@ func (a Vec2) Add(b Vec2) Vec2 { return Vec2{a.X + b.X, a.Y + b.Y} }
 func (a Vec2) Sub(b Vec2) Vec2 { return Vec2{a.X - b.X, a.Y - b.Y} }
 
 // Scale returns a*s.
-func (a Vec2) Scale(s float32) Vec2 { return Vec2{a.X * s, a.Y * s} }
+func (a Vec2) Scale(s float32) Vec2 { return Vec2{m32(a.X, s), m32(a.Y, s)} }
 
 // Mul returns the component-wise product.
-func (a Vec2) Mul(b Vec2) Vec2 { return Vec2{a.X * b.X, a.Y * b.Y} }
+func (a Vec2) Mul(b Vec2) Vec2 { return Vec2{m32(a.X, b.X), m32(a.Y, b.Y)} }
 
 // Dot returns the dot product.
-func (a Vec2) Dot(b Vec2) float32 { return a.X*b.X + a.Y*b.Y }
+func (a Vec2) Dot(b Vec2) float32 { return m32(a.X, b.X) + m32(a.Y, b.Y) }
 
 // Cross returns the z component of the 3D cross product of (a,0) and (b,0).
-func (a Vec2) Cross(b Vec2) float32 { return a.X*b.Y - a.Y*b.X }
+func (a Vec2) Cross(b Vec2) float32 { return m32(a.X, b.Y) - m32(a.Y, b.X) }
 
 // Len returns the Euclidean length (+Inf only if it exceeds MaxFloat32).
 func (a Vec2) Len() float32 {
@@ -108,20 +108,20 @@ func (a Vec3) Add(b Vec3) Vec3 { return Vec3{a.X + b.X, a.Y + b.Y, a.Z + b.Z} }
 func (a Vec3) Sub(b Vec3) Vec3 { return Vec3{a.X - b.X, a.Y - b.Y, a.Z - b.Z} }
 
 // Scale returns a*s.
-func (a Vec3) Scale(s float32) Vec3 { return Vec3{a.X * s, a.Y * s, a.Z * s} }
+func (a Vec3) Scale(s float32) Vec3 { return Vec3{m32(a.X, s), m32(a.Y, s), m32(a.Z, s)} }
 
 // Mul returns the component-wise product.
-func (a Vec3) Mul(b Vec3) Vec3 { return Vec3{a.X * b.X, a.Y * b.Y, a.Z * b.Z} }
+func (a Vec3) Mul(b Vec3) Vec3 { return Vec3{m32(a.X, b.X), m32(a.Y, b.Y), m32(a.Z, b.Z)} }
 
 // Neg returns -a.
 func (a Vec3) Neg() Vec3 { return Vec3{-a.X, -a.Y, -a.Z} }
 
 // Dot returns the dot product.
-func (a Vec3) Dot(b Vec3) float32 { return a.X*b.X + a.Y*b.Y + a.Z*b.Z }
+func (a Vec3) Dot(b Vec3) float32 { return m32(a.X, b.X) + m32(a.Y, b.Y) + m32(a.Z, b.Z) }
 
 // Cross returns the cross product a×b.
 func (a Vec3) Cross(b Vec3) Vec3 {
-	return Vec3{a.Y*b.Z - a.Z*b.Y, a.Z*b.X - a.X*b.Z, a.X*b.Y - a.Y*b.X}
+	return Vec3{m32(a.Y, b.Z) - m32(a.Z, b.Y), m32(a.Z, b.X) - m32(a.X, b.Z), m32(a.X, b.Y) - m32(a.Y, b.X)}
 }
 
 // LenSq returns the squared length.
@@ -208,13 +208,19 @@ func (a Vec4) Add(b Vec4) Vec4 { return Vec4{a.X + b.X, a.Y + b.Y, a.Z + b.Z, a.
 func (a Vec4) Sub(b Vec4) Vec4 { return Vec4{a.X - b.X, a.Y - b.Y, a.Z - b.Z, a.W - b.W} }
 
 // Scale returns a*s.
-func (a Vec4) Scale(s float32) Vec4 { return Vec4{a.X * s, a.Y * s, a.Z * s, a.W * s} }
+func (a Vec4) Scale(s float32) Vec4 {
+	return Vec4{m32(a.X, s), m32(a.Y, s), m32(a.Z, s), m32(a.W, s)}
+}
 
 // Mul returns the component-wise product.
-func (a Vec4) Mul(b Vec4) Vec4 { return Vec4{a.X * b.X, a.Y * b.Y, a.Z * b.Z, a.W * b.W} }
+func (a Vec4) Mul(b Vec4) Vec4 {
+	return Vec4{m32(a.X, b.X), m32(a.Y, b.Y), m32(a.Z, b.Z), m32(a.W, b.W)}
+}
 
 // Dot returns the dot product.
-func (a Vec4) Dot(b Vec4) float32 { return a.X*b.X + a.Y*b.Y + a.Z*b.Z + a.W*b.W }
+func (a Vec4) Dot(b Vec4) float32 {
+	return m32(a.X, b.X) + m32(a.Y, b.Y) + m32(a.Z, b.Z) + m32(a.W, b.W)
+}
 
 // Lerp interpolates between a and b.
 func (a Vec4) Lerp(b Vec4, t float32) Vec4 {

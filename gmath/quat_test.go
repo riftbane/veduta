@@ -252,7 +252,7 @@ func TestQuatSlerp(t *testing.T) {
 		// Constant angular velocity: the angle from a grows linearly with t.
 		total := angleBetween(a, b)
 		for _, tt := range []float32{0.25, 0.5, 0.75} {
-			if got := angleBetween(a, a.Slerp(b, tt)); math.Abs(got-float64(tt)*total) > 2e-5 {
+			if got := angleBetween(a, a.Slerp(b, tt)); math.Abs(got-float64(float64(tt)*total)) > 2e-5 {
 				t.Fatalf("angle(a, Slerp(%v)) = %v, want %v", tt, got, float64(tt)*total)
 			}
 		}

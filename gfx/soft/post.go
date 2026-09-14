@@ -51,7 +51,7 @@ func (c *core) postDepth(dl *gfx.DrawList) {
 	// For an OpenGL perspective matrix: m10 = (f+n)/(n-f), m14 = 2fn/(n-f).
 	a, b := float64(proj[10]), float64(proj[14])
 	eye := func(d float32) float64 {
-		zn := 2*float64(d) - 1
+		zn := float64(2*float64(d)) - 1 // rounded explicitly: arm64 must not fuse a multiply-sub
 		if persp {
 			return b / (zn + a) // -z_eye = m14/(z_ndc + m10), positive in front of the camera
 		}
@@ -120,21 +120,29 @@ func (c *core) drawLines(dl *gfx.DrawList) {
 			continue
 		}
 		W, H := float32(fb.W), float32(fb.H)
-		sx0, sy0, z0 := (pa.X/pa.W*0.5+0.5)*W, (0.5-pa.Y/pa.W*0.5)*H, pa.Z/pa.W*0.5+0.5
-		sx1, sy1, z1 := (pb.X/pb.W*0.5+0.5)*W, (0.5-pb.Y/pb.W*0.5)*H, pb.Z/pb.W*0.5+0.5
+		// Each product is rounded explicitly so arm64 cannot fuse it into a multiply-add
+		// (see gmath.m32).
+		sx0, sy0, z0 := float32((float32(pa.X/pa.W*0.5)+0.5)*W), float32((0.5-float32(pa.Y/pa.W*0.5))*H), float32(pa.Z/pa.W*0.5)+0.5
+		sx1, sy1, z1 := float32((float32(pb.X/pb.W*0.5)+0.5)*W), float32((0.5-float32(pb.Y/pb.W*0.5))*H), float32(pb.Z/pb.W*0.5)+0.5
 		dx, dy := sx1-sx0, sy1-sy0
-		steps := int(max(gmath.Abs(dx), gmath.Abs(dy))) + 1
+		// Out-of-range float to int conversions differ between amd64 and arm64, so a
+		// degenerate projection (NaN or huge coordinates) is refused in float32 first.
+		span := max(gmath.Abs(dx), gmath.Abs(dy))
+		if !(span < 1<<24) {
+			continue
+		}
+		steps := int(span) + 1
 		inv := 1 / float32(steps)
 		for s := 0; s <= steps; s++ {
 			f := float32(s) * inv
-			x := int(floorf(sx0 + dx*f))
-			y := int(floorf(sy0 + dy*f))
-			if x < 0 || y < 0 || x >= fb.W || y >= fb.H {
+			xf, yf := floorf(sx0+float32(dx*f)), floorf(sy0+float32(dy*f))
+			if !(xf >= 0 && yf >= 0 && xf < W && yf < H) {
 				continue
 			}
+			x, y := int(xf), int(yf)
 			i := y*fb.W + x
 			if l.DepthTest {
-				z := z0 + (z1-z0)*f
+				z := z0 + float32((z1-z0)*f)
 				if z > fb.Depth[i]+2e-4 {
 					continue
 				}
@@ -145,5 +153,10 @@ func (c *core) drawLines(dl *gfx.DrawList) {
 }
 
 func lerp4(a, b gmath.Vec4, t float32) gmath.Vec4 {
-	return gmath.Vec4{X: a.X + (b.X-a.X)*t, Y: a.Y + (b.Y-a.Y)*t, Z: a.Z + (b.Z-a.Z)*t, W: a.W + (b.W-a.W)*t}
+	return gmath.Vec4{
+		X: a.X + float32((b.X-a.X)*t),
+		Y: a.Y + float32((b.Y-a.Y)*t),
+		Z: a.Z + float32((b.Z-a.Z)*t),
+		W: a.W + float32((b.W-a.W)*t),
+	}
 }

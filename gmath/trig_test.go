@@ -133,7 +133,7 @@ func TestTrigFloat32Wrappers(t *testing.T) {
 		return d
 	}
 	for i := -5000; i <= 5000; i++ {
-		x := float32(i) * 0.0063
+		x := float32(float32(i) * 0.0063) // rounded: 1.5-x below would fuse with it on arm64
 		s, c := SinCos(x)
 		if !sameBits(s, Sin(x)) || !sameBits(c, Cos(x)) {
 			t.Fatalf("SinCos(%v) = %v,%v; Sin/Cos = %v,%v", x, s, c, Sin(x), Cos(x))
@@ -244,7 +244,7 @@ func TestTrigLargeArguments(t *testing.T) {
 			t.Errorf("SinCos(%v) = %v, %v", x, s, c)
 		}
 		// Still a point on the unit circle, and odd/even like sin and cos.
-		if d := math.Abs(s*s + c*c - 1); d > 1e-15 {
+		if d := math.Abs(float64(s*s) + float64(c*c) - 1); d > 1e-15 {
 			t.Errorf("SinCos(%v): sin²+cos² off by %g", x, d)
 		}
 		if s2, c2 := SinCos64(-x); s2 != -s || c2 != c {
@@ -257,7 +257,7 @@ func TestTanAndPythagoras(t *testing.T) {
 	for i := -1000; i <= 1000; i++ {
 		x := float64(i) * 0.0123
 		s, c := SinCos64(x)
-		if d := math.Abs(s*s + c*c - 1); d > 4e-16 {
+		if d := math.Abs(float64(s*s) + float64(c*c) - 1); d > 4e-16 {
 			t.Fatalf("sin²+cos² at %v off by %g", x, d)
 		}
 		if math.Abs(c) > 1e-3 {

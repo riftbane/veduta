@@ -716,7 +716,7 @@ func (a *scnAnalysis) checkOverlap() {
 		move := fmt.Sprintf("Move %q by %s%s m along %s (entities[%d].position%s", ej.Name, scnSign(dir), scnF(amount), axis, pr.j, a.parentNote(pr.j))
 		if a.idx(ej.Parent) < 0 {
 			np := ej.Transform.Position
-			np = np.With(ax, float32(float64(np.Get(ax))+float64(dir)*amount))
+			np = np.With(ax, float32(float64(np.Get(ax))+float64(float64(dir)*amount)))
 			move += fmt.Sprintf(" %s → %s", scnFV(ej.Transform.Position), scnFV(np))
 		}
 		move += ")"
@@ -1042,24 +1042,35 @@ func (a *scnAnalysis) checkUnlit() {
 // ---------------------------------------------------------------------------------
 // SCENE_ZFIGHT_RISK
 
+// scnV is a float64 vector. Each product that feeds an addition or subtraction is rounded
+// explicitly so arm64 cannot fuse it into a multiply-add (see gmath.m32); the helpers are
+// inlined, so rounding inside them also protects their callers.
 type scnV [3]float64
 
-func (p scnV) add(q scnV) scnV    { return scnV{p[0] + q[0], p[1] + q[1], p[2] + q[2]} }
-func (p scnV) sub(q scnV) scnV    { return scnV{p[0] - q[0], p[1] - q[1], p[2] - q[2]} }
-func (p scnV) mul(s float64) scnV { return scnV{p[0] * s, p[1] * s, p[2] * s} }
-func (p scnV) dot(q scnV) float64 { return p[0]*q[0] + p[1]*q[1] + p[2]*q[2] }
-func (p scnV) length() float64    { return math.Sqrt(p.dot(p)) }
-func (p scnV) vec3() gmath.Vec3   { return gmath.V3(float32(p[0]), float32(p[1]), float32(p[2])) }
+func (p scnV) add(q scnV) scnV { return scnV{p[0] + q[0], p[1] + q[1], p[2] + q[2]} }
+func (p scnV) sub(q scnV) scnV { return scnV{p[0] - q[0], p[1] - q[1], p[2] - q[2]} }
+func (p scnV) mul(s float64) scnV {
+	return scnV{float64(p[0] * s), float64(p[1] * s), float64(p[2] * s)}
+}
+func (p scnV) dot(q scnV) float64 {
+	return float64(p[0]*q[0]) + float64(p[1]*q[1]) + float64(p[2]*q[2])
+}
+func (p scnV) length() float64  { return math.Sqrt(p.dot(p)) }
+func (p scnV) vec3() gmath.Vec3 { return gmath.V3(float32(p[0]), float32(p[1]), float32(p[2])) }
 func (p scnV) cross(q scnV) scnV {
-	return scnV{p[1]*q[2] - p[2]*q[1], p[2]*q[0] - p[0]*q[2], p[0]*q[1] - p[1]*q[0]}
+	return scnV{
+		float64(p[1]*q[2]) - float64(p[2]*q[1]),
+		float64(p[2]*q[0]) - float64(p[0]*q[2]),
+		float64(p[0]*q[1]) - float64(p[1]*q[0]),
+	}
 }
 func (p scnV) finite() bool { return !math.IsNaN(p.dot(p)) && !math.IsInf(p.dot(p), 0) }
 func scnXform(m gmath.Mat4, v gmath.Vec3) scnV {
 	x, y, z := float64(v.X), float64(v.Y), float64(v.Z)
 	return scnV{
-		float64(m[0])*x + float64(m[4])*y + float64(m[8])*z + float64(m[12]),
-		float64(m[1])*x + float64(m[5])*y + float64(m[9])*z + float64(m[13]),
-		float64(m[2])*x + float64(m[6])*y + float64(m[10])*z + float64(m[14]),
+		float64(float64(m[0])*x) + float64(float64(m[4])*y) + float64(float64(m[8])*z) + float64(m[12]),
+		float64(float64(m[1])*x) + float64(float64(m[5])*y) + float64(float64(m[9])*z) + float64(m[13]),
+		float64(float64(m[2])*x) + float64(float64(m[6])*y) + float64(float64(m[10])*z) + float64(m[14]),
 	}
 }
 
@@ -1110,7 +1121,7 @@ func (a *scnAnalysis) worldTris(k int) []scnTri {
 				continue
 			}
 			t.n = n.mul(1 / l)
-			t.area = l / 2
+			t.area = float64(l / 2)
 			t.d = t.n.dot(t.p[0])
 			t.tri, t.part, t.twoSided = o/3, pi, mat.Cull == gfx.CullNone
 			for c := 0; c < 3; c++ {
@@ -1218,7 +1229,7 @@ func (a *scnAnalysis) zPair(i, j int) *scnZPair {
 			radius = max(radius, tj[t].p[c].length())
 		}
 	}
-	cell := scnZDist + 0.0142*radius + 1e-9
+	cell := scnZDist + float64(0.0142*radius) + 1e-9
 	if math.IsInf(cell, 0) || math.IsNaN(cell) {
 		return nil
 	}
@@ -1325,7 +1336,7 @@ func scnBoxesTouch(alo, ahi, blo, bhi scnV, eps float64) bool {
 type scnP2 [2]float64
 
 func scnCross2(p, q, r scnP2) float64 {
-	return (q[0]-p[0])*(r[1]-p[1]) - (q[1]-p[1])*(r[0]-p[0])
+	return float64((q[0]-p[0])*(r[1]-p[1])) - float64((q[1]-p[1])*(r[0]-p[0]))
 }
 
 // scnCoplanarOverlap tests two triangles for a z-fight risk: parallel planes, facing the
@@ -1375,9 +1386,9 @@ func scnCoplanarOverlap(A, B *scnTri) (area float64, poly []scnV, same, ok bool)
 	}
 	for i := range clip {
 		q := clip[(i+1)%len(clip)]
-		area += clip[i][0]*q[1] - q[0]*clip[i][1]
+		area += float64(clip[i][0]*q[1]) - float64(q[0]*clip[i][1])
 	}
-	area = math.Abs(area) / 2
+	area = float64(math.Abs(area) / 2)
 	if !(area > scnZAreaRel*min(A.area, B.area)) {
 		return 0, nil, false, false
 	}
@@ -1420,13 +1431,13 @@ func scnClipTri(a, b [3]scnP2) []scnP2 {
 }
 
 func scnLerp2(a, b scnP2, t float64) scnP2 {
-	return scnP2{a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t}
+	return scnP2{a[0] + float64((b[0]-a[0])*t), a[1] + float64((b[1]-a[1])*t)}
 }
 
 func scnSurface(b gmath.AABB) float64 {
 	s := b.Size()
 	x, y, z := float64(s.X), float64(s.Y), float64(s.Z)
-	return x*y + y*z + z*x
+	return float64(x*y) + float64(y*z) + float64(z*x)
 }
 
 func (a *scnAnalysis) zIssue(z *scnZPair) {
@@ -1733,7 +1744,7 @@ func (a *scnAnalysis) topBox() gmath.AABB {
 		b = gmath.AABB{Min: cam.Target.Sub(gmath.V3(5, 5, 5)), Max: cam.Target.Add(gmath.V3(5, 5, 5))}
 	}
 	c := b.Center()
-	r := b.Size().Len()/2 + 1
+	r := float32(b.Size().Len()/2) + 1
 	for _, p := range [2]gmath.Vec3{cam.Position, cam.Target} {
 		if p.IsFinite() && p.Dist(c) <= 3*r {
 			b = b.Extend(p)
@@ -1816,7 +1827,7 @@ func (a *scnAnalysis) topLines(dl *gfx.DrawList, view int, box gmath.AABB) {
 	}
 	line(cam.Position, cam.Position.Add(f.Scale(L)))
 	// A cross on the look_at point.
-	s := max(box.Size().X, box.Size().Z, 1) * 0.02
+	s := float32(max(box.Size().X, box.Size().Z, 1) * 0.02)
 	for _, d := range [2]gmath.Vec3{gmath.V3(s, 0, 0), gmath.V3(0, 0, s)} {
 		line(cam.Target.Sub(d), cam.Target.Add(d))
 	}
@@ -1858,7 +1869,7 @@ func (a *scnAnalysis) topLabels(img *gfx.Image, cam scene.Camera, aspect float32
 		if !(c.W > 0) || !p.IsFinite() {
 			return 0, 0, false
 		}
-		return float64((c.X/c.W*0.5 + 0.5) * float32(img.W)), float64((0.5 - c.Y/c.W*0.5) * float32(img.H)), true
+		return float64((float32(c.X/c.W*0.5) + 0.5) * float32(img.W)), float64((0.5 - float32(c.Y/c.W*0.5)) * float32(img.H)), true
 	}
 	var cands []cand
 	for k, e := range a.ents {
@@ -1900,12 +1911,20 @@ func (a *scnAnalysis) topLabels(img *gfx.Image, cam scene.Camera, aspect float32
 			text = string(r[:13]) + "…"
 		}
 		tw := sheet.TextWidth(text, 1)
-		x, y := c.x1+3, (c.y0+c.y1)/2-4
+		x, y := c.x1+3, float64((c.y0+c.y1)/2)-4
 		if x+float64(tw) > float64(img.W-2) {
 			x = c.x0 - 3 - float64(tw)
 		}
 		if c.x1-c.x0 > float64(3*tw) && c.y1-c.y0 > 36 {
 			x, y = max(c.x0, 0)+4, max(c.y0, 0)+4
+		}
+		// A label at a non-finite place goes to the corner on every architecture (out of
+		// range float to int conversions differ between amd64 and arm64).
+		if !(x < 1<<62) {
+			x = 2
+		}
+		if !(y < 1<<62) {
+			y = 2
 		}
 		x0 := min(max(int(math.Floor(x)), 2), img.W-tw-2)
 		y0 := min(max(int(math.Floor(y)), 2), img.H-10)

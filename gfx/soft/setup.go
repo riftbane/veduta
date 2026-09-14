@@ -263,10 +263,12 @@ func (c *core) vertex(ch *setupCtx, i uint32, verts []gfx.Vertex, x *xform) *cve
 	col := x.color
 	if !x.unlit {
 		d := max(0, n.Dot(c.lightDir))
+		// Each product is rounded explicitly so arm64 cannot fuse it into a multiply-add
+		// (see gmath.m32).
 		col = gmath.Vec3{
-			X: col.X * (x.ambient.X + x.light.X*d),
-			Y: col.Y * (x.ambient.Y + x.light.Y*d),
-			Z: col.Z * (x.ambient.Z + x.light.Z*d),
+			X: col.X * (x.ambient.X + float32(x.light.X*d)),
+			Y: col.Y * (x.ambient.Y + float32(x.light.Y*d)),
+			Z: col.Z * (x.ambient.Z + float32(x.light.Z*d)),
 		}
 	}
 	v.a = [nattr]float32{src.UV.X, src.UV.Y, col.X, col.Y, col.Z, n.X, n.Y, n.Z}
@@ -411,15 +413,16 @@ func clipPoly(in *[maxPoly]cvert, n int, out *[maxPoly]cvert, p int) int {
 	return m
 }
 
-// lerpVert interpolates in float64 and rounds once to float32.
+// lerpVert interpolates in float64 and rounds once to float32. The product is rounded
+// explicitly (in float64) so arm64 cannot fuse it into a multiply-add.
 func lerpVert(dst, a, b *cvert, t float64) {
 	for k := range dst.p {
 		x := float64(a.p[k])
-		dst.p[k] = float32(x + t*(float64(b.p[k])-x))
+		dst.p[k] = float32(x + float64(t*(float64(b.p[k])-x)))
 	}
 	for k := range dst.a {
 		x := float64(a.a[k])
-		dst.a[k] = float32(x + t*(float64(b.a[k])-x))
+		dst.a[k] = float32(x + float64(t*(float64(b.a[k])-x)))
 	}
 }
 
@@ -432,21 +435,22 @@ func (c *core) polyLevel(cmd int32, poly *[maxPoly]cvert, n int) int32 {
 		return -1
 	}
 	W, H := float64(c.target.W), float64(c.target.H)
+	// Each product is rounded explicitly so arm64 cannot fuse it into a multiply-add.
 	var sx, sy [maxPoly]float64
 	for i := 0; i < n; i++ {
 		w := float64(poly[i].p[3])
 		if !(w > 0) {
 			return 0
 		}
-		sx[i] = (float64(poly[i].p[0])/w*0.5 + 0.5) * W
-		sy[i] = (0.5 - float64(poly[i].p[1])/w*0.5) * H
+		sx[i] = float64((float64(float64(poly[i].p[0])/w*0.5) + 0.5) * W)
+		sy[i] = float64((0.5 - float64(float64(poly[i].p[1])/w*0.5)) * H)
 	}
 	var uv, px float64
 	for i := 1; i+1 < n; i++ {
 		du1, dv1 := float64(poly[i].a[aU]-poly[0].a[aU]), float64(poly[i].a[aV]-poly[0].a[aV])
 		du2, dv2 := float64(poly[i+1].a[aU]-poly[0].a[aU]), float64(poly[i+1].a[aV]-poly[0].a[aV])
-		uv += math.Abs(du1*dv2 - du2*dv1)
-		px += math.Abs((sx[i]-sx[0])*(sy[i+1]-sy[0]) - (sy[i]-sy[0])*(sx[i+1]-sx[0]))
+		uv += math.Abs(float64(du1*dv2) - float64(du2*dv1))
+		px += math.Abs(float64((sx[i]-sx[0])*(sy[i+1]-sy[0])) - float64((sy[i]-sy[0])*(sx[i+1]-sx[0])))
 	}
 	return mipLevel(tex, uv, px)
 }
@@ -483,8 +487,9 @@ func (c *core) setupTri(ch *setupCtx, cmd int32, v0, v1, v2 *cvert, e uint8, lv 
 			return false
 		}
 		inv := 1 / w
-		sx := (v.p[0]*inv*0.5 + 0.5) * W
-		sy := (0.5 - v.p[1]*inv*0.5) * H
+		// Each product is rounded explicitly so arm64 cannot fuse it into a multiply-add.
+		sx := (float32(v.p[0]*inv*0.5) + 0.5) * W
+		sy := (0.5 - float32(v.p[1]*inv*0.5)) * H
 		if !gmath.IsFinite(sx) || !gmath.IsFinite(sy) {
 			return false
 		}
@@ -492,7 +497,7 @@ func (c *core) setupTri(ch *setupCtx, cmd int32, v0, v1, v2 *cvert, e uint8, lv 
 		sx, sy = gmath.Clamp(sx, 0, W), gmath.Clamp(sy, 0, H)
 		X[k] = int64(math.Floor(float64(sx*16) + 0.5))
 		Y[k] = int64(math.Floor(float64(sy*16) + 0.5))
-		z[k] = v.p[2]*inv*0.5 + 0.5
+		z[k] = float32(v.p[2]*inv*0.5) + 0.5
 		iw[k] = inv
 	}
 	area := (X[1]-X[0])*(Y[2]-Y[0]) - (Y[1]-Y[0])*(X[2]-X[0])
@@ -571,7 +576,7 @@ func (c *core) setupTri(ch *setupCtx, cmd int32, v0, v1, v2 *cvert, e uint8, lv 
 			// areas (area is in 1/256 px²).
 			du1, dv1 := float64(vs[1].a[aU]-vs[0].a[aU]), float64(vs[1].a[aV]-vs[0].a[aV])
 			du2, dv2 := float64(vs[2].a[aU]-vs[0].a[aU]), float64(vs[2].a[aV]-vs[0].a[aV])
-			t.level = mipLevel(tex, math.Abs(du1*dv2-du2*dv1), float64(area)/256)
+			t.level = mipLevel(tex, math.Abs(float64(du1*dv2)-float64(du2*dv1)), float64(area)/256)
 		}
 	}
 

@@ -27,7 +27,7 @@ func init() {
 		return BehaviourFunc(func(ctx *Context, e *scene.Entity, in Input) {
 			dir := gmath.V3(in.Axis("KeyA", "KeyD"), 0, in.Axis("KeyW", "KeyS"))
 			step := dir.Scale(3 * ctx.DT)
-			step.X += (ctx.RNG.Float32() - 0.5) * 0.001
+			step.X += float32((ctx.RNG.Float32() - 0.5) * 0.001)
 			e.Transform.Position = e.Transform.Position.Add(step)
 		})
 	})

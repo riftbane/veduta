@@ -563,7 +563,7 @@ func TestSceneEdgeCases(t *testing.T) {
 	grid := &asset.Scene{Name: "grid", Camera: lib.Scenes["main"].Camera, Light: gfx.DefaultLight, Background: 0xff202830}
 	for i := 0; i < 400; i++ {
 		grid.Entities = append(grid.Entities, asset.Entity{Name: "crate_" + string(rune('a'+i/26)) + string(rune('a'+i%26)), Kind: "static", Model: "crate",
-			Position: gmath.V3(float32(i%20)*0.9-9, 0, float32(i/20)*0.9-9), Scale: gmath.One3, Visible: true})
+			Position: gmath.V3(float32(float32(i%20)*0.9)-9, 0, float32(float32(i/20)*0.9)-9), Scale: gmath.One3, Visible: true})
 	}
 	lib.Scenes["grid"] = grid
 	ir := scnRenderer(t, lib)

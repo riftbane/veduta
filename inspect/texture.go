@@ -267,7 +267,8 @@ func texImageStats(img *gfx.Image) texStats {
 	}
 	mean := float64(sum) / float64(n)
 	st.lumMean = mean / 1000
-	st.lumStd = math.Sqrt(max(float64(sq)/float64(n)-mean*mean, 0)) / 1000
+	// mean*mean is rounded on its own so arm64 cannot fuse it (see gmath.m32).
+	st.lumStd = math.Sqrt(max(float64(sq)/float64(n)-float64(mean*mean), 0)) / 1000
 	st.mean = 0xff000000 | uint32((sr+n/2)/n)<<16 | uint32((sg+n/2)/n)<<8 | uint32((sb+n/2)/n)
 	// Percentiles: the lowest (highest) value such that more than 1% of the texels are at
 	// or below (above) it; with fewer than 100 texels these are the minimum and maximum.
@@ -526,7 +527,7 @@ func texCheckSeam(r *Report, img *gfx.Image, s texSeam, layers *texLayers) {
 		if !horizontal {
 			edge, sides, mean, inside, line, n = "top-bottom", "top and bottom", s.tb, s.insideY, s.lineY, h
 		}
-		limit := texSeamTypical*inside + texSeamOffset
+		limit := float64(texSeamTypical*inside) + texSeamOffset
 		if n < 2 || mean < texSeamMin || mean <= limit || mean <= texSeamLine*line {
 			continue
 		}

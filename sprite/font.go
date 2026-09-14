@@ -83,8 +83,10 @@ func (b *Batch) Text(f *Font, tex gfx.TextureID, x, y float32, scale int, s stri
 			continue
 		}
 		if r != ' ' {
-			gx := x + float32(n)*cw
-			gy := y + float32(line)*ch
+			// Each product is rounded explicitly so arm64 cannot fuse it into a multiply-add
+			// (see gmath.m32).
+			gx := x + float32(float32(n)*cw)
+			gy := y + float32(float32(line)*ch)
 			dst := gmath.Rect{Min: gmath.Vec2{X: gx, Y: gy}, Max: gmath.Vec2{X: gx + cw, Y: gy + ch}}
 			b.Image(tex, tw, th, f.Glyph(r), dst, color, gfx.FilterNearest)
 		}

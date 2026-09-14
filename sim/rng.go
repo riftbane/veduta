@@ -55,14 +55,18 @@ func (r *RNG) Uint64() uint64 {
 // Uint32 returns the next 32 random bits.
 func (r *RNG) Uint32() uint32 { return uint32(r.Uint64() >> 32) }
 
+// The float helpers round every product explicitly: these calls are inlined into game
+// code, and without the conversion arm64 fuses a product with a caller's addition into one
+// multiply-add (see gmath.m32).
+
 // Float64 returns a uniform float64 in [0, 1).
-func (r *RNG) Float64() float64 { return float64(r.Uint64()>>11) * 0x1p-53 }
+func (r *RNG) Float64() float64 { return float64(float64(r.Uint64()>>11) * 0x1p-53) }
 
 // Float32 returns a uniform float32 in [0, 1).
-func (r *RNG) Float32() float32 { return float32(r.Uint64()>>40) * 0x1p-24 }
+func (r *RNG) Float32() float32 { return float32(float32(r.Uint64()>>40) * 0x1p-24) }
 
 // Range returns a uniform float32 in [lo, hi).
-func (r *RNG) Range(lo, hi float32) float32 { return lo + (hi-lo)*r.Float32() }
+func (r *RNG) Range(lo, hi float32) float32 { return lo + float32((hi-lo)*r.Float32()) }
 
 // Intn returns a uniform int in [0, n); it panics if n <= 0. Unbiased (Lemire).
 func (r *RNG) Intn(n int) int {

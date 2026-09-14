@@ -52,7 +52,8 @@ func (f *Frame) At(x, y int) (PixelInfo, error) {
 		// Unproject the pixel center at depth d.
 		inv, ok := f.Proj.Mul(f.View).Inverse()
 		if ok {
-			ndc := gmath.V4((float32(x)+0.5)/float32(f.Width)*2-1, 1-(float32(y)+0.5)/float32(f.Height)*2, d*2-1, 1)
+			// Products are rounded explicitly so arm64 cannot fuse them (see gmath.m32).
+			ndc := gmath.V4(float32((float32(x)+0.5)/float32(f.Width)*2)-1, 1-float32((float32(y)+0.5)/float32(f.Height)*2), float32(d*2)-1, 1)
 			w := inv.MulVec4(ndc)
 			if w.W != 0 {
 				world := gmath.V3(w.X/w.W, w.Y/w.W, w.Z/w.W)

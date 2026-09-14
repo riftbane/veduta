@@ -14,7 +14,7 @@ func QuatAxisAngle(axis Vec3, angle float32) Quat {
 		return QuatIdent()
 	}
 	s, c := SinCos(angle / 2)
-	return Quat{a.X * s, a.Y * s, a.Z * s, c}
+	return Quat{m32(a.X, s), m32(a.Y, s), m32(a.Z, s), c}
 }
 
 // QuatEuler returns the rotation for Euler angles in radians, applied to a vector in the
@@ -53,10 +53,10 @@ func (a Quat) EulerDeg() Vec3 {
 // Mul returns the composition a·b (apply b first, then a).
 func (a Quat) Mul(b Quat) Quat {
 	return Quat{
-		a.W*b.X + a.X*b.W + a.Y*b.Z - a.Z*b.Y,
-		a.W*b.Y - a.X*b.Z + a.Y*b.W + a.Z*b.X,
-		a.W*b.Z + a.X*b.Y - a.Y*b.X + a.Z*b.W,
-		a.W*b.W - a.X*b.X - a.Y*b.Y - a.Z*b.Z,
+		m32(a.W, b.X) + m32(a.X, b.W) + m32(a.Y, b.Z) - m32(a.Z, b.Y),
+		m32(a.W, b.Y) - m32(a.X, b.Z) + m32(a.Y, b.W) + m32(a.Z, b.X),
+		m32(a.W, b.Z) + m32(a.X, b.Y) - m32(a.Y, b.X) + m32(a.Z, b.W),
+		m32(a.W, b.W) - m32(a.X, b.X) - m32(a.Y, b.Y) - m32(a.Z, b.Z),
 	}
 }
 
@@ -64,7 +64,9 @@ func (a Quat) Mul(b Quat) Quat {
 func (a Quat) Conj() Quat { return Quat{-a.X, -a.Y, -a.Z, a.W} }
 
 // Dot returns the 4D dot product.
-func (a Quat) Dot(b Quat) float32 { return a.X*b.X + a.Y*b.Y + a.Z*b.Z + a.W*b.W }
+func (a Quat) Dot(b Quat) float32 {
+	return m32(a.X, b.X) + m32(a.Y, b.Y) + m32(a.Z, b.Z) + m32(a.W, b.W)
+}
 
 // Len returns the quaternion norm.
 func (a Quat) Len() float32 { return Sqrt(a.Dot(a)) }
@@ -76,26 +78,28 @@ func (a Quat) Normalize() Quat {
 		return QuatIdent()
 	}
 	i := 1 / l
-	return Quat{a.X * i, a.Y * i, a.Z * i, a.W * i}
+	return Quat{m32(a.X, i), m32(a.Y, i), m32(a.Z, i), m32(a.W, i)}
 }
 
 // Rotate applies the rotation to v.
 func (a Quat) Rotate(v Vec3) Vec3 {
 	u := Vec3{a.X, a.Y, a.Z}
 	t := u.Cross(v).Scale(2)
-	return v.Add(t.Scale(a.W)).Add(u.Cross(t))
+	w := Vec3{m32(t.X, a.W), m32(t.Y, a.W), m32(t.Z, a.W)}
+	c := u.Cross(t)
+	return Vec3{v.X + w.X + c.X, v.Y + w.Y + c.Y, v.Z + w.Z + c.Z}
 }
 
 // Mat4 returns the rotation matrix.
 func (a Quat) Mat4() Mat4 {
 	x, y, z, w := a.X, a.Y, a.Z, a.W
-	xx, yy, zz := x*x, y*y, z*z
-	xy, xz, yz := x*y, x*z, y*z
-	wx, wy, wz := w*x, w*y, w*z
+	xx, yy, zz := m32(x, x), m32(y, y), m32(z, z)
+	xy, xz, yz := m32(x, y), m32(x, z), m32(y, z)
+	wx, wy, wz := m32(w, x), m32(w, y), m32(w, z)
 	return Mat4{
-		1 - 2*(yy+zz), 2 * (xy + wz), 2 * (xz - wy), 0,
-		2 * (xy - wz), 1 - 2*(xx+zz), 2 * (yz + wx), 0,
-		2 * (xz + wy), 2 * (yz - wx), 1 - 2*(xx+yy), 0,
+		1 - m32(2, yy+zz), m32(2, xy+wz), m32(2, xz-wy), 0,
+		m32(2, xy-wz), 1 - m32(2, xx+zz), m32(2, yz+wx), 0,
+		m32(2, xz+wy), m32(2, yz-wx), 1 - m32(2, xx+yy), 0,
 		0, 0, 0, 1,
 	}
 }
@@ -112,7 +116,10 @@ func (a Quat) Slerp(b Quat, t float32) Quat {
 	}
 	th := Acos64(float64(d))
 	s := Sin64(th)
-	wa := float32(Sin64((1-float64(t))*th) / s)
-	wb := float32(Sin64(float64(t)*th) / s)
-	return Quat{a.X*wa + b.X*wb, a.Y*wa + b.Y*wb, a.Z*wa + b.Z*wb, a.W*wa + b.W*wb}
+	wa := float32(Sin64(float64((1-float64(t))*th)) / s)
+	wb := float32(Sin64(float64(float64(t)*th)) / s)
+	return Quat{
+		m32(a.X, wa) + m32(b.X, wb), m32(a.Y, wa) + m32(b.Y, wb),
+		m32(a.Z, wa) + m32(b.Z, wb), m32(a.W, wa) + m32(b.W, wb),
+	}
 }

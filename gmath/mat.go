@@ -27,7 +27,7 @@ func (a Mat4) Mul(b Mat4) Mat4 {
 	var o Mat4
 	for c := 0; c < 4; c++ {
 		for r := 0; r < 4; r++ {
-			o[c*4+r] = a[r]*b[c*4] + a[4+r]*b[c*4+1] + a[8+r]*b[c*4+2] + a[12+r]*b[c*4+3]
+			o[c*4+r] = m32(a[r], b[c*4]) + m32(a[4+r], b[c*4+1]) + m32(a[8+r], b[c*4+2]) + m32(a[12+r], b[c*4+3])
 		}
 	}
 	return o
@@ -36,10 +36,10 @@ func (a Mat4) Mul(b Mat4) Mat4 {
 // MulVec4 returns a·v.
 func (a Mat4) MulVec4(v Vec4) Vec4 {
 	return Vec4{
-		a[0]*v.X + a[4]*v.Y + a[8]*v.Z + a[12]*v.W,
-		a[1]*v.X + a[5]*v.Y + a[9]*v.Z + a[13]*v.W,
-		a[2]*v.X + a[6]*v.Y + a[10]*v.Z + a[14]*v.W,
-		a[3]*v.X + a[7]*v.Y + a[11]*v.Z + a[15]*v.W,
+		m32(a[0], v.X) + m32(a[4], v.Y) + m32(a[8], v.Z) + m32(a[12], v.W),
+		m32(a[1], v.X) + m32(a[5], v.Y) + m32(a[9], v.Z) + m32(a[13], v.W),
+		m32(a[2], v.X) + m32(a[6], v.Y) + m32(a[10], v.Z) + m32(a[14], v.W),
+		m32(a[3], v.X) + m32(a[7], v.Y) + m32(a[11], v.Z) + m32(a[15], v.W),
 	}
 }
 
@@ -59,9 +59,9 @@ func (a Mat4) MulPoint(p Vec3) Vec3 {
 // MulDir transforms the direction d (w = 0).
 func (a Mat4) MulDir(d Vec3) Vec3 {
 	return Vec3{
-		a[0]*d.X + a[4]*d.Y + a[8]*d.Z,
-		a[1]*d.X + a[5]*d.Y + a[9]*d.Z,
-		a[2]*d.X + a[6]*d.Y + a[10]*d.Z,
+		m32(a[0], d.X) + m32(a[4], d.Y) + m32(a[8], d.Z),
+		m32(a[1], d.X) + m32(a[5], d.Y) + m32(a[9], d.Z),
+		m32(a[2], d.X) + m32(a[6], d.Y) + m32(a[10], d.Z),
 	}
 }
 
@@ -118,29 +118,30 @@ func (a Mat4) Inverse() (Mat4, bool) {
 	return o, true
 }
 
-// inverse64 returns the adjugate and determinant in float64.
+// inverse64 returns the adjugate and determinant in float64. Each product is rounded
+// explicitly so arm64 cannot fuse it into a multiply-add (see m32).
 func (a Mat4) inverse64() (adj [16]float64, det float64) {
 	var m [16]float64
 	for i, v := range a {
 		m[i] = float64(v)
 	}
-	adj[0] = m[5]*m[10]*m[15] - m[5]*m[11]*m[14] - m[9]*m[6]*m[15] + m[9]*m[7]*m[14] + m[13]*m[6]*m[11] - m[13]*m[7]*m[10]
-	adj[4] = -m[4]*m[10]*m[15] + m[4]*m[11]*m[14] + m[8]*m[6]*m[15] - m[8]*m[7]*m[14] - m[12]*m[6]*m[11] + m[12]*m[7]*m[10]
-	adj[8] = m[4]*m[9]*m[15] - m[4]*m[11]*m[13] - m[8]*m[5]*m[15] + m[8]*m[7]*m[13] + m[12]*m[5]*m[11] - m[12]*m[7]*m[9]
-	adj[12] = -m[4]*m[9]*m[14] + m[4]*m[10]*m[13] + m[8]*m[5]*m[14] - m[8]*m[6]*m[13] - m[12]*m[5]*m[10] + m[12]*m[6]*m[9]
-	adj[1] = -m[1]*m[10]*m[15] + m[1]*m[11]*m[14] + m[9]*m[2]*m[15] - m[9]*m[3]*m[14] - m[13]*m[2]*m[11] + m[13]*m[3]*m[10]
-	adj[5] = m[0]*m[10]*m[15] - m[0]*m[11]*m[14] - m[8]*m[2]*m[15] + m[8]*m[3]*m[14] + m[12]*m[2]*m[11] - m[12]*m[3]*m[10]
-	adj[9] = -m[0]*m[9]*m[15] + m[0]*m[11]*m[13] + m[8]*m[1]*m[15] - m[8]*m[3]*m[13] - m[12]*m[1]*m[11] + m[12]*m[3]*m[9]
-	adj[13] = m[0]*m[9]*m[14] - m[0]*m[10]*m[13] - m[8]*m[1]*m[14] + m[8]*m[2]*m[13] + m[12]*m[1]*m[10] - m[12]*m[2]*m[9]
-	adj[2] = m[1]*m[6]*m[15] - m[1]*m[7]*m[14] - m[5]*m[2]*m[15] + m[5]*m[3]*m[14] + m[13]*m[2]*m[7] - m[13]*m[3]*m[6]
-	adj[6] = -m[0]*m[6]*m[15] + m[0]*m[7]*m[14] + m[4]*m[2]*m[15] - m[4]*m[3]*m[14] - m[12]*m[2]*m[7] + m[12]*m[3]*m[6]
-	adj[10] = m[0]*m[5]*m[15] - m[0]*m[7]*m[13] - m[4]*m[1]*m[15] + m[4]*m[3]*m[13] + m[12]*m[1]*m[7] - m[12]*m[3]*m[5]
-	adj[14] = -m[0]*m[5]*m[14] + m[0]*m[6]*m[13] + m[4]*m[1]*m[14] - m[4]*m[2]*m[13] - m[12]*m[1]*m[6] + m[12]*m[2]*m[5]
-	adj[3] = -m[1]*m[6]*m[11] + m[1]*m[7]*m[10] + m[5]*m[2]*m[11] - m[5]*m[3]*m[10] - m[9]*m[2]*m[7] + m[9]*m[3]*m[6]
-	adj[7] = m[0]*m[6]*m[11] - m[0]*m[7]*m[10] - m[4]*m[2]*m[11] + m[4]*m[3]*m[10] + m[8]*m[2]*m[7] - m[8]*m[3]*m[6]
-	adj[11] = -m[0]*m[5]*m[11] + m[0]*m[7]*m[9] + m[4]*m[1]*m[11] - m[4]*m[3]*m[9] - m[8]*m[1]*m[7] + m[8]*m[3]*m[5]
-	adj[15] = m[0]*m[5]*m[10] - m[0]*m[6]*m[9] - m[4]*m[1]*m[10] + m[4]*m[2]*m[9] + m[8]*m[1]*m[6] - m[8]*m[2]*m[5]
-	det = m[0]*adj[0] + m[1]*adj[4] + m[2]*adj[8] + m[3]*adj[12]
+	adj[0] = float64(m[5]*m[10]*m[15]) - float64(m[5]*m[11]*m[14]) - float64(m[9]*m[6]*m[15]) + float64(m[9]*m[7]*m[14]) + float64(m[13]*m[6]*m[11]) - float64(m[13]*m[7]*m[10])
+	adj[4] = float64(-m[4]*m[10]*m[15]) + float64(m[4]*m[11]*m[14]) + float64(m[8]*m[6]*m[15]) - float64(m[8]*m[7]*m[14]) - float64(m[12]*m[6]*m[11]) + float64(m[12]*m[7]*m[10])
+	adj[8] = float64(m[4]*m[9]*m[15]) - float64(m[4]*m[11]*m[13]) - float64(m[8]*m[5]*m[15]) + float64(m[8]*m[7]*m[13]) + float64(m[12]*m[5]*m[11]) - float64(m[12]*m[7]*m[9])
+	adj[12] = float64(-m[4]*m[9]*m[14]) + float64(m[4]*m[10]*m[13]) + float64(m[8]*m[5]*m[14]) - float64(m[8]*m[6]*m[13]) - float64(m[12]*m[5]*m[10]) + float64(m[12]*m[6]*m[9])
+	adj[1] = float64(-m[1]*m[10]*m[15]) + float64(m[1]*m[11]*m[14]) + float64(m[9]*m[2]*m[15]) - float64(m[9]*m[3]*m[14]) - float64(m[13]*m[2]*m[11]) + float64(m[13]*m[3]*m[10])
+	adj[5] = float64(m[0]*m[10]*m[15]) - float64(m[0]*m[11]*m[14]) - float64(m[8]*m[2]*m[15]) + float64(m[8]*m[3]*m[14]) + float64(m[12]*m[2]*m[11]) - float64(m[12]*m[3]*m[10])
+	adj[9] = float64(-m[0]*m[9]*m[15]) + float64(m[0]*m[11]*m[13]) + float64(m[8]*m[1]*m[15]) - float64(m[8]*m[3]*m[13]) - float64(m[12]*m[1]*m[11]) + float64(m[12]*m[3]*m[9])
+	adj[13] = float64(m[0]*m[9]*m[14]) - float64(m[0]*m[10]*m[13]) - float64(m[8]*m[1]*m[14]) + float64(m[8]*m[2]*m[13]) + float64(m[12]*m[1]*m[10]) - float64(m[12]*m[2]*m[9])
+	adj[2] = float64(m[1]*m[6]*m[15]) - float64(m[1]*m[7]*m[14]) - float64(m[5]*m[2]*m[15]) + float64(m[5]*m[3]*m[14]) + float64(m[13]*m[2]*m[7]) - float64(m[13]*m[3]*m[6])
+	adj[6] = float64(-m[0]*m[6]*m[15]) + float64(m[0]*m[7]*m[14]) + float64(m[4]*m[2]*m[15]) - float64(m[4]*m[3]*m[14]) - float64(m[12]*m[2]*m[7]) + float64(m[12]*m[3]*m[6])
+	adj[10] = float64(m[0]*m[5]*m[15]) - float64(m[0]*m[7]*m[13]) - float64(m[4]*m[1]*m[15]) + float64(m[4]*m[3]*m[13]) + float64(m[12]*m[1]*m[7]) - float64(m[12]*m[3]*m[5])
+	adj[14] = float64(-m[0]*m[5]*m[14]) + float64(m[0]*m[6]*m[13]) + float64(m[4]*m[1]*m[14]) - float64(m[4]*m[2]*m[13]) - float64(m[12]*m[1]*m[6]) + float64(m[12]*m[2]*m[5])
+	adj[3] = float64(-m[1]*m[6]*m[11]) + float64(m[1]*m[7]*m[10]) + float64(m[5]*m[2]*m[11]) - float64(m[5]*m[3]*m[10]) - float64(m[9]*m[2]*m[7]) + float64(m[9]*m[3]*m[6])
+	adj[7] = float64(m[0]*m[6]*m[11]) - float64(m[0]*m[7]*m[10]) - float64(m[4]*m[2]*m[11]) + float64(m[4]*m[3]*m[10]) + float64(m[8]*m[2]*m[7]) - float64(m[8]*m[3]*m[6])
+	adj[11] = float64(-m[0]*m[5]*m[11]) + float64(m[0]*m[7]*m[9]) + float64(m[4]*m[1]*m[11]) - float64(m[4]*m[3]*m[9]) - float64(m[8]*m[1]*m[7]) + float64(m[8]*m[3]*m[5])
+	adj[15] = float64(m[0]*m[5]*m[10]) - float64(m[0]*m[6]*m[9]) - float64(m[4]*m[1]*m[10]) + float64(m[4]*m[2]*m[9]) + float64(m[8]*m[1]*m[6]) - float64(m[8]*m[2]*m[5])
+	det = float64(m[0]*adj[0]) + float64(m[1]*adj[4]) + float64(m[2]*adj[8]) + float64(m[3]*adj[12])
 	return adj, det
 }
 
@@ -187,9 +188,9 @@ func RotateZ(angle float32) Mat4 {
 // TRS composes translation, rotation and scale: T·R·S.
 func TRS(t Vec3, r Quat, s Vec3) Mat4 {
 	m := r.Mat4()
-	m[0], m[1], m[2] = m[0]*s.X, m[1]*s.X, m[2]*s.X
-	m[4], m[5], m[6] = m[4]*s.Y, m[5]*s.Y, m[6]*s.Y
-	m[8], m[9], m[10] = m[8]*s.Z, m[9]*s.Z, m[10]*s.Z
+	m[0], m[1], m[2] = m32(m[0], s.X), m32(m[1], s.X), m32(m[2], s.X)
+	m[4], m[5], m[6] = m32(m[4], s.Y), m32(m[5], s.Y), m32(m[6], s.Y)
+	m[8], m[9], m[10] = m32(m[8], s.Z), m32(m[9], s.Z), m32(m[10], s.Z)
 	m[12], m[13], m[14] = t.X, t.Y, t.Z
 	return m
 }
@@ -197,13 +198,14 @@ func TRS(t Vec3, r Quat, s Vec3) Mat4 {
 // Perspective returns an OpenGL-style projection: right-handed eye space looking down
 // -Z, clip-space z in [-w, w]. fovY is the vertical field of view in radians.
 func Perspective(fovY, aspect, near, far float32) Mat4 {
-	f := float32(1 / Tan64(float64(fovY)/2))
+	// fovY/2 is a multiplication by 0.5 to the compiler: round it like any product (m32).
+	f := float32(1 / Tan64(float64(float64(fovY)/2)))
 	nf := 1 / (near - far)
 	return Mat4{
 		f / aspect, 0, 0, 0,
 		0, f, 0, 0,
-		0, 0, (far + near) * nf, -1,
-		0, 0, 2 * far * near * nf, 0,
+		0, 0, float32((far + near) * nf), -1,
+		0, 0, float32(2 * far * near * nf), 0,
 	}
 }
 
@@ -247,7 +249,7 @@ func (a Mat3) Mul(b Mat3) Mat3 {
 	var o Mat3
 	for c := 0; c < 3; c++ {
 		for r := 0; r < 3; r++ {
-			o[c*3+r] = a[r]*b[c*3] + a[3+r]*b[c*3+1] + a[6+r]*b[c*3+2]
+			o[c*3+r] = m32(a[r], b[c*3]) + m32(a[3+r], b[c*3+1]) + m32(a[6+r], b[c*3+2])
 		}
 	}
 	return o
@@ -256,9 +258,9 @@ func (a Mat3) Mul(b Mat3) Mat3 {
 // MulVec3 returns a·v.
 func (a Mat3) MulVec3(v Vec3) Vec3 {
 	return Vec3{
-		a[0]*v.X + a[3]*v.Y + a[6]*v.Z,
-		a[1]*v.X + a[4]*v.Y + a[7]*v.Z,
-		a[2]*v.X + a[5]*v.Y + a[8]*v.Z,
+		m32(a[0], v.X) + m32(a[3], v.Y) + m32(a[6], v.Z),
+		m32(a[1], v.X) + m32(a[4], v.Y) + m32(a[7], v.Z),
+		m32(a[2], v.X) + m32(a[5], v.Y) + m32(a[8], v.Z),
 	}
 }
 
@@ -267,34 +269,42 @@ func (a Mat3) Transpose() Mat3 {
 	return Mat3{a[0], a[3], a[6], a[1], a[4], a[7], a[2], a[5], a[8]}
 }
 
-// Det returns the determinant.
+// Det returns the determinant (computed in float64, every product rounded explicitly so
+// arm64 cannot fuse it into a multiply-add; see m32).
 func (a Mat3) Det() float32 {
 	m := [9]float64{}
 	for i, v := range a {
 		m[i] = float64(v)
 	}
-	return float32(m[0]*(m[4]*m[8]-m[7]*m[5]) - m[3]*(m[1]*m[8]-m[7]*m[2]) + m[6]*(m[1]*m[5]-m[4]*m[2]))
+	return float32(float64(m[0]*(float64(m[4]*m[8])-float64(m[7]*m[5]))) -
+		float64(m[3]*(float64(m[1]*m[8])-float64(m[7]*m[2]))) +
+		float64(m[6]*(float64(m[1]*m[5])-float64(m[4]*m[2]))))
 }
 
 // Inverse returns a⁻¹ and whether a was invertible. A singular matrix, or one whose
-// inverse is not finite in float32, yields the identity and false.
+// inverse is not finite in float32, yields the identity and false. Products are rounded
+// explicitly, as in Det.
 func (a Mat3) Inverse() (Mat3, bool) {
 	m := [9]float64{}
 	for i, v := range a {
 		m[i] = float64(v)
 	}
-	c0 := m[4]*m[8] - m[7]*m[5]
-	c1 := m[7]*m[2] - m[1]*m[8]
-	c2 := m[1]*m[5] - m[4]*m[2]
-	det := m[0]*c0 + m[3]*c1 + m[6]*c2
+	c0 := float64(m[4]*m[8]) - float64(m[7]*m[5])
+	c1 := float64(m[7]*m[2]) - float64(m[1]*m[8])
+	c2 := float64(m[1]*m[5]) - float64(m[4]*m[2])
+	det := float64(m[0]*c0) + float64(m[3]*c1) + float64(m[6]*c2)
 	if det == 0 {
 		return Ident3(), false
 	}
 	id := 1 / det
 	o := Mat3{
 		float32(c0 * id), float32(c1 * id), float32(c2 * id),
-		float32((m[6]*m[5] - m[3]*m[8]) * id), float32((m[0]*m[8] - m[6]*m[2]) * id), float32((m[3]*m[2] - m[0]*m[5]) * id),
-		float32((m[3]*m[7] - m[6]*m[4]) * id), float32((m[6]*m[1] - m[0]*m[7]) * id), float32((m[0]*m[4] - m[3]*m[1]) * id),
+		float32((float64(m[6]*m[5]) - float64(m[3]*m[8])) * id),
+		float32((float64(m[0]*m[8]) - float64(m[6]*m[2])) * id),
+		float32((float64(m[3]*m[2]) - float64(m[0]*m[5])) * id),
+		float32((float64(m[3]*m[7]) - float64(m[6]*m[4])) * id),
+		float32((float64(m[6]*m[1]) - float64(m[0]*m[7])) * id),
+		float32((float64(m[0]*m[4]) - float64(m[3]*m[1])) * id),
 	}
 	for _, v := range o {
 		if !IsFinite(v) {

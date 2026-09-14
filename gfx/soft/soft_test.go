@@ -110,8 +110,10 @@ func randomScene(t testing.TB, r *Renderer, w, h int) *gfx.Framebuffer {
 		var idx []uint32
 		for k := 0; k < 30; k++ {
 			for j := 0; j < 3; j++ {
-				p := gmath.V3(g.float()*8-4, g.float()*6-3, g.float()*8-6)
-				verts = append(verts, gfx.Vertex{Pos: p, Normal: gmath.V3(g.float()-0.5, g.float()-0.5, 1).Normalize(), UV: gmath.V2(g.float()*3, g.float()*3)})
+				// Products (g.float divides by 2^24) are rounded explicitly so arm64 cannot
+				// fuse them into a multiply-add and move the golden geometry.
+				p := gmath.V3(float32(g.float()*8)-4, float32(g.float()*6)-3, float32(g.float()*8)-6)
+				verts = append(verts, gfx.Vertex{Pos: p, Normal: gmath.V3(float32(g.float())-0.5, float32(g.float())-0.5, 1).Normalize(), UV: gmath.V2(g.float()*3, g.float()*3)})
 				idx = append(idx, uint32(len(idx)))
 			}
 		}
@@ -127,7 +129,7 @@ func randomScene(t testing.TB, r *Renderer, w, h int) *gfx.Framebuffer {
 			st.DepthWrite = false
 		}
 		dl.Add(gfx.DrawCmd{View: v, First: first, Count: count, Model: gmath.Ident4(), Texture: tex,
-			Color: gmath.V4(g.float(), g.float(), g.float(), 0.3+0.7*g.float()), State: st, ID: uint32(c + 1),
+			Color: gmath.V4(g.float(), g.float(), g.float(), 0.3+float32(0.7*g.float())), State: st, ID: uint32(c + 1),
 			Filter: gfx.Filter(c % 2)})
 	}
 	fb := gfx.NewFramebuffer(w, h, true)
@@ -167,11 +169,12 @@ func TestFillRuleWatertight(t *testing.T) {
 	var verts []gfx.Vertex
 	for j := 0; j <= N; j++ {
 		for i := 0; i <= N; i++ {
-			x := 20 + float32(i)*(160.0/N)
-			y := 10 + float32(j)*(140.0/N)
+			// Products are rounded explicitly so arm64 cannot fuse them into a multiply-add.
+			x := 20 + float32(float32(i)*(160.0/N))
+			y := 10 + float32(float32(j)*(140.0/N))
 			if i > 0 && i < N && j > 0 && j < N {
-				x += (g.float() - 0.5) * 9
-				y += (g.float() - 0.5) * 9
+				x += float32((float32(g.float()) - 0.5) * 9)
+				y += float32((float32(g.float()) - 0.5) * 9)
 			}
 			verts = append(verts, gfx.Vertex{Pos: gmath.V3(x, y, 0)})
 		}
@@ -392,7 +395,7 @@ func benchScene(b testing.TB, r *Renderer) (*gfx.DrawList, *gfx.Framebuffer) {
 	mesh := &gfx.MeshData{}
 	for j := 0; j <= nz; j++ {
 		for i := 0; i <= nx; i++ {
-			x, z := float32(i)/nx*16-8, float32(j)/nz*8-8
+			x, z := float32(float32(i)/nx*16)-8, float32(float32(j)/nz*8)-8 // rounded: no fused multiply-sub
 			y := 0.3 * gmath.Sin(x*0.9) * gmath.Cos(z*1.3)
 			mesh.Vertices = append(mesh.Vertices, gfx.Vertex{Pos: gmath.V3(x, y, z), Normal: gmath.V3(-0.27*gmath.Cos(x*0.9), 1, 0.39*gmath.Sin(z*1.3)).Normalize(), UV: gmath.V2(float32(i)/4, float32(j)/4)})
 		}

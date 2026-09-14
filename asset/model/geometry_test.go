@@ -39,10 +39,16 @@ func d3(v gmath.Vec3) [3]float64 { return [3]float64{float64(v.X), float64(v.Y),
 func sub3(a, b [3]float64) [3]float64 { return [3]float64{a[0] - b[0], a[1] - b[1], a[2] - b[2]} }
 
 func cross3(a, b [3]float64) [3]float64 {
-	return [3]float64{a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]}
+	return [3]float64{
+		float64(a[1]*b[2]) - float64(a[2]*b[1]),
+		float64(a[2]*b[0]) - float64(a[0]*b[2]),
+		float64(a[0]*b[1]) - float64(a[1]*b[0]),
+	}
 }
 
-func dot3(a, b [3]float64) float64 { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2] }
+func dot3(a, b [3]float64) float64 {
+	return float64(a[0]*b[0]) + float64(a[1]*b[1]) + float64(a[2]*b[2])
+}
 
 // faceNormal returns cross(b-a, c-a) in float64.
 func faceNormal(t [3]gmath.Vec3) [3]float64 {
@@ -136,7 +142,7 @@ func checkOutward(t *testing.T, ts [][3]gmath.Vec3, center gmath.Vec3) {
 
 // ngonArea is the area of a regular n-gon with circumradius r.
 func ngonArea(r float64, n int) float64 {
-	return float64(n) / 2 * r * r * math.Sin(2*math.Pi/float64(n))
+	return float64(float64(n) / 2 * r * r * math.Sin(2*math.Pi/float64(n)))
 }
 
 // latheVolume is the exact volume of a closed counter-clockwise profile revolved in n
@@ -145,7 +151,7 @@ func latheVolume(prof [][2]float64, n int) float64 {
 	var v float64
 	for i := 0; i+1 < len(prof); i++ {
 		a, b := prof[i], prof[i+1]
-		v += (b[1] - a[1]) / 6 * (ngonArea(a[0], n) + ngonArea(b[0], n) + 4*ngonArea((a[0]+b[0])/2, n))
+		v += float64((b[1] - a[1]) / 6 * (ngonArea(a[0], n) + ngonArea(b[0], n) + float64(4*ngonArea((a[0]+b[0])/2, n))))
 	}
 	return v
 }

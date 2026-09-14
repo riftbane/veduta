@@ -616,13 +616,13 @@ func TestImageFit(t *testing.T) {
 			for k := 0; k < 4; k++ {
 				r, g, b, a := gfx.UnpackRGBA(logo.Pix[(2*y+k/2)*48+2*x+k%2])
 				af := float64(a) / 255
-				sum[0] += float64(r) * af
-				sum[1] += float64(g) * af
-				sum[2] += float64(b) * af
+				sum[0] += float64(float64(r) * af)
+				sum[1] += float64(float64(g) * af)
+				sum[2] += float64(float64(b) * af)
 				sum[3] += af
 			}
 			r, g, b, a := gfx.UnpackRGBA(half.Pix[y*24+x])
-			if d := float64(a) - sum[3]/4*255; d > 0.51 || d < -0.51 {
+			if d := float64(a) - float64(sum[3]/4*255); d > 0.51 || d < -0.51 {
 				t.Fatalf("(%d,%d) alpha %d, want %.2f", x, y, a, sum[3]/4*255)
 			}
 			if sum[3] > 0 {

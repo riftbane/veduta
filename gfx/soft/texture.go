@@ -96,8 +96,9 @@ func (t *texture) nearest(lv int32, u, v float32) uint32 {
 
 func (t *texture) bilinear(lv int32, u, v float32) uint32 {
 	l := &t.levels[lv]
-	fu := bound(u*l.fw - 0.5)
-	fv := bound(v*l.fh - 0.5)
+	// The products are rounded explicitly so arm64 cannot fuse them into a multiply-sub.
+	fu := bound(float32(u*l.fw) - 0.5)
+	fv := bound(float32(v*l.fh) - 0.5)
 	xf, yf := floorf(fu), floorf(fv)
 	fx := uint32((fu - xf) * 256)
 	fy := uint32((fv - yf) * 256)
@@ -136,8 +137,8 @@ func uvChecker(u, v float32) uint32 {
 	if (int32(fu*8)+int32(fv*8))&1 != 0 {
 		base = 120
 	}
-	r := uint32(base * (0.45 + 0.55*fu))
-	g := uint32(base * (0.45 + 0.55*fv))
+	r := uint32(base * (0.45 + float32(0.55*fu))) // rounded explicitly: no fused multiply-add
+	g := uint32(base * (0.45 + float32(0.55*fv)))
 	b := uint32(base * 0.75)
 	return 0xff000000 | r<<16 | g<<8 | b
 }
