@@ -289,4 +289,13 @@ func (s *evdevSource) poll() ([]Event, error) {
 	}
 }
 
+// grab takes the device for this process alone, or gives it back.
+func (s *evdevSource) grab(take bool) error {
+	var gerr error
+	if err := s.raw.Control(func(fd uintptr) { gerr = grabDevice(fd, take) }); err != nil {
+		return err
+	}
+	return gerr
+}
+
 func (s *evdevSource) close() error { return s.f.Close() }

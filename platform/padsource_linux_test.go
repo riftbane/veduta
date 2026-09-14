@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -462,6 +463,82 @@ func TestInputSourceIdlePollAllocatesNothing(t *testing.T) {
 	}
 	if n := testing.AllocsPerRun(100, func() { p.poll() }); n != 0 {
 		t.Errorf("an idle poll allocates %v times", n)
+	}
+}
+
+// grabbingPad is a fake device that can be taken for one process alone, and remembers
+// every time it was taken or given back. The watchdog calls it from its own goroutine.
+type grabbingPad struct {
+	fakePad
+	mu    sync.Mutex
+	grabs []string
+}
+
+func (g *grabbingPad) grab(take bool) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.grabs = append(g.grabs, map[bool]string{true: "take", false: "give back"}[take])
+	return nil
+}
+
+func (g *grabbingPad) history() string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return strings.Join(g.grabs, ",")
+}
+
+// TestInputSourceGrabsWhilePolled: a device is taken for the player alone as soon as it is
+// opened, so a keyboard stops typing into the text console under the game. It is given
+// back when the player stops polling for grabStall, so that a game stuck in a loop does not
+// take Ctrl+C and the console switch with it, and taken again at the next poll.
+func TestInputSourceGrabsWhilePolled(t *testing.T) {
+	fakeInputs(t, "event0 AT Keyboard|"+keyboardBits)
+	keyboard := &grabbingPad{}
+	old, oldStall := openPad, grabStall
+	openPad = func(string) (events, error) { return keyboard, nil }
+	t.Cleanup(func() { openPad, grabStall = old, oldStall })
+	grabStall = time.Minute
+
+	p := newInputSource("")
+	now := time.Now()
+	p.now = func() time.Time { return now }
+	if _, err := p.poll(); err != nil {
+		t.Fatal(err)
+	}
+	if got := keyboard.history(); got != "take" {
+		t.Fatalf("after the first poll: %q, want the keyboard taken", got)
+	}
+	// Keeping it costs an idle poll nothing.
+	if n := testing.AllocsPerRun(100, func() { p.poll() }); n != 0 {
+		t.Errorf("an idle poll of a taken device allocates %v times", n)
+	}
+
+	grabStall = 20 * time.Millisecond
+	p.poll() // the watchdog now waits the short time
+	deadline := time.Now().Add(5 * time.Second)
+	for keyboard.history() != "take,give back" {
+		if time.Now().After(deadline) {
+			t.Fatalf("no poll for far longer than grabStall: %q, want the keyboard given back", keyboard.history())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	grabStall = time.Minute
+	if _, err := p.poll(); err != nil {
+		t.Fatal(err)
+	}
+	if got := keyboard.history(); got != "take,give back,take" {
+		t.Fatalf("polling again: %q, want the keyboard taken again", got)
+	}
+
+	// Closing gives it back by closing it, and stops the watchdog.
+	grabStall = 200 * time.Millisecond
+	p.poll()
+	if err := p.close(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(400 * time.Millisecond)
+	if got := keyboard.history(); got != "take,give back,take" || keyboard.closed != 1 {
+		t.Fatalf("after close: %q, closed %d", got, keyboard.closed)
 	}
 }
 

@@ -116,6 +116,27 @@ func TestFBWindow(t *testing.T) {
 	}
 }
 
+// TestFBWindowCloseFlushesTerminal: at a Linux text console, keys typed while the player
+// ran must not be left for the shell to run once it quits.
+func TestFBWindowCloseFlushesTerminal(t *testing.T) {
+	fakePanel(t, 320, 240, 640)
+	master, slave := newPty(t)
+	old := terminal
+	terminal = uintptr(slave)
+	t.Cleanup(func() { terminal = old })
+	win, err := Open(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	typeAhead(t, master, slave)
+	if err := win.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if n := pendingInput(t, slave); n != 0 {
+		t.Fatalf("%d bytes typed at the terminal are still waiting for the shell", n)
+	}
+}
+
 // TestFBWindowScale covers the small board: the game renders a quarter of the pixels and
 // each one covers two by two on the glass.
 func TestFBWindowScale(t *testing.T) {

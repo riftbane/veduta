@@ -387,4 +387,71 @@ func TestEvdevUinputJoystick(t *testing.T) {
 			t.Fatalf("%s: got %q, want %q", step.name, got, step.want)
 		}
 	}
+
+	// While the player reads the pad it has the pad to itself (EVIOCGRAB): another reader
+	// of the same node, as the text console is of a keyboard, gets nothing.
+	other := otherReader(t, dev.Dev)
+	pad.emit(evKey, btnTrigger+1, 1)
+	pad.emit(evKey, btnTrigger+1, 0)
+	if got := collect(t, src, "down Escape,up Escape"); got != "down Escape,up Escape" {
+		t.Fatalf("B while taken: got %q", got)
+	}
+	if n := other(); n != 0 {
+		t.Fatalf("while the player reads the pad, another reader got %d records", n)
+	}
+	// A player that stops polling gives the pad back, and takes it again when it polls.
+	oldStall := grabStall
+	t.Cleanup(func() { grabStall = oldStall })
+	grabStall = 100 * time.Millisecond
+	if _, err := src.poll(); err != nil { // the watchdog now waits the short time
+		t.Fatal(err)
+	}
+	time.Sleep(500 * time.Millisecond)
+	grabStall = oldStall
+	pad.emit(evKey, btnTrigger+1, 1)
+	pad.emit(evKey, btnTrigger+1, 0)
+	if n := other(); n == 0 {
+		t.Fatal("the player stopped polling, but the pad was not given back")
+	}
+	if got := collect(t, src, "down Escape,up Escape"); got != "down Escape,up Escape" {
+		t.Fatalf("B while given back: got %q", got)
+	}
+	pad.emit(evKey, btnTrigger+1, 1)
+	pad.emit(evKey, btnTrigger+1, 0)
+	if got := collect(t, src, "down Escape,up Escape"); got != "down Escape,up Escape" {
+		t.Fatalf("B once taken again: got %q", got)
+	}
+	if n := other(); n != 0 {
+		t.Fatalf("polling again did not take the pad back: another reader got %d records", n)
+	}
+	// Closed, the pad belongs to everyone again.
+	src.close()
+	pad.emit(evKey, btnTrigger+1, 1)
+	if n := other(); n == 0 {
+		t.Fatal("the player closed, but the pad was not given back")
+	}
+}
+
+// otherReader opens a device node as another program would, and returns a function that
+// counts the records that have reached it since it was last called.
+func otherReader(t *testing.T, path string) func() int {
+	t.Helper()
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
+	if err != nil {
+		t.Fatalf("a second reader of %s: %v", path, err)
+	}
+	t.Cleanup(func() { syscall.Close(fd) })
+	buf := make([]byte, 64*eventSize)
+	return func() int {
+		total := 0
+		for {
+			n, err := syscall.Read(fd, buf)
+			if n > 0 {
+				total += n / eventSize
+			}
+			if err != nil || n <= 0 {
+				return total
+			}
+		}
+	}
 }

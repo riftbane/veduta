@@ -5,10 +5,12 @@
 // There is one backend, pure Go with CGO_ENABLED=0: frames are written to a Linux
 // framebuffer (the console's panel, or the 32-bit framebuffer of a PC at a text console)
 // and gamepads and keyboards are read from the kernel's event devices, their buttons and
-// keys translated to W3C key codes (window_fb_linux.go, fb_linux.go, evdev_linux.go,
-// padsource_linux.go). No window system is involved, so nothing here needs a particular OS
-// thread. On every other GOOS, Open fails at runtime (window_other.go): Windows and macOS
-// build, test and cross-compile games, and play them only headless.
+// keys translated to W3C key codes and the devices taken for the player alone while it
+// polls, so a keyboard does not also type into the text console (window_fb_linux.go,
+// fb_linux.go, evdev_linux.go, padsource_linux.go). No window system is involved, so
+// nothing here needs a particular OS thread. On every other GOOS, Open fails at runtime
+// (window_other.go): Windows and macOS build, test and cross-compile games, and play them
+// only headless.
 package platform
 
 import (

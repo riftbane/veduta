@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -152,10 +153,20 @@ func bitmapHasWords(bitmap string, bit, wordBits int) bool {
 
 // openDevice is one device being read.
 type openDevice struct {
-	node string
-	src  events
-	down map[string]int // W3C code → how many of this device's buttons and axes hold it
+	node    string
+	src     events
+	down    map[string]int // W3C code → how many of this device's buttons and axes hold it
+	grabbed bool           // taken for this process alone
 }
+
+// grabber is a device that can be taken for this process alone (EVIOCGRAB) and given back.
+type grabber interface {
+	grab(take bool) error
+}
+
+// grabStall is how long the player may go without polling before the devices are given
+// back. A variable so a test need not wait that long.
+var grabStall = 2 * time.Second
 
 // inputSource reads every gamepad and keyboard at once and hands their events on together.
 // Reading all of them rather than choosing one is what lets a console be driven from a
@@ -165,6 +176,12 @@ type openDevice struct {
 // Several things report the same key: a pad's hat, its stick and its D-pad buttons all
 // press the arrows, and a keyboard's Space is the pad's A. A key is therefore held while
 // anything holds it, and reported down with the first press and up with the last release.
+//
+// Every device is taken for the player alone while it is being read, so a keyboard does not
+// also type into the text console the player draws over. The player must keep polling to
+// keep them: when it has not polled for grabStall, a watchdog gives them back, so that a
+// game stuck in a loop does not take Ctrl+C, the console switch and SysRq down with it.
+// The next poll takes them again.
 type inputSource struct {
 	want  string
 	open  []openDevice
@@ -176,6 +193,10 @@ type inputSource struct {
 
 	log     io.Writer // where a change in what can be read is reported: stderr
 	problem string    // why nothing is being read, as last reported; empty while something is
+
+	mu       sync.Mutex  // held by poll and close, and by the watchdog while it gives devices back
+	stall    *time.Timer // the watchdog, started with the first device taken and reset by every poll
+	released bool        // the watchdog gave the devices back: the next poll takes them again
 }
 
 func newInputSource(want string) *inputSource {
@@ -185,8 +206,8 @@ func newInputSource(want string) *inputSource {
 // Devices names what is being read, for diagnostics; empty when nothing is.
 func (p *inputSource) Devices() string {
 	nodes := make([]string, len(p.open))
-	for i, d := range p.open {
-		nodes[i] = d.node
+	for i := range p.open {
+		nodes[i] = p.open[i].node // the node alone: the watchdog may be changing the rest
 	}
 	return strings.Join(nodes, ",")
 }
@@ -194,6 +215,17 @@ func (p *inputSource) Devices() string {
 // poll returns the events of every device since the last call. The slice is reused by the
 // next call.
 func (p *inputSource) poll() ([]Event, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.stall != nil {
+		p.stall.Reset(grabStall)
+	}
+	if p.released {
+		p.released = false
+		for i := range p.open {
+			p.take(&p.open[i])
+		}
+	}
 	p.attach()
 	p.out = p.out[:0]
 	for i := 0; i < len(p.open); {
@@ -238,6 +270,34 @@ func (p *inputSource) pass(d openDevice, evs []Event) {
 			p.release(e.Code, 1)
 		default:
 			p.out = append(p.out, e)
+		}
+	}
+}
+
+// take grabs a device for this process alone, if it can be grabbed and is not already. A
+// device that refuses (not an event device, or one another process holds) is still read.
+func (p *inputSource) take(d *openDevice) {
+	g, ok := d.src.(grabber)
+	if !ok || d.grabbed || g.grab(true) != nil {
+		return
+	}
+	d.grabbed = true
+	if p.stall == nil {
+		p.stall = time.AfterFunc(grabStall, p.giveBack)
+	}
+}
+
+// giveBack is the watchdog: the player has stopped polling, so every device it took is
+// given back until it polls again.
+func (p *inputSource) giveBack() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for i := range p.open {
+		d := &p.open[i]
+		if d.grabbed {
+			d.src.(grabber).grab(false)
+			d.grabbed = false
+			p.released = true
 		}
 	}
 }
@@ -305,6 +365,7 @@ func (p *inputSource) attach() {
 			continue
 		}
 		list = append(list, openDevice{node: d.Node, src: src, down: map[string]int{}})
+		p.take(&list[len(list)-1])
 	}
 	for i, d := range p.open {
 		if !kept[i] {
@@ -350,7 +411,13 @@ func (p *inputSource) report(findErr error, refused []error) {
 	}
 }
 
+// close lets every device go; closing a descriptor also gives back what it had taken.
 func (p *inputSource) close() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.stall != nil {
+		p.stall.Stop()
+	}
 	var err error
 	for _, d := range p.open {
 		if cerr := d.src.close(); err == nil {

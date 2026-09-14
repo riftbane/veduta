@@ -120,7 +120,18 @@ func (w *fbWindow) SetPointerLock(bool) error {
 	return nil
 }
 
+// terminal is the descriptor of the terminal the player may have been started from: its
+// standard input. A test replaces it.
+var terminal uintptr = 0
+
 // Close releases the panel and the input source. It is safe to call more than once.
+//
+// It also throws away what was typed at the player's terminal and not read. The input
+// source keeps keyboards from typing into the text console while it polls, but not before
+// the first poll, nor while a stalled player has given them back; without this the shell
+// would run those keys once the player quits. The console's cursor is left alone: hiding
+// it could not be undone for a player killed outright, and a cursor that stays hidden at
+// the shell is worse than one blinking over the game.
 func (w *fbWindow) Close() error {
 	if w.closed {
 		return nil
@@ -132,5 +143,6 @@ func (w *fbWindow) Close() error {
 			err = cerr
 		}
 	}
+	flushInput(terminal) // not a terminal, or not ours to flush: nothing to do
 	return err
 }
