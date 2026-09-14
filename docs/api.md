@@ -128,7 +128,22 @@ default); there is no interpolation and the player renders once per tick.
 - Randomness only through `ctx.RNG`; no `time.Now`, no environment or file access after
   `Init`.
 - Never let map iteration order affect state or trace: sort keys first.
-- Same seed + same input ⇒ same trace hash and identical frames on the same GOOS/GOARCH.
+- Round every float product that feeds an addition or subtraction with a conversion to its
+  own type: `y += float32(v * ctx.DT)`, `float32(a*b) + float32(c*d)`. On linux/arm64, the
+  console, the compiler may fuse `a*b + c` into one instruction that rounds once, where
+  amd64 rounds twice; about a quarter of all inputs then differ in the last bit and the
+  trace drifts from goldens recorded on a PC. A conversion is a rounding point the
+  compiler may not fuse across, and it costs nothing on amd64. This holds across
+  statements and through inlined calls, so `p := a * b` followed by `q := p + c` needs it
+  too. `gmath` already rounds inside its own operations (`Vec3.Scale`, `Mul`, `Dot`,
+  `Cross`, `Lerp`, matrix and quaternion products), so `pos.Add(vel.Scale(ctx.DT))` is
+  safe as written. `veduta doctor` builds the game for linux/arm64 and lists every line of
+  the game's code where a fusion happened.
+- Use `gmath`'s trigonometry, never `math.Sin`, `math.Exp`, `math.Pow` or `math.Log`: those
+  are not the same on every architecture. `math.Sqrt`, `Abs`, `Floor`, `Ceil`, `Trunc`
+  and `Mod` are exact everywhere.
+- Same seed + same input ⇒ same trace hash and identical frames on linux/amd64,
+  linux/arm64 and windows/amd64 (the engine's CI runs its goldens on all three).
 
 ## Trace
 

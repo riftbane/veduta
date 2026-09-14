@@ -11,6 +11,12 @@ Rules
 - Assets are JSON sources under assets/. Never edit files under assets/.cooked.
 - Every feature gets a scenario in tests/scenarios. Every bug fix gets a regression scenario.
 - Keep the game deterministic: randomness only via ctx.RNG; no time.Now in game code.
+- The game plays on a console: linux/arm64, a 320x240 panel at 20 Hz, a gamepad (D-pad =
+  arrow keys, A = Space, B = Escape, Start = Enter). Drive the game with those keys; there
+  is no mouse on the console.
+- Round every float product that feeds + or -: `y += float32(v * ctx.DT)`. On arm64 the
+  compiler fuses a*b+c into one rounding and the console's traces drift from the goldens.
+  `doctor` lists the lines where it happened; gmath's own operations are already safe.
 - Run `fuzz` before every release; add minimized repros as scenarios.
 - Commit small, message in imperative mood. Tag releases with `release` only when `test` is green.
 - Do not add third-party Go modules.
