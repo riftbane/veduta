@@ -244,7 +244,7 @@ func (s *Session) releaseTargetsConsole() (bool, string) {
 		}
 		found = true
 		data, err := os.ReadFile(filepath.Join(s.Root, filepath.FromSlash(dir), name))
-		if err == nil && buildsConsole(string(data)) {
+		if err == nil && publishes(string(data)) && buildsConsole(string(data)) {
 			return true, dir + "/" + name + " builds " + targetOS + "/" + targetArch
 		}
 	}
@@ -256,23 +256,44 @@ func (s *Session) releaseTargetsConsole() (bool, string) {
 
 var (
 	consoleTargetRe = regexp.MustCompile(`\b` + targetOS + `/` + targetArch + `\b`)
-	targetOSRe      = regexp.MustCompile(`\b` + targetOS + `\b`)
-	targetArchRe    = regexp.MustCompile(`\b` + targetArch + `\b`)
+	// GOOS=linux, GOOS: linux, or GOOS set from an expression (a matrix).
+	targetOSRe = regexp.MustCompile(`(?i)\bgoos\s*[:=]\s*["']?(` + targetOS + `\b|\$\{\{)`)
+	// GOARCH=arm64 or GOARCH: arm64.
+	targetArchRe = regexp.MustCompile(`(?i)\bgoarch\s*[:=]\s*["']?` + targetArch + `\b`)
+	// GOARCH set from an expression, and a matrix list of architectures holding arm64.
+	matrixArchRe = regexp.MustCompile(`(?i)\bgoarch\s*[:=]\s*["']?\$\{\{`)
+	matrixListRe = regexp.MustCompile(`(?i)\b\w*arch\w*\s*:\s*\[[^\]\n]*\b` + targetArch + `\b`)
+	// A trigger that publishes: a pushed tag or a GitHub release.
+	publishRe = regexp.MustCompile(`(?m)^\s*(tags|release)\s*:`)
 )
+
+// publishes reports whether a workflow runs when a release is made (on a pushed tag or a
+// GitHub release), rather than on every push: a CI job that only tests arm64 under qemu
+// publishes nothing.
+func publishes(workflow string) bool { return publishRe.MatchString(workflowCode(workflow)) }
 
 // buildsConsole reports whether the text of a GitHub Actions workflow, its comments left
 // out, builds for the console: it names linux/arm64 (a "for target in linux/arm64 ..."
-// list), or has linux and arm64 as words of their own (GOOS=linux with GOARCH=arm64, or a
-// matrix such as goarch: [arm64, amd64]). It reads text, not YAML, so a workflow can
-// still mislead it, but a comment alone no longer counts.
+// list), or sets GOOS to linux and GOARCH to arm64, directly or from a matrix whose list
+// of architectures holds arm64. It reads text, not YAML, so a workflow can still mislead
+// it, but a comment, or arm64 built for another system, does not count.
 func buildsConsole(workflow string) bool {
+	text := workflowCode(workflow)
+	if consoleTargetRe.MatchString(text) {
+		return true
+	}
+	return targetOSRe.MatchString(text) &&
+		(targetArchRe.MatchString(text) || matrixArchRe.MatchString(text) && matrixListRe.MatchString(text))
+}
+
+// workflowCode is the text of a workflow with its comments cut.
+func workflowCode(workflow string) string {
 	var code strings.Builder
 	for _, line := range strings.Split(workflow, "\n") {
 		code.WriteString(stripYAMLComment(line))
 		code.WriteByte('\n')
 	}
-	text := code.String()
-	return consoleTargetRe.MatchString(text) || targetOSRe.MatchString(text) && targetArchRe.MatchString(text)
+	return code.String()
 }
 
 // stripYAMLComment cuts a line at a # that starts it or follows white space, which begins
@@ -348,6 +369,9 @@ func (s *Session) cardFix() string {
 func (s *Session) cardProblem() string {
 	c, why := s.readCard()
 	if why != "" {
+		if v0Engine(s.Project.Engine) {
+			return why + "; veduta release will refuse it once the project is upgraded to v1"
+		}
 		return why + "; veduta release refuses until it is fixed"
 	}
 	var diffs []string

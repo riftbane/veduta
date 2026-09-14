@@ -129,6 +129,8 @@ func TestBuildsConsole(t *testing.T) {
 		{"shell expansion", "run: |\n  os=\"${target%/*}\"; arch=\"${target#*/}\"\n  for target in linux/amd64; do echo $#; done\n", false},
 		{"other arm", "run: GOOS=linux GOARCH=arm go build\n", false},
 		{"no linux", "run: GOOS=darwin GOARCH=arm64 go build\n", false},
+		{"arm64 for other systems", "run: |\n  for target in linux/amd64 darwin/arm64 windows/arm64; do\n", false},
+		{"an arm64 runner", "runs-on: ubuntu-24.04-arm64\nrun: GOOS=linux go build\n", false},
 	} {
 		if got := buildsConsole(c.workflow); got != c.want {
 			t.Errorf("%s: buildsConsole = %v, want %v", c.name, got, c.want)
@@ -147,7 +149,11 @@ func TestBuildsConsole(t *testing.T) {
 	if ok, detail := s.releaseTargetsConsole(); ok || !strings.Contains(detail, "no linux/arm64") {
 		t.Fatalf("ci only: %v %q", ok, detail)
 	}
-	os.WriteFile(filepath.Join(wfs, "publish.yaml"), []byte("env:\n  GOOS: linux\n  GOARCH: arm64\n"), 0o644)
+	os.WriteFile(filepath.Join(wfs, "ci.yml"), []byte("on: push\nrun: GOOS=linux GOARCH=arm64 go test -exec qemu-aarch64-static ./...\n"), 0o644)
+	if ok, detail := s.releaseTargetsConsole(); ok || !strings.Contains(detail, "no linux/arm64") {
+		t.Fatalf("an arm64 test job that publishes nothing: %v %q", ok, detail)
+	}
+	os.WriteFile(filepath.Join(wfs, "publish.yaml"), []byte("on:\n  push:\n    tags: [\"v*\"]\nenv:\n  GOOS: linux\n  GOARCH: arm64\n"), 0o644)
 	if ok, detail := s.releaseTargetsConsole(); !ok || detail != ".github/workflows/publish.yaml builds linux/arm64" {
 		t.Fatalf("publish.yaml: %v %q", ok, detail)
 	}

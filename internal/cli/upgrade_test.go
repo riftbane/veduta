@@ -346,7 +346,7 @@ func TestUpgradeTellsWhatTheConsoleNeeds(t *testing.T) {
 	// A project that already has both is told nothing, and so is one that stays on v1.
 	s = upgradeProject(t, manifest, "v1.0.0")
 	os.MkdirAll(filepath.Join(s.Root, ".github", "workflows"), 0o755)
-	os.WriteFile(filepath.Join(s.Root, ".github", "workflows", "release.yml"), []byte("run: for target in linux/arm64; do go build; done\n"), 0o644)
+	os.WriteFile(filepath.Join(s.Root, ".github", "workflows", "release.yml"), []byte("on:\n  push:\n    tags: [\"v*\"]\nrun: for target in linux/arm64; do go build; done\n"), 0o644)
 	os.WriteFile(filepath.Join(s.Root, "card.json"), []byte(`{"veduta": "card/1"}`), 0o644)
 	if r, err := s.Upgrade(&Env{Version: "v1.0.0"}, false); err != nil || len(r.Next) != 0 {
 		t.Fatalf("ready project: %+v %v", r, err)
