@@ -311,6 +311,38 @@ func TestSpriteMaterialTraps(t *testing.T) {
 	})
 }
 
+// Neither layer nor draw order overrides the depth test: the fixture's translucent shade
+// (layer 1, drawn after every opaque sprite) darkens the hero only when it is nearer the
+// camera. At the hero's own z it is hidden where the hero is.
+func TestBlendedSpriteNeedsNearerZ(t *testing.T) {
+	const hero = 0xffe04848
+	for _, tc := range []struct {
+		shadeZ float32
+		dark   bool
+	}{{2, true}, {1, false}} {
+		p, a, err := loadProject(twodProject)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e := newEngine(&testGame{}, p, a)
+		defer e.close()
+		if err := e.start(runOptions{Scene: "main", Seed: 1, Headless: true}); err != nil {
+			t.Fatal(err)
+		}
+		e.ctx.Scene.Find("hero").Transform.Position = gmath.V3(4, 0, 1)
+		e.ctx.Scene.Find("shade").Transform.Position.Z = tc.shadeZ
+		e.ctx.Scene.Update()
+		f, err := e.render(e.ctx.Scene.Camera, 320, 240, gfx.ModeColor, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		x, y := twodXY(4, 0)
+		if c := f.FB.Color[y*f.FB.W+x]; (c != hero) != tc.dark {
+			t.Errorf("shade at z = %g: hero pixel %08x (unshaded %08x), want darkened %v", tc.shadeZ, c, uint32(hero), tc.dark)
+		}
+	}
+}
+
 // A plane model turned to face the camera has no thickness along Z: its AABB is flat at
 // z = 1, and at z = 0 only the rounding of the 90° rotation leaves a few 1e-8 m, so
 // whether two such quads overlap depends on where they stand. A thin box does not.
