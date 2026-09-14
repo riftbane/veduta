@@ -17,16 +17,35 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The newest stable Go, the toolchain the engine's own CI and arm64 checks run on:
+      # the console's binary is built by the compiler those checks have seen.
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
 
       - name: build archives
         run: |
           set -eu
           tag="${GITHUB_REF_NAME}"
           name="[[.Name]]"
-          mkdir -p dist
+          mkdir -p build dist
+          # card.json is what the console lists. The release sets its "version" to the tag
+          # and, when veduta.json names an icon, ships that file as icon.png beside the card
+          # and names it there. jq edits the JSON, not its lines, so any layout of the card
+          # works; a card that is not one card/1 object stops the job before anything is
+          # built.
+          icon="$(jq -r '.icon // ""' veduta.json)"
+          if [ -n "$icon" ] && [ ! -f "$icon" ]; then
+            echo "veduta.json names the icon $icon, which does not exist" >&2
+            exit 1
+          fi
+          if ! jq -s --arg version "$tag" --arg icon "${icon:+icon.png}" '
+            if length == 1 and (.[0] | type) == "object" and .[0].veduta == "card/1" then
+              .[0] | .version = $version | if $icon == "" then . else .icon = $icon end
+            else error("not a card/1 object") end' card.json > build/card.json; then
+            echo "card.json must hold one JSON object whose \"veduta\" is \"card/1\"" >&2
+            exit 1
+          fi
           # linux/arm64 is the console (Raspberry Pi Zero 2 W and Pi 5); linux/amd64 runs on
           # any other Linux machine with a framebuffer. Each archive unpacks to a folder that
           # is a game card as it is: copy it onto the console's card.
@@ -36,9 +55,8 @@ jobs:
             stage="build/${os}_${arch}/${name}"
             mkdir -p "$stage"
             GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "-s -w" -o "$stage/$name" ./cmd/game
-            cp veduta.json README.md "$stage/"
-            # card.json is what the console lists; the release stamps its version.
-            awk -v tag="$tag" '{ print } /"veduta": *"card\/1",/ { print "  \"version\": \"" tag "\"," }' card.json > "$stage/card.json"
+            cp veduta.json README.md build/card.json "$stage/"
+            if [ -n "$icon" ]; then cp "$icon" "$stage/icon.png"; fi
             cp -r assets "$stage/assets"
             rm -rf "$stage/assets/.cooked"
             tar -C "build/${os}_${arch}" -czf "dist/${name}_${tag}_${os}_${arch}.tar.gz" "$name"

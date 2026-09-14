@@ -502,7 +502,10 @@ can list a game written years later.
 ```
 
 Every field except `veduta` is optional. `veduta init` writes `veduta`, `title`, `name` and
-`exec`; the release workflow copies it into each archive and adds `version` from the tag.
+`exec`; the release workflow copies it into each archive, sets `version` to the tag and,
+when `veduta.json` names an `icon`, copies that file beside the card as `icon.png` and sets
+`icon` to it. The workflow edits the card as JSON, so any layout works, and stops before
+building when the card is not one `card/1` object or the icon does not exist.
 
 ## 9. Inspection
 
@@ -693,7 +696,9 @@ pre-release suffix is published as a pre-release.
 
 A game's `release.yml` builds `linux/arm64` and `linux/amd64` archives
 `<name>_<tag>_linux_<arch>.tar.gz`, each unpacking to a folder `<name>/` holding the binary,
-`veduta.json`, `card.json` (with `version`), `README.md` and `assets/` without cooked files.
+`veduta.json`, `card.json` (with `version`), `README.md`, `icon.png` when the manifest names
+an icon, and `assets/` without cooked files. It builds with Go `stable`, the toolchain the
+engine's CI and arm64 job run.
 
 ### 13.2 `install.sh`
 POSIX `sh`, usable as `curl -fsSL https://raw.githubusercontent.com/riftbane/veduta/main/install.sh | sh`.
