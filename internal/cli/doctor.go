@@ -115,7 +115,10 @@ func Doctor(env *Env, projectDir string) *DoctorReport {
 	return r
 }
 
-// engineCheck compares the engine versions of go.mod and veduta.json with the tool's.
+// engineCheck compares the engine versions of go.mod and veduta.json with the tool's. A
+// difference of a minor version or more is a warning (spec §13.3): the project builds
+// against the engine its go.mod pins whatever the tool is, so nothing fails until the
+// author chooses to upgrade.
 func (s *Session) engineCheck(env *Env) Check {
 	c := Check{Name: "engine", OK: true}
 	mod, err := os.ReadFile(filepath.Join(s.Root, "go.mod"))
@@ -130,7 +133,7 @@ func (s *Session) engineCheck(env *Env) Check {
 	}
 	c.Detail = fmt.Sprintf("go.mod requires %s, veduta.json says %s, tool is %s", orNone(required), s.Project.Engine, env.Version)
 	if d := minorDiff(s.Project.Engine, env.Version); d != "" {
-		c.OK = false
+		c.Warning = true
 		c.Detail += "; " + d
 		c.Fix = "run veduta upgrade to move the project to the tool's version, or veduta update to change the tool"
 	}

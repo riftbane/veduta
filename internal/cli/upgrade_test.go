@@ -304,3 +304,21 @@ func TestUpgradeReportHuman(t *testing.T) {
 		})
 	}
 }
+
+// TestEngineCheckWarnsOnAMinorGap checks that a project a minor version or more away from
+// the tool is a warning, as spec §13.3 says, which leaves doctor's exit status alone.
+func TestEngineCheckWarnsOnAMinorGap(t *testing.T) {
+	manifest := "{\n  \"veduta\": \"project/1\",\n  \"name\": \"mygame\",\n  \"engine\": \"v0.2.0\"\n}\n"
+	s := upgradeProject(t, manifest, "v0.2.0")
+	c := s.engineCheck(&Env{Version: "v1.0.0"})
+	if !c.OK || !c.Warning || !strings.Contains(c.Detail, "differ by a minor version or more") || !strings.Contains(c.Fix, "veduta upgrade") {
+		t.Fatalf("engine check across a minor version: %+v", c)
+	}
+	r := &DoctorReport{OK: true, Checks: []Check{c}}
+	if r.ExitCode() != 0 || !strings.HasPrefix(r.Human(), "warn engine ") || !strings.Contains(r.Human(), "fix: run veduta upgrade") {
+		t.Fatalf("doctor prints:\n%s", r.Human())
+	}
+	if c := s.engineCheck(&Env{Version: "v0.2.3"}); !c.OK || c.Warning {
+		t.Fatalf("engine check within a minor version: %+v", c)
+	}
+}
