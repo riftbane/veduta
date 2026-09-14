@@ -1,7 +1,7 @@
 {
   "veduta": "project/1",
   "name": "twod",
-  "engine": "v0.2.0",
+  "engine": "v1.0.0",
   "resolution": [320, 240],
   "inspect_resolution": [320, 240],
   "tick_rate": 20,

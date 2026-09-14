@@ -62,7 +62,7 @@ func templateEngine() string {
 			return string(m[1])
 		}
 	}
-	return "v0.2.0"
+	return "v1.0.0"
 }
 
 // projectFiles maps templated sources to their destination.
