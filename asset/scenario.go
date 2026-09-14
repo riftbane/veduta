@@ -36,7 +36,7 @@ type Input struct {
 	Press   []string    // keys that go down at this tick and stay held until released
 	Release []string    // held keys that go up at this tick
 	Buttons []string    // nil: unchanged; otherwise the mouse buttons held from now on (left, right, middle)
-	Mouse   *gmath.Vec2 // nil: unchanged; otherwise the mouse position in window pixels
+	Mouse   *gmath.Vec2 // nil: unchanged; otherwise the mouse position in frame pixels
 	Text    string      // characters typed during this tick
 }
 

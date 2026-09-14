@@ -1,7 +1,7 @@
 # Project manifest — `veduta.json`
 
 Every game project has a `veduta.json` at its root. It names the game, pins the engine
-version, and sets the defaults the tools use: window and inspection sizes, tick rate,
+version, and sets the defaults the tools use: player frame and inspection sizes, tick rate,
 default scene and seed, where assets live, project-wide invariants and world bounds.
 `veduta init` writes it; `veduta upgrade` updates `engine` (see [Upgrading](#upgrading)).
 

@@ -18,7 +18,8 @@ const Version = "v0.2.0"
 
 // Input is everything the player did during one tick: pressed, held and released keys
 // (W3C KeyboardEvent.code names such as KeyW, Space, ArrowLeft), the mouse position and
-// buttons, and typed text. It is identical whether it comes from a window or a script.
+// buttons, and typed text. It is identical whether it comes from the console or a scenario
+// script.
 type Input = sim.Input
 
 // Game is implemented by every Veduta game.

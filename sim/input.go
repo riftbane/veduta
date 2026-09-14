@@ -96,12 +96,12 @@ func (b ButtonSet) Has(name string) bool {
 }
 
 // Input is everything the player did during one tick. It is a value type and is
-// identical whether it comes from a real window or from a scenario script.
+// identical whether it comes from the console or from a scenario script.
 type Input struct {
 	Pressed         KeySet     // keys that went down this tick
 	Held            KeySet     // keys down at the end of this tick (a tap within the tick is only in Pressed and Released)
 	Released        KeySet     // keys that went up this tick
-	Mouse           gmath.Vec2 // cursor position in window pixels (origin top-left)
+	Mouse           gmath.Vec2 // cursor position in frame pixels (origin top-left)
 	MouseDelta      gmath.Vec2 // cursor movement during this tick, in pixels (mouse look)
 	Buttons         ButtonSet  // mouse buttons held
 	ButtonsPressed  ButtonSet
@@ -134,7 +134,7 @@ func (in Input) Axis(neg, pos string) float32 {
 	return v
 }
 
-// InputState turns raw events (from a window or a script) into one Input per tick.
+// InputState turns raw events (from the player or a script) into one Input per tick.
 type InputState struct {
 	held            KeySet
 	pressed         KeySet
@@ -194,7 +194,7 @@ func (s *InputState) SetButtons(b ButtonSet) {
 // TypeText appends typed characters.
 func (s *InputState) TypeText(t string) { s.text = append(s.text, t...) }
 
-// ReleaseAll releases every key and button (for example when the window loses focus).
+// ReleaseAll releases every key and button (for example when the player loses its input).
 func (s *InputState) ReleaseAll() {
 	s.released = s.released.union(s.held)
 	s.held = KeySet{}

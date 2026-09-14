@@ -148,7 +148,7 @@ type InputSource struct {
 	Text    string       `json:"text,omitempty"`
 }
 
-// MouseSource is a mouse position in window pixels.
+// MouseSource is a mouse position in frame pixels.
 type MouseSource struct {
 	X float32 `json:"x"`
 	Y float32 `json:"y"`
