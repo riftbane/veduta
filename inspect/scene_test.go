@@ -62,6 +62,12 @@ var scnFixtures = map[string]string{
 		{"name": "crate_c", "kind": "static", "model": "crate", "position": [-3, 1, 0]},
 		{"name": "pushable", "kind": "pickup", "model": "crate", "position": [0, 0, 0.3]},
 		{"name": "lid", "kind": "static", "model": "crate", "parent": "crate_a", "position": [-0.2, 0.8, 0], "scale": [0.5, 0.5, 0.5]}]}`,
+	// A 0.02-thick panel inside block's ±0.5 hitbox along z: the intersection is only
+	// 0.02 deep there, but block must move 0.21 m to clear the panel.
+	"thin": `{"veduta": "scene/1", "camera": {"type": "orthographic", "size": 4, "position": [0, 0, 100], "look_at": [0, 0, 0]}, "entities": [
+		{"name": "panel", "kind": "static", "model": "quad", "material": "flat"},
+		{"name": "block", "kind": "static", "model": "quad", "material": "flat", "position": [0, 0, 0.3],
+			"hitbox": [[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]]}]}`,
 	// The camera looks up and away from everything.
 	"away": `{"veduta": "scene/1", "camera": {"position": [0, 9, 11], "look_at": [0, 9, 30]}, "entities": [
 		{"name": "ground", "kind": "static", "model": "ground"},
@@ -441,6 +447,32 @@ func TestSceneOverlap(t *testing.T) {
 		t.Errorf("overlap_pairs %v", r.Metrics["overlap_pairs"])
 	}
 	golden.Image(t, "inspect_scene_overlap_top", scnSheet(t, r, "top"))
+}
+
+// The overlap hint moves the entity far enough to separate the boxes, not by the depth of
+// their intersection, so following it clears the warning instead of repeating it.
+func TestSceneOverlapHintSeparates(t *testing.T) {
+	lib := scnLibrary(t)
+	r := scnInspect(t, scnRenderer(t, lib), "thin", Options{Focus: "SCENE_OVERLAP"})
+	if len(r.Issues) != 1 {
+		t.Fatalf("want 1 SCENE_OVERLAP (panel, block), got %+v", r.Issues)
+	}
+	is := r.Issues[0]
+	if is.Where["overlap"] != gmath.V3(1, 1, 0.02) {
+		t.Errorf("overlap %v, want the intersection depth [1, 1, 0.02]", is.Where["overlap"])
+	}
+	want := `Move "block" by +0.21 m along z (entities[1].position [0, 0, 0.3] → [0, 0, 0.51])`
+	if !strings.Contains(is.Hint, want) {
+		t.Fatalf("hint %q, want %q", is.Hint, want)
+	}
+	moved := *lib.Scenes["thin"]
+	moved.Name = "thin_moved"
+	moved.Entities = append([]asset.Entity(nil), moved.Entities...)
+	moved.Entities[1].Position = gmath.V3(0, 0, 0.51)
+	lib.Scenes["thin_moved"] = &moved
+	if r := scnInspect(t, scnRenderer(t, lib), "thin_moved", Options{Focus: "SCENE_OVERLAP"}); len(r.Issues) != 0 {
+		t.Errorf("after the move: %+v", r.Issues)
+	}
 }
 
 func TestSceneCameraSeesNothing(t *testing.T) {

@@ -95,7 +95,8 @@ const (
 //     and pairs whose models are both drawn only with alpha-blended materials (water and
 //     mist stacked by layer) do not count; visibility is ignored (AABBs are collision
 //     volumes). One per pair; where: a, b, ids, overlap (depth per axis) and box (the
-//     intersection).
+//     intersection). The hint moves the later entity by the shortest distance along one
+//     axis that leaves the boxes only touching, rounded up to the cm.
 //   - SCENE_CAMERA_SEES_NOTHING (error): no pixel of the camera render belongs to an
 //     entity. The where explains why (distance to the drawn entities vs near/far, angle
 //     off the view direction, entities whose drawing's bounds contain the camera).
@@ -733,17 +734,10 @@ func (a *scnAnalysis) checkOverlap() {
 	for _, pr := range pairs {
 		ei, ej := a.ents[pr.i], a.ents[pr.j]
 		d := scnDepth(ei.AABB, ej.AABB)
-		ax := 0
-		for k := 1; k < 3; k++ {
-			if d.Get(k) < d.Get(ax) {
-				ax = k
-			}
-		}
-		dir := float32(1)
-		if ej.AABB.Center().Get(ax) < ei.AABB.Center().Get(ax) {
-			dir = -1
-		}
-		amount := math.Ceil(scnRound(float64(d.Get(ax)))*100) / 100 // cm, without float32 noise
+		ax, dir, sep := scnSeparation(ei.AABB, ej.AABB)
+		// Rounded to 4 decimals, then up to the cm: the boxes are left at most 5e-5 m deep,
+		// below scnOverlapMin, so the moved pair is no longer reported.
+		amount := math.Ceil(scnRound(sep)*100) / 100
 		axis := "xyz"[ax : ax+1]
 		move := fmt.Sprintf("Move %q by %s%s m along %s (entities[%d].position%s", ej.Name, scnSign(dir), scnF(amount), axis, pr.j, a.parentNote(pr.j))
 		if a.idx(ej.Parent) < 0 {
@@ -763,6 +757,26 @@ func (a *scnAnalysis) checkOverlap() {
 // they are apart).
 func scnDepth(a, b gmath.AABB) gmath.Vec3 {
 	return a.Max.Min(b.Max).Sub(a.Min.Max(b.Min))
+}
+
+// scnSeparation returns the shortest translation of b along one axis that leaves it only
+// touching a: the axis, the direction (+1 or -1) and the distance. The distance is not the
+// depth of the intersection: when one box contains the other on an axis, moving by the
+// depth leaves them overlapping (a ±0.5 hitbox against a 0.02-thick quad). Ties go to
+// the lower axis and to +1.
+func scnSeparation(a, b gmath.AABB) (ax int, dir float32, dist float64) {
+	dist = math.Inf(1)
+	for k := 0; k < 3; k++ {
+		plus := float64(a.Max.Get(k)) - float64(b.Min.Get(k))  // b.Min onto a.Max
+		minus := float64(b.Max.Get(k)) - float64(a.Min.Get(k)) // b.Max onto a.Min
+		if plus < dist {
+			ax, dir, dist = k, 1, plus
+		}
+		if minus < dist {
+			ax, dir, dist = k, -1, minus
+		}
+	}
+	return ax, dir, dist
 }
 
 func scnSign(f float32) string {
