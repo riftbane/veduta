@@ -57,8 +57,24 @@ func build(name string, s *spec) *asset.Model {
 			UV: ps.uv, FlipNormals: ps.flip, Of: ps.of,
 		})
 	}
-	applyPivot(m)
+	if len(nonFiniteParts(m)) == 0 {
+		applyPivot(m)
+	}
 	return m
+}
+
+// nonFiniteParts returns the indices of the parts with a vertex that is not finite.
+func nonFiniteParts(m *asset.Model) []int {
+	var bad []int
+	for _, p := range m.Parts {
+		for _, i := range m.Mesh.Indices[p.First : p.First+p.Count] {
+			if v := m.Mesh.Vertices[i]; !v.Pos.IsFinite() || !v.Normal.IsFinite() || !v.UV.IsFinite() {
+				bad = append(bad, p.Index)
+				break
+			}
+		}
+	}
+	return bad
 }
 
 func indexOf(list []string, s string) int {

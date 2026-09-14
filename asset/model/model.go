@@ -95,7 +95,21 @@ func Compile(name string, src *asset.ModelSource, loc *asset.Locator) (*asset.Mo
 	if err := c.Err(); err != nil {
 		return nil, err
 	}
-	return build(name, s), nil
+	m := build(name, s)
+	// Sources are only checked to be finite, so sizes, positions and scales can still
+	// multiply past the float32 range. Such geometry is refused: a NaN made from
+	// infinities carries a sign that differs between amd64 and arm64, so its cooked bytes
+	// would too.
+	for _, i := range nonFiniteParts(m) {
+		c.Errorf(asset.Path("parts", i), "geometry exceeds the float32 range (a vertex is not finite after size, position, rotation and scale are applied)")
+	}
+	if c.Err() == nil && !(m.PivotOffset.IsFinite() && m.Mesh.Bounds.Min.IsFinite() && m.Mesh.Bounds.Max.IsFinite()) {
+		c.Errorf("pivot", "the model is too large to move to its pivot within the float32 range")
+	}
+	if err := c.Err(); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // spec is a validated model source with every default resolved.

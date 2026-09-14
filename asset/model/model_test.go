@@ -392,3 +392,17 @@ func readModel(t testing.TB, name string) []byte {
 }
 
 func near(a, b, tol float32) bool { return gmath.Abs(a-b) <= tol }
+
+// TestGeometryBeyondFloat32 checks that parts whose finite numbers multiply past the
+// float32 range are refused rather than cooked with infinities and architecture-dependent
+// NaNs.
+func TestGeometryBeyondFloat32(t *testing.T) {
+	src := `{"veduta": "model/1", "pivot": "center", "parts": [
+		{"shape": "box", "size": [1, 1, 1]},
+		{"shape": "box", "size": [3e38, 1, 1], "position": [3e38, 0, 0]}
+	]}`
+	es := compileErrs(t, "test.model.json", src)
+	if len(es) != 1 || !strings.Contains(es[0].Error(), "parts[1]: geometry exceeds the float32 range") {
+		t.Fatalf("errors = %v", es)
+	}
+}
