@@ -313,6 +313,9 @@ type FrameStats struct {
 type Backend interface {
 	CreateTexture(t *TextureData) (TextureID, error)
 	CreateMesh(m *MeshData) (MeshID, error)
+	// UpdateMesh replaces the geometry behind an existing mesh handle (a streamed world
+	// reuses the handles of unloaded chunks).
+	UpdateMesh(id MeshID, m *MeshData) error
 	Begin(target *Framebuffer) error
 	Draw(dl *DrawList) error
 	End() error

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"github.com/riftbane/veduta/asset"
 	"github.com/riftbane/veduta/gfx"
@@ -27,6 +28,7 @@ type engine struct {
 	project *asset.Project
 	assets  *Assets
 	ctx     Context
+	world   *World // the loaded world, nil for a scene
 
 	behaviours map[uint32]Behaviour
 	rec        *sim.Recorder
@@ -60,6 +62,8 @@ func newEngine(g Game, p *asset.Project, a *Assets) *engine {
 // runOptions configures a simulation run.
 type runOptions struct {
 	Scene      string
+	World      string   // load this world instead of Scene
+	At         [2]int32 // the world's start cell
 	Seed       uint64
 	Invariants []string  // invariant specs; nil means the project's list
 	Trace      io.Writer // receives trace.jsonl (nil: hash only)
@@ -88,25 +92,44 @@ func (e *engine) prepare(opt runOptions) error {
 	if e.invSpecs == nil {
 		e.invSpecs = e.project.Invariants
 	}
-	if err := e.loadScene(opt.Scene); err != nil {
+	var err error
+	if opt.World != "" {
+		err = e.loadWorld(opt.World, opt.At)
+	} else {
+		err = e.loadScene(opt.Scene)
+	}
+	if err != nil {
 		return err
 	}
 	e.tickSize()
 	if err := e.game.Init(&e.ctx); err != nil {
 		return fmt.Errorf("game Init: %w", err)
 	}
+	if err := e.buildMonitor(); err != nil {
+		return err
+	}
+	e.ctx.Scene.Flush()
+	e.ctx.Scene.Update()
+	e.contacts.Step(e.ctx.Scene) // overlaps present at load are not collisions
+	return nil
+}
+
+// buildMonitor parses the run's invariant specs against the current bounds (the
+// world's extent when a world is loaded, else the project's) and the game's predicates.
+func (e *engine) buildMonitor() error {
+	bounds := e.project.Bounds
+	if e.world != nil {
+		bounds = e.world.worldBounds()
+	}
 	var list []sim.Invariant
 	for _, spec := range e.invSpecs {
-		inv, err := sim.ParseInvariant(spec, e.project.Bounds, e.custom)
+		inv, err := sim.ParseInvariant(spec, bounds, e.custom)
 		if err != nil {
 			return err
 		}
 		list = append(list, inv)
 	}
 	e.monitor = sim.NewMonitor(list)
-	e.ctx.Scene.Flush()
-	e.ctx.Scene.Update()
-	e.contacts.Step(e.ctx.Scene) // overlaps present at load are not collisions
 	return nil
 }
 
@@ -119,6 +142,54 @@ func (e *engine) loadScene(name string) error {
 	if err != nil {
 		return err
 	}
+	e.world = nil
+	if err := e.install(s); err != nil {
+		return err
+	}
+	e.emit(sim.EventSceneLoad, map[string]any{"scene": name, "entities": s.Len()})
+	return nil
+}
+
+// loadWorld replaces the scene with world name, streamed around its start cell at.
+func (e *engine) loadWorld(name string, at [2]int32) error {
+	src, ok := e.assets.Worlds[name]
+	if !ok {
+		return fmt.Errorf("unknown world %q", name)
+	}
+	w := newWorld(e, src, at)
+	if len(w.gen.Missing) > 0 {
+		return fmt.Errorf("world %q: missing prefabs %v", name, w.gen.Missing)
+	}
+	s, err := w.startScene()
+	if err != nil {
+		return err
+	}
+	e.world = w
+	e.ctx.Scene = s
+	e.behaviours = map[uint32]Behaviour{}
+	for _, ent := range s.Entities() {
+		if err := e.attach(ent); err != nil {
+			return err
+		}
+	}
+	w.stream()
+	s.OnEvent = e.emit
+	s.Update()
+	if e.contacts != nil {
+		e.contacts = sim.NewContacts()
+		e.contacts.Step(s)
+	}
+	if e.monitor != nil { // loaded from Update: the bounds changed
+		if err := e.buildMonitor(); err != nil {
+			return err
+		}
+	}
+	e.emit("world_load", map[string]any{"world": name, "at": at, "entities": s.Len()})
+	return nil
+}
+
+// install makes s the current scene: behaviours attached, contacts reset, events wired.
+func (e *engine) install(s *scene.Scene) error {
 	s.OnEvent = e.emit
 	e.ctx.Scene = s
 	e.behaviours = map[uint32]Behaviour{}
@@ -131,7 +202,11 @@ func (e *engine) loadScene(name string) error {
 		e.contacts = sim.NewContacts()
 		e.contacts.Step(s)
 	}
-	e.emit(sim.EventSceneLoad, map[string]any{"scene": name, "entities": s.Len()})
+	if e.monitor != nil {
+		if err := e.buildMonitor(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -185,6 +260,11 @@ func (e *engine) step(in Input) error {
 	e.tick++
 	e.ctx.Tick = e.tick
 	e.tickSize()
+	if w := e.world; w != nil && w.stream() {
+		// Entities that appear overlapping are not collisions, as at load.
+		e.ctx.Scene.Update()
+		e.contacts.Step(e.ctx.Scene)
+	}
 	e.game.Update(&e.ctx, in)
 	s := e.ctx.Scene
 	ents := s.Entities()
@@ -263,6 +343,9 @@ func (e *engine) render(cam scene.Camera, w, h int, mode gfx.RenderMode, normals
 		fb = gfx.NewFramebuffer(w, h, normals)
 		e.fb = fb
 	}
+	if err := e.syncGround(); err != nil {
+		return nil, err
+	}
 	e.dl.Reset()
 	e.ctx.Scene.Draw(&e.dl, e.res, scene.DrawOptions{Camera: cam, Width: w, Height: h, Mode: mode})
 	if e.extra != nil {
@@ -282,6 +365,28 @@ func (e *engine) render(cam scene.Camera, w, h int, mode gfx.RenderMode, normals
 		return nil, err
 	}
 	return &frame{FB: fb, Camera: cam, View: e.dl.Views[0], Mode: mode, Stats: e.renderer.Stats()}, nil
+}
+
+// syncGround uploads the ground meshes of the loaded chunks and frees those of unloaded
+// ones, so the renderer holds exactly the world's window.
+func (e *engine) syncGround() error {
+	var want map[string]*asset.Model
+	if e.world != nil {
+		want = e.world.models
+	}
+	for _, name := range sortedNames(e.res.Models) {
+		if strings.HasPrefix(name, "world:") && want[name] == nil {
+			e.res.Remove(name)
+		}
+	}
+	for _, name := range sortedNames(want) {
+		if cur := e.res.Models[name]; cur == nil || cur.Model != want[name] {
+			if err := e.res.AddModel(e.renderer, name, want[name]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (e *engine) close() {
@@ -317,12 +422,22 @@ type snapshot struct {
 	Contacts []sim.Pair
 	Failing  []bool
 	Game     []byte
+	// A world: its name, start and focus cells, and the streamed window.
+	World   string
+	Start   [2]int32
+	Focus   [2]int32
+	Chunks  []snapChunk
+	Structs []snapStruct
 }
 
 func (e *engine) snapshot() ([]byte, error) {
 	s := e.ctx.Scene
 	snap := snapshot{Version: Version, Scene: s.Name, Tick: e.tick, RNG: e.ctx.RNG.State(), NextID: s.NextID(),
 		Contacts: e.contacts.Active(), Failing: e.monitor.FailingState()}
+	if w := e.world; w != nil {
+		snap.World, snap.Start, snap.Focus = w.Name, w.Start, w.focus
+		snap.Chunks, snap.Structs = w.snapshot()
+	}
 	for _, ent := range s.Entities() {
 		if !ent.Alive() {
 			continue
@@ -363,13 +478,35 @@ func (e *engine) restore(data []byte, trace io.Writer) error {
 	if snap.Version != Version {
 		return fmt.Errorf("restore: snapshot is from engine %s, this is %s", snap.Version, Version)
 	}
-	src, ok := e.assets.Scenes[snap.Scene]
-	if !ok {
-		return fmt.Errorf("restore: unknown scene %q", snap.Scene)
+	var s *scene.Scene
+	e.world = nil
+	if snap.World != "" {
+		wd, ok := e.assets.Worlds[snap.World]
+		if !ok {
+			return fmt.Errorf("restore: unknown world %q", snap.World)
+		}
+		w := newWorld(e, wd, snap.Start)
+		if len(w.gen.Missing) > 0 {
+			return fmt.Errorf("restore: world %q: missing prefabs %v", snap.World, w.gen.Missing)
+		}
+		w.focus = snap.Focus
+		w.restore(snap.Chunks, snap.Structs)
+		start, err := w.startScene()
+		if err != nil {
+			return fmt.Errorf("restore: %w", err)
+		}
+		s = scene.New(snap.Scene, w.bounds)
+		s.Camera, s.Light, s.Background = start.Camera, start.Light, start.Background
+		e.world = w
+	} else {
+		src, ok := e.assets.Scenes[snap.Scene]
+		if !ok {
+			return fmt.Errorf("restore: unknown scene %q", snap.Scene)
+		}
+		s = scene.New(snap.Scene, e.assets.ModelBounds)
+		s.Camera = scene.CameraFromAsset(src.Camera)
+		s.Light, s.Background = src.Light, src.Background
 	}
-	s := scene.New(snap.Scene, e.assets.ModelBounds)
-	s.Camera = scene.CameraFromAsset(src.Camera)
-	s.Light, s.Background = src.Light, src.Background
 	ents := make([]scene.Entity, len(snap.Entities))
 	for i, se := range snap.Entities {
 		ents[i] = scene.Entity{ID: se.ID, Name: se.Name, Kind: se.Kind, Transform: se.Transform, Model: se.Model,
@@ -408,6 +545,9 @@ func (e *engine) restore(data []byte, trace io.Writer) error {
 	s.Update()
 	e.contacts = sim.NewContacts()
 	e.contacts.SetActive(snap.Contacts)
+	if err := e.buildMonitor(); err != nil { // the bounds follow the snapshot's world or scene
+		return fmt.Errorf("restore: %w", err)
+	}
 	e.monitor.SetFailingState(snap.Failing)
 	e.rec = sim.NewRecorder(trace)
 	e.recording = true

@@ -61,6 +61,11 @@ func (g *testGame) Update(ctx *Context, in Input) {
 		g.score = 0
 		ctx.LoadScene(ctx.Scene.Name)
 	}
+	if w := ctx.World(); w != nil {
+		if p := ctx.Scene.Find("player"); p != nil {
+			w.Focus(p.WorldPosition())
+		}
+	}
 }
 
 func (g *testGame) Draw(ctx *Context, dl *gfx.DrawList) {
@@ -107,11 +112,33 @@ func testAssets() (*asset.Project, *Assets) {
 			{Name: "gem_1", Kind: "tgem", Model: "box", Material: "gem", Position: gmath.V3(0, 0, -3), Scale: gmath.V3(0.4, 0.4, 0.4), Tags: []string{"gem"}, Visible: true},
 			{Name: "gem_2", Kind: "tgem", Model: "box", Material: "gem", Position: gmath.V3(4, 0, 0), Scale: gmath.V3(0.4, 0.4, 0.4), Tags: []string{"gem"}, Visible: true},
 		}}
+	// A world of 4-cell chunks of 0.5 m cells (2 m per chunk), so a short walk crosses
+	// chunks: trees on the forest, gems and huts on the plain, a hut at the start cell.
+	tree := &asset.Prefab{Name: "tree", Footprint: gmath.V2(0.5, 0.5), Tags: []string{"tree"}, Biomes: []string{"forest"},
+		Entities: []asset.Entity{{Name: "trunk", Kind: "static", Model: "box", Position: gmath.V3(0.25, 0, 0.25), Scale: gmath.V3(0.2, 0.6, 0.2), Tags: []string{"obstacle"}, Visible: true}}}
+	gemPrefab := &asset.Prefab{Name: "gem", Footprint: gmath.V2(0.5, 0.5), Tags: []string{"gem"}, Biomes: []string{"plain"},
+		Entities: []asset.Entity{{Name: "gem", Kind: "tgem", Model: "box", Material: "gem", Position: gmath.V3(0.25, 0, 0.25), Scale: gmath.V3(0.4, 0.4, 0.4), Tags: []string{"gem"}, Visible: true}}}
+	hut := &asset.Prefab{Name: "hut", Footprint: gmath.V2(1, 1), Tags: []string{"hut"}, Distances: []asset.Distance{{Tag: "hut", Meters: 1}},
+		Entities: []asset.Entity{
+			{Name: "walls", Kind: "static", Model: "box", Material: "red", Position: gmath.V3(0.5, 0, 0.5), Scale: gmath.V3(0.8, 0.5, 0.8), Tags: []string{"obstacle"}, Visible: true},
+			{Name: "roof", Kind: "static", Model: "box", Parent: "walls", Position: gmath.V3(0, 0.5, 0), Scale: gmath.V3(1, 0.3, 1), Visible: true},
+		}}
+	land := &asset.World{Name: "land", Seed: 3, Cell: 0.5, Chunk: 4, Extent: 16, View: 1, BiomeScale: 24,
+		Camera: asset.Camera{FovDeg: 60, Near: 0.1, Far: 100, Position: gmath.V3(0, 6, 8)}, Light: gfx.DefaultLight, Background: 0xff202830,
+		Biomes:  []asset.Biome{{Name: "plain", Ground: "red", Weight: 3}, {Name: "forest", Ground: "gem", Weight: 1}},
+		Scatter: []asset.Scatter{{Prefab: "tree", Density: 0.3}, {Prefab: "gem", Density: 0.05}},
+		Sites:   []asset.Site{{Tag: "hut", Prefabs: []string{"hut"}, Spacing: 6, Chance: 0.7}},
+		Places:  []asset.Place{{Name: "start", Prefab: "hut", Cell: [2]int32{0, 0}}},
+		Entities: []asset.Entity{
+			{Name: "player", Kind: "tplayer", Model: "box", Material: "red", Scale: gmath.One3, Tags: []string{"player"}, Visible: true},
+		}}
 	return p, &Assets{
 		Models:    map[string]*asset.Model{"box": cube()},
 		Textures:  map[string]*asset.Texture{},
 		Materials: map[string]*asset.Material{"red": red, "gem": gem},
 		Scenes:    map[string]*asset.Scene{"main": main},
+		Prefabs:   map[string]*asset.Prefab{"tree": tree, "gem": gemPrefab, "hut": hut},
+		Worlds:    map[string]*asset.World{"land": land},
 	}
 }
 

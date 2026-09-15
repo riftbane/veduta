@@ -14,6 +14,8 @@ type Resources struct {
 	Models    map[string]*ModelRes
 	Materials map[string]*asset.Material
 	Textures  map[string]gfx.TextureID
+
+	free []gfx.MeshID // handles of removed models, reused by AddModel
 }
 
 // ModelRes is an uploaded model.
@@ -53,6 +55,42 @@ func Upload(b gfx.Backend, models map[string]*asset.Model, textures map[string]*
 		r.Materials[name] = m
 	}
 	return r, nil
+}
+
+// AddModel uploads a model created at runtime (a world chunk's ground) under name,
+// replacing a model of that name and reusing the handle of a removed model when one is
+// free.
+func (r *Resources) AddModel(b gfx.Backend, name string, m *asset.Model) error {
+	if old := r.Models[name]; old != nil {
+		if err := b.UpdateMesh(old.Mesh, &m.Mesh); err != nil {
+			return fmt.Errorf("upload model %s: %w", name, err)
+		}
+		old.Model = m
+		return nil
+	}
+	if n := len(r.free); n > 0 {
+		id := r.free[n-1]
+		if err := b.UpdateMesh(id, &m.Mesh); err != nil {
+			return fmt.Errorf("upload model %s: %w", name, err)
+		}
+		r.free = r.free[:n-1]
+		r.Models[name] = &ModelRes{Mesh: id, Model: m}
+		return nil
+	}
+	id, err := b.CreateMesh(&m.Mesh)
+	if err != nil {
+		return fmt.Errorf("upload model %s: %w", name, err)
+	}
+	r.Models[name] = &ModelRes{Mesh: id, Model: m}
+	return nil
+}
+
+// Remove forgets the model called name and keeps its mesh handle for the next AddModel.
+func (r *Resources) Remove(name string) {
+	if m := r.Models[name]; m != nil {
+		r.free = append(r.free, m.Mesh)
+		delete(r.Models, name)
+	}
 }
 
 func sortedKeys[V any](m map[string]V) []string {

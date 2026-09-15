@@ -27,6 +27,7 @@ type Project struct {
 	InspectResolution [2]int     // default inspection image size
 	TickRate          int        // simulation ticks per second
 	DefaultScene      string     // scene used when a command names none
+	DefaultWorld      string     // world used instead of DefaultScene when set (the player starts in it)
 	DefaultSeed       uint64     // seed used when a command names none
 	Assets            string     // asset sources directory, relative to the project root
 	Cooked            string     // cooked .vda output directory, relative to the project root
@@ -71,6 +72,7 @@ func CompileProject(src *ProjectSource, loc *Locator) (*Project, error) {
 		Entry:        orDefault(src.Entry, d.Entry),
 		TickRate:     c.Int("tick_rate", src.TickRate, 1, 1000, d.TickRate),
 		DefaultScene: orDefault(src.DefaultScene, d.DefaultScene),
+		DefaultWorld: src.DefaultWorld,
 		DefaultSeed:  src.DefaultSeed,
 		Assets:       orDefault(src.Assets, d.Assets),
 		Cooked:       orDefault(src.Cooked, d.Cooked),
@@ -110,6 +112,9 @@ func CompileProject(src *ProjectSource, loc *Locator) (*Project, error) {
 	p.InspectResolution = resolution(c, "inspect_resolution", src.InspectResolution, d.InspectResolution)
 	if src.DefaultScene != "" {
 		c.Name("default_scene", src.DefaultScene)
+	}
+	if src.DefaultWorld != "" {
+		c.Name("default_world", src.DefaultWorld)
 	}
 	checkRelPath(c, "assets", p.Assets)
 	checkRelPath(c, "cooked", p.Cooked)

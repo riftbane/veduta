@@ -1,0 +1,13 @@
+{
+  "veduta": "prefab/1",
+  "footprint": [12, 8],
+  "tags": ["village", "building"],
+  "rules": { "biomes": ["plain"], "min_distance": { "village": 6 } },
+  "entities": [
+    { "name": "house_nw", "kind": "static", "model": "house", "position": [2, 0, 1.5], "tags": ["obstacle"] },
+    { "name": "house_ne", "kind": "static", "model": "house", "position": [10, 0, 1.5], "tags": ["obstacle"] },
+    { "name": "house_sw", "kind": "static", "model": "house", "position": [2, 0, 6.5], "rotation_deg": [0, 180, 0], "tags": ["obstacle"] },
+    { "name": "house_se", "kind": "static", "model": "house", "position": [10, 0, 6.5], "rotation_deg": [0, 180, 0], "tags": ["obstacle"] },
+    { "name": "well", "kind": "static", "model": "crate", "position": [6, 0, 4], "scale": [0.8, 0.6, 0.8], "tags": ["obstacle"] }
+  ]
+}

@@ -129,3 +129,44 @@ func TestHeadlessErrors(t *testing.T) {
 		t.Fatalf("bad subcommand: code %d", code)
 	}
 }
+
+func TestHeadlessWorld(t *testing.T) {
+	useTestProject(t, walkSpec(t))
+	dir := t.TempDir()
+	code, rep := runCmd(t, "-headless", "render", "--world", "land", "--at", "40,-2", "--tick", "30", "--out", filepath.Join(dir, "w.png"), "--input", "walk")
+	if code != exitOK || rep["world"] != "land" || rep["scene"] != nil {
+		t.Fatalf("render: %d %v", code, rep)
+	}
+	if at := rep["at"].([]any); at[0].(float64) != 40 || at[1].(float64) != -2 {
+		t.Fatalf("at %v", at)
+	}
+	if code, _ := runCmd(t, "-headless", "render", "--world", "land", "--scene", "main", "--out", filepath.Join(dir, "x.png")); code != exitUsage {
+		t.Fatalf("scene and world accepted together: %d", code)
+	}
+	if code, _ := runCmd(t, "-headless", "render", "--at", "1,2", "--out", filepath.Join(dir, "x.png")); code != exitUsage {
+		t.Fatalf("at without world accepted: %d", code)
+	}
+	if code, _ := runCmd(t, "-headless", "render", "--world", "land", "--at", "1", "--out", filepath.Join(dir, "x.png")); code != exitUsage {
+		t.Fatalf("bad at accepted: %d", code)
+	}
+	code, rep = runCmd(t, "-headless", "simulate", "--world", "land", "--ticks", "100", "--input", "walk", "--out", filepath.Join(dir, "run"))
+	if code != exitOK || rep["world"] != "land" || rep["verdict"] != "pass" {
+		t.Fatalf("simulate: %d %v", code, rep)
+	}
+	if ev := rep["events"].(map[string]any); ev["chunk_load"].(float64) < 9 || ev["world_load"].(float64) != 1 {
+		t.Fatalf("events %v", ev)
+	}
+	snap := filepath.Join(dir, "w.snap")
+	if code, rep = runCmd(t, "-headless", "snapshot", "--world", "land", "--tick", "60", "--input", "walk", "--out", snap); code != exitOK {
+		t.Fatalf("snapshot: %v", rep)
+	}
+	code, rep = runCmd(t, "-headless", "snapshot", "--restore", snap, "--ticks", "60", "--input", "walk")
+	if code != exitOK || rep["to_tick"].(float64) != 120 {
+		t.Fatalf("restore: %v", rep)
+	}
+	code, rep = runCmd(t, "-headless", "describe")
+	b, _ := json.Marshal(rep)
+	if code != exitOK || !strings.Contains(string(b), `"worlds":["land"]`) || !strings.Contains(string(b), `"prefabs":["gem","hut","tree"]`) {
+		t.Fatalf("describe: %s", b)
+	}
+}

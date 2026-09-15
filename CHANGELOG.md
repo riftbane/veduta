@@ -23,8 +23,22 @@ All notable changes to this project are documented here. The format follows
   earlier rules; every chunk generated on its own, in any order, with one greedy-merged
   ground mesh per chunk; `Validate`, `Solve` (rings outward, east first, clockwise),
   `Displaced`, `Region`, `Query` and `Check` for the tools.
+- Worlds run: `Context.LoadWorld(name, at)` and `Context.World()` (`Focus`, `CellOf`,
+  `Loaded`), the chunks within `view` of the focus loaded at the start of every tick and
+  unloaded one chunk farther out, structures spawned whole, one `chunk_load` /
+  `chunk_unload` trace event per chunk (streamed entities emit no `spawn`/`despawn`),
+  `world_load` on load; snapshots carry the window, so `Restore` streams on; while a
+  world is loaded `within_bounds` uses its extent. `render`, `simulate` and `snapshot`
+  take `--world W --at x,z`; the manifest's `default_world` starts the player in a world;
+  `describe` lists worlds and prefabs. The template ships `overworld` with tree, gem,
+  house and village prefabs and a `world` scenario walking across chunk borders.
+- `gfx.Backend.UpdateMesh` and `scene.Resources.AddModel`/`Remove`: chunk ground meshes
+  are uploaded when a frame is rendered and their handles reused.
 
 ### Changed
+
+- The player prepares its run without recording a trace: no tick spends time summarizing
+  every entity (a streamed world has hundreds), and nothing read the trace.
 
 - `asset.CompilerVersion` is `veduta-asset/0.3.0`: every cooked asset is recompiled once.
 

@@ -1,0 +1,10 @@
+{
+  "veduta": "prefab/1",
+  "footprint": [1, 1],
+  "tags": ["tree"],
+  "rules": { "biomes": ["forest"], "min_distance": { "village": 2, "house": 1 } },
+  "entities": [
+    { "name": "trunk", "kind": "static", "model": "tree", "position": [0.5, 0, 0.5],
+      "hitbox": [[-0.2, 0, -0.2], [0.2, 1.2, 0.2]], "tags": ["obstacle"] }
+  ]
+}

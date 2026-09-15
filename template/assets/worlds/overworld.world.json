@@ -1,0 +1,28 @@
+{
+  "veduta": "world/1",
+  "seed": 7,
+  "cell": 1,
+  "chunk": 16,
+  "extent": 512,
+  "view": 1,
+  "biome_scale": 64,
+  "camera": { "type": "orthographic", "size": 14, "position": [0, 24, 10], "look_at": [0, 0, 0] },
+  "light": { "direction": [-0.4, -1, -0.3], "color": "#ffffff", "ambient": "#505862" },
+  "background": "#202830",
+  "biomes": [
+    { "name": "plain", "ground": "grass", "weight": 3 },
+    { "name": "forest", "ground": "moss", "weight": 2 }
+  ],
+  "scatter": [
+    { "prefab": "tree", "density": 0.06 },
+    { "prefab": "gem", "density": 0.01 }
+  ],
+  "sites": [
+    { "tag": "village", "prefabs": ["village"], "spacing": 48, "chance": 0.6 },
+    { "tag": "house", "prefabs": ["house"], "spacing": 12, "chance": 0.15 }
+  ],
+  "places": [],
+  "entities": [
+    { "name": "player", "kind": "player", "model": "hero", "position": [0, 0, 0], "tags": ["player", "important"] }
+  ]
+}

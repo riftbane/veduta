@@ -240,6 +240,27 @@ func (r *Renderer) CreateMesh(m *gfx.MeshData) (gfx.MeshID, error) {
 	return gfx.MeshID(len(r.meshes)), nil
 }
 
+// UpdateMesh replaces the geometry of an existing mesh handle.
+func (r *Renderer) UpdateMesh(id gfx.MeshID, m *gfx.MeshData) error {
+	if id < 1 || int(id) > len(r.meshes) {
+		return fmt.Errorf("soft: unknown mesh %d", id)
+	}
+	if m == nil {
+		return errors.New("soft: nil mesh")
+	}
+	if len(m.Indices)%3 != 0 {
+		return fmt.Errorf("soft: mesh index count %d is not a multiple of 3", len(m.Indices))
+	}
+	nv := uint32(len(m.Vertices))
+	for i, idx := range m.Indices {
+		if idx >= nv {
+			return fmt.Errorf("soft: mesh index %d = %d out of range (%d vertices)", i, idx, nv)
+		}
+	}
+	r.meshes[id-1] = m
+	return nil
+}
+
 // Begin starts rendering into target.
 func (r *Renderer) Begin(target *gfx.Framebuffer) error {
 	if r.closed {

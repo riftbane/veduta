@@ -26,7 +26,7 @@ func loadScenario(path string) (*scenarioSpec, error) {
 // specFromScenario converts a compiled scenario into a runnable spec.
 func specFromScenario(sc *asset.Scenario) *scenarioSpec {
 	spec := &scenarioSpec{
-		Name: sc.Name, Scene: sc.Scene, Seed: sc.Seed, Ticks: sc.Ticks,
+		Name: sc.Name, Scene: sc.Scene, World: sc.World, At: sc.At, Seed: sc.Seed, Ticks: sc.Ticks,
 		Inputs:      inputEvents(sc.Inputs),
 		Invariants:  sc.Invariants,
 		Screenshots: sc.Screenshots,

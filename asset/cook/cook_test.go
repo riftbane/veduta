@@ -189,17 +189,17 @@ func TestCookPrefabAndWorld(t *testing.T) {
 		os.MkdirAll(filepath.Dir(p), 0o755)
 		os.WriteFile(p, []byte(data), 0o644)
 	}
-	write("assets/prefabs/tree.prefab.json", `{"veduta": "prefab/1", "footprint": [1, 1], "tags": ["tree"],
+	write("assets/prefabs/shrub.prefab.json", `{"veduta": "prefab/1", "footprint": [1, 1], "tags": ["shrub"],
 	  "entities": [{"name": "trunk", "kind": "static", "model": "crate", "position": [0.5, 0, 0.5]}]}`)
 	write("assets/worlds/land.world.json", `{"veduta": "world/1", "camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]},
-	  "biomes": [{"name": "plain", "ground": "grass"}], "scatter": [{"prefab": "tree", "density": 0.1}],
-	  "places": [{"name": "home", "prefab": "tree", "cell": [3, 4]}]}`)
+	  "biomes": [{"name": "plain", "ground": "grass"}], "scatter": [{"prefab": "shrub", "density": 0.1}],
+	  "places": [{"name": "home", "prefab": "shrub", "cell": [3, 4]}]}`)
 	r, err := Run(Options{Root: root})
 	if err != nil {
 		t.Fatal(err)
 	}
 	st := statuses(r)
-	if r.Failed != 0 || st["prefab/tree"] != StatusCompiled || st["world/land"] != StatusCompiled {
+	if r.Failed != 0 || st["prefab/shrub"] != StatusCompiled || st["world/land"] != StatusCompiled {
 		t.Fatalf("cook: %+v", r)
 	}
 	if len(r.Warnings) != 0 {
@@ -209,22 +209,22 @@ func TestCookPrefabAndWorld(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if lib.Prefabs["tree"] == nil || lib.Worlds["land"] == nil || lib.Worlds["land"].Places[0].Cell != [2]int32{3, 4} {
+	if lib.Prefabs["shrub"] == nil || lib.Worlds["land"] == nil || lib.Worlds["land"].Places[0].Cell != [2]int32{3, 4} {
 		t.Fatalf("library %+v %+v", lib.Prefabs, lib.Worlds)
 	}
 	data, _ := os.ReadFile(filepath.Join(root, "assets", ".cooked", "worlds", "land.vda"))
 	meta, _, err := asset.UnpackVDA(data)
-	if err != nil || len(meta.Deps) != 1 || meta.Deps[0] != "prefabs/tree.prefab.json" {
+	if err != nil || len(meta.Deps) != 1 || meta.Deps[0] != "prefabs/shrub.prefab.json" {
 		t.Fatalf("world meta %+v %v", meta, err)
 	}
-	// A larger tree no longer fits a scatter cell: the world is recooked and fails.
-	write("assets/prefabs/tree.prefab.json", `{"veduta": "prefab/1", "footprint": [2, 2], "entities": []}`)
+	// A larger shrub no longer fits a scatter cell: the world is recooked and fails.
+	write("assets/prefabs/shrub.prefab.json", `{"veduta": "prefab/1", "footprint": [2, 2], "entities": []}`)
 	r, err = Run(Options{Root: root})
 	if err != nil {
 		t.Fatal(err)
 	}
 	st = statuses(r)
-	if st["prefab/tree"] != StatusCompiled || st["world/land"] != StatusError || r.Failed != 1 {
+	if st["prefab/shrub"] != StatusCompiled || st["world/land"] != StatusError || r.Failed != 1 {
 		t.Fatalf("after edit: %+v", st)
 	}
 	if es := r.Errors(); len(es) != 1 || es[0].File != "assets/worlds/land.world.json" || es[0].Line != 2 {

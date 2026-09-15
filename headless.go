@@ -34,10 +34,10 @@ const (
 // and the project's assets, and runs the player on the framebuffer, or with -headless
 // one of the subcommands the veduta tool delegates to:
 //
-//	game -headless render   --scene S --tick T --seed N --camera P --mode M --out F [--bundle]
-//	game -headless simulate --scenario F | --scene S --ticks N --seed N --input F --out DIR
+//	game -headless render   --scene S | --world W --at x,z  --tick T --seed N --camera P --mode M --out F [--bundle]
+//	game -headless simulate --scenario F | --scene S | --world W --at x,z  --ticks N --seed N --input F --out DIR
 //	game -headless query    --frame F --at x,y | --coverage
-//	game -headless snapshot --scene S --tick T --out F   (and --restore F --ticks N)
+//	game -headless snapshot --scene S | --world W --at x,z  --tick T --out F   (and --restore F --ticks N)
 //	game -headless describe
 //
 // Headless subcommands print one JSON report on stdout. Run does not return.
@@ -225,10 +225,62 @@ func writePNG(path string, img *gfx.Image) error {
 	return os.WriteFile(path, buf.Bytes(), 0o644)
 }
 
-// startRun creates an engine, starts the scene and replays input up to tick.
-func (h *headless) startRun(sceneName string, seed uint64, invariants []string, trace io.Writer, script *sim.Script, tick int) (*engine, error) {
+// target resolves the --scene, --world and --at flags of a command: a world when one is
+// named (or the project's default world when neither is), else a scene.
+func (h *headless) target(sceneName, worldName, at string) (runOptions, error) {
+	var opt runOptions
+	switch {
+	case sceneName != "" && worldName != "":
+		return opt, usageError{errors.New("--scene and --world are exclusive")}
+	case worldName != "":
+		opt.World = worldName
+	case sceneName != "":
+		opt.Scene = sceneName
+	case h.project.DefaultWorld != "":
+		opt.World = h.project.DefaultWorld
+	default:
+		opt.Scene = h.project.DefaultScene
+	}
+	if at != "" {
+		if opt.World == "" {
+			return opt, usageError{errors.New("--at needs --world (the start cell)")}
+		}
+		cell, err := parseCell(at)
+		if err != nil {
+			return opt, usageError{fmt.Errorf("--at: %w", err)}
+		}
+		opt.At = cell
+	}
+	return opt, nil
+}
+
+// parseCell reads "x,z" cell coordinates.
+func parseCell(s string) ([2]int32, error) {
+	a, b, ok := strings.Cut(s, ",")
+	if !ok {
+		return [2]int32{}, fmt.Errorf("want x,z (cells), got %q", s)
+	}
+	x, err1 := strconv.ParseInt(strings.TrimSpace(a), 10, 32)
+	z, err2 := strconv.ParseInt(strings.TrimSpace(b), 10, 32)
+	if err1 != nil || err2 != nil {
+		return [2]int32{}, fmt.Errorf("want x,z (whole cells), got %q", s)
+	}
+	return [2]int32{int32(x), int32(z)}, nil
+}
+
+// name returns what a run is called: its scene or its world.
+func (o runOptions) name() string {
+	if o.World != "" {
+		return o.World
+	}
+	return o.Scene
+}
+
+// startRun creates an engine, starts the scene or world and replays input up to tick.
+func (h *headless) startRun(opt runOptions, seed uint64, invariants []string, trace io.Writer, script *sim.Script, tick int) (*engine, error) {
 	e := newEngine(h.game, h.project, h.assets)
-	if err := e.start(runOptions{Scene: sceneName, Seed: seed, Invariants: invariants, Trace: trace, Headless: true}); err != nil {
+	opt.Seed, opt.Invariants, opt.Trace, opt.Headless = seed, invariants, trace, true
+	if err := e.start(opt); err != nil {
 		e.close()
 		return nil, err
 	}
@@ -258,7 +310,9 @@ func (h *headless) script(path string) (*sim.Script, error) {
 
 func (h *headless) render(args []string) error {
 	fs := h.flags("render")
-	sceneName := fs.String("scene", h.project.DefaultScene, "scene to render")
+	sceneName := fs.String("scene", "", "scene to render (default: the project's default world or scene)")
+	worldName := fs.String("world", "", "world to render instead of a scene")
+	at := fs.String("at", "", "with --world: start cell x,z (default 0,0)")
 	tick := fs.Int("tick", 0, "simulate this many ticks before rendering")
 	seed := fs.Uint64("seed", h.project.DefaultSeed, "RNG seed")
 	camera := fs.String("camera", "scene", "camera preset: scene, top, front, back, left, right, iso, orbit:<deg>, or a camera entity")
@@ -282,7 +336,11 @@ func (h *headless) render(args []string) error {
 	if err != nil {
 		return err
 	}
-	e, err := h.startRun(*sceneName, *seed, nil, nil, sc, *tick)
+	target, err := h.target(*sceneName, *worldName, *at)
+	if err != nil {
+		return err
+	}
+	e, err := h.startRun(target, *seed, nil, nil, sc, *tick)
 	if err != nil {
 		return err
 	}
@@ -297,15 +355,19 @@ func (h *headless) render(args []string) error {
 	}
 	path := *out
 	if path == "" {
-		path = filepath.Join("out", fmt.Sprintf("render_%s_t%d_%s.png", *sceneName, *tick, m))
+		path = filepath.Join("out", fmt.Sprintf("render_%s_t%d_%s.png", target.name(), *tick, m))
 	}
 	if err := writePNG(path, f.FB.Image()); err != nil {
 		return err
 	}
 	rep := map[string]any{
-		"ok": true, "out": path, "scene": *sceneName, "tick": *tick, "seed": *seed,
+		"ok": true, "out": path, "scene": target.Scene, "tick": *tick, "seed": *seed,
 		"mode": m.String(), "width": *width, "height": *height, "camera": camReport(*camera, cam),
 		"stats": f.Stats, "entities": visibleEntities(e.ctx.Scene, f.FB), "trace_hash": e.rec.Hash(),
+	}
+	if target.World != "" {
+		rep["world"], rep["at"] = target.World, target.At
+		delete(rep, "scene")
 	}
 	if *bundle {
 		bpath := strings.TrimSuffix(path, filepath.Ext(path)) + ".vframe"
@@ -330,6 +392,8 @@ func modeNames() []string {
 type scenarioSpec struct {
 	Name        string
 	Scene       string
+	World       string   // instead of Scene
+	At          [2]int32 // the world's start cell
 	Seed        uint64
 	Ticks       int
 	Inputs      []sim.InputEvent
@@ -342,7 +406,9 @@ type scenarioSpec struct {
 type simResult struct {
 	OK           bool               `json:"ok"`
 	Scenario     string             `json:"scenario,omitempty"`
-	Scene        string             `json:"scene"`
+	Scene        string             `json:"scene,omitempty"`
+	World        string             `json:"world,omitempty"`
+	At           *[2]int32          `json:"at,omitempty"`
 	Seed         uint64             `json:"seed"`
 	Ticks        int                `json:"ticks"`
 	Verdict      string             `json:"verdict"`
@@ -362,7 +428,9 @@ type simResult struct {
 func (h *headless) simulate(args []string) (int, error) {
 	fs := h.flags("simulate")
 	scenario := fs.String("scenario", "", "scenario file (tests/scenarios/<name>.scenario.json)")
-	sceneName := fs.String("scene", h.project.DefaultScene, "scene (without --scenario)")
+	sceneName := fs.String("scene", "", "scene (without --scenario; default: the project's default world or scene)")
+	worldName := fs.String("world", "", "world instead of a scene (without --scenario)")
+	at := fs.String("at", "", "with --world: start cell x,z (default 0,0)")
 	ticks := fs.Int("ticks", 200, "ticks to simulate (without --scenario)")
 	seed := fs.Uint64("seed", h.project.DefaultSeed, "RNG seed (without --scenario)")
 	input := fs.String("input", "", "input script file (without --scenario)")
@@ -384,7 +452,11 @@ func (h *headless) simulate(args []string) (int, error) {
 		if *ticks < 1 {
 			return 0, fmt.Errorf("simulate: --ticks must be at least 1")
 		}
-		spec = &scenarioSpec{Scene: *sceneName, Seed: *seed, Ticks: *ticks}
+		target, err := h.target(*sceneName, *worldName, *at)
+		if err != nil {
+			return 0, err
+		}
+		spec = &scenarioSpec{Scene: target.Scene, World: target.World, At: target.At, Seed: *seed, Ticks: *ticks}
 		if *input != "" {
 			events, err := loadInputFunc(*input)
 			if err != nil {
@@ -410,7 +482,7 @@ func (h *headless) simulate(args []string) (int, error) {
 	if dir == "" {
 		name := spec.Name
 		if name == "" {
-			name = spec.Scene
+			name = spec.target().name()
 		}
 		dir = filepath.Join("out", "runs", name)
 	}
@@ -461,7 +533,7 @@ func (h *headless) runScenario(spec *scenarioSpec, dir string, tileW int, withSh
 	if len(inv) == 0 {
 		inv = nil // project defaults
 	}
-	e, err := h.startRun(spec.Scene, spec.Seed, inv, tf, nil, 0)
+	e, err := h.startRun(spec.target(), spec.Seed, inv, tf, nil, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -534,10 +606,14 @@ func (h *headless) runScenario(spec *scenarioSpec, dir string, tileW int, withSh
 	}
 
 	res := &simResult{
-		OK: true, Scenario: spec.Name, Scene: spec.Scene, Seed: spec.Seed, Ticks: spec.Ticks,
+		OK: true, Scenario: spec.Name, Scene: spec.Scene, World: spec.World, Seed: spec.Seed, Ticks: spec.Ticks,
 		Expectations: results, Violations: e.monitor.First(), Invariants: e.monitor.Names(),
 		Events: e.rec.Counts(), TraceHash: e.rec.Hash(), Out: dir, Trace: tracePath, Sheet: sheetPath,
 		Screenshots: spec.Screenshots, Entities: e.ctx.Scene.Len(),
+	}
+	if spec.World != "" {
+		at := spec.At
+		res.At = &at
 	}
 	if res.Expectations == nil {
 		res.Expectations = []sim.ExpectResult{}
@@ -562,6 +638,11 @@ func (h *headless) runScenario(spec *scenarioSpec, dir string, tileW int, withSh
 		return nil, err
 	}
 	return res, nil
+}
+
+// target returns the scene or world the scenario starts in.
+func (spec *scenarioSpec) target() runOptions {
+	return runOptions{Scene: spec.Scene, World: spec.World, At: spec.At}
 }
 
 func describeFailure(r sim.ExpectResult) string {
@@ -673,7 +754,9 @@ func looksDownZ(c scene.Camera) bool {
 
 func (h *headless) snapshot(args []string) error {
 	fs := h.flags("snapshot")
-	sceneName := fs.String("scene", h.project.DefaultScene, "scene")
+	sceneName := fs.String("scene", "", "scene (default: the project's default world or scene)")
+	worldName := fs.String("world", "", "world instead of a scene")
+	at := fs.String("at", "", "with --world: start cell x,z (default 0,0)")
 	tick := fs.Int("tick", 0, "ticks to simulate before the snapshot")
 	seed := fs.Uint64("seed", h.project.DefaultSeed, "RNG seed")
 	input := fs.String("input", "", "input script")
@@ -687,11 +770,15 @@ func (h *headless) snapshot(args []string) error {
 	if err != nil {
 		return err
 	}
+	target, err := h.target(*sceneName, *worldName, *at)
+	if err != nil {
+		return err
+	}
 	if *restore == "" {
 		if *out == "" {
 			return usageError{errors.New("snapshot: --out is required")}
 		}
-		e, err := h.startRun(*sceneName, *seed, nil, nil, sc, *tick)
+		e, err := h.startRun(target, *seed, nil, nil, sc, *tick)
 		if err != nil {
 			return err
 		}
@@ -715,7 +802,8 @@ func (h *headless) snapshot(args []string) error {
 	}
 	e := newEngine(h.game, h.project, h.assets)
 	defer e.close()
-	if err := e.prepare(runOptions{Scene: *sceneName, Seed: *seed, Headless: true}); err != nil {
+	target.Seed, target.Headless = *seed, true
+	if err := e.prepare(target); err != nil {
 		return err
 	}
 	var trace io.Writer
@@ -764,8 +852,9 @@ func (h *headless) describe(args []string) error {
 	defer e.close()
 	var gameInv []string
 	codec := false
-	if h.project.DefaultScene != "" {
-		if err := e.prepare(runOptions{Scene: h.project.DefaultScene, Seed: h.project.DefaultSeed, Headless: true}); err != nil {
+	if target, err := h.target("", "", ""); err == nil && target.name() != "" {
+		target.Seed, target.Headless = h.project.DefaultSeed, true
+		if err := e.prepare(target); err != nil {
 			return err
 		}
 		gameInv = sortedNames(e.custom)
@@ -782,6 +871,9 @@ func (h *headless) describe(args []string) error {
 		},
 		"state_codec":    codec,
 		"scenes":         sortedNames(h.assets.Scenes),
+		"worlds":         sortedNames(h.assets.Worlds),
+		"prefabs":        sortedNames(h.assets.Prefabs),
+		"default_world":  h.project.DefaultWorld,
 		"render_modes":   modeNames(),
 		"camera_presets": append(append([]string{}, scene.Presets...), "orbit:<deg>"),
 		"tick_rate":      h.project.TickRate,

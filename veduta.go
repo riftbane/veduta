@@ -158,8 +158,17 @@ func (c *Context) Spawn(tmpl scene.Entity) *scene.Entity { return c.eng.spawn(tm
 func (c *Context) Despawn(e *scene.Entity) { c.Scene.Despawn(e) }
 
 // LoadScene replaces the current scene with a freshly loaded one (entity ids restart at
-// 1) and emits a scene_load event. Use it to reset a level.
+// 1) and emits a scene_load event. Use it to reset a level. It unloads a world.
 func (c *Context) LoadScene(name string) error { return c.eng.loadScene(name) }
+
+// LoadWorld replaces the current scene with world name (docs/world.md) streamed around
+// the start cell at: the world's camera and persistent entities are placed relative to
+// that cell's centre and the chunks around it are loaded. It emits a world_load event.
+func (c *Context) LoadWorld(name string, at [2]int32) error { return c.eng.loadWorld(name, at) }
+
+// World returns the loaded world, or nil when the game is in a scene. Call its Focus
+// every tick with the position the chunks should follow.
+func (c *Context) World() *World { return c.eng.world }
 
 // Overlapping returns the live entities whose AABB overlaps e's, in id order, using the
 // bounds of the last completed tick.

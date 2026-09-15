@@ -9,12 +9,14 @@ import (
 
 	"github.com/riftbane/veduta"
 	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/gmath"
 )
 
 // Game is the demo's global state: everything outside the scene.
 type Game struct {
-	Score  int // gems collected since the last reset
-	Resets int
+	Score     int // gems collected since the last reset
+	Resets    int
+	CamOffset gmath.Vec3 // in a world: the camera's offset from the hero
 }
 
 // Init registers the game's invariants and state codec.
@@ -23,21 +25,37 @@ func (g *Game) Init(ctx *veduta.Context) error {
 		return fmt.Errorf("scene %s has no entity named player", ctx.Scene.Name)
 	}
 	current = g
+	g.CamOffset = ctx.Scene.Camera.Position.Sub(ctx.Scene.Camera.Target)
 	ctx.Invariant("score_non_negative", func() bool { return g.Score >= 0 })
 	ctx.RegisterState(g)
 	return nil
 }
 
-// Update handles the reset key; entity logic lives in the kinds (kinds.go).
+// Update handles the reset key and, in a world (`veduta render --world overworld`),
+// keeps the chunks and the camera on the hero; entity logic lives in the kinds (kinds.go).
 func (g *Game) Update(ctx *veduta.Context, in veduta.Input) {
 	if in.JustPressed("KeyR") {
 		g.Score = 0
 		g.Resets++
-		if err := ctx.LoadScene(ctx.Scene.Name); err != nil {
+		var err error
+		if w := ctx.World(); w != nil {
+			err = ctx.LoadWorld(w.Name, w.Start)
+		} else {
+			err = ctx.LoadScene(ctx.Scene.Name)
+		}
+		if err != nil {
 			ctx.Trace("error", map[string]any{"msg": err.Error()})
 			return
 		}
 		ctx.Trace("reset", map[string]any{"resets": g.Resets})
+	}
+	if w := ctx.World(); w != nil {
+		if hero := ctx.Scene.Find("player"); hero != nil {
+			p := hero.WorldPosition()
+			w.Focus(p)
+			ctx.Scene.Camera.Target = p
+			ctx.Scene.Camera.Position = p.Add(g.CamOffset)
+		}
 	}
 }
 

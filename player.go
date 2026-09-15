@@ -21,7 +21,16 @@ func runPlayer(g Game, p *asset.Project, a *Assets) error {
 	defer win.Close()
 	e := newEngine(g, p, a)
 	defer e.close()
-	if err := e.start(runOptions{Scene: p.DefaultScene, Seed: p.DefaultSeed}); err != nil {
+	// The player has no trace reader: it prepares without recording, so no tick spends
+	// time summarizing every entity (a streamed world has hundreds).
+	opt := runOptions{Scene: p.DefaultScene, Seed: p.DefaultSeed}
+	if p.DefaultWorld != "" {
+		opt = runOptions{World: p.DefaultWorld, Seed: p.DefaultSeed}
+	}
+	if err := e.prepare(opt); err != nil {
+		return err
+	}
+	if err := e.endTick(); err != nil {
 		return err
 	}
 	var input sim.InputState

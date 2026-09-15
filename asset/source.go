@@ -192,6 +192,7 @@ type ProjectSource struct {
 	InspectResolution []int       `json:"inspect_resolution"`
 	TickRate          int         `json:"tick_rate"`
 	DefaultScene      string      `json:"default_scene"`
+	DefaultWorld      string      `json:"default_world"`
 	DefaultSeed       uint64      `json:"default_seed"`
 	Assets            string      `json:"assets"`
 	Cooked            string      `json:"cooked"`

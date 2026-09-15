@@ -1,0 +1,9 @@
+{
+  "veduta": "model/1",
+  "name": "house",
+  "pivot": "bottom-center",
+  "parts": [
+    { "shape": "box", "size": [2.6, 1.6, 1.6], "position": [0, 0.8, 0], "material": "wall" },
+    { "shape": "box", "size": [2.9, 0.5, 1.9], "position": [0, 1.85, 0], "material": "roof" }
+  ]
+}

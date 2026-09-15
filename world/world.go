@@ -247,8 +247,10 @@ func (g *Gen) Origin(x, z int32) gmath.Vec3 {
 
 // Center returns the world position of the middle of cell (x, z), on the ground.
 func (g *Gen) Center(x, z int32) gmath.Vec3 {
+	// Products and halves rounded explicitly, so arm64 cannot fuse them into the sum.
 	c := float64(g.W.Cell)
-	return gmath.V3(float32(float64(x)*c+c/2), 0, float32(float64(z)*c+c/2))
+	half := float64(c / 2)
+	return gmath.V3(float32(float64(float64(x)*c)+half), 0, float32(float64(float64(z)*c)+half))
 }
 
 // meters converts a cell coordinate to meters (one product, no fusion possible).
@@ -515,17 +517,20 @@ func (g *Gen) Instantiate(s *Struct) []asset.Entity {
 		}
 		// Turn about the footprint's centre, then anchor the rotated footprint's min
 		// corner at the cell: exact for right angles, no trigonometry.
-		x, z := float64(e.Position.X)-fw/2, float64(e.Position.Z)-fd/2
-		cx, cz := fw/2, fd/2
+		// Halves are rounded explicitly: the compiler turns /2 into *0.5, which arm64
+		// would otherwise fuse into the subtraction.
+		hw, hd := float64(fw/2), float64(fd/2)
+		x, z := float64(e.Position.X)-hw, float64(e.Position.Z)-hd
+		cx, cz := hw, hd
 		switch s.Rotation {
 		case 90:
 			x, z = z, -x
-			cx, cz = fd/2, fw/2
+			cx, cz = hd, hw
 		case 180:
 			x, z = -x, -z
 		case 270:
 			x, z = -z, x
-			cx, cz = fd/2, fw/2
+			cx, cz = hd, hw
 		}
 		e.Position = gmath.V3(float32(ox+cx+x), e.Position.Y, float32(oz+cz+z))
 		e.RotationDeg.Y += float32(s.Rotation)

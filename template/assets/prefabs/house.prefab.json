@@ -1,0 +1,9 @@
+{
+  "veduta": "prefab/1",
+  "footprint": [3, 2],
+  "tags": ["house", "building"],
+  "rules": { "biomes": ["plain"], "min_distance": { "house": 1, "village": 3 } },
+  "entities": [
+    { "name": "walls", "kind": "static", "model": "house", "position": [1.5, 0, 1], "tags": ["obstacle"] }
+  ]
+}

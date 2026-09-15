@@ -1,0 +1,21 @@
+{
+  "veduta": "scenario/1",
+  "world": "overworld",
+  "at": [0, 0],
+  "seed": 1,
+  "ticks": 200,
+  "inputs": [
+    { "tick": 0, "press": ["ArrowUp"] },
+    { "tick": 120, "release": ["ArrowUp"] },
+    { "tick": 121, "press": ["ArrowRight"] },
+    { "tick": 180, "release": ["ArrowRight"] }
+  ],
+  "expect": [
+    { "tick": 120, "entity": "player", "path": "position.z", "op": "<", "value": -20 },
+    { "tick": 200, "trace": "chunk_load", "count_min": 12 },
+    { "tick": 200, "trace": "chunk_unload", "count_min": 3 },
+    { "tick": 200, "trace": "spawn", "count_max": 0 }
+  ],
+  "invariants": ["finite_positions", "within_bounds", "no_overlap:player,obstacle", "entity_count_max:3000"],
+  "screenshots": [0, 100, 200]
+}
