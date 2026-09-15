@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+The console's final controls: a D-pad, an analog stick, A, B, X, Y, Select, Start and Home,
+with a keyboard and a mouse standing in for them until the handheld exists. A minor
+release: every v1.0.0 file keeps its meaning, and a v1.0.0 project traces the same.
+
 ### Added
 
 - The console's analog stick: `Input.Stick` (`gmath.Vec2`, each axis −1…1, +X right, +Y
@@ -52,6 +56,57 @@ All notable changes to this project are documented here. The format follows
 - **W, A, S, D press both codes.** Replacing `KeyW` with `ArrowUp` would break games that
   read WASD; pressing both is what "held while anything holds it" already allows, and a
   game summing WASD and the arrows before normalising (the template) is unaffected.
+
+### Acceptance (§15)
+
+Every criterion of `SPEC-v1.0.0.md` §15, run again against the candidate `v1.1.0-rc.1`
+(commit a125a48, tagged by hand and published as a pre-release by `release.yml`).
+
+1. **Fresh VPS → `veduta test` in under 5 minutes.**
+   `docker run --rm -v "$PWD/scripts/acceptance:/a:ro" ubuntu:24.04 sh /a/fresh_vps.sh v1.1.0-rc.1`:
+   install 16 s, `veduta init demo && cd demo && veduta test` 35 s, 51 s in total; tool and
+   project engine are v1.1.0-rc.1, the five scenarios pass.
+2. **`claude` in a project lists every §11 tool; visual tools return images.** With the
+   candidate on PATH in a `veduta init` project, `claude -p '<list tools, status, render,
+   simulate stick, inspect hero, query, diff>' --mcp-config .mcp.json --strict-mcp-config
+   --allowedTools 'mcp__veduta__*'` listed build, cook, diff, docs, fuzz, inspect, query,
+   release, render, simulate, status, test and trace; status reported the console target and
+   engine v1.1.0-rc.1, render 320×240, simulate `stick` passed with one image, inspect `hero`
+   0 issues and a sheet, query at 160,120 named `player`, diff 0 changed pixels.
+   `go test ./internal/cli -run TestMCPEndToEnd` passes.
+3. **A game release is a card for the console.** In a `veduta init` project, the `build
+   archives` step of its `release.yml`, run as written with `GITHUB_REF_NAME=v0.1.0`:
+   both archives and `checksums.txt`; the arm64 archive unpacks to `demo/` with the binary,
+   `veduta.json`, `README.md`, `assets/` and a `card.json` at version `v0.1.0`, and
+   `qemu-aarch64-static ./demo -project . -headless render --scene main` renders 320×240.
+   Emulated end to end: `vedutaos qemu --fresh --game <engine>/template` booted the dashboard,
+   Enter started the demo, and tablet positions sent with QMP walked the hero right, stopped
+   it and walked it up.
+4. **Identical traces and frames across runs and architectures.** CI runs 34902871695
+   (main) and 34934352193 (tag) on a125a48: ubuntu-latest and windows-latest (Go stable and
+   oldstable) and linux/arm64 under qemu-user pass the same goldens, with
+   `TestEngineHasNoFusedMultiplyAdd`. Locally `GOARCH=arm64 go test -exec qemu-aarch64-static ./...`
+   passes. A project made by the v1.0.0 tool and upgraded to the candidate gives the same
+   four trace hashes as its v1.0.0 build.
+5. **Flipped normals are reported and visible.** `go test ./inspect -run TestModelFlippedNormals`.
+6. **Fuzzing.** `veduta fuzz --games 200 --ticks 200 --seed 1` on the demo: 0 violations in
+   6.3 s. With `PlayerSpeed = 400.0`: every game violates `within_bounds`; minimized repro
+   `tests/scenarios/fuzz_cd96a0cd.scenario.json` (6 ticks, one input), the same file as for
+   v1.0.0, which `veduta simulate` reports as `fail`.
+7. **Update and upgrade.** The v1.0.0 tool from GitHub Releases with a fresh configuration:
+   `veduta update --check --channel beta` → "v1.1.0-rc.1 is available", then
+   `veduta update --channel beta` → "updated v1.0.0 → v1.1.0-rc.1 … verified"; the
+   configuration follows beta. `veduta upgrade` of a v1.0.0 project moved `go.mod` and
+   `veduta.json` to the candidate and its tests pass. Pinning:
+   `go test ./internal/cli -run TestUpgradePinsTheV0Defaults`.
+8. **Rasterizer.** `go test -bench . -benchmem -run '^$' ./gfx/soft`:
+   `BenchmarkDraw10kTriangles320x240` 6.1 ms/frame, 0 allocs/op, on a loaded VPS where
+   v1.0.0 measured 5.6 ms in the same minute (the rasterizer is unchanged).
+9. **No third-party modules.** There is no `go.sum`.
+10. **The tool and the console.** `veduta run` on this VPS refuses with "no framebuffer on this
+    machine … Set VEDUTA_FB …"; `go list -deps ./cmd/veduta` holds no `platform`;
+    `CGO_ENABLED=0 GOOS=windows go build ./cmd/veduta` succeeds.
+11. **2D.** `go test . -run TestTwoDFixture`.
 
 ## v1.0.0 — 2026-09-14
 
