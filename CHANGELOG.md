@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## v1.1.1 — 2026-09-15
+
 ### Fixed
 
 - `veduta init` from a build without a version (`go run ./cmd/veduta`, `go install` with no
