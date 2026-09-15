@@ -130,7 +130,7 @@ func TestParseWorldErrors(t *testing.T) {
 		{"site spacing missing", world(`, "sites": [{"tag": "city", "prefabs": ["city_small"]}]`),
 			[]wantErr{{`sites[0].spacing: is required`, `{"tag"`}}},
 		{"site spacing too small for prefab", world(`, "sites": [{"tag": "city", "prefabs": ["city_small"], "spacing": 12}]`),
-			[]wantErr{{`sites[0].spacing: 12 cells is less than the 12×8 cell footprint of prefab "city_small" (prefabs[0]) plus its min_distance (4 m): need at least 16`, `12}`}}},
+			[]wantErr{{`sites[0].spacing: 12 cells is less than the 12×8 cell footprint of prefab "city_small" (prefabs[0]) plus the rule's largest min_distance (4 m): need at least 16`, `12}`}}},
 		{"site chance range", world(`, "sites": [{"tag": "city", "prefabs": ["city_small"], "spacing": 24, "chance": 0}]`),
 			[]wantErr{{`sites[0].chance: 0 out of range (0, 1]`, `0}`}}},
 		{"site no prefabs", world(`, "sites": [{"tag": "city", "prefabs": [], "spacing": 24}]`),

@@ -97,7 +97,7 @@ rotated.
 | Field | Type | Default | Meaning |
 |-------|------|---------|---------|
 | `tag` | string | required | Tag of the sites of this rule, for `min_distance` rules (`city`, `ruin`). |
-| `prefabs` | array of strings | required | Prefabs to choose from, by seed. Each must fit: `spacing` ≥ its footprint in cells (the larger side) + its largest `min_distance` in cells. |
+| `prefabs` | array of strings | required | Prefabs to choose from, by seed. Each must fit: `spacing` ≥ its footprint in cells (the larger side) + the largest `min_distance` of the rule's prefabs, in cells. |
 | `biomes` | array of strings | the prefab's rule | Biomes the region's candidate cell must be in. |
 | `spacing` | integer | required | Cells per region, 2 to 4096. |
 | `chance` | number | `1` | Share of the regions that get a site, more than 0 and at most 1. |

@@ -17,6 +17,12 @@ All notable changes to this project are documented here. The format follows
   changed prefab recooks the world, and prefabs known at cook time are checked against
   their cells, site spacing and the world's extent (`extent × chunk × cell ≤ 8192 m`).
 - Scenarios may name a `world` and a start cell `at` instead of a `scene`.
+- Package `world`: the generator behind a world. Integer-only biome noise cut at
+  quantiles so biome shares follow their weights; scatter decided cell by cell; sites on
+  a jittered region grid that keeps their `min_distance`, yielding to places and to
+  earlier rules; every chunk generated on its own, in any order, with one greedy-merged
+  ground mesh per chunk; `Validate`, `Solve` (rings outward, east first, clockwise),
+  `Displaced`, `Region`, `Query` and `Check` for the tools.
 
 ### Changed
 

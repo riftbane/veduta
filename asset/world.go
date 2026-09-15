@@ -183,16 +183,24 @@ func CompileWorld(name string, src *WorldSource, loc *Locator, prefabs func(stri
 			st.Spacing = MinSpacing
 		default:
 			st.Spacing = s.Spacing
+			// Sites of one rule keep the largest min_distance any of its prefabs asks
+			// for, so every prefab must leave that much room inside its region.
+			var dist float32
+			for _, name := range st.Prefabs {
+				if pf := prefabs(name); pf != nil {
+					dist = max(dist, pf.MaxDistance())
+				}
+			}
 			for k, name := range st.Prefabs {
 				pf := prefabs(name)
 				if pf == nil {
 					continue
 				}
 				fw, fd := w.Footprint(pf, 0)
-				need := max(fw, fd) + w.Cells(pf.MaxDistance())
+				need := max(fw, fd) + w.Cells(dist)
 				if need > st.Spacing {
-					c.Errorf(Path(p, "spacing"), "%d cells is less than the %d×%d cell footprint of prefab %q (prefabs[%d]) plus its min_distance (%v m): need at least %d",
-						st.Spacing, fw, fd, name, k, pf.MaxDistance(), need)
+					c.Errorf(Path(p, "spacing"), "%d cells is less than the %d×%d cell footprint of prefab %q (prefabs[%d]) plus the rule's largest min_distance (%v m): need at least %d",
+						st.Spacing, fw, fd, name, k, dist, need)
 				}
 			}
 		}
