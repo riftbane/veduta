@@ -47,6 +47,8 @@ All notable changes to this project are documented here. The format follows
 - `asset.CompilerVersion` is `veduta-asset/0.3.0`: every cooked asset is recompiled once.
 - The player prepares its run without recording a trace: no tick spends time summarizing
   every entity (a streamed world has hundreds), and nothing read the trace.
+- `veduta.Version` (what `game -version` and `describe` print, and what snapshots are
+  checked against) is `v1.2.0`; it had stayed at `v1.0.0` through v1.1.x.
 
 ### Decisions
 
