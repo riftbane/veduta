@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## v1.1.0 — 2026-09-15
+
 The console's final controls: a D-pad, an analog stick, A, B, X, Y, Select, Start and Home,
 with a keyboard and a mouse standing in for them until the handheld exists. A minor
 release: every v1.0.0 file keeps its meaning, and a v1.0.0 project traces the same.
