@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -122,7 +123,7 @@ func TestReleaseProjectFlow(t *testing.T) {
 	os.WriteFile(wf, []byte(strings.Replace(string(w), "for target in linux/arm64 linux/amd64", "for target in linux/amd64 windows/amd64", 1)), 0o644)
 	manifest := filepath.Join(dir, "veduta.json")
 	m, _ := os.ReadFile(manifest)
-	os.WriteFile(manifest, []byte(strings.Replace(string(m), `"engine": "v1.0.0"`, `"engine": "v0.2.0"`, 1)), 0o644)
+	os.WriteFile(manifest, regexp.MustCompile(`"engine": "v[^"]*"`).ReplaceAll(m, []byte(`"engine": "v0.2.0"`)), 0o644)
 	git(dir, "commit", "-q", "-am", "Stay on v0.2.0")
 	r, err = Release(env, dir, ReleaseOptions{Version: "v0.1.0", DryRun: true})
 	if st := findStep(r, "console"); err != nil || !r.OK || st == nil || !st.OK || !strings.Contains(st.Detail, "veduta upgrade") || findStep(r, "arm64") != nil {
@@ -160,4 +161,30 @@ func findStep(r *ReleaseReport, name string) *ReleaseStep {
 		}
 	}
 	return nil
+}
+
+func TestReleaseTemplate(t *testing.T) {
+	got, err := releaseTemplate([]byte("{\n  \"veduta\": \"project/1\",\n  \"engine\": \"v1.0.0\",\n  \"x\": 1\n}\n"), "v1.2.3")
+	if err != nil || string(got) != "{\n  \"veduta\": \"project/1\",\n  \"engine\": \"v1.2.3\",\n  \"x\": 1\n}\n" {
+		t.Fatalf("%q %v", got, err)
+	}
+	if _, err := releaseTemplate([]byte("{}"), "v1.2.3"); err == nil {
+		t.Fatal("a manifest without an engine field was accepted")
+	}
+}
+
+// The template's engine is the latest released engine: init falls back to it when the tool
+// has no version, and the template's code is written against it.
+func TestTemplateEngineIsTheLatestRelease(t *testing.T) {
+	cl, err := os.ReadFile(filepath.Join("..", "..", "CHANGELOG.md"))
+	if err != nil {
+		t.Skip("no CHANGELOG.md beside the module")
+	}
+	m := regexp.MustCompile(`(?m)^## (v\d+\.\d+\.\d+)`).FindSubmatch(cl)
+	if m == nil {
+		t.Fatal("CHANGELOG.md names no release")
+	}
+	if got := templateEngine(); got != string(m[1]) {
+		t.Fatalf("template/veduta.json names engine %s, the latest release is %s (veduta release moves it)", got, m[1])
+	}
 }

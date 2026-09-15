@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- `veduta init` from a build without a version (`go run ./cmd/veduta`, `go install` with no
+  `-ldflags`) created a project on engine v1.0.0 while the template it copied reads the
+  stick of v1.1.0, so the project did not build. The template's `veduta.json` now names the
+  engine its code is written against, and `veduta release` moves it to each engine release
+  along with the changelog; a test holds the two together.
+
 ## v1.1.0 — 2026-09-15
 
 The console's final controls: a D-pad, an analog stick, A, B, X, Y, Select, Start and Home,

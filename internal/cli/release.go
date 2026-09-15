@@ -8,9 +8,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/riftbane/veduta/asset"
 	"github.com/riftbane/veduta/internal/update"
 	"github.com/riftbane/veduta/mcp"
 )
@@ -207,6 +209,22 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 	if !step("changelog", err == nil, "%s", okOr("Unreleased → "+o.Version+" — "+date, err)) {
 		return finish(r), nil
 	}
+	// The engine's template names the engine version its code is written against, and
+	// init falls back to it when the tool has no version of its own: a release moves it.
+	staged := []string{"CHANGELOG.md"}
+	var tmplPath string
+	var tmpl []byte
+	if r.Kind == "engine" {
+		tmplPath = filepath.Join(root, "template", asset.ProjectFile)
+		src, err := os.ReadFile(tmplPath)
+		if err == nil {
+			tmpl, err = releaseTemplate(src, o.Version)
+		}
+		if !step("template", err == nil, "%s", okOr("template engine → "+o.Version, err)) {
+			return finish(r), nil
+		}
+		staged = append(staged, filepath.ToSlash(filepath.Join("template", asset.ProjectFile)))
+	}
 	if o.DryRun {
 		r.OK = true
 		return r, nil
@@ -215,11 +233,16 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 	if err := os.WriteFile(clPath, next, 0o644); err != nil {
 		return nil, err
 	}
+	if tmpl != nil {
+		if err := os.WriteFile(tmplPath, tmpl, 0o644); err != nil {
+			return nil, err
+		}
+	}
 	msg := fmt.Sprintf("Release %s\n\nMove the Unreleased changelog section to %s.", o.Version, o.Version)
 	if len(o.Trailers) > 0 {
 		msg += "\n\n" + strings.Join(o.Trailers, "\n")
 	}
-	if out, err := git("add", "CHANGELOG.md"); !step("stage", err == nil, "%s", okOr(out, err)) {
+	if out, err := git(append([]string{"add"}, staged...)...); !step("stage", err == nil, "%s", okOr(out, err)) {
 		return finish(r), nil
 	}
 	if out, err := git("commit", "-q", "-m", msg); !step("commit", err == nil, "%s", okOr(out, err)) {
@@ -312,6 +335,15 @@ func isEngineRepo(dir string) bool {
 
 // releaseChangelog renames "## Unreleased" to "## <version> — <date>" and opens a new,
 // empty Unreleased section above it. The Unreleased section must not be empty.
+// releaseTemplate returns the template's veduta.json naming version as its engine.
+func releaseTemplate(src []byte, version string) ([]byte, error) {
+	re := regexp.MustCompile(`"engine":\s*"[^"]*"`)
+	if !re.Match(src) {
+		return nil, fmt.Errorf("template/%s has no engine field", asset.ProjectFile)
+	}
+	return re.ReplaceAll(src, []byte(fmt.Sprintf(`"engine": %q`, version))), nil
+}
+
 func releaseChangelog(cl []byte, version, date string) ([]byte, error) {
 	s := string(cl)
 	i := strings.Index(s, "## Unreleased")
