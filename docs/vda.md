@@ -35,6 +35,8 @@ chunk = type length payload crc
 | `TEXR` | texture | compiled texture with its mip chain |
 | `MATL` | material | compiled material |
 | `SCEN` | scene | compiled scene |
+| `PRFB` | prefab | compiled prefab (since v1.2.0) |
+| `WRLD` | world | compiled world (since v1.2.0) |
 
 ## `META`
 
@@ -43,14 +45,14 @@ escaping, `deps` sorted without duplicates and `[]` when empty. Readers reject M
 is not byte-for-byte canonical, so equal metadata always has equal bytes.
 
 ```json
-{"compiler":"veduta-asset/0.2.0","deps":[],"kind":"model","name":"crate","source":"models/crate.model.json","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
+{"compiler":"veduta-asset/0.3.0","deps":[],"kind":"model","name":"crate","source":"models/crate.model.json","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
 ```
 
 | Key | Meaning |
 |-----|---------|
-| `compiler` | Compiler version (`asset.CompilerVersion`: `veduta-asset/0.2.0` since scene entities carry a hitbox and a layer, `veduta-asset/0.1.0` before). A different version forces a recompile. |
+| `compiler` | Compiler version (`asset.CompilerVersion`: `veduta-asset/0.3.0` since prefabs and worlds, `veduta-asset/0.2.0` since scene entities carry a hitbox and a layer, `veduta-asset/0.1.0` before). A different version forces a recompile. |
 | `deps` | Other input files the compiled output depends on besides the source (for example the PNG of a texture `image` layer), as paths relative to the assets directory. |
-| `kind` | `model`, `texture`, `material` or `scene`. |
+| `kind` | `model`, `texture`, `material`, `scene`, `prefab` or `world`. |
 | `name` | Asset name (the source file name without its suffix). |
 | `source` | Source path relative to the assets directory, forward slashes (`models/crate.model.json`). |
 | `source_hash` | Lowercase hex SHA-256 (64 characters) of the compiler inputs, computed by `cook`: SHA-256 over `veduta-cook/1\n`, the compiler version and `\n`, then `source <path> <length>\n` followed by the source bytes, then for each dependency in `deps` order `dep <path> <length>\n` followed by its bytes (`missing <path>\n` when it cannot be read). It changes whenever the source or any dependency changes. |
@@ -153,6 +155,39 @@ none), `vec3` position, `vec3` rotation_deg, `vec3` scale, `list<str>` tags, `st
 (`""` for none), `bool` visible, `bool` has_hitbox, then only when has_hitbox is true
 `aabb` hitbox (local space, min <= max on every axis; readers reject any other box), then
 `i64` layer (in [-1000, 1000]).
+
+## `PRFB` — compiled prefab
+
+| # | Field | Type | Meaning |
+|---|-------|------|---------|
+| 1 | name | `str` | prefab name |
+| 2 | footprint | `vec2` | width (x) and depth (z) in meters, each in (0, 1024] |
+| 3 | tags | `list<str>` | structure tags |
+| 4 | biomes | `list<str>` | allowed biomes (empty: any) |
+| 5 | distances | `list<distance>` | `str` tag, `f32` meters in [0, 4096]; sorted by tag |
+| 6 | entities | `list<entity>` | as in `SCEN` |
+
+## `WRLD` — compiled world
+
+| # | Field | Type | Meaning |
+|---|-------|------|---------|
+| 1 | name | `str` | world name |
+| 2 | seed | `u64` | generator seed |
+| 3 | cell | `f32` | meters per cell, in (0, 64] |
+| 4 | chunk | `i64` | cells per chunk side, 4 to 64 |
+| 5 | extent | `i64` | chunks from the origin, 1 to 4096; extent × chunk × cell ≤ 8192 |
+| 6 | view | `i64` | chunks loaded around the focus, 1 to 4 |
+| 7 | biome_scale | `i64` | cells per noise period, 4 to 4096 |
+| 8–14 | camera | as `SCEN` fields 2–8 | relative to the start cell |
+| 15–17 | light | as `SCEN` fields 9–11 | |
+| 18 | background | `color` | |
+| 19 | biomes | `list<biome>` | `str` name, `str` ground material, `i64` weight in [1, 1000]; at least one |
+| 20 | scatter | `list<scatter>` | `str` prefab, `list<str>` biomes, `f32` density in (0, 1] |
+| 21 | sites | `list<site>` | `str` tag, `list<str>` prefabs, `list<str>` biomes, `i64` spacing in [2, 4096], `f32` chance in (0, 1] |
+| 22 | places | `list<place>` | `str` name, `str` prefab, `i64` x, `i64` z (cells inside the world), `i64` rotation (0, 90, 180 or 270) |
+| 23 | entities | `list<entity>` | persistent entities, as in `SCEN` |
+
+`u64` is an unsigned 64-bit little-endian integer.
 
 ## Determinism
 

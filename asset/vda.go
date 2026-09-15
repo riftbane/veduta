@@ -16,13 +16,15 @@ import (
 // VDAMagic starts every .vda file.
 const VDAMagic = "VDA1"
 
-// Chunk types of v0.1.0.
+// Chunk types (PRFB and WRLD since v1.2.0).
 const (
 	ChunkMeta     = "META" // Meta as canonical JSON
 	ChunkMesh     = "MESH" // compiled Model (EncodeModel)
 	ChunkTexture  = "TEXR" // compiled Texture (EncodeTexture)
 	ChunkMaterial = "MATL" // compiled Material (EncodeMaterial)
 	ChunkScene    = "SCEN" // compiled Scene (EncodeScene)
+	ChunkPrefab   = "PRFB" // compiled Prefab (EncodePrefab)
+	ChunkWorld    = "WRLD" // compiled World (EncodeWorld)
 )
 
 // Chunk is one chunk of a .vda file. Type is exactly 4 ASCII letters or digits.
@@ -42,12 +44,16 @@ func BodyChunkType(k Kind) (string, bool) {
 		return ChunkMaterial, true
 	case KindScene:
 		return ChunkScene, true
+	case KindPrefab:
+		return ChunkPrefab, true
+	case KindWorld:
+		return ChunkWorld, true
 	}
 	return "", false
 }
 
 func isBodyChunk(t string) bool {
-	return t == ChunkMesh || t == ChunkTexture || t == ChunkMaterial || t == ChunkScene
+	return t == ChunkMesh || t == ChunkTexture || t == ChunkMaterial || t == ChunkScene || t == ChunkPrefab || t == ChunkWorld
 }
 
 func checkChunkType(t string) error {
@@ -133,7 +139,7 @@ func ReadVDA(data []byte) ([]Chunk, error) {
 
 // Meta describes a compiled asset; it is stored in the META chunk of every .vda file.
 type Meta struct {
-	Kind       Kind     // model, texture, material or scene
+	Kind       Kind     // model, texture, material, scene, prefab or world
 	Name       string   // asset name
 	Source     string   // source path relative to the assets directory, e.g. "models/crate.model.json"
 	SourceHash string   // lowercase hex SHA-256 (64 characters) of the compiler inputs, see docs/vda.md
@@ -153,7 +159,7 @@ type metaJSON struct {
 
 func (m *Meta) validate() error {
 	if _, ok := BodyChunkType(m.Kind); !ok {
-		return fmt.Errorf("kind %q is not cooked (want model, texture, material or scene)", m.Kind)
+		return fmt.Errorf("kind %q is not cooked (want model, texture, material, scene, prefab or world)", m.Kind)
 	}
 	if err := ValidName(m.Name); err != nil {
 		return err
@@ -250,8 +256,8 @@ func PackVDA(meta Meta, body Chunk) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// UnpackVDA reads a .vda file and returns its META and body chunk (MESH, TEXR, MATL or
-// SCEN, matching Meta.Kind). Chunks of unknown types are skipped. A missing or repeated
+// UnpackVDA reads a .vda file and returns its META and body chunk (MESH, TEXR, MATL, SCEN,
+// PRFB or WRLD, matching Meta.Kind). Chunks of unknown types are skipped. A missing or repeated
 // META or body chunk is an error.
 func UnpackVDA(data []byte) (Meta, Chunk, error) {
 	chunks, err := ReadVDA(data)
@@ -282,7 +288,7 @@ func UnpackVDA(data []byte) (Meta, Chunk, error) {
 	case !haveMeta:
 		return Meta{}, Chunk{}, errors.New("unpack vda: missing META chunk")
 	case !haveBody:
-		return Meta{}, Chunk{}, errors.New("unpack vda: missing body chunk (MESH, TEXR, MATL or SCEN)")
+		return Meta{}, Chunk{}, errors.New("unpack vda: missing body chunk (MESH, TEXR, MATL, SCEN, PRFB or WRLD)")
 	}
 	if want, _ := BodyChunkType(meta.Kind); body.Type != want {
 		return Meta{}, Chunk{}, fmt.Errorf("unpack vda: META kind %s needs a %s chunk, found %s", meta.Kind, want, body.Type)

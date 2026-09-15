@@ -131,13 +131,15 @@ type EntitySource struct {
 // ScenarioSource is tests/scenarios/<name>.scenario.json.
 type ScenarioSource struct {
 	Veduta      string         `json:"veduta"`
-	Scene       string         `json:"scene"`
+	Scene       string         `json:"scene,omitempty"`
 	Seed        uint64         `json:"seed"`
 	Ticks       int            `json:"ticks"`
 	Inputs      []InputSource  `json:"inputs,omitempty"`
 	Expect      []ExpectSource `json:"expect,omitempty"`
 	Invariants  []string       `json:"invariants,omitempty"`
 	Screenshots []int          `json:"screenshots,omitempty"`
+	World       string         `json:"world,omitempty"` // instead of scene
+	At          []int          `json:"at,omitempty"`    // start cell of a world, default [0, 0]
 }
 
 // InputSource is one input event of a scenario or input script. Keys use W3C
@@ -195,4 +197,69 @@ type ProjectSource struct {
 	Cooked            string      `json:"cooked"`
 	Invariants        []string    `json:"invariants"`
 	Bounds            [][]float32 `json:"bounds"`
+}
+
+// PrefabSource is assets/prefabs/<name>.prefab.json.
+type PrefabSource struct {
+	Veduta    string         `json:"veduta"`
+	Footprint []float32      `json:"footprint"` // [width, depth] in meters
+	Tags      []string       `json:"tags,omitempty"`
+	Rules     *RulesSource   `json:"rules,omitempty"`
+	Entities  []EntitySource `json:"entities"`
+}
+
+// RulesSource are the placement rules of a prefab.
+type RulesSource struct {
+	Biomes      []string           `json:"biomes,omitempty"`       // biomes the prefab may stand in (default: any)
+	MinDistance map[string]float32 `json:"min_distance,omitempty"` // tag → meters of free ground
+}
+
+// WorldSource is assets/worlds/<name>.world.json.
+type WorldSource struct {
+	Veduta     string          `json:"veduta"`
+	Seed       uint64          `json:"seed,omitempty"`
+	Cell       *float32        `json:"cell,omitempty"`        // default 1
+	Chunk      int             `json:"chunk,omitempty"`       // default 16
+	Extent     int             `json:"extent,omitempty"`      // default 512
+	View       int             `json:"view,omitempty"`        // default 1
+	BiomeScale int             `json:"biome_scale,omitempty"` // default 64
+	Camera     CameraSource    `json:"camera"`
+	Light      *LightSource    `json:"light,omitempty"`
+	Background string          `json:"background,omitempty"`
+	Biomes     []BiomeSource   `json:"biomes"`
+	Scatter    []ScatterSource `json:"scatter,omitempty"`
+	Sites      []SiteSource    `json:"sites,omitempty"`
+	Places     []PlaceSource   `json:"places,omitempty"`
+	Entities   []EntitySource  `json:"entities,omitempty"`
+}
+
+// BiomeSource is one biome of a world.
+type BiomeSource struct {
+	Name   string `json:"name"`
+	Ground string `json:"ground"`           // material name
+	Weight int    `json:"weight,omitempty"` // default 1
+}
+
+// ScatterSource is one scatter rule of a world.
+type ScatterSource struct {
+	Prefab  string   `json:"prefab"`
+	Biomes  []string `json:"biomes,omitempty"`
+	Density *float32 `json:"density"`
+}
+
+// SiteSource is one site rule of a world.
+type SiteSource struct {
+	Tag     string   `json:"tag"`
+	Prefabs []string `json:"prefabs"`
+	Biomes  []string `json:"biomes,omitempty"`
+	Spacing int      `json:"spacing"`
+	Chance  *float32 `json:"chance,omitempty"` // default 1
+}
+
+// PlaceSource is one explicit landmark of a world.
+type PlaceSource struct {
+	Name     string `json:"name"`
+	Prefab   string `json:"prefab"`
+	Cell     []int  `json:"cell"` // [x, z] in cells
+	Rotation int    `json:"rotation,omitempty"`
 }

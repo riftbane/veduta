@@ -1,6 +1,6 @@
 # Scenario — `tests/scenarios/<name>.scenario.json`
 
-A scenario is an automated play test: it loads a scene, simulates a fixed number of ticks
+A scenario is an automated play test: it loads a scene (or a world), simulates a fixed number of ticks
 from a seed with scripted inputs, and checks expectations and invariants along the way,
 capturing screenshots at chosen ticks. The same seed and inputs always produce the same
 trace and the same frames, so a scenario is a regression test. Run one with
@@ -30,7 +30,9 @@ update of tick t; at tick 0 it is the initial state. Every tick field in a scena
 | Field | Type | Default | Meaning |
 |-------|------|---------|---------|
 | `veduta` | string | required | Must be exactly `"scenario/1"`. |
-| `scene` | string | required | Name of the scene to load (`assets/scenes/<scene>.scene.json`). |
+| `scene` | string | required unless `world` | Name of the scene to load (`assets/scenes/<scene>.scene.json`). |
+| `world` | string | none | Name of a world to load instead of a scene (`assets/worlds/<world>.world.json`, `world` topic). Exactly one of `scene` and `world`. Since v1.2.0. |
+| `at` | `[x, z]` | `[0, 0]` | Start cell of the world (only with `world`): the camera and the persistent entities are placed relative to it and the loaded chunks begin there. |
 | `seed` | integer | `0` | Seed of the simulation's random number generator, 0 to 18446744073709551615. |
 | `ticks` | integer | required | Number of ticks to simulate, 1 to 1000000 (20 Hz: 20 ticks = 1 s). |
 | `inputs` | array of objects | `[]` | Scripted input events; see Inputs. |

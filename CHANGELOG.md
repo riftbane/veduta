@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- Two source formats for generated maps (`docs/prefab.md`, `docs/world.md`):
+  `assets/prefabs/<name>.prefab.json` (`prefab/1`), a group of entities with a footprint in
+  meters, tags and placement rules (`biomes`, `min_distance`), and
+  `assets/worlds/<name>.world.json` (`world/1`), a seeded world of integer cells and chunks
+  with biome noise, `scatter` and `sites` rules, explicit `places` and persistent
+  `entities`. Both cook to `.vda` (`PRFB`, `WRLD`); a world depends on its prefabs, so a
+  changed prefab recooks the world, and prefabs known at cook time are checked against
+  their cells, site spacing and the world's extent (`extent × chunk × cell ≤ 8192 m`).
+- Scenarios may name a `world` and a start cell `at` instead of a `scene`.
+
+### Changed
+
+- `asset.CompilerVersion` is `veduta-asset/0.3.0`: every cooked asset is recompiled once.
+
 ## v1.1.1 — 2026-09-15
 
 ### Fixed

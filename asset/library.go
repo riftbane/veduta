@@ -16,12 +16,14 @@ type Library struct {
 	Textures  map[string]*Texture
 	Materials map[string]*Material
 	Scenes    map[string]*Scene
+	Prefabs   map[string]*Prefab
+	Worlds    map[string]*World
 }
 
 // NewLibrary returns an empty library.
 func NewLibrary(p *Project) *Library {
 	return &Library{Project: p, Models: map[string]*Model{}, Textures: map[string]*Texture{},
-		Materials: map[string]*Material{}, Scenes: map[string]*Scene{}}
+		Materials: map[string]*Material{}, Scenes: map[string]*Scene{}, Prefabs: map[string]*Prefab{}, Worlds: map[string]*World{}}
 }
 
 // ModelBounds returns the local bounds of a model (a scene.BoundsFunc).
@@ -42,8 +44,12 @@ func Names[V any](m map[string]V) []string {
 	return out
 }
 
+// Prefab returns the prefab called name, or nil (a CompileWorld lookup).
+func (l *Library) Prefab(name string) *Prefab { return l.Prefabs[name] }
+
 // References returns a sorted warning for every name that does not resolve: material
-// textures, model part materials, scene entity models and materials.
+// textures, model part materials, scene, prefab and world entity models and materials,
+// world ground materials and prefabs.
 func (l *Library) References() []string {
 	w := []string{}
 	for _, name := range Names(l.Materials) {
@@ -58,15 +64,47 @@ func (l *Library) References() []string {
 			}
 		}
 	}
-	for _, name := range Names(l.Scenes) {
-		for _, e := range l.Scenes[name].Entities {
+	entities := func(what, name string, ents []Entity) {
+		for _, e := range ents {
 			if e.Model != "" && l.Models[e.Model] == nil {
-				w = append(w, fmt.Sprintf("scene %s: entity %s: model %q not found", name, e.Name, e.Model))
+				w = append(w, fmt.Sprintf("%s %s: entity %s: model %q not found", what, name, e.Name, e.Model))
 			}
 			if e.Material != "" && l.Materials[e.Material] == nil {
-				w = append(w, fmt.Sprintf("scene %s: entity %s: material %q not found", name, e.Name, e.Material))
+				w = append(w, fmt.Sprintf("%s %s: entity %s: material %q not found", what, name, e.Name, e.Material))
 			}
 		}
+	}
+	for _, name := range Names(l.Scenes) {
+		entities("scene", name, l.Scenes[name].Entities)
+	}
+	for _, name := range Names(l.Prefabs) {
+		entities("prefab", name, l.Prefabs[name].Entities)
+	}
+	for _, name := range Names(l.Worlds) {
+		wd := l.Worlds[name]
+		for _, b := range wd.Biomes {
+			if l.Materials[b.Ground] == nil {
+				w = append(w, fmt.Sprintf("world %s: biome %s: ground material %q not found", name, b.Name, b.Ground))
+			}
+		}
+		for i, s := range wd.Scatter {
+			if l.Prefabs[s.Prefab] == nil {
+				w = append(w, fmt.Sprintf("world %s: scatter[%d]: prefab %q not found", name, i, s.Prefab))
+			}
+		}
+		for i, s := range wd.Sites {
+			for _, p := range s.Prefabs {
+				if l.Prefabs[p] == nil {
+					w = append(w, fmt.Sprintf("world %s: sites[%d]: prefab %q not found", name, i, p))
+				}
+			}
+		}
+		for _, p := range wd.Places {
+			if l.Prefabs[p.Prefab] == nil {
+				w = append(w, fmt.Sprintf("world %s: place %s: prefab %q not found", name, p.Name, p.Prefab))
+			}
+		}
+		entities("world", name, wd.Entities)
 	}
 	return w
 }

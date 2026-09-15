@@ -1,5 +1,5 @@
 // Package asset defines Veduta's declarative source formats (model, texture, material,
-// scene, scenario, project manifest), compiles them into runtime data, stores compiled
+// scene, prefab, world, scenario, project manifest), compiles them into runtime data, stores compiled
 // assets in the chunked .vda container, and cooks a project's assets incrementally.
 //
 // Every source file is JSON with a "veduta": "<type>/<version>" header. Decoding is strict:
@@ -22,7 +22,7 @@ import (
 
 // CompilerVersion is stored in every .vda META chunk; changing it invalidates cooked
 // assets.
-const CompilerVersion = "veduta-asset/0.2.0"
+const CompilerVersion = "veduta-asset/0.3.0"
 
 // Source format headers (the value of the "veduta" field).
 const (
@@ -31,6 +31,8 @@ const (
 	TypeMaterial = "material/1"
 	TypeScene    = "scene/1"
 	TypeScenario = "scenario/1"
+	TypePrefab   = "prefab/1"
+	TypeWorld    = "world/1"
 	TypeProject  = "project/1"
 )
 
@@ -45,10 +47,12 @@ const (
 	KindMaterial Kind = "material"
 	KindScene    Kind = "scene"
 	KindScenario Kind = "scenario"
+	KindPrefab   Kind = "prefab"
+	KindWorld    Kind = "world"
 )
 
 // CookedKinds are the kinds compiled into .vda files by Cook, in cooking order.
-var CookedKinds = []Kind{KindTexture, KindMaterial, KindModel, KindScene}
+var CookedKinds = []Kind{KindTexture, KindMaterial, KindModel, KindPrefab, KindScene, KindWorld}
 
 // Dir returns the directory holding sources of kind k, relative to assets/
 // (scenarios live in tests/scenarios, relative to the project root).
@@ -64,6 +68,10 @@ func (k Kind) Dir() string {
 		return "scenes"
 	case KindScenario:
 		return "tests/scenarios"
+	case KindPrefab:
+		return "prefabs"
+	case KindWorld:
+		return "worlds"
 	}
 	return string(k)
 }
@@ -92,6 +100,10 @@ func (k Kind) Header() string {
 		return TypeScene
 	case KindScenario:
 		return TypeScenario
+	case KindPrefab:
+		return TypePrefab
+	case KindWorld:
+		return TypeWorld
 	}
 	return ""
 }
@@ -248,4 +260,76 @@ type Entity struct {
 	Visible     bool
 	Hitbox      *gmath.AABB // local-space collision box replacing the model bounds; nil for none
 	Layer       int         // draw order: lower layers are drawn first
+}
+
+// Prefab is a compiled prefab: a group of entities placed as one structure in a world
+// (docs/prefab.md). Entity positions are meters from the min corner of the footprint.
+type Prefab struct {
+	Name      string
+	Footprint gmath.Vec2 // width along x and depth along z in meters, both > 0
+	Tags      []string
+	Biomes    []string   // biomes the prefab may stand in; nil for any
+	Distances []Distance // minimum distances to other structures by tag, sorted by tag
+	Entities  []Entity   // file order; names unique within the prefab
+}
+
+// Distance is a prefab rule: at least Meters of free ground between this prefab's
+// footprint and any structure carrying Tag.
+type Distance struct {
+	Tag    string
+	Meters float32
+}
+
+// World is a compiled world (docs/world.md): a seeded, rule-generated map streamed in
+// chunks around a focus, with explicit landmarks (Places) and persistent Entities.
+type World struct {
+	Name       string
+	Seed       uint64
+	Cell       float32 // meters per cell
+	Chunk      int     // cells per chunk side
+	Extent     int     // the world spans chunks -Extent…Extent-1 on each axis
+	View       int     // chunks loaded around the focus in each direction
+	BiomeScale int     // cells per biome noise period
+	Camera     Camera  // relative to the start cell
+	Light      gfx.Light
+	Background uint32
+	Biomes     []Biome
+	Scatter    []Scatter
+	Sites      []Site
+	Places     []Place
+	Entities   []Entity // persistent entities, positions relative to the start cell
+}
+
+// Biome is one band of the biome noise: Weight shares of the noise range, painted with
+// the Ground material.
+type Biome struct {
+	Name   string
+	Ground string // material name
+	Weight int
+}
+
+// Scatter puts a one-cell prefab on a share (Density) of the cells of the given biomes.
+type Scatter struct {
+	Prefab  string
+	Biomes  []string // nil for any
+	Density float32  // 0 < Density <= 1
+}
+
+// Site puts one of Prefabs in a share (Chance) of the Spacing×Spacing cell regions of
+// the given biomes, at a seeded offset that keeps the footprint inside the region.
+type Site struct {
+	Tag     string
+	Prefabs []string
+	Biomes  []string // nil for any
+	Spacing int      // cells
+	Chance  float32  // 0 < Chance <= 1
+}
+
+// Place is an explicit landmark: Prefab with its footprint's min corner at Cell, turned
+// by Rotation degrees (0, 90, 180 or 270) about +Y.
+type Place struct {
+	Name     string
+	Prefab   string
+	Cell     [2]int32 // x, z in cells
+	Rotation int
 }

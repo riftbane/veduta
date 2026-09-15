@@ -467,26 +467,7 @@ func EncodeScene(s *Scene) Chunk {
 	w.vec3(s.Light.Color)
 	w.vec3(s.Light.Ambient)
 	w.u32(s.Background)
-	w.count(len(s.Entities))
-	for i := range s.Entities {
-		e := &s.Entities[i]
-		w.str(e.Name)
-		w.str(e.Kind)
-		w.str(e.Model)
-		w.str(e.Material)
-		w.vec3(e.Position)
-		w.vec3(e.RotationDeg)
-		w.vec3(e.Scale)
-		w.strs(e.Tags)
-		w.str(e.Parent)
-		w.bool(e.Visible)
-		w.bool(e.Hitbox != nil)
-		if e.Hitbox != nil {
-			w.vec3(e.Hitbox.Min)
-			w.vec3(e.Hitbox.Max)
-		}
-		w.i64(e.Layer)
-	}
+	w.entities(s.Entities)
 	return Chunk{Type: ChunkScene, Data: w.b}
 }
 
@@ -514,36 +495,310 @@ func DecodeScene(c Chunk) (*Scene, error) {
 	s.Light.Ambient = r.vec3()
 	s.Background = r.u32()
 	r.field = "entities"
-	if n := r.count(4*4 + 36 + 4 + 4 + 1 + 1 + 8); n > 0 {
-		s.Entities = make([]Entity, n)
-		for i := range s.Entities {
-			r.field = fmt.Sprintf("entity %d", i)
-			e := &s.Entities[i]
-			e.Name = r.str()
-			e.Kind = r.str()
-			e.Model = r.str()
-			e.Material = r.str()
-			e.Position = r.vec3()
-			e.RotationDeg = r.vec3()
-			e.Scale = r.vec3()
-			e.Tags = r.strs()
-			e.Parent = r.str()
-			e.Visible = r.bool()
-			if r.bool() {
-				b := gmath.AABB{Min: r.vec3(), Max: r.vec3()}
-				// Negated so a NaN component fails too.
-				if r.err == nil && !(b.Min.X <= b.Max.X && b.Min.Y <= b.Max.Y && b.Min.Z <= b.Max.Z) {
-					r.failf("hitbox min %v exceeds max %v", b.Min, b.Max)
-				}
-				e.Hitbox = &b
-			}
-			if e.Layer = r.i64(); r.err == nil && (e.Layer < MinLayer || e.Layer > MaxLayer) {
-				r.failf("layer %d out of range [%d, %d]", e.Layer, MinLayer, MaxLayer)
-			}
-		}
-	}
+	s.Entities = r.entities()
 	if err := r.done(); err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+// entitySize is the smallest encoding of an entity (every string and list empty).
+const entitySize = 4*4 + 36 + 4 + 4 + 1 + 1 + 8
+
+func (w *wbuf) u64(v uint64) { w.b = binary.LittleEndian.AppendUint64(w.b, v) }
+
+func (r *rbuf) u64() uint64 {
+	b := r.take(8)
+	if b == nil {
+		return 0
+	}
+	return binary.LittleEndian.Uint64(b)
+}
+
+// entities writes a list<entity> (docs/vda.md, SCEN).
+func (w *wbuf) entities(ents []Entity) {
+	w.count(len(ents))
+	for i := range ents {
+		e := &ents[i]
+		w.str(e.Name)
+		w.str(e.Kind)
+		w.str(e.Model)
+		w.str(e.Material)
+		w.vec3(e.Position)
+		w.vec3(e.RotationDeg)
+		w.vec3(e.Scale)
+		w.strs(e.Tags)
+		w.str(e.Parent)
+		w.bool(e.Visible)
+		w.bool(e.Hitbox != nil)
+		if e.Hitbox != nil {
+			w.vec3(e.Hitbox.Min)
+			w.vec3(e.Hitbox.Max)
+		}
+		w.i64(e.Layer)
+	}
+}
+
+// entities reads a list<entity>, checking hitboxes and layers.
+func (r *rbuf) entities() []Entity {
+	n := r.count(entitySize)
+	if n == 0 {
+		return nil
+	}
+	field := r.field
+	ents := make([]Entity, n)
+	for i := range ents {
+		r.field = fmt.Sprintf("%s: entity %d", field, i)
+		e := &ents[i]
+		e.Name = r.str()
+		e.Kind = r.str()
+		e.Model = r.str()
+		e.Material = r.str()
+		e.Position = r.vec3()
+		e.RotationDeg = r.vec3()
+		e.Scale = r.vec3()
+		e.Tags = r.strs()
+		e.Parent = r.str()
+		e.Visible = r.bool()
+		if r.bool() {
+			b := gmath.AABB{Min: r.vec3(), Max: r.vec3()}
+			// Negated so a NaN component fails too.
+			if r.err == nil && !(b.Min.X <= b.Max.X && b.Min.Y <= b.Max.Y && b.Min.Z <= b.Max.Z) {
+				r.failf("hitbox min %v exceeds max %v", b.Min, b.Max)
+			}
+			e.Hitbox = &b
+		}
+		if e.Layer = r.i64(); r.err == nil && (e.Layer < MinLayer || e.Layer > MaxLayer) {
+			r.failf("layer %d out of range [%d, %d]", e.Layer, MinLayer, MaxLayer)
+		}
+	}
+	r.field = field
+	return ents
+}
+
+// EncodePrefab returns the PRFB chunk of p.
+func EncodePrefab(p *Prefab) Chunk {
+	w := wbuf{b: make([]byte, 0, 64+96*len(p.Entities))}
+	w.str(p.Name)
+	w.vec2(p.Footprint)
+	w.strs(p.Tags)
+	w.strs(p.Biomes)
+	w.count(len(p.Distances))
+	for _, d := range p.Distances {
+		w.str(d.Tag)
+		w.f32(d.Meters)
+	}
+	w.entities(p.Entities)
+	return Chunk{Type: ChunkPrefab, Data: w.b}
+}
+
+// DecodePrefab parses a PRFB chunk.
+func DecodePrefab(c Chunk) (*Prefab, error) {
+	r, err := newReader(c, ChunkPrefab)
+	if err != nil {
+		return nil, err
+	}
+	p := &Prefab{}
+	r.field = "header"
+	p.Name = r.str()
+	p.Footprint = r.vec2()
+	if r.err == nil && !(p.Footprint.X > 0 && p.Footprint.X <= MaxFootprint && p.Footprint.Y > 0 && p.Footprint.Y <= MaxFootprint) {
+		r.failf("footprint %v out of range (0, %d]", p.Footprint, MaxFootprint)
+	}
+	r.field = "tags"
+	p.Tags = r.strs()
+	r.field = "biomes"
+	p.Biomes = r.strs()
+	r.field = "distances"
+	if n := r.count(4 + 4); n > 0 {
+		p.Distances = make([]Distance, n)
+		for i := range p.Distances {
+			d := &p.Distances[i]
+			d.Tag = r.str()
+			d.Meters = r.f32()
+			if r.err == nil && !(d.Meters >= 0 && d.Meters <= MaxDistance) {
+				r.failf("distance %v out of range [0, %d]", d.Meters, MaxDistance)
+			}
+		}
+	}
+	r.field = "entities"
+	p.Entities = r.entities()
+	if err := r.done(); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// EncodeWorld returns the WRLD chunk of w.
+func EncodeWorld(wd *World) Chunk {
+	w := wbuf{b: make([]byte, 0, 256+96*len(wd.Entities))}
+	w.str(wd.Name)
+	w.u64(wd.Seed)
+	w.f32(wd.Cell)
+	w.i64(wd.Chunk)
+	w.i64(wd.Extent)
+	w.i64(wd.View)
+	w.i64(wd.BiomeScale)
+	c := &wd.Camera
+	w.bool(c.Ortho)
+	w.f32(c.FovDeg)
+	w.f32(c.Size)
+	w.f32(c.Near)
+	w.f32(c.Far)
+	w.vec3(c.Position)
+	w.vec3(c.LookAt)
+	w.vec3(wd.Light.Dir)
+	w.vec3(wd.Light.Color)
+	w.vec3(wd.Light.Ambient)
+	w.u32(wd.Background)
+	w.count(len(wd.Biomes))
+	for _, b := range wd.Biomes {
+		w.str(b.Name)
+		w.str(b.Ground)
+		w.i64(b.Weight)
+	}
+	w.count(len(wd.Scatter))
+	for _, s := range wd.Scatter {
+		w.str(s.Prefab)
+		w.strs(s.Biomes)
+		w.f32(s.Density)
+	}
+	w.count(len(wd.Sites))
+	for _, s := range wd.Sites {
+		w.str(s.Tag)
+		w.strs(s.Prefabs)
+		w.strs(s.Biomes)
+		w.i64(s.Spacing)
+		w.f32(s.Chance)
+	}
+	w.count(len(wd.Places))
+	for _, p := range wd.Places {
+		w.str(p.Name)
+		w.str(p.Prefab)
+		w.i64(int(p.Cell[0]))
+		w.i64(int(p.Cell[1]))
+		w.i64(p.Rotation)
+	}
+	w.entities(wd.Entities)
+	return Chunk{Type: ChunkWorld, Data: w.b}
+}
+
+// DecodeWorld parses a WRLD chunk and checks its ranges (docs/world.md).
+func DecodeWorld(c Chunk) (*World, error) {
+	r, err := newReader(c, ChunkWorld)
+	if err != nil {
+		return nil, err
+	}
+	wd := &World{}
+	r.field = "header"
+	wd.Name = r.str()
+	wd.Seed = r.u64()
+	wd.Cell = r.f32()
+	wd.Chunk = r.i64()
+	wd.Extent = r.i64()
+	wd.View = r.i64()
+	wd.BiomeScale = r.i64()
+	if r.err == nil {
+		switch {
+		case !(wd.Cell > 0 && wd.Cell <= MaxCell):
+			r.failf("cell %v out of range (0, %d]", wd.Cell, MaxCell)
+		case wd.Chunk < MinChunk || wd.Chunk > MaxChunk:
+			r.failf("chunk %d out of range [%d, %d]", wd.Chunk, MinChunk, MaxChunk)
+		case wd.Extent < 1 || wd.Extent > MaxExtent:
+			r.failf("extent %d out of range [1, %d]", wd.Extent, MaxExtent)
+		case wd.View < 1 || wd.View > MaxView:
+			r.failf("view %d out of range [1, %d]", wd.View, MaxView)
+		case wd.BiomeScale < MinBiomeScale || wd.BiomeScale > MaxBiomeScale:
+			r.failf("biome_scale %d out of range [%d, %d]", wd.BiomeScale, MinBiomeScale, MaxBiomeScale)
+		case float64(wd.Extent)*float64(wd.Chunk)*float64(wd.Cell) > MaxWorldMeters:
+			r.failf("extent %d × chunk %d × cell %v reaches more than %d m", wd.Extent, wd.Chunk, wd.Cell, MaxWorldMeters)
+		}
+	}
+	r.field = "camera"
+	cam := &wd.Camera
+	cam.Ortho = r.bool()
+	cam.FovDeg = r.f32()
+	cam.Size = r.f32()
+	cam.Near = r.f32()
+	cam.Far = r.f32()
+	cam.Position = r.vec3()
+	cam.LookAt = r.vec3()
+	r.field = "light"
+	wd.Light.Dir = r.vec3()
+	wd.Light.Color = r.vec3()
+	wd.Light.Ambient = r.vec3()
+	wd.Background = r.u32()
+	r.field = "biomes"
+	if n := r.count(4 + 4 + 8); n > 0 {
+		wd.Biomes = make([]Biome, n)
+		for i := range wd.Biomes {
+			b := &wd.Biomes[i]
+			b.Name = r.str()
+			b.Ground = r.str()
+			if b.Weight = r.i64(); r.err == nil && (b.Weight < 1 || b.Weight > MaxWeight) {
+				r.failf("weight %d out of range [1, %d]", b.Weight, MaxWeight)
+			}
+		}
+	} else if r.err == nil {
+		r.failf("no biomes")
+	}
+	r.field = "scatter"
+	if n := r.count(4 + 4 + 4); n > 0 {
+		wd.Scatter = make([]Scatter, n)
+		for i := range wd.Scatter {
+			s := &wd.Scatter[i]
+			s.Prefab = r.str()
+			s.Biomes = r.strs()
+			if s.Density = r.f32(); r.err == nil && !(s.Density > 0 && s.Density <= 1) {
+				r.failf("density %v out of range (0, 1]", s.Density)
+			}
+		}
+	}
+	r.field = "sites"
+	if n := r.count(4 + 4 + 4 + 8 + 4); n > 0 {
+		wd.Sites = make([]Site, n)
+		for i := range wd.Sites {
+			s := &wd.Sites[i]
+			s.Tag = r.str()
+			s.Prefabs = r.strs()
+			s.Biomes = r.strs()
+			s.Spacing = r.i64()
+			s.Chance = r.f32()
+			if r.err == nil {
+				switch {
+				case s.Spacing < MinSpacing || s.Spacing > MaxSpacing:
+					r.failf("spacing %d out of range [%d, %d]", s.Spacing, MinSpacing, MaxSpacing)
+				case !(s.Chance > 0 && s.Chance <= 1):
+					r.failf("chance %v out of range (0, 1]", s.Chance)
+				}
+			}
+		}
+	}
+	r.field = "places"
+	if n := r.count(4 + 4 + 8 + 8 + 8); n > 0 {
+		wd.Places = make([]Place, n)
+		span := wd.Extent * wd.Chunk
+		for i := range wd.Places {
+			p := &wd.Places[i]
+			p.Name = r.str()
+			p.Prefab = r.str()
+			x, z := r.i64(), r.i64()
+			p.Rotation = r.i64()
+			if r.err == nil {
+				switch {
+				case x < -span || x >= span || z < -span || z >= span:
+					r.failf("cell [%d, %d] is outside the world (cells -%d to %d)", x, z, span, span-1)
+				case indexOfInt(Rotations, p.Rotation) < 0:
+					r.failf("rotation %d is not one of %v", p.Rotation, Rotations)
+				}
+			}
+			p.Cell = [2]int32{int32(x), int32(z)}
+		}
+	}
+	r.field = "entities"
+	wd.Entities = r.entities()
+	if err := r.done(); err != nil {
+		return nil, err
+	}
+	return wd, nil
 }

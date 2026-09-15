@@ -60,7 +60,7 @@ func CompileScene(name string, src *SceneSource, loc *Locator) (*Scene, error) {
 		Light:      compileLight(c, src.Light),
 		Background: c.Color("background", src.Background, defaultBackground),
 	}
-	s.Entities = compileEntities(c, src.Entities)
+	s.Entities = compileEntities(c, src.Entities, "scene")
 	if err := c.Err(); err != nil {
 		return nil, err
 	}
@@ -137,7 +137,9 @@ func lightColor(c *Checker, path, s string, def uint32) uint32 {
 	return c.Color(path, s, def)
 }
 
-func compileEntities(c *Checker, src []EntitySource) []Entity {
+// compileEntities validates a list of entities; what names the container ("scene",
+// "prefab", "world") in messages.
+func compileEntities(c *Checker, src []EntitySource, what string) []Entity {
 	if len(src) == 0 {
 		return nil
 	}
@@ -195,7 +197,7 @@ func compileEntities(c *Checker, src []EntitySource) []Entity {
 		}
 		ent.Visible = e.Visible == nil || *e.Visible
 	}
-	checkParents(c, src, ents, byName)
+	checkParents(c, src, ents, byName, what)
 	return ents
 }
 
@@ -229,7 +231,7 @@ func compileHitbox(c *Checker, path string, v [][]float32) *gmath.AABB {
 
 // checkParents resolves parent names and reports unknown parents and cycles. Each cycle
 // is reported once, at the parent field of its entity with the lowest index.
-func checkParents(c *Checker, src []EntitySource, ents []Entity, byName map[string]int) {
+func checkParents(c *Checker, src []EntitySource, ents []Entity, byName map[string]int, what string) {
 	parent := make([]int, len(src))
 	for i := range src {
 		parent[i] = -1
@@ -247,7 +249,7 @@ func checkParents(c *Checker, src []EntitySource, ents []Entity, byName map[stri
 		}
 		j, ok := byName[name]
 		if !ok {
-			c.Errorf(pp, "no entity named %q in this scene", name)
+			c.Errorf(pp, "no entity named %q in this %s", name, what)
 			continue
 		}
 		parent[i] = j

@@ -179,3 +179,62 @@ func TestCookReportsLocatedErrors(t *testing.T) {
 		}
 	}
 }
+
+// A world is cooked after its prefabs and depends on them: editing a prefab makes the
+// world stale, and both are decoded back from their cooked files.
+func TestCookPrefabAndWorld(t *testing.T) {
+	root := copyTemplate(t)
+	write := func(rel, data string) {
+		p := filepath.Join(root, filepath.FromSlash(rel))
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, []byte(data), 0o644)
+	}
+	write("assets/prefabs/tree.prefab.json", `{"veduta": "prefab/1", "footprint": [1, 1], "tags": ["tree"],
+	  "entities": [{"name": "trunk", "kind": "static", "model": "crate", "position": [0.5, 0, 0.5]}]}`)
+	write("assets/worlds/land.world.json", `{"veduta": "world/1", "camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]},
+	  "biomes": [{"name": "plain", "ground": "grass"}], "scatter": [{"prefab": "tree", "density": 0.1}],
+	  "places": [{"name": "home", "prefab": "tree", "cell": [3, 4]}]}`)
+	r, err := Run(Options{Root: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := statuses(r)
+	if r.Failed != 0 || st["prefab/tree"] != StatusCompiled || st["world/land"] != StatusCompiled {
+		t.Fatalf("cook: %+v", r)
+	}
+	if len(r.Warnings) != 0 {
+		t.Fatalf("warnings %v", r.Warnings)
+	}
+	lib, err := Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lib.Prefabs["tree"] == nil || lib.Worlds["land"] == nil || lib.Worlds["land"].Places[0].Cell != [2]int32{3, 4} {
+		t.Fatalf("library %+v %+v", lib.Prefabs, lib.Worlds)
+	}
+	data, _ := os.ReadFile(filepath.Join(root, "assets", ".cooked", "worlds", "land.vda"))
+	meta, _, err := asset.UnpackVDA(data)
+	if err != nil || len(meta.Deps) != 1 || meta.Deps[0] != "prefabs/tree.prefab.json" {
+		t.Fatalf("world meta %+v %v", meta, err)
+	}
+	// A larger tree no longer fits a scatter cell: the world is recooked and fails.
+	write("assets/prefabs/tree.prefab.json", `{"veduta": "prefab/1", "footprint": [2, 2], "entities": []}`)
+	r, err = Run(Options{Root: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st = statuses(r)
+	if st["prefab/tree"] != StatusCompiled || st["world/land"] != StatusError || r.Failed != 1 {
+		t.Fatalf("after edit: %+v", st)
+	}
+	if es := r.Errors(); len(es) != 1 || es[0].File != "assets/worlds/land.world.json" || es[0].Line != 2 {
+		t.Fatalf("errors %v", r.Errors())
+	}
+	// A missing prefab is only a warning.
+	write("assets/worlds/land.world.json", `{"veduta": "world/1", "camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]},
+	  "biomes": [{"name": "plain", "ground": "grass"}], "places": [{"name": "home", "prefab": "castle", "cell": [3, 4]}]}`)
+	r, err = Run(Options{Root: root})
+	if err != nil || r.Failed != 0 || len(r.Warnings) != 1 || r.Warnings[0] != `world land: place home: prefab "castle" not found` {
+		t.Fatalf("missing prefab: %v %+v", err, r)
+	}
+}

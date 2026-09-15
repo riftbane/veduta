@@ -26,6 +26,8 @@ type Scenario struct {
 	Expect      []Expectation // file order
 	Invariants  []string      // invariant specs, see ParseInvariant
 	Screenshots []int         // ticks to capture, strictly increasing
+	World       string        // world asset name, instead of Scene
+	At          [2]int32      // start cell of the world (x, z)
 }
 
 // Input is one scripted input event. Keys are W3C KeyboardEvent.code names (KeyCodes).
@@ -186,11 +188,20 @@ func CompileScenario(name string, src *ScenarioSource, loc *Locator) (*Scenario,
 	if err := ValidName(name); err != nil {
 		c.Errorf("", "scenario %v", err)
 	}
-	sc := &Scenario{Name: name, Scene: src.Scene, Seed: src.Seed, Ticks: src.Ticks}
-	if src.Scene == "" {
-		c.Errorf("scene", "is required (name of a scene in assets/scenes)")
-	} else {
+	sc := &Scenario{Name: name, Scene: src.Scene, World: src.World, Seed: src.Seed, Ticks: src.Ticks}
+	switch {
+	case src.Scene == "" && src.World == "":
+		c.Errorf("scene", "is required (name of a scene in assets/scenes), or world (name of a world in assets/worlds)")
+	case src.Scene != "" && src.World != "":
+		c.Errorf("world", "a scenario simulates a scene or a world, not both")
+	case src.Scene != "":
 		c.Name("scene", src.Scene)
+		if src.At != nil {
+			c.Errorf("at", "only used with world (the start cell)")
+		}
+	default:
+		c.Name("world", src.World)
+		sc.At = compileCell(c, "at", src.At)
 	}
 	maxTick := src.Ticks // upper bound for tick fields; -1 when unknown
 	switch {
@@ -627,4 +638,23 @@ func normValue(v any) (any, error) {
 		return nil, fmt.Errorf("value cannot be an object; compare one field with a longer path")
 	}
 	return nil, fmt.Errorf("value of type %T is not a number, string, boolean or list", v)
+}
+
+// compileCell validates an optional [x, z] cell (nil yields the origin).
+func compileCell(c *Checker, path string, v []int) [2]int32 {
+	if v == nil {
+		return [2]int32{}
+	}
+	if len(v) != 2 {
+		c.Errorf(path, "want [x, z] in cells, got %d numbers", len(v))
+		return [2]int32{}
+	}
+	const lim = MaxExtent * MaxChunk
+	for k, x := range v {
+		if x < -lim || x >= lim {
+			c.Errorf(Path(path, k), "%d out of range [%d, %d]", x, -lim, lim-1)
+			return [2]int32{}
+		}
+	}
+	return [2]int32{int32(v[0]), int32(v[1])}
 }

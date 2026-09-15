@@ -228,13 +228,24 @@ func (c *cooker) cookOne(k asset.Kind, base string) {
 	var deps []string
 	var texSrc asset.TextureSource
 	var texLoc *asset.Locator
-	if k == asset.KindTexture {
+	var worldSrc asset.WorldSource
+	var worldLoc *asset.Locator
+	switch k {
+	case asset.KindTexture:
 		texLoc, err = asset.Decode(it.Source, data, asset.TypeTexture, &texSrc)
 		if err != nil {
 			fail(err)
 			return
 		}
 		deps = texture.Deps(&texSrc)
+	case asset.KindWorld:
+		// A world is compiled against its prefabs' footprints, so it depends on them.
+		worldLoc, err = asset.Decode(it.Source, data, asset.TypeWorld, &worldSrc)
+		if err != nil {
+			fail(err)
+			return
+		}
+		deps = asset.WorldDeps(&worldSrc)
 	}
 	hash, err := c.hash(srcAssetRel, data, deps)
 	if err != nil {
@@ -300,6 +311,22 @@ func (c *cooker) cookOne(k asset.Kind, base string) {
 		}
 		c.lib.Scenes[name] = s
 		body = asset.EncodeScene(s)
+	case asset.KindPrefab:
+		p, err := asset.ParsePrefab(it.Source, data)
+		if err != nil {
+			fail(err)
+			return
+		}
+		c.lib.Prefabs[name] = p
+		body = asset.EncodePrefab(p)
+	case asset.KindWorld:
+		w, err := asset.CompileWorld(name, &worldSrc, worldLoc, c.lib.Prefab)
+		if err != nil {
+			fail(err)
+			return
+		}
+		c.lib.Worlds[name] = w
+		body = asset.EncodeWorld(w)
 	}
 	if c.write {
 		meta := asset.Meta{Kind: k, Name: name, Source: srcAssetRel, SourceHash: hash, Compiler: asset.CompilerVersion, Deps: deps}
@@ -361,6 +388,20 @@ func (c *cooker) decodeInto(k asset.Kind, name string, body asset.Chunk) error {
 		}
 		s.Name = name
 		c.lib.Scenes[name] = s
+	case asset.KindPrefab:
+		p, err := asset.DecodePrefab(body)
+		if err != nil {
+			return err
+		}
+		p.Name = name
+		c.lib.Prefabs[name] = p
+	case asset.KindWorld:
+		w, err := asset.DecodeWorld(body)
+		if err != nil {
+			return err
+		}
+		w.Name = name
+		c.lib.Worlds[name] = w
 	}
 	return nil
 }
