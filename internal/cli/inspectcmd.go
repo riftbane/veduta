@@ -43,9 +43,9 @@ func (r InspectResult) Human() string {
 }
 
 // InspectKinds are the inspectable asset kinds.
-var InspectKinds = []string{"model", "texture", "scene"}
+var InspectKinds = []string{"model", "texture", "scene", "prefab", "world"}
 
-// Inspect produces the report and sheets of one model, texture or scene.
+// Inspect produces the report and sheets of one model, texture, scene, prefab or world.
 func (s *Session) Inspect(kind, name, focus string, sheets []string) (*inspect.Report, error) {
 	lib, errs, err := s.PartialLibrary()
 	if err != nil {
@@ -59,8 +59,12 @@ func (s *Session) Inspect(kind, name, focus string, sheets []string) (*inspect.R
 		k = asset.KindTexture
 	case "scene":
 		k = asset.KindScene
+	case "prefab":
+		k = asset.KindPrefab
+	case "world":
+		k = asset.KindWorld
 	default:
-		return nil, usagef("inspect: kind %q (want model, texture or scene)", kind)
+		return nil, usagef("inspect: kind %q (want one of %s)", kind, strings.Join(InspectKinds, ", "))
 	}
 	if err := asset.ValidName(name); err != nil {
 		return nil, usagef("inspect: %v", err)
@@ -99,6 +103,10 @@ func (s *Session) Inspect(kind, name, focus string, sheets []string) (*inspect.R
 		rep, err = inspect.Texture(ir, name, ts, opt)
 	case "scene":
 		rep, err = inspect.Scene(ir, name, opt)
+	case "prefab":
+		rep, err = inspect.Prefab(ir, name, opt)
+	case "world":
+		rep, err = inspect.World(ir, name, opt)
 	}
 	if err != nil {
 		return nil, err
@@ -117,8 +125,8 @@ func (s *Session) PartialLibrary() (*asset.Library, asset.Errors, error) {
 func init() {
 	register(command{
 		name:    "inspect",
-		usage:   "inspect model|texture|scene NAME [--focus ISSUE] [--sheets list]",
-		summary: "report (issues ranked by severity, metrics) and sheets for a model, texture or scene",
+		usage:   "inspect model|texture|scene|prefab|world NAME [--focus ISSUE] [--sheets list]",
+		summary: "report (issues ranked by severity, metrics) and sheets for a model, texture, scene, prefab or world",
 		project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) {
 			fs := newFlags("inspect", env.Stderr)
@@ -153,12 +161,12 @@ func init() {
 	mcpExtraTools = func(m *mcpServer) []mcp.Tool {
 		return append(prev(m), mcp.Tool{
 			Name:        "inspect",
-			Description: "Inspect a model, texture or scene: a report with issues ranked by severity (codes like MESH_FLIPPED_NORMALS, TEX_SEAM, SCENE_MISSING_ASSET, each with where it is and a hint naming the source field to change) and metrics, plus the requested sheets as images (default: one summary sheet). Read the report first.",
+			Description: "Inspect a model, texture, scene, prefab or world: a report with issues ranked by severity (codes like MESH_FLIPPED_NORMALS, TEX_SEAM, SCENE_MISSING_ASSET, PREFAB_FOOTPRINT_SMALL, WORLD_PLACE_OVERLAP, each with where it is and a hint naming the source field to change) and metrics, plus the requested sheets as images (default: one summary sheet; a world's is its map around the origin). Read the report first.",
 			InputSchema: schema(map[string]any{
 				"kind":   enum("asset kind", InspectKinds...),
 				"name":   str("asset name"),
 				"focus":  str("keep only issues with this code"),
-				"sheets": strList("sheet kinds, e.g. [\"normals\"], [\"turntable\"], [\"tiled_2x2\"], [\"on_model:crate\"], [\"ids\"]; [\"none\"] for the report only"),
+				"sheets": strList("sheet kinds, e.g. [\"normals\"], [\"turntable\"], [\"tiled_2x2\"], [\"on_model:crate\"], [\"ids\"], [\"map\"]; [\"none\"] for the report only"),
 			}, "kind", "name"),
 			Handler: func(ctx context.Context, args json.RawMessage) (*mcp.Result, error) {
 				var a struct {

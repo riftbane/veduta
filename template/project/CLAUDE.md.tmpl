@@ -18,6 +18,10 @@ Rules
 - Round every float product that feeds + or -: `y += float32(v * ctx.DT)`. On arm64 the
   compiler fuses a*b+c into one rounding and the console's traces drift from the goldens.
   `doctor` lists the lines where it happened; gmath's own operations are already safe.
+- A map larger than a scene is a world (`docs` topic `world`): write prefabs and rules,
+  never coordinates by hand. `world_place` finds and validates a landmark's cell,
+  `world_query` says what is at a cell, `world_map` shows a region, `inspect world` ranks
+  the problems. Render and simulate it with `world` and `at`; keep a world scenario.
 - Run `fuzz` before every release; add minimized repros as scenarios.
 - Commit small, message in imperative mood. Tag releases with `release` only when `test` is green.
 - Do not add third-party Go modules.

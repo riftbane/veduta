@@ -136,6 +136,43 @@ edge can count as visible although the camera view and the frustum leave it out.
   and look-at point in yellow, the project bounds in blue, and the same overlays.
 - `ids`: entity-id false colors with a legend of every visible entity.
 
+## Prefab (`inspect prefab NAME`)
+
+The prefab's entities are loaded as a scene with the library's model bounds; the
+footprint is the box `[0, width] × [0, depth]` on the ground.
+
+| Code | Severity | Meaning | What to change |
+|------|----------|---------|----------------|
+| `PREFAB_MISSING_ASSET` | error | An entity's `model` or `material` is not in the library. | Create the asset, or fix `entities[i].model` / `entities[i].material`. |
+| `PREFAB_FOOTPRINT_SMALL` | warning | An entity's bounds reach more than 1 cm past the footprint along x or z, so it will overlap the neighbours the world keeps clear. | Enlarge `footprint`, or move `entities[i].position`. |
+| `PREFAB_OVERLAP` | warning | Two entities' bounds overlap (parent and child do not count). | Move one, or parent one to the other if it is intended. |
+| `PREFAB_KIND_UNCHECKED` | info | An entity kind that is not built in: the tool has no game, so it is checked when the game loads a world. | Nothing, unless the kind is misspelled. |
+
+Metrics: `entities`, `triangles`, `footprint`, `tags`. Sheet `summary`: an isometric and
+a top view, the footprint in orange.
+
+## World (`inspect world NAME`)
+
+The world's generator (`world` topic) is checked against the library; chunks are sampled
+(the 3×3 around the origin, one per place, twelve more from the seed) for the budget.
+
+| Code | Severity | Meaning | What to change |
+|------|----------|---------|----------------|
+| `WORLD_MISSING_PREFAB` | error | A scatter, site or place names a prefab that does not exist. | Create `assets/prefabs/<name>.prefab.json`, or fix the name. |
+| `WORLD_MISSING_ASSET` | error | A ground material, or a model or material of a persistent entity, does not exist. | Create it, or fix `biomes[i].ground` / `entities[i]`. |
+| `WORLD_GROUND_NOT_TILING` | error | A biome's ground material has no texture, or one that is not `tiling`; the ground repeats it once per cell. | Give the material a texture with `"tiling": true`. |
+| `WORLD_PLACE_OVERLAP` | error | Two places' footprints share a cell (reported once per pair). | Move one (`world_place` finds a free cell). |
+| `WORLD_PLACE_OUTSIDE` | error | A place's footprint leaves the world. | `places[i].cell`, or `extent`. |
+| `WORLD_PLACE_BIOME` | warning | A place stands on a biome its prefab's rules do not allow (the footprint's centre cell decides). | Move it, or widen the prefab's `rules.biomes`. |
+| `WORLD_PLACE_TOO_CLOSE` | warning | Two places are closer than their `min_distance` rules allow. | Move one. |
+| `WORLD_CHUNK_BUDGET` | warning | The densest sampled chunk, scaled to what the camera sees (an orthographic camera's area, else the loaded window), exceeds the console's 1200 triangles. | Lower `scatter[i].density`, use simpler models, or a smaller camera `size`. |
+| `WORLD_VIEW_SHORT` | warning | The camera sees farther than `view` chunks from the focus, so unloaded ground is visible. | Raise `view`, lower the camera's `size` or `far`. |
+
+Metrics: `max_chunk_triangles`, `max_chunk`, `visible_triangles`, `sampled_chunks`,
+`extent_m`, `cells`, `places`, `missing_prefabs`. Sheet `map`: the cells within 64 of
+the origin (`world_map` draws any region), biomes in their palette colour with a legend,
+scatter as dark dots, sites outlined in orange, places in red with their names, north up.
+
 ## Diff and query
 
 - `veduta diff A B [--threshold N]` (PNG or `.vframe`): `changed_pixels`, `changed_ratio`,

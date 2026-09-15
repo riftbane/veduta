@@ -316,3 +316,40 @@ Win32 windows are gone.
   by tag, so no pseudo-version).
 - **Resolved:** the spec is extended, not edited; D-pad vs stick decided by `BTN_DPAD_*`;
   mouse held where left; Home as a one-button chord (CHANGELOG → Decisions).
+
+
+## Unreleased — worlds: prefabs, generation, streaming, tools (2026-09-15)
+
+- **Built:** formats `prefab/1` and `world/1` (`asset/prefab.go`, `asset/world.go`, cooked
+  as `PRFB`/`WRLD`, a world depending on its prefabs); package `world/` (Q16 integer noise,
+  quantile biome cuts, per-cell scatter, jittered-region sites, places, greedy ground
+  meshes, `Validate`/`Solve`/`Displaced`/`Region`/`Query`/`Check`); the streamer
+  (`stream.go`, `Context.LoadWorld`, `Context.World`, chunk events, snapshots,
+  `within_bounds` on the world's extent, `Backend.UpdateMesh`, `Resources.AddModel`);
+  `--world`/`--at` on render, simulate, snapshot and fuzz, `default_world`; `inspect
+  prefab|world`, `veduta world map|query|place|remove` and the four `world_*` MCP tools;
+  docs `prefab`, `world`, `inspect`, `vda`, `scenario`, `project`; the template's
+  `overworld` (tree, gem, house, village prefabs) and its `world` scenario.
+- **Verified:**
+  - `go test ./...`, `GOARCH=arm64 go test -exec qemu-aarch64-static ./ ./world/ ./asset/...`,
+    `go test ./internal/fused` (two fused products found in `world` and fixed with explicit
+    roundings), `go vet ./...`, `gofmt -l .`.
+  - Template: `scenario world` passes (15 `chunk_load`, 3 `chunk_unload`, no violation),
+    golden `testdata/golden/scenario_world_sheet.png` looked at; the other five hashes
+    unchanged. `render --world overworld --at 0,0`: 422 triangles drawn.
+  - Tools on the template: `inspect world overworld` and `inspect prefab village` clean
+    (sheets `out/overworld.map.png`, `out/village.summary.png` looked at); `world map`
+    (biome shares 71/29 %, sites listed); `world place --cell` on a site's cell written
+    and reported as displacing it, `--near` search, duplicate name refused; `world query`;
+    `world remove` restores the file byte for byte; `fuzz --world overworld --at 8,8`.
+  - MCP end to end (`TestMCPEndToEnd`): `world_map` (one image), `world_query`,
+    `world_place` dry run and an outside cell refused, `render`/`simulate`/`inspect` of
+    the world.
+- **Not verified:** a world on the console (only hardware, §17); the triangle budget is
+  a sampled estimate (`WORLD_CHUNK_BUDGET`).
+- **Deferred:** roads and rivers between sites; a floating origin beyond 8192 m; a 2D
+  (x/y) plane; frustum culling by entity bounds in `scene.Draw` (off-screen chunks cost
+  vertex transforms only).
+- **Resolved:** spec extended, not edited; silent streamed spawns; bounds follow the
+  world; start-cell-relative camera and entities; footprints in meters (CHANGELOG →
+  Decisions).

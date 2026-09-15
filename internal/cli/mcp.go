@@ -227,7 +227,9 @@ func (m *mcpServer) tools() []mcp.Tool {
 			Description: fmt.Sprintf("Render one frame headless through the game at a tick. Returns the image (%d×%d, the console panel, unless width/height are given; max %d×%d; one side alone gets the other at %s) and camera/frame metadata with per-entity visible pixels. bundle writes a .vframe for query/diff.",
 				mcpDefaultW, mcpDefaultH, mcpMaxW, mcpMaxH, mcpAspect()),
 			InputSchema: schema(map[string]any{
-				"scene":  str("scene name (default: the project's default scene)"),
+				"scene":  str("scene name (default: the project's default world or scene)"),
+				"world":  str("world name instead of a scene (docs topic world)"),
+				"at":     map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "with world: start cell [x, z] (default [0, 0])"},
 				"tick":   num("ticks to simulate before the frame (default 0)"),
 				"seed":   num("RNG seed (default: the project's)"),
 				"camera": str("camera preset: scene, top, front, back, left, right, iso, orbit:<deg>, or a camera entity name"),
@@ -238,20 +240,22 @@ func (m *mcpServer) tools() []mcp.Tool {
 			}),
 			Handler: withSession(func(ctx context.Context, s *Session, args json.RawMessage) (*mcp.Result, error) {
 				var a struct {
-					Scene  string `json:"scene"`
-					Tick   int    `json:"tick"`
-					Seed   uint64 `json:"seed"`
-					Camera string `json:"camera"`
-					Mode   string `json:"mode"`
-					Width  int    `json:"width"`
-					Height int    `json:"height"`
-					Bundle bool   `json:"bundle"`
+					Scene  string    `json:"scene"`
+					World  string    `json:"world"`
+					At     *[2]int32 `json:"at"`
+					Tick   int       `json:"tick"`
+					Seed   uint64    `json:"seed"`
+					Camera string    `json:"camera"`
+					Mode   string    `json:"mode"`
+					Width  int       `json:"width"`
+					Height int       `json:"height"`
+					Bundle bool      `json:"bundle"`
 				}
 				if err := mcp.Strict(args, &a); err != nil {
 					return nil, err
 				}
 				w, h := clampSize(a.Width, a.Height)
-				rep, err := s.Render(RenderOptions{Scene: a.Scene, Tick: a.Tick, Seed: a.Seed, Camera: a.Camera, Mode: a.Mode, Width: w, Height: h, Bundle: a.Bundle})
+				rep, err := s.Render(RenderOptions{Scene: a.Scene, World: a.World, At: a.At, Tick: a.Tick, Seed: a.Seed, Camera: a.Camera, Mode: a.Mode, Width: w, Height: h, Bundle: a.Bundle})
 				if err != nil {
 					return nil, err
 				}
@@ -264,6 +268,8 @@ func (m *mcpServer) tools() []mcp.Tool {
 			InputSchema: schema(map[string]any{
 				"scenario":    str("scenario name (\"move\" = tests/scenarios/move.scenario.json) or file path"),
 				"scene":       str("scene (without scenario)"),
+				"world":       str("world instead of a scene (without scenario)"),
+				"at":          map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "with world: start cell [x, z]"},
 				"ticks":       num("ticks to simulate (without scenario, default 200)"),
 				"seed":        num("RNG seed (without scenario)"),
 				"inputs":      map[string]any{"type": "array", "description": "input events as in scenario files: {tick, press[], release[], mouse{x,y}, buttons[], text, stick{x,y}}", "items": map[string]any{"type": "object"}},
@@ -274,6 +280,8 @@ func (m *mcpServer) tools() []mcp.Tool {
 				var a struct {
 					Scenario    string          `json:"scenario"`
 					Scene       string          `json:"scene"`
+					World       string          `json:"world"`
+					At          *[2]int32       `json:"at"`
 					Ticks       int             `json:"ticks"`
 					Seed        uint64          `json:"seed"`
 					Inputs      json.RawMessage `json:"inputs"`
@@ -290,7 +298,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 				if scenario != "" && !filepath.IsAbs(scenario) {
 					scenario = filepath.Join(s.Root, filepath.FromSlash(scenario))
 				}
-				rep, err := s.Simulate(SimulateOptions{Scenario: scenario, Scene: a.Scene, Ticks: a.Ticks, Seed: a.Seed, Inputs: a.Inputs, Screenshots: a.Screenshots, Invariants: a.Invariants})
+				rep, err := s.Simulate(SimulateOptions{Scenario: scenario, Scene: a.Scene, World: a.World, At: a.At, Ticks: a.Ticks, Seed: a.Seed, Inputs: a.Inputs, Screenshots: a.Screenshots, Invariants: a.Invariants})
 				if err != nil {
 					return nil, err
 				}
@@ -412,22 +420,26 @@ func (m *mcpServer) tools() []mcp.Tool {
 			Name:        "fuzz",
 			Description: "Play random-input games looking for invariant violations; a minimized repro is written to tests/scenarios/fuzz_<hash>.scenario.json.",
 			InputSchema: schema(map[string]any{
-				"scene": str("scene (default: the project's)"),
+				"scene": str("scene (default: the project's default world or scene)"),
+				"world": str("world instead of a scene"),
+				"at":    map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "with world: start cell [x, z]"},
 				"games": num("number of games (default 200)"),
 				"ticks": num("ticks per game (default 200)"),
 				"seed":  num("seed of the random players (default 1)"),
 			}),
 			Handler: withSession(func(ctx context.Context, s *Session, args json.RawMessage) (*mcp.Result, error) {
 				a := struct {
-					Scene string `json:"scene"`
-					Games int    `json:"games"`
-					Ticks int    `json:"ticks"`
-					Seed  uint64 `json:"seed"`
+					Scene string    `json:"scene"`
+					World string    `json:"world"`
+					At    *[2]int32 `json:"at"`
+					Games int       `json:"games"`
+					Ticks int       `json:"ticks"`
+					Seed  uint64    `json:"seed"`
 				}{Games: 200, Ticks: 200, Seed: 1}
 				if err := mcp.Strict(args, &a); err != nil {
 					return nil, err
 				}
-				r, err := s.Fuzz(FuzzOptions{Scene: a.Scene, Games: a.Games, Ticks: a.Ticks, Seed: a.Seed})
+				r, err := s.Fuzz(FuzzOptions{Scene: a.Scene, World: a.World, At: a.At, Games: a.Games, Ticks: a.Ticks, Seed: a.Seed})
 				if err != nil {
 					return nil, err
 				}

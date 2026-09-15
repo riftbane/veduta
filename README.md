@@ -71,7 +71,8 @@ topic ([docs/2d.md](docs/2d.md)).
 | `veduta cook [--force]` | compile changed asset sources to `.vda` |
 | `veduta render --scene S [--tick T] [--seed N] [--camera P] [--mode M] [--out f.png] [--bundle]` | render one frame headless |
 | `veduta simulate --scenario F` / `--scene S --ticks N --seed N [--input F]` | trace, verdict, expectations, invariants, one contact sheet |
-| `veduta inspect model\|texture\|scene NAME [--focus ISSUE] [--sheets list]` | report + sheets |
+| `veduta inspect model\|texture\|scene\|prefab\|world NAME [--focus ISSUE] [--sheets list]` | report + sheets |
+| `veduta world map\|query\|place\|remove NAME [flags]` | describe a generated world ([docs/world.md](docs/world.md)) and put landmarks where its rules allow |
 | `veduta query --frame F --at x,y` / `--coverage` | ID-buffer questions on a frame bundle |
 | `veduta diff A B [--out f.png]` | image diff with an a\|b\|heat sheet |
 | `veduta test [--update-golden]` | `go test ./...` + every scenario + golden hashes and sheets |
@@ -89,6 +90,7 @@ its report as JSON with `--json`.
 
 `veduta mcp` speaks JSON-RPC 2.0 over stdio (protocol 2025-06-18, also 2025-03-26 and
 2024-11-05). Tools: `status`, `build`, `cook`, `render`, `simulate`, `trace`, `inspect`,
+`world_map`, `world_query`, `world_place`, `world_remove`,
 `query`, `diff`, `test`, `fuzz`, `release`, `docs`. Reports come back as JSON text;
 `render`, `simulate`, `inspect`, `query` and `diff` also return PNG images inline
 sized after the 320×240 console panel: renders are 320×240 by default and at most
@@ -106,6 +108,7 @@ same binary runs the player on the console or, with `-headless`, the `render`, `
 contains game logic.
 
 Format references (also served by the MCP `docs` tool): [model](docs/model.md),
+[prefab](docs/prefab.md), [world](docs/world.md),
 [texture](docs/texture.md), [material](docs/material.md), [scene](docs/scene.md),
 [scenario](docs/scenario.md), [game API](docs/api.md), [project manifest](docs/project.md),
 [.vda container](docs/vda.md), [inspection](docs/inspect.md),

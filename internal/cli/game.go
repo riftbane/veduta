@@ -108,6 +108,8 @@ func tail(s string, n int) string {
 // RenderOptions are the flags of render (spec §10).
 type RenderOptions struct {
 	Scene  string
+	World  string    // world instead of a scene
+	At     *[2]int32 // the world's start cell
 	Tick   int
 	Seed   uint64 // 0: project default
 	Camera string
@@ -122,9 +124,7 @@ type RenderOptions struct {
 // Render renders one frame headless through the game binary.
 func (s *Session) Render(o RenderOptions) (map[string]any, error) {
 	args := []string{"render"}
-	if o.Scene != "" {
-		args = append(args, "--scene", o.Scene)
-	}
+	args = append(args, targetArgs(o.Scene, o.World, o.At)...)
 	args = append(args, "--tick", strconv.Itoa(o.Tick))
 	if o.Seed != 0 {
 		args = append(args, "--seed", strconv.FormatUint(o.Seed, 10))
@@ -158,6 +158,21 @@ func (s *Session) Render(o RenderOptions) (map[string]any, error) {
 	return rep, nil
 }
 
+// targetArgs are the --scene, --world and --at flags of a game command.
+func targetArgs(scene, world string, at *[2]int32) []string {
+	var args []string
+	if scene != "" {
+		args = append(args, "--scene", scene)
+	}
+	if world != "" {
+		args = append(args, "--world", world)
+	}
+	if at != nil {
+		args = append(args, "--at", strconv.Itoa(int(at[0]))+","+strconv.Itoa(int(at[1])))
+	}
+	return args
+}
+
 // relPaths rewrites absolute paths under the project root as project-relative paths.
 func (s *Session) relPaths(rep map[string]any, keys ...string) {
 	for _, k := range keys {
@@ -174,6 +189,8 @@ func (s *Session) relPaths(rep map[string]any, keys ...string) {
 type SimulateOptions struct {
 	Scenario    string // scenario file; or:
 	Scene       string
+	World       string    // world instead of a scene
+	At          *[2]int32 // the world's start cell
 	Ticks       int
 	Seed        uint64
 	Input       string          // input script file
@@ -241,6 +258,12 @@ func (s *Session) Simulate(o SimulateOptions) (SimResult, error) {
 		name = strings.TrimSuffix(filepath.Base(o.Scenario), ".scenario.json")
 	}
 	if name == "" {
+		name = o.World
+	}
+	if name == "" {
+		name = s.Project.DefaultWorld
+	}
+	if name == "" {
 		name = s.Project.DefaultScene
 	}
 	id, dir, err := s.newRun(name)
@@ -251,9 +274,7 @@ func (s *Session) Simulate(o SimulateOptions) (SimResult, error) {
 	if o.Scenario != "" {
 		args = append(args, "--scenario", absFrom(o.Scenario))
 	} else {
-		if o.Scene != "" {
-			args = append(args, "--scene", o.Scene)
-		}
+		args = append(args, targetArgs(o.Scene, o.World, o.At)...)
 		if o.Ticks > 0 {
 			args = append(args, "--ticks", strconv.Itoa(o.Ticks))
 		}
@@ -397,7 +418,10 @@ func init() {
 		run: func(env *Env, s *Session, args []string) (any, error) {
 			fs := newFlags("render", env.Stderr)
 			var o RenderOptions
-			fs.StringVar(&o.Scene, "scene", "", "scene (default: the project's)")
+			var at string
+			fs.StringVar(&o.Scene, "scene", "", "scene (default: the project's default world or scene)")
+			fs.StringVar(&o.World, "world", "", "world instead of a scene")
+			fs.StringVar(&at, "at", "", "with --world: start cell x,z")
 			fs.IntVar(&o.Tick, "tick", 0, "ticks to simulate first")
 			fs.Uint64Var(&o.Seed, "seed", 0, "RNG seed (default: the project's)")
 			fs.StringVar(&o.Camera, "camera", "scene", "camera preset")
@@ -410,20 +434,26 @@ func init() {
 			if err := parseFlags(fs, args); err != nil {
 				return nil, err
 			}
+			var err error
+			if o.At, err = parseCellFlag(at); err != nil {
+				return nil, err
+			}
 			return s.Render(o)
 		},
 	})
 	register(command{
 		name:    "simulate",
-		usage:   "simulate --scenario F | --scene S --ticks N --seed N [--input script.json] [--screenshots 0,60] [--invariants a,b]",
+		usage:   "simulate --scenario F | --scene S | --world W --at x,z  --ticks N --seed N [--input script.json] [--screenshots 0,60] [--invariants a,b]",
 		summary: "run ticks through the game: trace, verdict, expectations, invariant violations, one contact sheet",
 		project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) {
 			fs := newFlags("simulate", env.Stderr)
 			var o SimulateOptions
-			var shots, invs string
+			var shots, invs, at string
 			fs.StringVar(&o.Scenario, "scenario", "", "scenario name (tests/scenarios/<name>.scenario.json) or file")
 			fs.StringVar(&o.Scene, "scene", "", "scene")
+			fs.StringVar(&o.World, "world", "", "world instead of a scene")
+			fs.StringVar(&at, "at", "", "with --world: start cell x,z")
 			fs.IntVar(&o.Ticks, "ticks", 200, "ticks")
 			fs.Uint64Var(&o.Seed, "seed", 0, "seed")
 			fs.StringVar(&o.Input, "input", "", "input script file")
@@ -431,6 +461,10 @@ func init() {
 			fs.StringVar(&invs, "invariants", "", "invariants, comma-separated")
 			fs.IntVar(&o.Width, "width", 0, "screenshot tile width")
 			if err := parseFlags(fs, args); err != nil {
+				return nil, err
+			}
+			var err error
+			if o.At, err = parseCellFlag(at); err != nil {
 				return nil, err
 			}
 			if shots != "" {

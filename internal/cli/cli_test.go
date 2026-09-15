@@ -329,7 +329,7 @@ func TestMCPEndToEnd(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"status", "build", "cook", "render", "simulate", "trace", "query", "diff", "test", "fuzz", "docs"} {
+	for _, want := range []string{"status", "build", "cook", "render", "simulate", "trace", "query", "diff", "test", "fuzz", "docs", "inspect", "world_map", "world_query", "world_place", "world_remove"} {
 		if !names[want] {
 			t.Errorf("missing tool %s", want)
 		}
@@ -365,6 +365,30 @@ func TestMCPEndToEnd(t *testing.T) {
 	}
 	if q, imgs, isErr := c.tool("query", map[string]any{"frame": bundle, "coverage": true}); isErr || imgs != 1 || q["coverage"] == nil {
 		t.Fatalf("coverage: %v", q)
+	}
+	// The world tools: the map with one image, a cell, a dry-run placement, a render and
+	// a simulation of the template's world through the game.
+	if wm, imgs, isErr := c.tool("world_map", map[string]any{"world": "overworld", "radius": 32}); isErr || imgs != 1 || wm["cells"].(float64) != 65*65 {
+		t.Fatalf("world_map: %v images=%d", wm, imgs)
+	}
+	if wq, _, isErr := c.tool("world_query", map[string]any{"world": "overworld", "cell": []int{3, -4}}); isErr || wq["biome"] == nil {
+		t.Fatalf("world_query: %v", wq)
+	}
+	wp, _, isErr := c.tool("world_place", map[string]any{"world": "overworld", "prefab": "village", "name": "capital", "near": []int{0, 0}, "dry_run": true})
+	if isErr || wp["valid"] != true || wp["written"] != false {
+		t.Fatalf("world_place: %v", wp)
+	}
+	if bad, _, isErr := c.tool("world_place", map[string]any{"world": "overworld", "prefab": "village", "name": "far", "cell": []int{8190, 0}}); !isErr || bad["valid"] != false {
+		t.Fatalf("world_place outside: %v", bad)
+	}
+	if wr, imgs, isErr := c.tool("render", map[string]any{"world": "overworld", "at": []int{16, 16}}); isErr || imgs != 1 || wr["world"] != "overworld" {
+		t.Fatalf("render world: %v", wr)
+	}
+	if ws, imgs, isErr := c.tool("simulate", map[string]any{"world": "overworld", "ticks": 30}); isErr || imgs != 1 || ws["verdict"] != "pass" || ws["world"] != "overworld" {
+		t.Fatalf("simulate world: %v", ws)
+	}
+	if in, imgs, isErr := c.tool("inspect", map[string]any{"kind": "world", "name": "overworld"}); isErr || imgs != 1 || in["summary"].(map[string]any)["errors"].(float64) != 0 {
+		t.Fatalf("inspect world: %v", in)
 	}
 	d, imgs, isErr := c.tool("diff", map[string]any{"a": r["out"], "b": bundle})
 	if isErr || imgs != 1 || d["changed_pixels"].(float64) != 0 {

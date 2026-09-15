@@ -34,13 +34,54 @@ All notable changes to this project are documented here. The format follows
   house and village prefabs and a `world` scenario walking across chunk borders.
 - `gfx.Backend.UpdateMesh` and `scene.Resources.AddModel`/`Remove`: chunk ground meshes
   are uploaded when a frame is rendered and their handles reused.
+- Tools for worlds (`docs/world.md`, `docs/inspect.md`): `inspect prefab` and `inspect
+  world` (codes `PREFAB_*`, `WORLD_*`, a map sheet); `veduta world map|query|place|remove`
+  and the MCP tools `world_map`, `world_query`, `world_place` and `world_remove`.
+  `world_place` validates a cell or searches outward from one, writes only a valid place
+  into the world file (every other byte untouched) and reports the sites it displaces;
+  `render`, `simulate` and `fuzz` take `world` and `at`. The `docs` tool serves `prefab`
+  and `world`.
 
 ### Changed
 
+- `asset.CompilerVersion` is `veduta-asset/0.3.0`: every cooked asset is recompiled once.
 - The player prepares its run without recording a trace: no tick spends time summarizing
   every entity (a streamed world has hundreds), and nothing read the trace.
 
-- `asset.CompilerVersion` is `veduta-asset/0.3.0`: every cooked asset is recompiled once.
+### Decisions
+
+- **Worlds extend `SPEC-v1.0.0.md` at the user's request (2026-09-15).** The spec file is
+  not edited (as for v1.1.0); this entry, `docs/prefab.md`, `docs/world.md` and
+  `docs/inspect.md` are the record. Prefabs and worlds are cooked kinds and inspect kinds
+  beyond §11's list; the MCP tools `world_map`, `world_query`, `world_place` and
+  `world_remove` mirror `veduta world`.
+- **Integer cells, prefabs and a solver instead of hand-written coordinates.** An agent
+  writing thousands of positions overlaps structures and misses biomes; so a world is
+  rules plus named places, places go through `world_place`, which refuses an invalid
+  cell and can search for a valid one, and every generated position is the engine's.
+- **A world reaches at most 8192 m from the origin.** A float32 position loses about a
+  millimetre of precision there (`P·V·M` cancels in eye space); farther out a 320×240
+  frame would jitter. No floating origin: 16384 × 16384 cells at the defaults is 68
+  minutes of walking at 4 m/s. Only the x/z plane is generated.
+- **Generation is integer-only and neighbour-free.** The biome noise is Q16 value noise
+  cut at quantiles of a fixed sample; scatter is a hash per cell; sites live inside
+  regions sized for their footprint and largest `min_distance`, so no rounding differs
+  between architectures and any chunk generates alone, whatever was generated before.
+  Sites yield to places and to earlier rules; scatter yields to both.
+- **Streamed spawns are silent.** A chunk of hundreds of entities would emit hundreds of
+  `spawn` events per border crossing; the trace gets one `chunk_load` per chunk (with the
+  first id and the count) and one `chunk_unload`. Overlaps present when a chunk loads are
+  not collisions, as at scene load. Chunks unload one chunk beyond `view` (hysteresis).
+- **`within_bounds` follows the loaded world.** The project's `bounds` would fail every
+  world game at the first border; while a world is loaded the invariant uses the world's
+  extent along x and z and the project's range along y.
+- **The camera and the persistent entities of a world are relative to the start cell.**
+  `render --world W --at x,z` shows the world there with the hero standing there.
+- **Prefab footprints and rules are in meters.** A prefab knows no cell size; the world
+  rounds both up to whole cells, so `inspect prefab` can check the footprint.
+- **`world_place` edits the file in place.** Only the `places` array changes (an element
+  appended or removed in the file's own indentation); the result is parsed again before
+  it is written, so a wrong edit is an error, never a broken file.
 
 ## v1.1.1 — 2026-09-15
 

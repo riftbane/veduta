@@ -21,6 +21,8 @@ import (
 // FuzzOptions configures fuzz (spec §10).
 type FuzzOptions struct {
 	Scene      string
+	World      string    // world instead of a scene
+	At         *[2]int32 // the world's start cell
 	Games      int
 	Ticks      int
 	Seed       uint64
@@ -44,7 +46,9 @@ type FuzzViolation struct {
 // FuzzReport is the result of fuzz.
 type FuzzReport struct {
 	OK          bool            `json:"ok"`
-	Scene       string          `json:"scene"`
+	Scene       string          `json:"scene,omitempty"`
+	World       string          `json:"world,omitempty"`
+	At          *[2]int32       `json:"at,omitempty"`
 	Games       int             `json:"games"`
 	Ticks       int             `json:"ticks"`
 	Seed        uint64          `json:"seed"`
@@ -68,7 +72,7 @@ func (r *FuzzReport) ExitCode() int {
 // Human summarizes the run.
 func (r *FuzzReport) Human() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "fuzz %s: %d games × %d ticks, seed %d, %d violating (%d ms)\n", r.Scene, r.Games, r.Ticks, r.Seed, len(r.Violations), r.Millis)
+	fmt.Fprintf(&b, "fuzz %s: %d games × %d ticks, seed %d, %d violating (%d ms)\n", r.Scene+r.World, r.Games, r.Ticks, r.Seed, len(r.Violations), r.Millis)
 	for i, v := range r.Violations {
 		if i == 10 {
 			fmt.Fprintf(&b, "  … %d more\n", len(r.Violations)-10)
@@ -218,8 +222,15 @@ func (g fuzzGame) events(limit int) []asset.InputSource {
 // of the first one to tests/scenarios/fuzz_<hash>.scenario.json.
 func (s *Session) Fuzz(o FuzzOptions) (*FuzzReport, error) {
 	start := time.Now()
-	if o.Scene == "" {
-		o.Scene = s.Project.DefaultScene
+	if o.Scene == "" && o.World == "" {
+		if s.Project.DefaultWorld != "" {
+			o.World = s.Project.DefaultWorld
+		} else {
+			o.Scene = s.Project.DefaultScene
+		}
+	}
+	if o.Scene != "" && o.World != "" {
+		return nil, usagef("fuzz: --scene and --world are exclusive")
 	}
 	if o.Games <= 0 || o.Ticks <= 0 {
 		return nil, usagef("fuzz: --games and --ticks must be positive")
@@ -246,7 +257,7 @@ func (s *Session) Fuzz(o FuzzOptions) (*FuzzReport, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
-	r := &FuzzReport{Scene: o.Scene, Games: o.Games, Ticks: o.Ticks, Seed: o.Seed, Invariants: o.Invariants, Violations: []FuzzViolation{}}
+	r := &FuzzReport{Scene: o.Scene, World: o.World, At: o.At, Games: o.Games, Ticks: o.Ticks, Seed: o.Seed, Invariants: o.Invariants, Violations: []FuzzViolation{}}
 	games := make([]fuzzGame, o.Games)
 	found := make([]*FuzzViolation, o.Games)
 	errs := make([]error, o.Games)
@@ -307,8 +318,9 @@ func (s *Session) playGame(bin, dir, name string, o FuzzOptions, seed uint64, g 
 	if err := os.WriteFile(input, data, 0o644); err != nil {
 		return nil, err
 	}
-	args := []string{"simulate", "--scene", o.Scene, "--ticks", strconv.Itoa(ticks), "--seed", strconv.FormatUint(seed, 10),
-		"--input", input, "--out", gdir, "--sheet=false"}
+	args := append([]string{"simulate"}, targetArgs(o.Scene, o.World, o.At)...)
+	args = append(args, "--ticks", strconv.Itoa(ticks), "--seed", strconv.FormatUint(seed, 10),
+		"--input", input, "--out", gdir, "--sheet=false")
 	if len(o.Invariants) > 0 {
 		args = append(args, "--invariants", strings.Join(o.Invariants, ","))
 	}
@@ -417,11 +429,15 @@ func (s *Session) minimize(bin, dir string, o FuzzOptions, games []fuzzGame, r *
 	sc := asset.ScenarioSource{
 		Veduta:      asset.TypeScenario,
 		Scene:       o.Scene,
+		World:       o.World,
 		Seed:        first.Seed,
 		Ticks:       max(ticks, 1),
 		Inputs:      events,
 		Invariants:  []string{first.Invariant},
 		Screenshots: []int{0, max(ticks, 1)},
+	}
+	if o.At != nil {
+		sc.At = []int{int(o.At[0]), int(o.At[1])}
 	}
 	data := marshal(sc, true)
 	sum := sha256.Sum256(data)
@@ -465,14 +481,16 @@ func trimGame(g fuzzGame, limit int) fuzzGame {
 func init() {
 	register(command{
 		name:    "fuzz",
-		usage:   "fuzz --scene S --games N --ticks T --seed N [--keys KeyW,Space] [--invariants a,b]",
+		usage:   "fuzz --scene S | --world W --at x,z  --games N --ticks T --seed N [--keys KeyW,Space] [--invariants a,b]",
 		summary: "play random-input games, report invariant violations, write a minimized repro scenario",
 		project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) {
 			fs := newFlags("fuzz", env.Stderr)
 			var o FuzzOptions
-			var keys, invs string
-			fs.StringVar(&o.Scene, "scene", "", "scene (default: the project's)")
+			var keys, invs, at string
+			fs.StringVar(&o.Scene, "scene", "", "scene (default: the project's default world or scene)")
+			fs.StringVar(&o.World, "world", "", "world instead of a scene")
+			fs.StringVar(&at, "at", "", "with --world: start cell x,z")
 			fs.IntVar(&o.Games, "games", 200, "number of random games")
 			fs.IntVar(&o.Ticks, "ticks", 200, "ticks per game")
 			fs.Uint64Var(&o.Seed, "seed", 1, "seed of the random players")
@@ -480,6 +498,10 @@ func init() {
 			fs.StringVar(&invs, "invariants", "", "comma-separated invariants (default: the project's)")
 			fs.IntVar(&o.Parallel, "parallel", 0, "concurrent games (default: CPUs)")
 			if err := parseFlags(fs, args); err != nil {
+				return nil, err
+			}
+			var err error
+			if o.At, err = parseCellFlag(at); err != nil {
 				return nil, err
 			}
 			if keys != "" {
