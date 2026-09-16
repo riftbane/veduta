@@ -60,6 +60,8 @@ func RegisterKind(name string, ctor func(*scene.Entity) veduta.Behaviour)
 | `Spawn(tmpl) *scene.Entity` | add an entity (next id); its behaviour starts next tick |
 | `Despawn(e)` | remove `e` and its children at the end of the tick |
 | `LoadScene(name)` | replace the scene (ids restart at 1), e.g. to reset a level |
+| `SetModel(name, m) error` | add or replace a model the game builds at runtime (a voxel chunk's mesh): entities name it like an asset model, with culling, `LODs` and `DrawDistance`; uploaded at the next frame. The name contains `:` and does not start with `world:`; pass a new `*asset.Model` to change it (the engine re-uploads when the pointer changes). Not saved in snapshots and kept across `LoadScene` |
+| `RemoveModel(name)`, `Model(name)` | forget a runtime model; look one up |
 | `Overlapping(e)` | live entities whose AABB overlaps `e`'s (last tick's bounds) |
 | `HUD(dl) *sprite.Batch` | start a HUD batch covering the frame; call `End()` |
 | `Text(b, x, y, scale, s, color)` | draw text with the built-in font |

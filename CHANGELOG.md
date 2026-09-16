@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- `Context.SetModel`, `RemoveModel` and `Model`: a game builds models at runtime (a voxel
+  chunk's mesh after a block changes) and entities draw them like asset models, with
+  culling, levels of detail and draw distance; they are uploaded when a frame is rendered
+  and re-uploaded only when a new model replaces one.
+
 ## v1.3.0 — 2026-09-16
 
 ### Added

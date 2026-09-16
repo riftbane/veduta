@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/riftbane/veduta/asset"
@@ -165,6 +166,60 @@ func (c *Context) LoadScene(name string) error { return c.eng.loadScene(name) }
 // the start cell at: the world's camera and persistent entities are placed relative to
 // that cell's centre and the chunks around it are loaded. It emits a world_load event.
 func (c *Context) LoadWorld(name string, at [2]int32) error { return c.eng.loadWorld(name, at) }
+
+// SetModel adds or replaces a model the game builds at runtime, such as the mesh of a
+// voxel chunk after a block changed. Entities name it in their Model like an asset model,
+// with the same culling, levels of detail and draw distance; it is uploaded when the next
+// frame is rendered. The name must contain ':' (asset names cannot) and must not start
+// with "world:". The engine keeps m and re-uploads a name only when it is given another
+// *asset.Model, so build a new model instead of changing one already set. Runtime models
+// outlive LoadScene and are not saved in snapshots: rebuild them from the game's state.
+func (c *Context) SetModel(name string, m *asset.Model) error {
+	switch {
+	case !strings.Contains(name, ":"):
+		return fmt.Errorf("veduta: SetModel %q: a runtime model's name must contain ':' (asset names cannot)", name)
+	case strings.HasPrefix(name, "world:"):
+		return fmt.Errorf("veduta: SetModel %q: names starting with world: belong to worlds", name)
+	case m == nil:
+		return fmt.Errorf("veduta: SetModel %q: nil model", name)
+	}
+	check := func(level string, md *gfx.MeshData) error {
+		if len(md.Indices)%3 != 0 {
+			return fmt.Errorf("veduta: SetModel %q%s: %d indices is not whole triangles", name, level, len(md.Indices))
+		}
+		for i, idx := range md.Indices {
+			if int(idx) >= len(md.Vertices) {
+				return fmt.Errorf("veduta: SetModel %q%s: index %d is %d, but there are %d vertices", name, level, i, idx, len(md.Vertices))
+			}
+		}
+		for i, p := range md.Parts {
+			if p.First < 0 || p.Count < 0 || p.Count%3 != 0 || p.First+p.Count > len(md.Indices) {
+				return fmt.Errorf("veduta: SetModel %q%s: part %d range [%d, +%d) is outside the %d indices", name, level, i, p.First, p.Count, len(md.Indices))
+			}
+		}
+		return nil
+	}
+	if err := check("", &m.Mesh); err != nil {
+		return err
+	}
+	for i := range m.LODs {
+		l := &m.LODs[i]
+		if l.Model == "" && len(l.Mesh.Parts) != len(m.Mesh.Parts) {
+			return fmt.Errorf("veduta: SetModel %q level %d: %d parts, the base mesh has %d", name, i+1, len(l.Mesh.Parts), len(m.Mesh.Parts))
+		}
+		if err := check(fmt.Sprintf(" level %d", i+1), &l.Mesh); err != nil {
+			return err
+		}
+	}
+	c.eng.runtime[name] = m
+	return nil
+}
+
+// RemoveModel forgets a model set with SetModel; entities that still name it draw nothing.
+func (c *Context) RemoveModel(name string) { delete(c.eng.runtime, name) }
+
+// Model returns the model set with SetModel under name, or nil.
+func (c *Context) Model(name string) *asset.Model { return c.eng.runtime[name] }
 
 // World returns the loaded world, or nil when the game is in a scene. Call its Focus
 // every tick with the position the chunks should follow.

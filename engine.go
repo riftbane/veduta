@@ -29,7 +29,8 @@ type engine struct {
 	project *asset.Project
 	assets  *Assets
 	ctx     Context
-	world   *World // the loaded world, nil for a scene
+	world   *World                  // the loaded world, nil for a scene
+	runtime map[string]*asset.Model // models the game built with Context.SetModel
 
 	behaviours map[uint32]Behaviour
 	rec        *sim.Recorder
@@ -50,7 +51,7 @@ type engine struct {
 }
 
 func newEngine(g Game, p *asset.Project, a *Assets) *engine {
-	e := &engine{game: g, project: p, assets: a, custom: map[string]func() bool{}}
+	e := &engine{game: g, project: p, assets: a, custom: map[string]func() bool{}, runtime: map[string]*asset.Model{}}
 	e.ctx = Context{
 		DT:      1 / float32(p.TickRate),
 		Project: p,
@@ -139,7 +140,7 @@ func (e *engine) loadScene(name string) error {
 	if !ok {
 		return fmt.Errorf("unknown scene %q", name)
 	}
-	s, err := scene.Load(src, e.assets.ModelBounds)
+	s, err := scene.Load(src, e.modelBounds)
 	if err != nil {
 		return err
 	}
@@ -345,7 +346,7 @@ func (e *engine) render(cam scene.Camera, w, h int, mode gfx.RenderMode, normals
 		fb = gfx.NewFramebuffer(w, h, normals)
 		e.fb = fb
 	}
-	if err := e.syncGround(); err != nil {
+	if err := e.syncModels(); err != nil {
 		return nil, err
 	}
 	e.dl.Reset()
@@ -370,18 +371,34 @@ func (e *engine) render(cam scene.Camera, w, h int, mode gfx.RenderMode, normals
 	return &frame{FB: fb, Camera: cam, View: e.dl.Views[0], Mode: mode, Stats: e.renderer.Stats(), Draw: ds}, nil
 }
 
-// syncGround uploads the ground meshes of the loaded chunks and frees those of unloaded
-// ones, so the renderer holds exactly the world's window.
-func (e *engine) syncGround() error {
-	var want map[string]*asset.Model
+// modelBounds is the scenes' BoundsFunc: a model the game built, else the library's.
+func (e *engine) modelBounds(name string) (gmath.AABB, bool) {
+	if m := e.runtime[name]; m != nil {
+		return m.Mesh.Bounds, true
+	}
+	return e.assets.ModelBounds(name)
+}
+
+// syncModels uploads the runtime models (the loaded chunks' ground and flora, the game's
+// own) that changed since the last frame and frees those that went away, so the renderer
+// holds exactly the models entities can name. Runtime names contain ':', asset names
+// never do.
+func (e *engine) syncModels() error {
+	want := e.runtime
 	if e.world != nil {
-		want = e.world.models
+		want = make(map[string]*asset.Model, len(e.runtime)+len(e.world.models))
+		for k, m := range e.runtime {
+			want[k] = m
+		}
+		for k, m := range e.world.models {
+			want[k] = m
+		}
 		if e.res.Materials[world.WaterMaterial] == nil {
 			e.res.Materials[world.WaterMaterial] = &world.DefaultWater
 		}
 	}
 	for _, name := range sortedNames(e.res.Models) {
-		if strings.HasPrefix(name, "world:") && want[name] == nil {
+		if strings.Contains(name, ":") && want[name] == nil {
 			e.res.Remove(name)
 		}
 	}
@@ -509,7 +526,7 @@ func (e *engine) restore(data []byte, trace io.Writer) error {
 		if !ok {
 			return fmt.Errorf("restore: unknown scene %q", snap.Scene)
 		}
-		s = scene.New(snap.Scene, e.assets.ModelBounds)
+		s = scene.New(snap.Scene, e.modelBounds)
 		s.Camera = scene.CameraFromAsset(src.Camera)
 		s.Light, s.Background = src.Light, src.Background
 	}

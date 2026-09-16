@@ -89,12 +89,13 @@ func (w *World) WaterAt(pos gmath.Vec3) (level float32, ok bool) {
 	return w.chunkAt(pos).WaterAt(pos.X, pos.Z, w.gen.W.Cell)
 }
 
-// bounds is the scene's BoundsFunc: a chunk ground's model, else the library's.
+// bounds is the scene's BoundsFunc: a chunk's ground or flora model, else the game's or
+// the library's.
 func (w *World) bounds(model string) (gmath.AABB, bool) {
 	if m, ok := w.models[model]; ok {
 		return m.Mesh.Bounds, true
 	}
-	return w.eng.assets.ModelBounds(model)
+	return w.eng.modelBounds(model)
 }
 
 // worldBounds returns the within_bounds box of a world: its extent along x and z, the
