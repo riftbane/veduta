@@ -20,6 +20,7 @@ type client struct {
 	seq  int
 	msgs chan map[string]any
 	out  strings.Builder
+	kept []map[string]any // messages read while waiting for another
 }
 
 func newClient(t *testing.T) *client {
@@ -66,9 +67,16 @@ func (c *client) request(command string, args any) int {
 	return c.seq
 }
 
-// wait returns the first message that matches, keeping the game's output.
+// wait returns the first message that matches, in the order they came; the others are kept
+// for later waits.
 func (c *client) wait(what string, match func(map[string]any) bool) map[string]any {
 	c.t.Helper()
+	for i, m := range c.kept {
+		if match(m) {
+			c.kept = append(c.kept[:i], c.kept[i+1:]...)
+			return m
+		}
+	}
 	timeout := time.After(60 * time.Second)
 	for {
 		select {
@@ -78,10 +86,12 @@ func (c *client) wait(what string, match func(map[string]any) bool) map[string]a
 			}
 			if m["event"] == "output" {
 				c.out.WriteString(m["body"].(map[string]any)["output"].(string))
+				continue
 			}
 			if match(m) {
 				return m
 			}
+			c.kept = append(c.kept, m)
 		case <-timeout:
 			c.t.Fatalf("timed out waiting for %s (output: %s)", what, c.out.String())
 		}

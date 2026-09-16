@@ -224,14 +224,16 @@ func (s *Session) handle(req *message) {
 			return
 		}
 		kind := map[string]step{"continue": stepNone, "next": stepOver, "stepIn": stepIn, "stepOut": stepOut}[req.Command]
-		s.work <- func() bool {
-			s.step = kind
-			return true
-		}
+		// The response goes before the game moves, so the client hears it before the next
+		// stopped event.
 		if req.Command == "continue" {
 			s.respond(req, map[string]any{"allThreadsContinued": true})
 		} else {
 			s.respond(req, nil)
+		}
+		s.work <- func() bool {
+			s.step = kind
+			return true
 		}
 	case "pause":
 		s.pause.Store(true)
