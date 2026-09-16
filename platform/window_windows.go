@@ -20,8 +20,8 @@ import (
 // game renders its 320×240 frame as on the console; the window shows it at a whole scale
 // (VEDUTA_SCALE, 3 by default, then the largest that fits when the window is resized),
 // centered on black, in the panel's 16-bit colors (VEDUTA_PANEL=0 shows the frame's own).
-// The keyboard presses the console's buttons (sim.go), and closing the window or Ctrl+Q
-// leaves the game as Home does.
+// The keyboard (sim.go) and any pad (pad_windows.go) press the console's buttons, and
+// closing the window, Ctrl+Q or a pad's Select+Start leave the game as Home does.
 //
 // One window class and one window procedure; messages are pumped only by Poll, on the
 // thread that created the window (the main thread, see init). Calls made per message or
@@ -89,6 +89,8 @@ type window struct {
 	panel  bool
 
 	keys  keyboard
+	pads  pads
+	merge buttonMerge
 	queue []Event
 	out   []Event
 
@@ -280,7 +282,12 @@ func (w *window) Poll() ([]Event, error) {
 	if err != nil {
 		return nil, err
 	}
-	w.out, w.queue = w.queue, w.out[:0]
+	w.queue = w.pads.poll(w.queue)
+	w.out = w.out[:0]
+	for _, e := range w.queue {
+		w.out = w.merge.add(w.out, e)
+	}
+	w.queue = w.queue[:0]
 	if len(w.out) == 0 {
 		return nil, nil
 	}

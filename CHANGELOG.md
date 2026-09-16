@@ -33,7 +33,9 @@ All notable changes to this project are documented here. The format follows
   3 by default, the largest that fits when resized), centered on black, in the panel's
   RGB565 colors (`VEDUTA_PANEL=0` shows the frame's own). The keyboard presses the eight
   buttons as on the console (arrows or W A S D, Space or Z, X or Shift, Enter or Tab, Escape
-  or Backspace); closing the window or Ctrl+Q leaves. Pure Go through `syscall`, no cgo.
+  or Backspace); closing the window or Ctrl+Q leaves. Pads work too: Xbox controllers
+  through XInput, any other pad through WinMM (D-pad, hat or axes; A, B, Select, Start as
+  Cancel; Select+Start leaves). Pure Go through `syscall`, no cgo.
 - Engine hooks for games that are not Go code: `veduta.Starter`, `KindProvider` and
   `Failer`; `sim.Canonicaler` for state that encodes itself in the trace.
 
