@@ -21,6 +21,9 @@ onto its card ([vedutaos](https://github.com/riftbane/vedutaos)).
 - **Standard library only**, `CGO_ENABLED=0`; the tool is released for Linux and Windows
   and builds from source on macOS, games are released for linux/arm64.
 
+Documentation: **https://riftbane.github.io/veduta/**, built from [docs/](docs/): getting
+started on Windows, a first game step by step, the Lua API and every format.
+
 ## Install
 
 On Windows, in PowerShell (no administrator rights; a Lua game needs nothing else):

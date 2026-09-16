@@ -12,6 +12,12 @@ All notable changes to this project are documented here. The format follows
   (checksum verified) into `%LOCALAPPDATA%\Programs\veduta` and puts it on the user's PATH
   without administrator rights, from the stable or beta channel; CI runs it in Windows
   PowerShell and pwsh and plays a new Lua game's scenarios with what it installed.
+- The documentation website, https://riftbane.github.io/veduta/: `docs/*.md` rendered by
+  `internal/site` (a Markdown subset in Go, links between pages and headings checked by a
+  test) and published by the `site` workflow with GitHub Pages. Two new pages, also docs
+  topics: `start-windows` (install, VS Code, the simulator's keys, test, deploy) and
+  `first-game` (star catcher step by step; a test builds the game from the page and runs
+  its scenarios).
 - The VS Code extension (`editors/vscode`): New Game, Play in the Simulator (F5), Test, Build
   (errors in Problems, also on save) and Deploy, as commands and `veduta` tasks; CI checks
   its helpers, packages it and runs it inside VS Code on a new game. Each release carries it

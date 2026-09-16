@@ -1,5 +1,6 @@
-// Package docs embeds the format references in this directory. The MCP docs tool returns
-// them verbatim, so the files are written for AI agents that author Veduta sources.
+// Package docs embeds the references and guides in this directory. The MCP docs tool returns
+// them verbatim to AI agents that author Veduta sources, and internal/site makes them the
+// website people read (https://riftbane.github.io/veduta/).
 package docs
 
 import (
