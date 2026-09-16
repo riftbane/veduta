@@ -18,6 +18,21 @@ All notable changes to this project are documented here. The format follows
   triangles, drawn triangles, culled and reduced entities per frame; `--cpus` limits the
   renderer's processors.
 
+### Changed
+
+- `veduta.Version` is `v1.4.0`.
+- The renderer holds every runtime model, a world's and a game's alike: names with `:`.
+
+### Decisions
+
+- **Runtime models are named, not handles.** Entities already name models; a runtime
+  model under a name with `:` (which asset names cannot contain) needs no new entity
+  field, gets culling and levels of detail for free, and is uploaded only when its
+  pointer changes. They stay out of snapshots: the game rebuilds them from its own state.
+- **`bench` measures, it does not decide.** Timings depend on the machine and are never
+  part of a trace or a verdict; the report compares them with the tick budget so an agent
+  can see a regression, and `--cpus` approximates the console's four cores.
+
 ## v1.3.0 — 2026-09-16
 
 ### Added

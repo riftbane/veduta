@@ -65,7 +65,7 @@ func stats(ms []float64) BenchStats {
 	return BenchStats{Mean: round3(sum / float64(len(s))), P50: at(0.5), P95: at(0.95), Max: round3(s[len(s)-1])}
 }
 
-func round3(v float64) float64 { return float64(int64(v*1000+0.5)) / 1000 }
+func round3(v float64) float64 { return float64(int64(float64(v*1000)+0.5)) / 1000 }
 
 func count(n []int) benchCount {
 	c := benchCount{}
