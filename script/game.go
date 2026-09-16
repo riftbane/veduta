@@ -150,6 +150,8 @@ func (g *Game) Start(ctx *veduta.Context) error {
 	g.vm.SetGlobal("kinds", lua.TableValue(g.kinds))
 	g.vm.SetGlobal("engine", lua.TableValue(g.engine))
 	g.install()
+	g.engine.SetString("name", lua.String(ctx.Project.Name))
+	g.engine.SetString("title", lua.String(ctx.Project.Title))
 	g.syncEngine()
 	if _, err := g.require(g.main); err != nil {
 		return err

@@ -48,8 +48,11 @@ All notable changes to this project are documented here. The format follows
   only as the D-pad of a pad without D-pad buttons, and X, Y and shoulders are ignored.
 - `fuzz` players press buttons: `--buttons` replaces `--keys`.
 
-- `veduta init` creates an empty game: an empty scene showing the game's name, the `quad`
-  model and `sprite` material, and one scenario (`start`). The demo game (hero, gems,
+- `veduta init` creates an empty Lua game (`main.lua`, no Go, a release workflow that
+  packages the scripts and assets into one archive); `veduta init --go` creates the empty
+  Go game. Both have an empty scene showing the game's name, the `quad` model and `sprite`
+  material, and one scenario (`start`). `doctor` and `release` check a script game's scripts
+  instead of a console build, and need no Go; `upgrade` leaves its missing go.mod alone. The demo game (hero, gems,
   village, world) is no longer shipped; it moved to `internal/testgame`, the fixture the
   engine's own scenarios, goldens and benchmarks run on.
 

@@ -49,12 +49,14 @@ go install -ldflags "-X main.version=vX.Y.Z" github.com/riftbane/veduta/cmd/vedu
 
 ```sh
 veduta init mygame && cd mygame
-veduta test          # go test + the project's scenarios
+veduta test          # the project's scenarios
 claude               # Claude Code connects to `veduta mcp` through .mcp.json
 ```
 
-The template is an empty game: an empty scene with the game's name on it, the `quad` model
-and `sprite` material a 2D game builds on, and one scenario. `veduta release v0.1.0` tags the game; its GitHub Actions workflow publishes a linux/arm64
+A game is written in Lua: `main.lua` and the `lua` docs topic ([docs/lua.md](docs/lua.md));
+the tool runs it itself, with no Go and no build. `veduta init --go` creates a Go game
+instead. The template is an empty game: an empty scene with the game's name on it, the
+`quad` model and `sprite` material a 2D game builds on, and one scenario. `veduta release v0.1.0` tags the game; its GitHub Actions workflow publishes a linux/arm64
 archive that unpacks to a folder the console lists by its `card.json`, and a linux/amd64
 one for any other Linux machine with a framebuffer. A 2D game starts from the `2d` docs
 topic ([docs/2d.md](docs/2d.md)).
@@ -63,7 +65,7 @@ topic ([docs/2d.md](docs/2d.md)).
 
 | Command | Purpose |
 |---------|---------|
-| `veduta init [dir] --name N [--module M]` | create a game project from the embedded template |
+| `veduta init [dir] --name N [--go [--module M]]` | create a game project from the embedded template: Lua, or Go with `--go` |
 | `veduta doctor` | check Go, git, the manifest, engine/tool versions, assets, updates, and the game against the console (arm64 build, fused multiply-adds in the game's code, release target, `card.json`) |
 | `veduta build [--vet]` | cook stale assets, `go build` the game; errors as `{file,line,col,msg}` |
 | `veduta run` | run the player on this machine's framebuffer; refuses where there is none (no 16 or 32 bpp `/sys/class/graphics/fbN`, no `VEDUTA_FB`). A desktop session's DRM framebuffer counts as one: play from a text console (a VT) |
@@ -127,7 +129,9 @@ inspect/                           reports, sheets, diff, frame bundles and quer
 platform/                          the console player: framebuffer and evdev pad/keyboard (Linux)
 mcp/, internal/cli, cmd/veduta     the MCP server and the veduta tool
 internal/fused                     finds fused multiply-adds in linux/arm64 binaries
-template/                          the project created by veduta init (empty game)
+lua/                               the Lua 5.4 interpreter games are written for
+script/                            script games: Lua kinds and callbacks on the engine
+template/                          the project created by veduta init (empty game, Lua or Go)
 internal/testgame/                 the engine's test game: scenarios, goldens, benchmarks
 testdata/                          golden images, trace hashes and fixtures
 ```

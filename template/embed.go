@@ -1,9 +1,10 @@
-// Package template holds the project created by `veduta init`: an empty game (game/,
-// cmd/game), an empty scene, the sprite building blocks, one scenario, and the templated
-// project files in project/ (go.mod, CLAUDE.md, README.md, .gitignore, .mcp.json,
-// card.json, the release workflow).
+// Package template holds the project created by `veduta init`: an empty game in Lua (lua/)
+// or in Go (go/, with --go), the parts both share (common/: an empty scene, the sprite
+// building blocks, one scenario), and the templated project files (project/: CHANGELOG.md,
+// .gitignore, .mcp.json and card.json for both, and in project/lua and project/go the
+// README.md, CLAUDE.md and release workflow of each, and go.mod).
 //
-// The game is a real package of this module, so the engine's own tests build and run it;
+// The Go game is a real package of this module, so the engine's own tests build and run it;
 // init rewrites its import paths to the new module.
 package template
 
@@ -11,9 +12,9 @@ import "embed"
 
 // FS is the template tree.
 //
-//go:embed veduta.json cmd game assets tests project
+//go:embed common go lua project
 var FS embed.FS
 
-// GamePackage is the import path of the game package inside the engine module,
+// GamePackage is the import path of the Go game package inside the engine module,
 // rewritten to "<module>/game" by init.
-const GamePackage = "github.com/riftbane/veduta/template/game"
+const GamePackage = "github.com/riftbane/veduta/template/go/game"

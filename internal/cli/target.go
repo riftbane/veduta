@@ -235,6 +235,14 @@ func modulePath(gomod []byte) string {
 // Any workflow counts, not only release.yml, since a project may name or split its own.
 func (s *Session) releaseTargetsConsole() (bool, string) {
 	const dir = ".github/workflows"
+	what := targetOS + "/" + targetArch
+	if s.IsScript() {
+		what = "console" // a script game's archive is the same for every console
+	}
+	built := what
+	if s.IsScript() {
+		built = "the console archive"
+	}
 	entries, _ := os.ReadDir(filepath.Join(s.Root, filepath.FromSlash(dir)))
 	found := false
 	for _, e := range entries { // ReadDir sorts by name
@@ -244,14 +252,14 @@ func (s *Session) releaseTargetsConsole() (bool, string) {
 		}
 		found = true
 		data, err := os.ReadFile(filepath.Join(s.Root, filepath.FromSlash(dir), name))
-		if err == nil && publishes(string(data)) && buildsConsole(string(data)) {
-			return true, dir + "/" + name + " builds " + targetOS + "/" + targetArch
+		if err == nil && publishes(string(data)) && (s.IsScript() || buildsConsole(string(data))) {
+			return true, dir + "/" + name + " builds " + built
 		}
 	}
 	if !found {
-		return false, "no workflow in " + dir + ", so no " + targetOS + "/" + targetArch + " archive"
+		return false, "no workflow in " + dir + ", so no " + what + " archive"
 	}
-	return false, dir + " has no " + targetOS + "/" + targetArch + " build"
+	return false, dir + " has no " + what + " build"
 }
 
 var (
@@ -425,8 +433,16 @@ func (s *Session) consoleChecks() []Check {
 // lookGo finds the go command. Tests replace it.
 var lookGo = func() error { _, err := exec.LookPath("go"); return err }
 
-// arm64Check builds the game for the console and scans the build for fused lines.
+// arm64Check builds the game for the console and scans the build for fused lines. A script
+// game has nothing to build: its scripts must compile, and the console's runtime runs them.
 func (s *Session) arm64Check() Check {
+	if s.IsScript() {
+		b, err := s.Build(false)
+		if err != nil || !b.OK {
+			return Check{Name: "scripts", OK: false, Detail: buildDetail(b, err), Fix: "fix the located errors (veduta build lists them)"}
+		}
+		return Check{Name: "scripts", OK: true, Detail: "the scripts compile; the console runs them as they are"}
+	}
 	if err := lookGo(); err != nil {
 		// The go check already fails and says how to install Go.
 		return Check{Name: "arm64", OK: true, Warning: true, Detail: "not checked: go not found on PATH"}

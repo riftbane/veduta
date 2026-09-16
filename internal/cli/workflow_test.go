@@ -87,7 +87,7 @@ func flatObject(data []byte) (map[string]string, error) {
 	return m, nil
 }
 
-// TestReleaseWorkflowCard runs the archive step of the release workflow veduta init
+// TestReleaseWorkflowCard runs the archive step of the release workflow veduta init --go
 // writes, with a stand-in for `go build`, on cards in every layout an author may give
 // them, and checks what each archive holds: one card/1 object whose version is the tag,
 // and the manifest's icon as icon.png named by the card. A card that is not a card/1
@@ -103,7 +103,7 @@ func TestReleaseWorkflowCard(t *testing.T) {
 	}
 	dir := filepath.Join(t.TempDir(), "demo")
 	env := &Env{Version: "dev", Stdout: io.Discard, Stderr: io.Discard}
-	if _, err := Init(env, InitOptions{Dir: dir, NoTidy: true}); err != nil {
+	if _, err := Init(env, InitOptions{Dir: dir, NoTidy: true, Go: true}); err != nil {
 		t.Fatal(err)
 	}
 	wf, err := os.ReadFile(filepath.Join(dir, ".github", "workflows", "release.yml"))
@@ -246,5 +246,72 @@ func TestReleaseWorkflowCard(t *testing.T) {
 				t.Error("the job built a target before refusing the card")
 			}
 		})
+	}
+}
+
+// TestReleaseWorkflowScript runs the archive step of the release workflow of a Lua game:
+// one archive, with the card versioned, the manifest, the scripts where they are and the
+// asset sources, and no Go involved.
+func TestReleaseWorkflowScript(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the release workflow runs on ubuntu-latest")
+	}
+	for _, tool := range []string{"sh", "jq", "tar", "sha256sum", "find"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skipf("%s not available: %v", tool, err)
+		}
+	}
+	dir := filepath.Join(t.TempDir(), "demo")
+	env := &Env{Version: "dev", Stdout: io.Discard, Stderr: io.Discard}
+	if _, err := Init(env, InitOptions{Dir: dir}); err != nil {
+		t.Fatal(err)
+	}
+	os.MkdirAll(filepath.Join(dir, "lib"), 0o755)
+	os.WriteFile(filepath.Join(dir, "lib", "util.lua"), []byte("return {}\n"), 0o644)
+	wf, err := os.ReadFile(filepath.Join(dir, ".github", "workflows", "release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(wf), "go build") || strings.Contains(string(wf), "setup-go") {
+		t.Errorf("a Lua game's release workflow uses Go:\n%s", wf)
+	}
+	cmd := exec.Command("sh", "-c", workflowStep(t, string(wf), "build the archive"))
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GITHUB_REF_NAME=v0.3.0", "PATH=/usr/bin:/bin")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build the archive: %v\n%s", err, out)
+	}
+	f, err := os.Open(filepath.Join(dir, "dist", "demo_v0.3.0.tar.gz"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	zr, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string][]byte{}
+	tr := tar.NewReader(zr)
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.Typeflag == tar.TypeReg {
+			files[h.Name], _ = io.ReadAll(tr)
+		}
+	}
+	for _, name := range []string{"demo/veduta.json", "demo/README.md", "demo/main.lua", "demo/lib/util.lua",
+		"demo/assets/scenes/main.scene.json", "demo/assets/models/quad.model.json"} {
+		if _, ok := files[name]; !ok {
+			t.Errorf("the archive has no %s (it has %v)", name, reflect.ValueOf(files).MapKeys())
+		}
+	}
+	card, err := flatObject(files["demo/card.json"])
+	if err != nil || card["version"] != "v0.3.0" || card["veduta"] != "card/1" {
+		t.Fatalf("card.json %v: %v", card, err)
 	}
 }

@@ -1,0 +1,28 @@
+# Game project on Veduta
+
+You are building a game with the Veduta engine, in Lua. There is no display: verify
+everything with the `veduta` MCP tools (or the CLI). Never try to open a window.
+
+Loop: edit → `build` (compiles the scripts) → `simulate` / `render` / `inspect` → read the
+report → fix → `diff` to confirm only the intended change → `test` → commit.
+
+Rules
+- Read reports before images. Open an image only to confirm a suspected issue.
+- The API is the `lua` docs topic. `main.lua` fills `game` (init, update, draw) and `kinds`
+  (init and update per entity kind); keep an entity's values in `e.state`, which the trace
+  records, so scenarios can check them (`state.score`).
+- Assets are JSON sources under assets/. Never edit files under assets/.cooked.
+- Every feature gets a scenario in tests/scenarios. Every bug fix gets a regression scenario.
+- Keep the game deterministic: randomness only from `math.random` (the run's seeded
+  generator); never rely on the order of `pairs` over a table built in an order that varies.
+- The game plays on a console: a 320x240 panel at 20 Hz and eight buttons: the D-pad
+  (`input.dpad()`, or `input.down("left")`…), `a`, `b`, `select` (the game's menu) and
+  `cancel` (back). Home leaves the game and never reaches it. Scenarios press the same names.
+- A map larger than a scene is a world (`docs` topic `world`): write prefabs and rules,
+  never coordinates by hand; `world_terrain`, `world_vegetation`, `world_place`,
+  `world_query`, `world_map` and `inspect world` shape and check it.
+- Run `fuzz` before every release; add minimized repros as scenarios. Run `bench` on the
+  heaviest scenario before a release too: frame_ms must stay well under budget_ms.
+- Commit small, message in imperative mood. Tag releases with `release` only when `test` is green.
+- When something in the engine blocks you, write it down in ENGINE-NOTES.md with a repro,
+  do not work around it silently.

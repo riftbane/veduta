@@ -163,7 +163,13 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 		if !step("smoke", err == nil, "render %v", renderDetail(rep, err)) {
 			return finish(r), nil
 		}
-		if !preConsole {
+		switch {
+		case s.IsScript():
+			b, err := s.Build(false)
+			if !step("scripts", err == nil && b.OK, "%s", buildDetail(b, err)) {
+				return finish(r), nil
+			}
+		case !preConsole:
 			why = s.consoleBuilds()
 			if !step("arm64", why == "", "%s", firstNonEmpty(why, "the game builds for "+targetOS+"/"+targetArch)) {
 				return finish(r), nil
@@ -209,21 +215,27 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 	if !step("changelog", err == nil, "%s", okOr("Unreleased → "+o.Version+" — "+date, err)) {
 		return finish(r), nil
 	}
-	// The engine's template names the engine version its code is written against, and
-	// init falls back to it when the tool has no version of its own: a release moves it.
+	// The engine's template manifests name the engine version their code is written
+	// against, and init falls back to it when the tool has no version of its own: a release
+	// moves it.
 	staged := []string{"CHANGELOG.md"}
-	var tmplPath string
-	var tmpl []byte
+	tmpls := map[string][]byte{} // path → rewritten manifest
 	if r.Kind == "engine" {
-		tmplPath = filepath.Join(root, "template", asset.ProjectFile)
-		src, err := os.ReadFile(tmplPath)
-		if err == nil {
-			tmpl, err = releaseTemplate(src, o.Version)
+		var err error
+		for _, m := range templateManifests {
+			path := filepath.Join(root, "template", filepath.FromSlash(m))
+			var src []byte
+			if src, err = os.ReadFile(path); err == nil {
+				tmpls[path], err = releaseTemplate(src, o.Version)
+			}
+			if err != nil {
+				break
+			}
+			staged = append(staged, "template/"+m)
 		}
 		if !step("template", err == nil, "%s", okOr("template engine → "+o.Version, err)) {
 			return finish(r), nil
 		}
-		staged = append(staged, filepath.ToSlash(filepath.Join("template", asset.ProjectFile)))
 	}
 	if o.DryRun {
 		r.OK = true
@@ -233,9 +245,12 @@ func Release(env *Env, projectDir string, o ReleaseOptions) (*ReleaseReport, err
 	if err := os.WriteFile(clPath, next, 0o644); err != nil {
 		return nil, err
 	}
-	if tmpl != nil {
-		if err := os.WriteFile(tmplPath, tmpl, 0o644); err != nil {
-			return nil, err
+	for _, m := range templateManifests { // in order, so a failure leaves the same files behind
+		path := filepath.Join(root, "template", filepath.FromSlash(m))
+		if data, ok := tmpls[path]; ok {
+			if err := os.WriteFile(path, data, 0o644); err != nil {
+				return nil, err
+			}
 		}
 	}
 	msg := fmt.Sprintf("Release %s\n\nMove the Unreleased changelog section to %s.", o.Version, o.Version)
@@ -339,7 +354,7 @@ func isEngineRepo(dir string) bool {
 func releaseTemplate(src []byte, version string) ([]byte, error) {
 	re := regexp.MustCompile(`"engine":\s*"[^"]*"`)
 	if !re.Match(src) {
-		return nil, fmt.Errorf("template/%s has no engine field", asset.ProjectFile)
+		return nil, fmt.Errorf("a template %s has no engine field", asset.ProjectFile)
 	}
 	return re.ReplaceAll(src, []byte(fmt.Sprintf(`"engine": %q`, version))), nil
 }
@@ -420,3 +435,14 @@ type stringList []string
 
 func (l *stringList) String() string     { return strings.Join(*l, ", ") }
 func (l *stringList) Set(v string) error { *l = append(*l, v); return nil }
+
+// buildDetail describes a build for a release step.
+func buildDetail(b *BuildReport, err error) string {
+	switch {
+	case err != nil:
+		return err.Error()
+	case b.OK:
+		return "the scripts compile"
+	}
+	return (&BuildFailed{b}).Error()
+}

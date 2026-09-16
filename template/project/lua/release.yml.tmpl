@@ -1,0 +1,58 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: build the archive
+        run: |
+          set -eu
+          tag="${GITHUB_REF_NAME}"
+          name="[[.Name]]"
+          mkdir -p build dist
+          # card.json is what the console lists. The release sets its "version" to the tag
+          # and, when veduta.json names an icon, ships that file as icon.png beside the card
+          # and names it there. A card that is not one card/1 object stops the job.
+          icon="$(jq -r '.icon // ""' veduta.json)"
+          if [ -n "$icon" ] && [ ! -f "$icon" ]; then
+            echo "veduta.json names the icon $icon, which does not exist" >&2
+            exit 1
+          fi
+          if ! jq -s --arg version "$tag" --arg icon "${icon:+icon.png}" '
+            if length == 1 and (.[0] | type) == "object" and .[0].veduta == "card/1" then
+              .[0] | .version = $version | if $icon == "" then . else .icon = $icon end
+            else error("not a card/1 object") end' card.json > build/card.json; then
+            echo "card.json must hold one JSON object whose \"veduta\" is \"card/1\"" >&2
+            exit 1
+          fi
+          # A script game is the same on every console: one archive, which unpacks to a
+          # folder that is a game card as it is. The console runs its scripts.
+          stage="build/$name"
+          mkdir -p "$stage"
+          cp veduta.json README.md build/card.json "$stage/"
+          if [ -n "$icon" ]; then cp "$icon" "$stage/icon.png"; fi
+          find . -name '*.lua' -not -path './build/*' -not -path './.git/*' -not -path './out/*' \
+            -exec cp --parents {} "$stage/" \;
+          cp -r assets "$stage/assets"
+          rm -rf "$stage/assets/.cooked"
+          tar -C build -czf "dist/${name}_${tag}.tar.gz" "$name"
+          (cd dist && sha256sum * > checksums.txt)
+          cat dist/checksums.txt
+
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A tag with a pre-release suffix (v0.2.0-rc.1) is published as a pre-release.
+          pre=""
+          case "${GITHUB_REF_NAME}" in *-*) pre="--prerelease" ;; esac
+          gh release create "${GITHUB_REF_NAME}" $pre --generate-notes dist/*

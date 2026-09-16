@@ -4,7 +4,7 @@ package main
 
 import (
 	"github.com/riftbane/veduta"
-	"github.com/riftbane/veduta/template/game"
+	"github.com/riftbane/veduta/template/go/game"
 )
 
 func main() { veduta.Run(&game.Game{}) }

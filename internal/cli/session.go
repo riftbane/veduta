@@ -74,7 +74,7 @@ func (s *Session) Library() (*asset.Library, error) {
 
 // IsScript reports whether the project is a script game: Lua the tool runs itself, with
 // no Go code to build.
-func (s *Session) IsScript() bool { return s.Project.Script != "" }
+func (s *Session) IsScript() bool { return s.Project != nil && s.Project.Script != "" }
 
 // GameBinary is where build writes the game.
 func (s *Session) GameBinary() string {

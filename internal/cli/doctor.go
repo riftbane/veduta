@@ -70,8 +70,14 @@ func Doctor(env *Env, projectDir string) *DoctorReport {
 		}
 	}
 	add(Check{Name: "veduta", OK: true, Detail: strings.TrimSpace(versionInfo(env).Human()[len("veduta "):])})
+	s, serr := OpenSession(projectDir, env)
+	script := serr == nil && s.IsScript()
 	if out, err := exec.Command("go", "env", "GOVERSION").Output(); err != nil {
-		add(Check{Name: "go", OK: false, Detail: "go not found on PATH", Fix: "install Go 1.25 or newer (install.sh --with-go does it)"})
+		if script {
+			add(Check{Name: "go", OK: true, Detail: "go not found on PATH: a script game does not need it"})
+		} else {
+			add(Check{Name: "go", OK: false, Detail: "go not found on PATH", Fix: "install Go 1.25 or newer (install.sh --with-go does it)"})
+		}
 	} else {
 		v := strings.TrimSpace(string(out))
 		m := goVersionRe.FindStringSubmatch(v)
@@ -92,9 +98,8 @@ func Doctor(env *Env, projectDir string) *DoctorReport {
 	} else {
 		add(Check{Name: "git", OK: true, Detail: strings.TrimSpace(string(out))})
 	}
-	s, err := OpenSession(projectDir, env)
-	if err != nil {
-		add(Check{Name: "project", OK: true, Detail: "not in a project (" + err.Error() + ")"})
+	if serr != nil {
+		add(Check{Name: "project", OK: true, Detail: "not in a project (" + serr.Error() + ")"})
 	} else {
 		add(Check{Name: "project", OK: true, Detail: fmt.Sprintf("%s at %s", s.Project.Name, s.Root)})
 		add(s.engineCheck(env))
@@ -132,6 +137,9 @@ func (s *Session) engineCheck(env *Env) Check {
 		}
 	}
 	c.Detail = fmt.Sprintf("go.mod requires %s, veduta.json says %s, tool is %s", orNone(required), s.Project.Engine, env.Version)
+	if s.IsScript() {
+		c.Detail = fmt.Sprintf("veduta.json says %s, tool is %s (the tool runs the scripts)", s.Project.Engine, env.Version)
+	}
 	if d := minorDiff(s.Project.Engine, env.Version); d != "" {
 		c.Warning = true
 		c.Detail += "; " + d

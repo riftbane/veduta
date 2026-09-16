@@ -20,15 +20,16 @@ import (
 type InitOptions struct {
 	Dir       string // target directory (created; must be empty if it exists)
 	Name      string // game name (default: base of Dir)
-	Module    string // Go module path (default: Name)
+	Module    string // Go module path of a Go game (default: Name)
 	Engine    string // engine version to require (default: the tool's version, or the template's for dev builds)
-	EngineDir string // local engine checkout: adds a replace directive (development and CI)
-	NoTidy    bool   // skip `go mod tidy`
+	EngineDir string // local engine checkout: adds a replace directive to a Go game's go.mod (development and CI)
+	NoTidy    bool   // skip `go mod tidy` for a Go game
+	Go        bool   // create a Go game instead of a Lua one
 
 	// game is the tree the game, its assets and scenarios come from, laid out as a project,
 	// and gamePackage the import path its Go files use for the game package; the project
-	// files always come from the template. Unset, both are the template's. The engine's
-	// tests set them to create projects from their test game.
+	// files always come from the template. Unset, they are the template's. The engine's
+	// tests set them to create Go projects from their test game.
 	game        fs.FS
 	gamePackage string
 }
@@ -38,7 +39,8 @@ type InitReport struct {
 	OK       bool     `json:"ok"`
 	Dir      string   `json:"dir"`
 	Name     string   `json:"name"`
-	Module   string   `json:"module"`
+	Language string   `json:"language"`
+	Module   string   `json:"module,omitempty"`
 	Engine   string   `json:"engine"`
 	Files    int      `json:"files"`
 	Warnings []string `json:"warnings"`
@@ -48,7 +50,11 @@ type InitReport struct {
 // Human prints the next steps.
 func (r *InitReport) Human() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "created %s (%d files, module %s, engine %s)\n", r.Dir, r.Files, r.Module, r.Engine)
+	if r.Module != "" {
+		fmt.Fprintf(&b, "created %s (%d files, %s, module %s, engine %s)\n", r.Dir, r.Files, r.Language, r.Module, r.Engine)
+	} else {
+		fmt.Fprintf(&b, "created %s (%d files, %s, engine %s)\n", r.Dir, r.Files, r.Language, r.Engine)
+	}
 	for _, w := range r.Warnings {
 		fmt.Fprintln(&b, "warning:", w)
 	}
@@ -61,9 +67,12 @@ func (r *InitReport) Human() string {
 
 var semver = regexp.MustCompile(`^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
 
-// templateEngine is the engine version the embedded template's veduta.json names.
+// templateManifests are the template's manifests, whose engine field a release moves.
+var templateManifests = []string{"lua/" + asset.ProjectFile, "go/" + asset.ProjectFile}
+
+// templateEngine is the engine version the embedded template's manifests name.
 func templateEngine() string {
-	data, err := projtemplate.FS.ReadFile(asset.ProjectFile)
+	data, err := projtemplate.FS.ReadFile(templateManifests[0])
 	if err == nil {
 		if m := regexp.MustCompile(`"engine":\s*"([^"]+)"`).FindSubmatch(data); m != nil {
 			return string(m[1])
@@ -72,19 +81,20 @@ func templateEngine() string {
 	return "v1.0.0"
 }
 
-// projectFiles maps templated sources to their destination.
+// projectFiles maps templated project files to their destination.
 var projectFiles = map[string]string{
-	"project/go.mod.tmpl":       "go.mod",
-	"project/CLAUDE.md.tmpl":    "CLAUDE.md",
-	"project/README.md.tmpl":    "README.md",
-	"project/CHANGELOG.md.tmpl": "CHANGELOG.md",
-	"project/gitignore.tmpl":    ".gitignore",
-	"project/mcp.json.tmpl":     ".mcp.json",
-	"project/release.yml.tmpl":  ".github/workflows/release.yml",
-	"project/card.json.tmpl":    "card.json",
+	"go.mod.tmpl":       "go.mod",
+	"CLAUDE.md.tmpl":    "CLAUDE.md",
+	"README.md.tmpl":    "README.md",
+	"CHANGELOG.md.tmpl": "CHANGELOG.md",
+	"gitignore.tmpl":    ".gitignore",
+	"mcp.json.tmpl":     ".mcp.json",
+	"release.yml.tmpl":  ".github/workflows/release.yml",
+	"card.json.tmpl":    "card.json",
 }
 
-// Init creates a game project from the embedded template (spec §12).
+// Init creates a game project from the embedded template (spec §12): a Lua game, or a Go
+// game with Go set.
 func Init(env *Env, o InitOptions) (*InitReport, error) {
 	if o.Dir == "" && o.Name == "" {
 		return nil, usagef("init: give a directory or --name")
@@ -98,11 +108,20 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 	if err := asset.ValidName(o.Name); err != nil {
 		return nil, usagef("init: %v (use --name)", err)
 	}
-	if o.Module == "" {
-		o.Module = o.Name
+	if o.game != nil {
+		o.Go = true
 	}
-	if strings.ContainsAny(o.Module, " \t\"`") {
-		return nil, usagef("init: invalid module path %q", o.Module)
+	lang := "lua"
+	if o.Go {
+		lang = "go"
+		if o.Module == "" {
+			o.Module = o.Name
+		}
+		if strings.ContainsAny(o.Module, " \t\"`") {
+			return nil, usagef("init: invalid module path %q", o.Module)
+		}
+	} else if o.Module != "" || o.EngineDir != "" {
+		return nil, usagef("init: --module and --engine-dir are for a Go game (--go)")
 	}
 	if o.Engine == "" {
 		o.Engine = env.Version
@@ -127,23 +146,21 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 	if entries, err := os.ReadDir(dir); err == nil && len(entries) > 0 {
 		return nil, fmt.Errorf("init: %s exists and is not empty", dir)
 	}
-	r := &InitReport{Dir: dir, Name: o.Name, Module: o.Module, Engine: o.Engine, Warnings: []string{}}
+	r := &InitReport{Dir: dir, Name: o.Name, Language: lang, Module: o.Module, Engine: o.Engine, Warnings: []string{}}
 	data := map[string]string{"Name": o.Name, "Module": o.Module, "Engine": o.Engine, "EngineDir": o.EngineDir}
-	if o.game == nil {
-		o.game, o.gamePackage = projtemplate.FS, projtemplate.GamePackage
+	gamePackage := projtemplate.GamePackage
+	if o.game != nil {
+		gamePackage = o.gamePackage
 	}
-	write := func(tree fs.FS, p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || p == "embed.go" {
-			return err
-		}
+	// write copies one file of tree to dst in the project, templated or rewritten as needed.
+	write := func(tree fs.FS, p, dst string) error {
 		src, err := fs.ReadFile(tree, p)
 		if err != nil {
 			return err
 		}
-		dst := p
+		base := path.Base(p)
 		switch {
-		case projectFiles[p] != "":
-			dst = projectFiles[p]
+		case projectFiles[base] != "" && strings.HasPrefix(p, "project/"):
 			t, err := template.New(p).Delims("[[", "]]").Option("missingkey=error").Parse(string(src))
 			if err != nil {
 				return fmt.Errorf("template %s: %w", p, err)
@@ -153,11 +170,9 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 				return fmt.Errorf("template %s: %w", p, err)
 			}
 			src = buf.Bytes()
-		case strings.HasPrefix(p, "project/"):
-			return nil
 		case strings.HasSuffix(p, ".go"):
-			src = bytes.ReplaceAll(src, []byte(`"`+o.gamePackage+`"`), []byte(`"`+path.Join(o.Module, "game")+`"`))
-		case p == asset.ProjectFile:
+			src = bytes.ReplaceAll(src, []byte(`"`+gamePackage+`"`), []byte(`"`+path.Join(o.Module, "game")+`"`))
+		case base == asset.ProjectFile:
 			src = regexp.MustCompile(`"name":\s*"[^"]*"`).ReplaceAll(src, []byte(fmt.Sprintf(`"name": %q`, o.Name)))
 			src = regexp.MustCompile(`"engine":\s*"[^"]*"`).ReplaceAll(src, []byte(fmt.Sprintf(`"engine": %q`, o.Engine)))
 		}
@@ -168,21 +183,51 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 		r.Files++
 		return os.WriteFile(out, src, 0o644)
 	}
-	err = fs.WalkDir(projtemplate.FS, "project", func(p string, d fs.DirEntry, err error) error {
-		return write(projtemplate.FS, p, d, err)
+	// copyTree copies every file under root of tree, at its path relative to root.
+	copyTree := func(tree fs.FS, root string, rename func(rel string) string) error {
+		return fs.WalkDir(tree, root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || p == "embed.go" {
+				return err
+			}
+			rel := strings.TrimPrefix(strings.TrimPrefix(p, root), "/")
+			if root == "." {
+				rel = p
+			}
+			return write(tree, p, rename(rel))
+		})
+	}
+	projectFile := func(rel string) string {
+		if dst, ok := projectFiles[path.Base(rel)]; ok {
+			return dst
+		}
+		return rel
+	}
+	tmpl := projtemplate.FS
+	err = fs.WalkDir(tmpl, "project", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || p == "project" {
+			return err
+		}
+		if d.IsDir() {
+			return fs.SkipDir // the language directories, copied below
+		}
+		return write(tmpl, p, projectFile(p))
 	})
 	if err == nil {
-		err = fs.WalkDir(o.game, ".", func(p string, d fs.DirEntry, err error) error {
-			if p == "project" && d != nil && d.IsDir() {
-				return fs.SkipDir
-			}
-			return write(o.game, p, d, err)
-		})
+		err = copyTree(tmpl, "project/"+lang, projectFile)
+	}
+	switch {
+	case err != nil:
+	case o.game != nil:
+		err = copyTree(o.game, ".", func(rel string) string { return rel })
+	default:
+		if err = copyTree(tmpl, "common", func(rel string) string { return rel }); err == nil {
+			err = copyTree(tmpl, lang, func(rel string) string { return rel })
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("init: %w", err)
 	}
-	if !o.NoTidy {
+	if o.Go && !o.NoTidy {
 		cmd := exec.Command("go", "mod", "tidy")
 		cmd.Dir = dir
 		cmd.Env = goEnv(os.Environ())
@@ -197,8 +242,7 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 			r.Warnings = append(r.Warnings, "git init failed: "+err.Error())
 		}
 	}
-	rel := o.Dir
-	r.Next = []string{"cd " + rel, "veduta test", "claude"}
+	r.Next = []string{"cd " + o.Dir, "veduta test", "claude"}
 	r.OK = true
 	return r, nil
 }
@@ -206,16 +250,17 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 func init() {
 	register(command{
 		name:    "init",
-		usage:   "init [dir] --name N [--module M] [--engine vX.Y.Z] [--engine-dir PATH]",
-		summary: "create a game project from the embedded template (empty game and scene, sprite assets, one scenario, Claude Code setup)",
+		usage:   "init [dir] --name N [--engine vX.Y.Z] [--go [--module M] [--engine-dir PATH]]",
+		summary: "create a game project: an empty Lua game (or a Go one with --go), an empty scene, sprite assets, one scenario, Claude Code setup",
 		run: func(env *Env, _ *Session, args []string) (any, error) {
 			fs := newFlags("init", env.Stderr)
 			var o InitOptions
 			fs.StringVar(&o.Name, "name", "", "game name")
-			fs.StringVar(&o.Module, "module", "", "Go module path (default: the name)")
+			fs.BoolVar(&o.Go, "go", false, "create a Go game instead of a Lua one")
+			fs.StringVar(&o.Module, "module", "", "with --go: Go module path (default: the name)")
 			fs.StringVar(&o.Engine, "engine", "", "engine version to require (default: this tool's)")
-			fs.StringVar(&o.EngineDir, "engine-dir", "", "use a local engine checkout (replace directive)")
-			fs.BoolVar(&o.NoTidy, "no-tidy", false, "do not run go mod tidy")
+			fs.StringVar(&o.EngineDir, "engine-dir", "", "with --go: use a local engine checkout (replace directive)")
+			fs.BoolVar(&o.NoTidy, "no-tidy", false, "with --go: do not run go mod tidy")
 			var dirs []string
 			for {
 				if err := fs.Parse(args); err != nil {

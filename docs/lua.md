@@ -136,7 +136,7 @@ A color is `"#rrggbb"`, `"#rrggbbaa"` or an integer `0xrrggbb`; the default is w
 
 `engine.tick` (0 in `game.init`), `engine.dt` (seconds per tick), `engine.width`,
 `engine.height` (the frame: the project resolution, or in `game.draw` the frame being
-drawn) and `engine.headless`.
+drawn), `engine.headless`, and the project's `engine.name` and `engine.title`.
 
 ## trace, invariant, require
 

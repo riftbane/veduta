@@ -195,8 +195,8 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 			r.Migrations = append(r.Migrations, "pin "+p+" in veduta.json (the default before v1.0.0)")
 		}
 	}
-	mod, _ := os.ReadFile(filepath.Join(s.Root, "go.mod"))
-	if !goModRequires(mod, to) {
+	mod, err := os.ReadFile(filepath.Join(s.Root, "go.mod"))
+	if !(s.IsScript() && os.IsNotExist(err)) && !goModRequires(mod, to) {
 		for _, args := range [][]string{{"get", "github.com/riftbane/veduta@" + to}, {"mod", "tidy"}} {
 			cmd := s.goCmd(args...)
 			if out, err := cmd.CombinedOutput(); err != nil {

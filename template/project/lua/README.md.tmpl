@@ -1,0 +1,29 @@
+# [[.Name]]
+
+A game made with [Veduta](https://github.com/riftbane/veduta) [[.Engine]], in Lua, for the
+Veduta console: a handheld with a 320×240 panel, a D-pad, A, B, Select, Cancel and Home.
+
+## Play
+
+Download `[[.Name]]_<version>.tar.gz` from the project's GitHub Releases and unpack it onto
+the console's card: the `[[.Name]]` folder it contains is the game, with its `card.json`,
+and the console lists it by that.
+
+## Develop
+
+```sh
+veduta build                     # checks the scripts
+veduta test                      # every scenario in tests/scenarios
+veduta simulate --scenario tests/scenarios/start.scenario.json
+veduta render --scene main --out out/main.png
+veduta doctor
+veduta release v0.1.0            # tag; GitHub Actions publishes the archive
+```
+
+No Go and no build: the `veduta` tool runs the game itself. The project is set up for
+Claude Code: `claude` in this directory connects to the `veduta` MCP server (see
+`.mcp.json`) and follows `CLAUDE.md`.
+
+Layout: `veduta.json` (manifest), `card.json` (what the console lists), `main.lua` (the
+game), `assets/` (JSON sources for models, textures, materials and scenes),
+`tests/scenarios/` (deterministic scenario tests).

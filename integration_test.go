@@ -12,7 +12,8 @@ import (
 	"github.com/riftbane/veduta/gfx"
 	"github.com/riftbane/veduta/internal/golden"
 	"github.com/riftbane/veduta/internal/testgame/game"
-	skeleton "github.com/riftbane/veduta/template/game"
+	"github.com/riftbane/veduta/script"
+	skeleton "github.com/riftbane/veduta/template/go/game"
 )
 
 // TestGameScenarios runs every scenario of the engine's test game (internal/testgame)
@@ -54,15 +55,46 @@ func TestGameScenarios(t *testing.T) {
 // testGame is the directory of the engine's test game.
 var testGame = filepath.Join("internal", "testgame")
 
-// TestTemplateStarts runs the scenario veduta init ships with the empty game: a new project
-// passes its own tests before anything is added to it.
+// TestTemplateStarts runs the scenario veduta init ships, in the Lua game and in the Go
+// game: a new project passes its own tests before anything is added to it.
 func TestTemplateStarts(t *testing.T) {
-	f := filepath.Join("template", "tests", "scenarios", "start.scenario.json")
-	var stdout, stderr bytes.Buffer
-	code := veduta.RunArgs(&skeleton.Game{}, []string{"-project", "template", "-headless", "simulate", "--scenario", f, "--out", t.TempDir()}, &stdout, &stderr)
-	var res simResult
-	if err := json.Unmarshal(stdout.Bytes(), &res); err != nil || code != 0 || res.Verdict != "pass" {
-		t.Fatalf("exit %d, verdict %q %s, stderr %q", code, res.Verdict, res.FirstFailure, stderr.String())
+	for _, lang := range []string{"lua", "go"} {
+		t.Run(lang, func(t *testing.T) {
+			dir := t.TempDir()
+			for _, part := range []string{"common", lang} {
+				src := filepath.Join("template", part)
+				err := filepath.Walk(src, func(p string, info os.FileInfo, err error) error {
+					if err != nil {
+						return err
+					}
+					rel, _ := filepath.Rel(src, p)
+					if info.IsDir() {
+						return os.MkdirAll(filepath.Join(dir, rel), 0o755)
+					}
+					data, err := os.ReadFile(p)
+					if err != nil {
+						return err
+					}
+					return os.WriteFile(filepath.Join(dir, rel), data, 0o644)
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			args := []string{"-project", dir, "-headless", "simulate", "--scenario", filepath.Join(dir, "tests", "scenarios", "start.scenario.json"), "--out", t.TempDir()}
+			var stdout, stderr bytes.Buffer
+			var code int
+			if lang == "lua" {
+				code = script.Run(args, &stdout, &stderr)
+			} else {
+				code = veduta.RunArgs(&skeleton.Game{}, args, &stdout, &stderr)
+			}
+			lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+			var res simResult
+			if err := json.Unmarshal([]byte(lines[len(lines)-1]), &res); err != nil || code != 0 || res.Verdict != "pass" {
+				t.Fatalf("exit %d, verdict %q %s, stdout %q, stderr %q", code, res.Verdict, res.FirstFailure, stdout.String(), stderr.String())
+			}
+		})
 	}
 }
 
