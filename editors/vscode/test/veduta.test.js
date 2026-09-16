@@ -1,0 +1,48 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert');
+const v = require('../lib/veduta');
+
+test('program', () => {
+  assert.strictEqual(v.program('C:\\tools\\veduta.exe', 'win32', {}), 'C:\\tools\\veduta.exe');
+  const installed = 'C:\\Users\\me\\AppData\\Local\\Programs\\veduta\\veduta.exe';
+  assert.strictEqual(v.program('', 'win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, (p) => p === installed), installed);
+  assert.strictEqual(v.program('', 'win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, () => false), 'veduta');
+  assert.strictEqual(v.program('', 'linux', { LOCALAPPDATA: 'x' }, () => true), 'veduta');
+});
+
+test('playCommand', () => {
+  assert.strictEqual(v.playCommand('win32'), 'sim');
+  assert.strictEqual(v.playCommand('linux'), 'run');
+});
+
+test('diagnostics', () => {
+  const report = {
+    ok: false,
+    errors: [{ file: 'main.lua', line: 15, col: 0, msg: "<name> expected near 'local'" }],
+    cook_errors: [{ file: 'assets/models/crate.model.json', line: 3, col: 12, msg: 'parts: required' }],
+    vet_errors: [{ file: 'game/game.go', line: 7, col: 2, msg: 'unreachable code' }],
+  };
+  const d = v.diagnostics(report);
+  assert.deepStrictEqual(d.get('main.lua'), [{ line: 14, col: 0, message: "<name> expected near 'local'", source: 'veduta build', severity: 'error' }]);
+  assert.deepStrictEqual(d.get('assets/models/crate.model.json')[0], { line: 2, col: 11, message: 'parts: required', source: 'veduta cook', severity: 'error' });
+  assert.strictEqual(d.get('game/game.go')[0].severity, 'warning');
+  assert.strictEqual(v.diagnostics({ ok: true, errors: [] }).size, 0);
+});
+
+test('isGameFile', () => {
+  for (const f of ['main.lua', 'lib/a.lua', 'veduta.json', 'C:\\g\\veduta.json', 'assets/scenes/main.scene.json', 'tests/scenarios/start.scenario.json', 'game/game.go']) {
+    assert.ok(v.isGameFile(f), f);
+  }
+  for (const f of ['package.json', '.vscode/settings.json', 'README.md', 'notveduta.json']) {
+    assert.ok(!v.isGameFile(f), f);
+  }
+});
+
+test('validName', () => {
+  assert.ok(v.validName('mygame'));
+  assert.ok(v.validName('cave-of-gems_2'));
+  assert.ok(!v.validName('My Game'));
+  assert.ok(!v.validName('-x'));
+  assert.ok(!v.validName(''));
+});

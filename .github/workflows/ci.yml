@@ -93,7 +93,12 @@ jobs:
           Get-Content -Raw install.ps1 | iex
           $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
           if (@($userPath.Split(';') | Where-Object { $_ -ieq $env:VEDUTA_HOME }).Count -ne 1) { throw "PATH has the folder other than once: $userPath" }
-          veduta version
+          # The beta channel's newest by version, as GitHub's own list says.
+          $headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN" }
+          $tags = (Invoke-RestMethod -Headers $headers 'https://api.github.com/repos/riftbane/veduta/releases?per_page=30').tag_name
+          $newest = $tags | Sort-Object { $t = $_ -replace '^v' -split '-', 2; [version]$t[0] }, { if ($_ -match '-rc\.(\d+)$') { [int]$Matches[1] } else { [int]::MaxValue } } | Select-Object -Last 1
+          $got = (veduta version) -split ' ' | Select-Object -Index 1
+          if ($got -ne $newest) { throw "installed $got, the newest release is $newest" }
           Set-Location $env:RUNNER_TEMP
           veduta init psgame
           Set-Location psgame
@@ -151,3 +156,39 @@ jobs:
         env:
           GOARCH: arm64
         run: go test -exec qemu-aarch64-static ./...
+
+  vscode:
+    # The VS Code extension: its helpers under node --test, the package vsce makes, and the
+    # extension inside a real VS Code (under Xvfb) on a game veduta init made.
+    name: vscode extension
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+
+      - name: veduta on PATH, and a game
+        run: |
+          go build -o "$RUNNER_TEMP/bin/veduta" ../../cmd/veduta
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/veduta" init "$RUNNER_TEMP/extgame"
+
+      - run: npm ci
+
+      - name: helpers
+        run: npm test
+
+      - name: package
+        run: npx vsce package --no-dependencies
+
+      - name: inside VS Code
+        run: xvfb-run -a node test/integration/run.js "$RUNNER_TEMP/extgame"

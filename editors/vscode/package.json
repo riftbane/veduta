@@ -1,0 +1,129 @@
+{
+  "name": "veduta",
+  "displayName": "Veduta",
+  "description": "Make Veduta console games: new game, play in the simulator (F5), test, build with errors in Problems, deploy to the console's card.",
+  "version": "0.1.0",
+  "publisher": "riftbane",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/riftbane/veduta"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "veduta",
+    "lua",
+    "game",
+    "console"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "workspaceContains:veduta.json"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "veduta.newGame",
+        "title": "New Game",
+        "category": "Veduta"
+      },
+      {
+        "command": "veduta.play",
+        "title": "Play in the Simulator",
+        "category": "Veduta",
+        "icon": "$(play)"
+      },
+      {
+        "command": "veduta.test",
+        "title": "Test",
+        "category": "Veduta"
+      },
+      {
+        "command": "veduta.build",
+        "title": "Build",
+        "category": "Veduta"
+      },
+      {
+        "command": "veduta.deploy",
+        "title": "Deploy to the Console's Card",
+        "category": "Veduta"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "veduta.play",
+        "key": "f5",
+        "when": "veduta.project && !inDebugMode"
+      }
+    ],
+    "configuration": {
+      "title": "Veduta",
+      "properties": {
+        "veduta.path": {
+          "type": "string",
+          "default": "",
+          "description": "The veduta program. Empty: veduta on PATH, or where install.ps1 puts it."
+        },
+        "veduta.buildOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Build when a script or an asset is saved, and show its errors in Problems."
+        }
+      }
+    },
+    "taskDefinitions": [
+      {
+        "type": "veduta",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "enum": [
+              "sim",
+              "run",
+              "test",
+              "build",
+              "deploy",
+              "fuzz",
+              "bench"
+            ],
+            "description": "The veduta command to run in the project."
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "veduta",
+        "owner": "veduta",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": {
+          "regexp": "^(?:vet: )?([^\\s:][^:]*):(\\d+):(\\d+): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.6.0"
+  }
+}
