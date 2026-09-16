@@ -30,6 +30,9 @@ var evdevKeys = map[uint16]sim.Button{
 	keyEsc: sim.ButtonCancel, 14: sim.ButtonCancel, // Escape, Backspace
 }
 
+// keyboardTools maps the kernel's F1, F5 and F9 to the player's tool keys.
+var keyboardTools = map[uint16]ToolKey{59: ToolOverlay, 63: ToolRecord, 67: ToolReload}
+
 // keyboardExit closes the player from a keyboard, as Home does from a pad: Ctrl+Q, with
 // either Ctrl. It is not Escape, which is Cancel.
 var keyboardExit = [2][2]uint16{{keyLeftCtrl, keyQ}, {keyRightCtrl, keyQ}}

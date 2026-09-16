@@ -13,6 +13,19 @@ the cooked assets and hidden ones are skipped). The main script runs once per ru
 the scene is loaded; it fills the `game` and `kinds` tables. A run is deterministic: the
 same seed and the same inputs give the same trace on every machine.
 
+## Playing it
+
+`veduta sim` (Windows) plays the game in the simulator: the console's panel at a whole scale,
+in its 16-bit colors, with the keyboard pressing the buttons (arrows or W A S D, Space or Z
+for A, X or Shift for B, Enter or Tab for Select, Escape or Backspace for Cancel; Ctrl+Q
+leaves) or any pad. Three keys work the player itself:
+
+| Key | Does |
+|-----|------|
+| F1 | shows update, render and frame milliseconds against the tick's budget, and triangles against the console's 1200 |
+| F5 | restarts the game and records the buttons; F5 again saves them as `tests/scenarios/recorded-<time>.scenario.json`, a scenario to add expectations to |
+| F9 | reads the scripts and assets again and restarts; the simulator also does it by itself when a file changes |
+
 ## The game
 
 ```lua

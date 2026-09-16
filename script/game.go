@@ -36,6 +36,7 @@ var skipDirs = map[string]bool{".git": true, "out": true, "bin": true, "node_mod
 
 // Game is a game written in Lua.
 type Game struct {
+	root    string            // the project directory
 	main    string            // slash path of the main script
 	sources map[string]string // slash path → source, every .lua file of the project
 	stderr  io.Writer         // where print writes
@@ -59,7 +60,7 @@ func Load(root string, p *asset.Project, stderr io.Writer) (*Game, error) {
 	if p.Script == "" {
 		return nil, fmt.Errorf("script: %s names no script", asset.ProjectFile)
 	}
-	g := &Game{main: p.Script, sources: map[string]string{}, stderr: stderr}
+	g := &Game{root: root, main: p.Script, sources: map[string]string{}, stderr: stderr}
 	cooked := filepath.Clean(filepath.Join(root, p.Cooked))
 	err := filepath.WalkDir(root, func(file string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -92,6 +93,24 @@ func Load(root string, p *asset.Project, stderr io.Writer) (*Game, error) {
 		return nil, fmt.Errorf("script: %s names the script %q, which does not exist", asset.ProjectFile, g.main)
 	}
 	return g, nil
+}
+
+// Reload reads the scripts again, for the next run: the player calls it on F9 and when the
+// simulator sees a file change. On an error the scripts stay as they were.
+func (g *Game) Reload() error {
+	p, err := cook.ReadProject(g.root)
+	if err != nil {
+		return err
+	}
+	fresh, err := Load(g.root, p, g.stderr)
+	if err != nil {
+		return err
+	}
+	if errs := fresh.SyntaxErrors(); len(errs) > 0 {
+		return errs[0]
+	}
+	g.main, g.sources = fresh.main, fresh.sources
+	return nil
 }
 
 // SyntaxErrors compiles every script and returns the errors, in file order.

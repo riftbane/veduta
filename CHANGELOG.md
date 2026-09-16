@@ -36,6 +36,12 @@ All notable changes to this project are documented here. The format follows
   or Backspace); closing the window or Ctrl+Q leaves. Pads work too: Xbox controllers
   through XInput, any other pad through WinMM (D-pad, hat or axes; A, B, Select, Start as
   Cancel; Select+Start leaves). Pure Go through `syscall`, no cgo.
+- The player's tool keys, on any keyboard: F1 shows update, render and frame milliseconds
+  against the tick's budget and triangles against the console's 1200; F5 restarts the game
+  and records the buttons, and F5 again (or leaving) saves them as
+  `tests/scenarios/recorded-<time>.scenario.json`; F9 reads the scripts (`veduta.Reloader`)
+  and assets again and restarts. The simulator reloads by itself when a script, an asset
+  source or veduta.json changes (`VEDUTA_WATCH=1` does it on Linux too).
 - Engine hooks for games that are not Go code: `veduta.Starter`, `KindProvider` and
   `Failer`; `sim.Canonicaler` for state that encodes itself in the trace.
 

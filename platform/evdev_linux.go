@@ -118,6 +118,12 @@ func (d *padDecoder) event(out []Event, typ, code uint16, value int32) []Event {
 			out = d.releaseAll(out)
 			return append(out, Event{Kind: Close})
 		}
+		if tool, ok := keyboardTools[code]; ok {
+			if down {
+				out = append(out, Event{Kind: Tool, Tool: tool})
+			}
+			return out
+		}
 		b, ok := padButtons[code]
 		if !ok {
 			if b, ok = padDPad[code]; !ok {

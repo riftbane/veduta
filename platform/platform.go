@@ -27,12 +27,24 @@ const (
 	Release                        // Button went up
 	FocusLost                      // input was lost: release everything; not produced by the framebuffer backend
 	Close                          // the player asked to leave: Home, Select and Start held together on a pad, Ctrl+Q on a keyboard
+	Tool                           // a keyboard's tool key went down: the player's own functions, never the game's
+)
+
+// ToolKey is a key of a keyboard that works the player rather than the game.
+type ToolKey uint8
+
+// The tool keys.
+const (
+	ToolOverlay ToolKey = iota + 1 // F1: show the timings and triangles against the console's budget
+	ToolRecord                     // F5: restart and record the buttons, F5 again to save them as a scenario
+	ToolReload                     // F9: read the scripts and assets again and restart
 )
 
 // Event is one input event.
 type Event struct {
 	Kind   EventKind
 	Button sim.Button // Press, Release
+	Tool   ToolKey    // Tool
 }
 
 // Options configures Open.

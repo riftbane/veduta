@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -16,6 +17,8 @@ func describePad(evs []Event) string {
 			s = append(s, "up "+e.Button.String())
 		case Close:
 			s = append(s, "close")
+		case Tool:
+			s = append(s, fmt.Sprintf("tool %d", e.Tool))
 		default:
 			s = append(s, "other")
 		}
@@ -58,8 +61,10 @@ func TestSimKeyboard(t *testing.T) {
 	out = k.key(out, scanW, true)  // up held twice
 	out = k.key(out, scanUp, false)
 	out = k.key(out, scanSpace, true)
-	out = k.key(out, 0x3b, true) // F1: nothing on the console
-	if got, want := describePad(out), "down up,down a"; got != want {
+	out = k.key(out, 0x3b, true) // F1: a tool key
+	out = k.key(out, 0x3b, false)
+	out = k.key(out, 0x44, true) // F10: nothing
+	if got, want := describePad(out), "down up,down a,tool 1"; got != want {
 		t.Fatalf("keys: %s, want %s", got, want)
 	}
 	out = k.key(out[:0], scanW, false)

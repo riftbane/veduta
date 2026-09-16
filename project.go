@@ -12,20 +12,27 @@ import (
 	"github.com/riftbane/veduta/scene"
 )
 
-// loadProject reads veduta.json in dir and loads every asset of the project (fresh cooked
-// files, else compiled from source in memory). When dir is "." and holds no manifest, the
-// directory of the executable is tried, so a player can start the game from anywhere.
-func loadProject(dir string) (*asset.Project, *Assets, error) {
+// projectDir is the directory of the project: dir, or for "." without a manifest there, the
+// directory of the executable, where a released game ships its veduta.json.
+func projectDir(dir string) string {
 	if dir == "." {
 		if _, err := os.Stat(asset.ProjectFile); errors.Is(err, fs.ErrNotExist) {
 			if exe, err := os.Executable(); err == nil {
 				alt := filepath.Dir(exe)
 				if _, err := os.Stat(filepath.Join(alt, asset.ProjectFile)); err == nil {
-					dir = alt
+					return alt
 				}
 			}
 		}
 	}
+	return dir
+}
+
+// loadProject reads veduta.json in dir and loads every asset of the project (fresh cooked
+// files, else compiled from source in memory). When dir is "." and holds no manifest, the
+// directory of the executable is tried, so a player can start the game from anywhere.
+func loadProject(dir string) (*asset.Project, *Assets, error) {
+	dir = projectDir(dir)
 	p, err := cook.ReadProject(dir)
 	if err != nil {
 		return nil, nil, err

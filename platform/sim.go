@@ -56,7 +56,13 @@ const (
 	scanLeft      = extendedScan | 0x4b
 	scanRight     = extendedScan | 0x4d
 	scanDown      = extendedScan | 0x50
+	scanF1        = 0x3b
+	scanF5        = 0x3f
+	scanF9        = 0x43
 )
+
+// scanTools maps the tool keys.
+var scanTools = map[int]ToolKey{scanF1: ToolOverlay, scanF5: ToolRecord, scanF9: ToolReload}
 
 // scanButtons maps a keyboard scan code to the button it presses, the same keys the console
 // reads from a keyboard: the arrows or W, A, S, D for the D-pad, Space or Z for A, X or
@@ -88,6 +94,12 @@ func (k *keyboard) key(out []Event, scan int, down bool) []Event {
 	k.down[scan] = down
 	if down && scan == scanQ && (k.down[scanLCtrl] || k.down[scanRCtrl]) {
 		return append(k.releaseAll(out), Event{Kind: Close})
+	}
+	if tool, ok := scanTools[scan]; ok {
+		if down {
+			out = append(out, Event{Kind: Tool, Tool: tool})
+		}
+		return out
 	}
 	b, ok := scanButtons[scan]
 	if !ok {

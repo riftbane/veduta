@@ -189,3 +189,24 @@ func TestAPIDocumented(t *testing.T) {
 		}
 	}
 }
+
+// TestReload: Reload reads the scripts again for the next run, and keeps the old ones when
+// the new ones do not compile.
+func TestReload(t *testing.T) {
+	dir := copyGame(t, nil)
+	g, err := loadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(dir, "lib", "extra.lua"), []byte("return 42\n"), 0o644)
+	if err := g.Reload(); err != nil || g.sources["lib/extra.lua"] != "return 42\n" {
+		t.Fatalf("reload: %v, sources %v", err, sortedKeys(g.sources))
+	}
+	os.WriteFile(filepath.Join(dir, "main.lua"), []byte("function game.update(\n"), 0o644)
+	if err := g.Reload(); err == nil || !strings.Contains(err.Error(), "main.lua:2") {
+		t.Fatalf("reload of a broken script: %v", err)
+	}
+	if !strings.Contains(g.sources["main.lua"], "kinds.hero") {
+		t.Fatal("a failed reload replaced the scripts")
+	}
+}

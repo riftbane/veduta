@@ -81,7 +81,7 @@ func runMain(g Game, args []string, stdout, stderr io.Writer) int {
 		return fail(stdout, stderr, err)
 	}
 	if !*headlessMode {
-		if err := runPlayer(g, p, a); err != nil {
+		if err := runPlayer(g, p, a, projectDir(*dir), stderr); err != nil {
 			fmt.Fprintln(stderr, err)
 			return exitError
 		}
