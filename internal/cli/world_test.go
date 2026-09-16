@@ -14,10 +14,10 @@ import (
 	"github.com/riftbane/veduta/asset"
 )
 
-// templateSession copies the template into a temp dir (no build) and opens it.
-func templateSession(t *testing.T) (*Session, string) {
+// gameSession copies the engine's test game into a temp dir (no build) and opens it.
+func gameSession(t *testing.T) (*Session, string) {
 	t.Helper()
-	src := filepath.Join("..", "..", "template")
+	src := filepath.Join("..", "testgame")
 	dst := t.TempDir()
 	err := filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -48,7 +48,7 @@ func templateSession(t *testing.T) (*Session, string) {
 }
 
 func TestWorldMapQuery(t *testing.T) {
-	s, dir := templateSession(t)
+	s, dir := gameSession(t)
 	rep, err := s.WorldMap("overworld", [2]int32{0, 0}, 48)
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +82,7 @@ func TestWorldMapQuery(t *testing.T) {
 }
 
 func TestWorldPlaceAndRemove(t *testing.T) {
-	s, dir := templateSession(t)
+	s, dir := gameSession(t)
 	file := filepath.Join(dir, "assets", "worlds", "overworld.world.json")
 	before, _ := os.ReadFile(file)
 
@@ -237,7 +237,7 @@ func TestWorldToolsRegistered(t *testing.T) {
 }
 
 func TestWorldTerrainAndVegetation(t *testing.T) {
-	s, dir := templateSession(t)
+	s, dir := gameSession(t)
 	file := filepath.Join(dir, "assets", "worlds", "overworld.world.json")
 	before, _ := os.ReadFile(file)
 	h := float32(6)

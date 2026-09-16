@@ -11,10 +11,10 @@ import (
 	"github.com/riftbane/veduta/asset"
 )
 
-// copyTemplate copies the demo project (template/) into a temporary directory.
+// copyTemplate copies the engine's test game (internal/testgame) into a temporary directory.
 func copyTemplate(t *testing.T) string {
 	t.Helper()
-	src := filepath.Join("..", "..", "template")
+	src := filepath.Join("..", "..", "internal", "testgame")
 	dst := t.TempDir()
 	err := filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {

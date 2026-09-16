@@ -1,0 +1,19 @@
+{
+  "veduta": "scene/1",
+  "camera": { "type": "perspective", "fov_deg": 55, "near": 0.1, "far": 200,
+              "position": [0, 9, 11], "look_at": [0, 0, -1] },
+  "light": { "direction": [-0.4, -1, -0.3], "color": "#ffffff", "ambient": "#505862" },
+  "background": "#202830",
+  "entities": [
+    { "name": "ground", "kind": "static", "model": "ground" },
+    { "name": "player", "kind": "player", "model": "hero", "tags": ["player"] },
+    { "name": "gem_1", "kind": "collectible", "model": "gem", "position": [0, 0.3, -3], "tags": ["gem"] },
+    { "name": "gem_2", "kind": "collectible", "model": "gem", "position": [4, 0.3, -4], "tags": ["gem"] },
+    { "name": "gem_3", "kind": "collectible", "model": "gem", "position": [-4, 0.3, 2], "tags": ["gem"] },
+    { "name": "gem_4", "kind": "collectible", "model": "gem", "position": [5, 0.3, 5], "tags": ["gem"] },
+    { "name": "gem_5", "kind": "collectible", "model": "gem", "position": [-6, 0.3, -6], "tags": ["gem"] },
+    { "name": "crate_1", "kind": "static", "model": "crate", "position": [-3, 0, -4], "rotation_deg": [0, 20, 0], "tags": ["obstacle"] },
+    { "name": "crate_2", "kind": "static", "model": "crate", "position": [3, 0, 3], "rotation_deg": [0, -35, 0], "tags": ["obstacle"] },
+    { "name": "crate_3", "kind": "static", "model": "crate", "position": [3.6, 0, 1.6], "scale": [0.7, 0.7, 0.7], "tags": ["obstacle"] }
+  ]
+}

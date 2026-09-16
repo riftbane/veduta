@@ -382,7 +382,7 @@ func TestRotatedPlaneAABBIsFlat(t *testing.T) {
 	if d := plane.AABB.Size().Z; d == 0 || d > 1e-7 {
 		t.Errorf("plane at z = 0: AABB depth %g, want a rounding residue in (0, 1e-7]", d)
 	}
-	quad := e.ctx.Scene.Find("sky") // the template's thin box, no hitbox
+	quad := e.ctx.Scene.Find("sky") // the test game's thin box, no hitbox
 	if d := quad.AABB.Size().Z; d < 0.019 || d > 0.021 {
 		t.Errorf("quad AABB depth %g, want 0.02", d)
 	}

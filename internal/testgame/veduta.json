@@ -1,6 +1,6 @@
 {
   "veduta": "project/1",
-  "name": "game",
+  "name": "demo",
   "engine": "v1.4.1",
   "entry": "./cmd/game",
   "resolution": [320, 240],
@@ -10,5 +10,6 @@
   "default_seed": 1,
   "assets": "assets",
   "cooked": "assets/.cooked",
-  "invariants": ["finite_positions"]
+  "invariants": ["finite_positions", "within_bounds", "score_non_negative"],
+  "bounds": [[-100, -50, -100], [100, 100, 100]]
 }

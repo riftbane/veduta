@@ -1,0 +1,10 @@
+{
+  "veduta": "scenario/1",
+  "scene": "main",
+  "seed": 1,
+  "ticks": 20,
+  "expect": [
+    { "tick": 20, "trace": "invariant_violation", "count_max": 0 }
+  ],
+  "screenshots": [20]
+}

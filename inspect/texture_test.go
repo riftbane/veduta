@@ -59,7 +59,7 @@ var texFixtures = map[string]string{
 		{"type": "gradient", "from": "#000000", "to": "#ffffff", "angle_deg": 90}]}`,
 }
 
-// Materials added to the template library for the alpha checks.
+// Materials added to the test game library for the alpha checks.
 var texFixtureMaterials = []*asset.Material{
 	{Name: "leaf_opaque", Albedo: 0xffffffff, Texture: "leaf", Alpha: "opaque", Cutoff: 0.5},
 	{Name: "tile_blend", Albedo: 0xffffffff, Texture: "tile", Alpha: "blend", Cutoff: 0.5},
@@ -73,11 +73,11 @@ var (
 	texTemplateErr  error
 )
 
-// texTestRenderer returns a renderer over the template library plus the crafted
+// texTestRenderer returns a renderer over the test game library plus the crafted
 // textures and materials, and the source of every texture.
 func texTestRenderer(t *testing.T) (*Renderer, map[string]*TexSource) {
 	t.Helper()
-	texTemplateOnce.Do(func() { texTemplateLib, texTemplateErr = cook.Load(filepath.Join("..", "template")) })
+	texTemplateOnce.Do(func() { texTemplateLib, texTemplateErr = cook.Load(filepath.Join("..", "internal", "testgame")) })
 	if texTemplateErr != nil {
 		t.Fatal(texTemplateErr)
 	}
@@ -96,7 +96,7 @@ func texTestRenderer(t *testing.T) (*Renderer, map[string]*TexSource) {
 		lib.Scenes[n] = base.Scenes[n]
 	}
 	srcs := map[string]*TexSource{}
-	assets := filepath.Join("..", "template", "assets")
+	assets := filepath.Join("..", "internal", "testgame", "assets")
 	for _, n := range []string{"grass", "crate"} {
 		file := filepath.Join(assets, "textures", n+".tex.json")
 		data, err := os.ReadFile(file)

@@ -18,10 +18,10 @@ var (
 	wldTemplateErr  error
 )
 
-// wldLibrary returns a copy of the template library (prefabs and worlds included).
+// wldLibrary returns a copy of the test game library (prefabs and worlds included).
 func wldLibrary(t *testing.T) *asset.Library {
 	t.Helper()
-	wldTemplateOnce.Do(func() { wldTemplateLib, wldTemplateErr = cook.Load(filepath.Join("..", "template")) })
+	wldTemplateOnce.Do(func() { wldTemplateLib, wldTemplateErr = cook.Load(filepath.Join("..", "internal", "testgame")) })
 	if wldTemplateErr != nil {
 		t.Fatal(wldTemplateErr)
 	}
@@ -66,7 +66,7 @@ func TestWorldTemplateClean(t *testing.T) {
 		t.Fatal(err)
 	}
 	if rep.Summary.Errors != 0 || rep.Summary.Warnings != 0 {
-		t.Fatalf("template world: %+v", rep.Issues)
+		t.Fatalf("test game world: %+v", rep.Issues)
 	}
 	if len(rep.Sheets) != 1 || filepath.Base(rep.Sheets[0]) != "overworld.map.png" {
 		t.Fatalf("sheets %v", rep.Sheets)
@@ -162,7 +162,7 @@ func TestPrefab(t *testing.T) {
 	if _, err := os.Stat(rep.Sheets[0]); err != nil {
 		t.Fatal(err)
 	}
-	// The template's gem prefab uses a game kind: information, not an error.
+	// The test game's gem prefab uses a game kind: information, not an error.
 	gem, err := Prefab(ir, "gem", Options{OutDir: t.TempDir(), Sheets: []string{"none"}})
 	if err != nil || gem.Summary.Errors != 0 || gem.Summary.Info != 1 || gem.Issues[0].Code != pfKind {
 		t.Fatalf("gem: %v %+v", err, gem.Issues)

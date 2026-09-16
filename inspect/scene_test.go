@@ -20,7 +20,7 @@ import (
 	"github.com/riftbane/veduta/internal/golden"
 )
 
-// Models added to the template library: a 2×2 plane facing +Y (a decal) and a box whose
+// Models added to the test game library: a 2×2 plane facing +Y (a decal) and a box whose
 // part names a material that does not exist.
 var scnFixtureModels = map[string]string{
 	"decal":    `{"veduta": "model/1", "name": "decal", "parts": [{"shape": "plane", "size": [2, 2]}]}`,
@@ -96,7 +96,7 @@ var scnFixtures = map[string]string{
 		{"name": "crate", "kind": "static", "model": "crate", "position": [-2, 0, 0]},
 		{"name": "raised", "kind": "static", "model": "decal", "material": "gem", "position": [-1, 0.01, 3]},
 		{"name": "flipped", "kind": "static", "model": "decal", "material": "twosided", "position": [0, 0, -2.5], "rotation_deg": [180, 0, 0]}]}`,
-	// A 2D scene of the template's quads under an orthographic camera: translucent water
+	// A 2D scene of the test game's quads under an orthographic camera: translucent water
 	// and mist overlap at the same z (ordered by layer); two opaque tiles overlap at the
 	// same z; translucent pool overlaps opaque rock at the same z; coin's hitbox is far
 	// from hero, but its drawing overlaps hero's at the same z.
@@ -148,11 +148,11 @@ var (
 	scnTemplateErr  error
 )
 
-// scnLibrary returns a copy of the template library plus the fixture models, materials
+// scnLibrary returns a copy of the test game library plus the fixture models, materials
 // and scenes.
 func scnLibrary(t *testing.T) *asset.Library {
 	t.Helper()
-	scnTemplateOnce.Do(func() { scnTemplateLib, scnTemplateErr = cook.Load(filepath.Join("..", "template")) })
+	scnTemplateOnce.Do(func() { scnTemplateLib, scnTemplateErr = cook.Load(filepath.Join("..", "internal", "testgame")) })
 	if scnTemplateErr != nil {
 		t.Fatal(scnTemplateErr)
 	}
@@ -264,7 +264,7 @@ func TestSceneTemplateMain(t *testing.T) {
 		t.Errorf("subject %q", r.Subject)
 	}
 	if r.Summary.Errors != 0 || r.Summary.Warnings != 0 {
-		t.Errorf("template main scene: %+v %v", r.Summary, scnCodes(r))
+		t.Errorf("test game main scene: %+v %v", r.Summary, scnCodes(r))
 	}
 	m := r.Metrics
 	if m["entities"] != 10 || m["drawn_entities"] != 10 || m["visible_entities"] != 10 {
@@ -322,7 +322,7 @@ func TestSceneTopFrustum(t *testing.T) {
 	wide, wideTop, wideSum := sheets([2]int{640, 360})
 	panel, panelTop, panelSum := sheets([2]int{320, 240})
 	if len(wide.Issues) != 0 || len(panel.Issues) != 0 {
-		t.Fatalf("template main has issues: %v / %v", scnCodes(wide), scnCodes(panel))
+		t.Fatalf("test game main has issues: %v / %v", scnCodes(wide), scnCodes(panel))
 	}
 	if !equalPix(wideTop, panelTop) {
 		t.Error("top view changes with inspect_resolution: the frustum does not follow the camera view")
@@ -631,7 +631,7 @@ func TestSceneUnlit(t *testing.T) {
 			t.Errorf("%s: %+v", tc.scene, r.Issues)
 		}
 	}
-	// The template scene is well lit.
+	// The test game scene is well lit.
 	if r := scnInspect(t, ir, "main", Options{}); r.Has("SCENE_UNLIT") {
 		t.Errorf("main: %+v", r.Issues)
 	}

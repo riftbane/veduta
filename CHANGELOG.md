@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- `veduta init` creates an empty game: an empty scene showing the game's name, the `quad`
+  model and `sprite` material, and one scenario (`start`). The demo game (hero, gems,
+  village, world) is no longer shipped; it moved to `internal/testgame`, the fixture the
+  engine's own scenarios, goldens and benchmarks run on.
+
 ## v1.4.1 — 2026-09-16
 
 ### Fixed

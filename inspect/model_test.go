@@ -20,10 +20,10 @@ import (
 	"github.com/riftbane/veduta/scene"
 )
 
-// mdlTestLib loads the template project plus fixtures from testdata/inspect/models.
+// mdlTestLib loads the test game project plus fixtures from testdata/inspect/models.
 func mdlTestLib(t *testing.T, fixtures ...string) *asset.Library {
 	t.Helper()
-	lib, err := cook.Load(filepath.Join("..", "template"))
+	lib, err := cook.Load(filepath.Join("..", "internal", "testgame"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestModelTemplateClean(t *testing.T) {
 			rep := mdlTestInspect(t, ir, name, Options{})
 			t.Logf("%s", mdlTestJSON(t, rep))
 			if rep.Summary.Errors != 0 {
-				t.Errorf("unmodified template model %s has %d error(s)", name, rep.Summary.Errors)
+				t.Errorf("unmodified test game model %s has %d error(s)", name, rep.Summary.Errors)
 			}
 			if rep.Subject != "model:"+name {
 				t.Errorf("subject %q", rep.Subject)
@@ -247,7 +247,7 @@ func TestModelFlippedNormals(t *testing.T) {
 	golden.Image(t, "inspect_model_hero_flipped_sections", mdlTestDecode(t, filepath.Join(dir, "hero_flipped.sections.png")))
 
 	// A flipped sphere is named by its own index.
-	src, err := os.ReadFile(filepath.Join("..", "template", "assets", "models", "hero.model.json"))
+	src, err := os.ReadFile(filepath.Join("..", "internal", "testgame", "assets", "models", "hero.model.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

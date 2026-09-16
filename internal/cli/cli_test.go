@@ -19,6 +19,7 @@ import (
 	"github.com/riftbane/veduta/docs"
 	"github.com/riftbane/veduta/inspect"
 	"github.com/riftbane/veduta/internal/golden"
+	"github.com/riftbane/veduta/internal/testgame"
 )
 
 // The docs tool's description names every topic, so an agent reading the tool list learns
@@ -42,7 +43,8 @@ func TestMCPDocsToolNamesEveryTopic(t *testing.T) {
 	t.Fatal("no docs tool")
 }
 
-// newProject creates a demo project with veduta init against this engine checkout.
+// newProject creates a project from the engine's test game with veduta init against this
+// engine checkout.
 func newProject(t *testing.T) (string, *Env) {
 	t.Helper()
 	if testing.Short() {
@@ -54,7 +56,7 @@ func newProject(t *testing.T) (string, *Env) {
 	}
 	env := &Env{Version: "dev", Stdout: io.Discard, Stderr: io.Discard}
 	dir := filepath.Join(t.TempDir(), "demo")
-	r, err := Init(env, InitOptions{Dir: dir, EngineDir: root})
+	r, err := Init(env, InitOptions{Dir: dir, EngineDir: root, game: testgame.FS, gamePackage: testgame.GamePackage})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +86,7 @@ func TestInitAndCommands(t *testing.T) {
 		t.Fatalf("release workflow does not build for the console only:\n%s", wf)
 	}
 	main, _ := os.ReadFile(filepath.Join(dir, "cmd", "game", "main.go"))
-	if !strings.Contains(string(main), `"demo/game"`) || strings.Contains(string(main), "template/game") {
+	if !strings.Contains(string(main), `"demo/game"`) || strings.Contains(string(main), "testgame/game") {
 		t.Fatalf("import path not rewritten:\n%s", main)
 	}
 	s, err := OpenSession(filepath.Join(dir, "game"), env) // found from a subdirectory

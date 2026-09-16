@@ -49,13 +49,12 @@ go install -ldflags "-X main.version=vX.Y.Z" github.com/riftbane/veduta/cmd/vedu
 
 ```sh
 veduta init mygame && cd mygame
-veduta test          # go test + the demo's scenarios
+veduta test          # go test + the project's scenarios
 claude               # Claude Code connects to `veduta mcp` through .mcp.json
 ```
 
-The template is a playable demo: the arrows or WASD (the pad's D-pad) move the hero, Space
-(A) jumps, gems are collected on contact, R (Y) resets, and a HUD shows score and tick.
-`veduta release v0.1.0` tags the game; its GitHub Actions workflow publishes a linux/arm64
+The template is an empty game: an empty scene with the game's name on it, the `quad` model
+and `sprite` material a 2D game builds on, and one scenario. `veduta release v0.1.0` tags the game; its GitHub Actions workflow publishes a linux/arm64
 archive that unpacks to a folder the console lists by its `card.json`, and a linux/amd64
 one for any other Linux machine with a framebuffer. A 2D game starts from the `2d` docs
 topic ([docs/2d.md](docs/2d.md)).
@@ -128,7 +127,8 @@ inspect/                           reports, sheets, diff, frame bundles and quer
 platform/                          the console player: framebuffer and evdev pad/keyboard (Linux)
 mcp/, internal/cli, cmd/veduta     the MCP server and the veduta tool
 internal/fused                     finds fused multiply-adds in linux/arm64 binaries
-template/                          the project created by veduta init (demo game)
+template/                          the project created by veduta init (empty game)
+internal/testgame/                 the engine's test game: scenarios, goldens, benchmarks
 testdata/                          golden images, trace hashes and fixtures
 ```
 

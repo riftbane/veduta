@@ -11,10 +11,8 @@ unpack it onto the console's card: the `[[.Name]]` folder it contains is the gam
 `card.json`, and the console lists it by that. The `linux_amd64` archive runs on any other
 Linux machine with a framebuffer (a text console, not a desktop session).
 
-On the pad the D-pad or the stick moves the hero, A jumps and Y resets the level; on a
-keyboard, WASD or the arrows move (or the mouse, as the stick: a click brings it back to
-rest), Space jumps and R resets. Collect every gem. Home, or Select and Start together
-(Ctrl+Q on a keyboard), leave the game and go back to the console's list.
+Home, or Select and Start together (Ctrl+Q on a keyboard), leave the game and go back to
+the console's list.
 
 While the game runs it takes the pad, the keyboard and the mouse for itself, so Ctrl+C and
 switching consoles do nothing until you leave with Home, Select+Start or Ctrl+Q. At a PC's text console the
@@ -24,9 +22,9 @@ console's blinking cursor may show over the game: `setterm --cursor off` hides i
 
 ```sh
 veduta test                      # go test + every scenario in tests/scenarios
-veduta simulate --scenario tests/scenarios/collect.scenario.json
+veduta simulate --scenario tests/scenarios/start.scenario.json
 veduta render --scene main --out out/main.png
-veduta inspect model hero
+veduta inspect scene main
 veduta doctor                    # also checks the game against the console
 veduta release v0.1.0            # tag; GitHub Actions builds the console archives
 ```

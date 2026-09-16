@@ -1,6 +1,7 @@
 package veduta
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/riftbane/veduta/asset"
@@ -10,12 +11,12 @@ import (
 	"github.com/riftbane/veduta/scene"
 )
 
-// BenchmarkWorldFrame renders one 320×240 frame of the template's world, 7×7 chunks loaded,
+// BenchmarkWorldFrame renders one 320×240 frame of the test game's world, 7×7 chunks loaded,
 // from a third-person camera that sees 100 m: with the levels of detail and the draw
 // distances (lod), and with every level and draw distance stripped (full). It reports the
 // triangles submitted and drawn per frame and the entities outside the view.
 func BenchmarkWorldFrame(b *testing.B) {
-	for _, kind := range []string{"player", "collectible"} { // the template's, linked by the external tests
+	for _, kind := range []string{"player", "collectible"} { // the test game's, linked by the external tests
 		if lookupKind(kind) == nil {
 			RegisterKind(kind, func(*scene.Entity) Behaviour { return nil })
 		}
@@ -25,7 +26,7 @@ func BenchmarkWorldFrame(b *testing.B) {
 		full bool
 	}{{"lod", false}, {"full", true}} {
 		b.Run(c.name, func(b *testing.B) {
-			lib, err := cook.Load("template")
+			lib, err := cook.Load(filepath.Join("internal", "testgame"))
 			if err != nil {
 				b.Fatal(err)
 			}

@@ -24,6 +24,13 @@ type InitOptions struct {
 	Engine    string // engine version to require (default: the tool's version, or the template's for dev builds)
 	EngineDir string // local engine checkout: adds a replace directive (development and CI)
 	NoTidy    bool   // skip `go mod tidy`
+
+	// game is the tree the game, its assets and scenarios come from, laid out as a project,
+	// and gamePackage the import path its Go files use for the game package; the project
+	// files always come from the template. Unset, both are the template's. The engine's
+	// tests set them to create projects from their test game.
+	game        fs.FS
+	gamePackage string
 }
 
 // InitReport describes the created project.
@@ -122,11 +129,14 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 	}
 	r := &InitReport{Dir: dir, Name: o.Name, Module: o.Module, Engine: o.Engine, Warnings: []string{}}
 	data := map[string]string{"Name": o.Name, "Module": o.Module, "Engine": o.Engine, "EngineDir": o.EngineDir}
-	err = fs.WalkDir(projtemplate.FS, ".", func(p string, d fs.DirEntry, err error) error {
+	if o.game == nil {
+		o.game, o.gamePackage = projtemplate.FS, projtemplate.GamePackage
+	}
+	write := func(tree fs.FS, p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || p == "embed.go" {
 			return err
 		}
-		src, err := projtemplate.FS.ReadFile(p)
+		src, err := fs.ReadFile(tree, p)
 		if err != nil {
 			return err
 		}
@@ -146,7 +156,7 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 		case strings.HasPrefix(p, "project/"):
 			return nil
 		case strings.HasSuffix(p, ".go"):
-			src = bytes.ReplaceAll(src, []byte(`"`+projtemplate.GamePackage+`"`), []byte(`"`+path.Join(o.Module, "game")+`"`))
+			src = bytes.ReplaceAll(src, []byte(`"`+o.gamePackage+`"`), []byte(`"`+path.Join(o.Module, "game")+`"`))
 		case p == asset.ProjectFile:
 			src = regexp.MustCompile(`"name":\s*"[^"]*"`).ReplaceAll(src, []byte(fmt.Sprintf(`"name": %q`, o.Name)))
 			src = regexp.MustCompile(`"engine":\s*"[^"]*"`).ReplaceAll(src, []byte(fmt.Sprintf(`"engine": %q`, o.Engine)))
@@ -157,7 +167,18 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 		}
 		r.Files++
 		return os.WriteFile(out, src, 0o644)
+	}
+	err = fs.WalkDir(projtemplate.FS, "project", func(p string, d fs.DirEntry, err error) error {
+		return write(projtemplate.FS, p, d, err)
 	})
+	if err == nil {
+		err = fs.WalkDir(o.game, ".", func(p string, d fs.DirEntry, err error) error {
+			if p == "project" && d != nil && d.IsDir() {
+				return fs.SkipDir
+			}
+			return write(o.game, p, d, err)
+		})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("init: %w", err)
 	}
@@ -186,7 +207,7 @@ func init() {
 	register(command{
 		name:    "init",
 		usage:   "init [dir] --name N [--module M] [--engine vX.Y.Z] [--engine-dir PATH]",
-		summary: "create a game project from the embedded template (demo game, assets, scenarios, Claude Code setup)",
+		summary: "create a game project from the embedded template (empty game and scene, sprite assets, one scenario, Claude Code setup)",
 		run: func(env *Env, _ *Session, args []string) (any, error) {
 			fs := newFlags("init", env.Stderr)
 			var o InitOptions

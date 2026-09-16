@@ -195,7 +195,7 @@ func main() {
 
 // TestEngineHasNoFusedMultiplyAdd is the gate that keeps the engine deterministic on
 // arm64, the console's architecture: no line of the engine may compile to a fused
-// multiply-add. It scans the veduta tool and the template game, which between them link
+// multiply-add. It scans the veduta tool and the engine's test game, which between them link
 // every package that draws, simulates, cooks or inspects, and a program that refers to
 // every exported function and method of the public engine packages, so that API no linked
 // binary happens to call (the linker drops it) is scanned too.
@@ -214,7 +214,7 @@ func TestEngineHasNoFusedMultiplyAdd(t *testing.T) {
 		t.Skip("not inside the engine repository")
 	}
 	dir := t.TempDir()
-	for _, pkg := range []string{"./cmd/veduta", "./template/cmd/game"} {
+	for _, pkg := range []string{"./cmd/veduta", "./internal/testgame/cmd/game"} {
 		bin := filepath.Join(dir, filepath.Base(pkg))
 		buildArm64(t, gocmd, root, bin, pkg)
 		scanEngine(t, pkg, bin)
