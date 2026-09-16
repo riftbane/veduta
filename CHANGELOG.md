@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- `lua`: a Lua 5.4 interpreter in pure Go, the language v2 games are written in. Source is
+  compiled to Go closures; integers wrap, floats never fuse, tables iterate in insertion
+  order, so a script runs identically on amd64 and arm64. It has the base library, Lua
+  errors with positions and tracebacks, a step budget that stops endless loops (and that
+  `pcall` cannot swallow), and an API for Go functions and userdata. Not supported: goto,
+  to-be-closed variables, weak tables, finalizers, coroutines (for now).
+- `gmath.Exp64`, `Log64` and `Pow64`: deterministic, unlike `math.Exp` and `math.Log`,
+  which use different assembly on amd64 and arm64.
+
 ### Changed
 
 - **The console has eight game buttons** (breaking): the D-pad, A, B, Select (the game's
