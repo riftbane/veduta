@@ -14,7 +14,15 @@ type ModelSource struct {
 	SmoothAngleDeg *float32     `json:"smooth_angle_deg,omitempty"` // default 30
 	Symmetry       string       `json:"symmetry,omitempty"`         // "", x, y, z: check MESH_ASYMMETRIC
 	TriangleBudget int          `json:"triangle_budget,omitempty"`  // 0: default budget
+	LOD            []LODSource  `json:"lod,omitempty"`              // levels of detail, nearest first
+	DrawDistance   *float32     `json:"draw_distance,omitempty"`    // not drawn beyond (default: always)
 	Parts          []PartSource `json:"parts"`
+}
+
+// LODSource is one level of detail of a model.
+type LODSource struct {
+	Distance *float32 `json:"distance"`
+	Model    string   `json:"model,omitempty"` // another model drawn instead (default: fewer segments)
 }
 
 // PartSource is one primitive of a model. Which fields are allowed depends on Shape.

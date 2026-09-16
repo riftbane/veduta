@@ -29,7 +29,9 @@ const (
 	DefaultRings          = 8 // sphere rings
 	MinRings              = 2
 	MaxRings              = 128
-	MaxProfilePoints      = 1024 // extrude and lathe profile length
+	MaxProfilePoints      = 1024   // extrude and lathe profile length
+	MaxLODs               = 4      // lod levels
+	MaxDistance           = 100000 // lod distance and draw_distance, meters
 )
 
 var (
@@ -118,7 +120,15 @@ type spec struct {
 	smoothDeg float32
 	symmetry  string
 	budget    int
+	lods      []lodSpec
+	drawDist  float32
 	parts     []partSpec
+}
+
+// lodSpec is a validated level of detail.
+type lodSpec struct {
+	distance float32
+	model    string
 }
 
 // partSpec is a validated part. Lengths are meters, angles degrees.
@@ -155,6 +165,7 @@ func validate(c *asset.Checker, name string, src *asset.ModelSource) *spec {
 		symmetry:  c.Enum("symmetry", src.Symmetry, axes, ""),
 		budget:    intField(c, "triangle_budget", src.TriangleBudget, 1, MaxTriangleBudget, DefaultTriangleBudget),
 	}
+	validateLOD(c, name, src, s)
 	if len(src.Parts) == 0 {
 		c.Errorf("parts", "at least one part is required")
 	}
@@ -163,6 +174,47 @@ func validate(c *asset.Checker, name string, src *asset.ModelSource) *spec {
 		s.parts[i] = validatePart(c, i, &src.Parts[i], s.parts[:i])
 	}
 	return s
+}
+
+// validateLOD checks the levels of detail and the draw distance.
+func validateLOD(c *asset.Checker, name string, src *asset.ModelSource, s *spec) {
+	if src.DrawDistance != nil {
+		if d := *src.DrawDistance; !gmath.IsFinite(d) || d <= 0 || d > MaxDistance {
+			c.Errorf("draw_distance", "%v out of range (0, %d]", d, MaxDistance)
+		} else {
+			s.drawDist = d
+		}
+	}
+	if len(src.LOD) > MaxLODs {
+		c.Errorf("lod", "%d levels, at most %d", len(src.LOD), MaxLODs)
+	}
+	var last float32
+	for i, l := range src.LOD {
+		lp := asset.Path("lod", i)
+		ls := lodSpec{}
+		switch d := l.Distance; {
+		case d == nil:
+			c.Errorf(asset.Path(lp, "distance"), "is required (meters from which this level is drawn)")
+		case !gmath.IsFinite(*d) || *d <= 0 || *d > MaxDistance:
+			c.Errorf(asset.Path(lp, "distance"), "%v out of range (0, %d]", *d, MaxDistance)
+		case *d <= last:
+			c.Errorf(asset.Path(lp, "distance"), "%v is not farther than the level before (%v): levels go from near to far", *d, last)
+		default:
+			ls.distance = *d
+			last = *d
+		}
+		if l.Model != "" && c.Name(asset.Path(lp, "model"), l.Model) {
+			if l.Model == name {
+				c.Errorf(asset.Path(lp, "model"), "%q is this model: omit model to draw it with fewer segments", l.Model)
+			} else {
+				ls.model = l.Model
+			}
+		}
+		s.lods = append(s.lods, ls)
+	}
+	if s.drawDist > 0 && last > 0 && s.drawDist <= last {
+		c.Errorf("draw_distance", "%v is not farther than the last level of detail (%v)", s.drawDist, last)
+	}
 }
 
 // validatePart checks part i; prev holds the already validated earlier parts.

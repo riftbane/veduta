@@ -103,6 +103,23 @@ func (g *gen) model() *Model {
 				FlipNormals: g.b(), Of: g.r.IntN(10) - 1}
 		}
 	}
+	m.DrawDistance = float32(g.n(100))
+	var dist float32
+	for range g.n(3) {
+		dist += 1 + float32(g.n(50))
+		l := LOD{Distance: dist}
+		if g.b() {
+			l.Model = "m" + g.s()
+		} else {
+			l.Mesh.Bounds = gmath.AABB{Min: g.v3(), Max: g.v3()}
+			l.Mesh.Vertices = []gfx.Vertex{{Pos: g.v3(), Normal: g.v3(), UV: g.v2()}}
+			l.Mesh.Indices = []uint32{0, 0, 0}
+			for range m.Mesh.Parts {
+				l.Mesh.Parts = append(l.Mesh.Parts, gfx.MeshPart{First: 0, Count: 3 * g.n(1), Material: g.r.IntN(max(1, len(m.Materials)))})
+			}
+		}
+		m.LODs = append(m.LODs, l)
+	}
 	return m
 }
 
@@ -249,6 +266,18 @@ func TestDecodeModelValidation(t *testing.T) {
 		"part material":         func(m *Model) { m.Mesh.Parts[0].Material = 1 },
 		"info range":            func(m *Model) { m.Parts[0].Count = 6 },
 		"mirror of":             func(m *Model) { m.Parts[0].Of = -2 },
+		"draw distance":         func(m *Model) { m.DrawDistance = -1 },
+		"lod distance order": func(m *Model) {
+			m.LODs = []LOD{{Distance: 10, Model: "a"}, {Distance: 10, Model: "b"}}
+		},
+		"lod parts": func(m *Model) { m.LODs = []LOD{{Distance: 10}} },
+		"lod model with geometry": func(m *Model) {
+			m.LODs = []LOD{{Distance: 10, Model: "far", Mesh: m.Mesh}}
+		},
+		"lod index": func(m *Model) {
+			m.LODs = []LOD{{Distance: 10, Mesh: gfx.MeshData{Vertices: make([]gfx.Vertex, 1), Indices: []uint32{0, 1, 0},
+				Parts: []gfx.MeshPart{{First: 0, Count: 3}}}}}
+		},
 	}
 	for name, f := range cases {
 		m := base()
@@ -263,7 +292,7 @@ func TestDecodeModelValidation(t *testing.T) {
 		t.Errorf("empty materials: %v", err)
 	}
 	c := EncodeModel(base())
-	c.Data[len(c.Data)-9] = 2 // flip_normals byte of the last part
+	c.Data[len(c.Data)-17] = 2 // flip_normals byte of the last part, before draw_distance and lods
 	if _, err := DecodeModel(c); err == nil || !strings.Contains(err.Error(), "boolean byte is 2") {
 		t.Errorf("bad bool: %v", err)
 	}

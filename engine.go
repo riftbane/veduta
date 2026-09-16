@@ -316,6 +316,7 @@ type frame struct {
 	View   gfx.View
 	Mode   gfx.RenderMode
 	Stats  gfx.FrameStats
+	Draw   scene.DrawStats // entities culled, too far or drawn at a lower level of detail
 }
 
 // render draws the current scene (and the game's HUD in color mode) with cam.
@@ -347,7 +348,8 @@ func (e *engine) render(cam scene.Camera, w, h int, mode gfx.RenderMode, normals
 		return nil, err
 	}
 	e.dl.Reset()
-	e.ctx.Scene.Draw(&e.dl, e.res, scene.DrawOptions{Camera: cam, Width: w, Height: h, Mode: mode})
+	var ds scene.DrawStats
+	e.ctx.Scene.Draw(&e.dl, e.res, scene.DrawOptions{Camera: cam, Width: w, Height: h, Mode: mode, Stats: &ds})
 	if e.extra != nil {
 		e.extra(&e.dl, 0)
 	}
@@ -364,7 +366,7 @@ func (e *engine) render(cam scene.Camera, w, h int, mode gfx.RenderMode, normals
 	if err := e.renderer.End(); err != nil {
 		return nil, err
 	}
-	return &frame{FB: fb, Camera: cam, View: e.dl.Views[0], Mode: mode, Stats: e.renderer.Stats()}, nil
+	return &frame{FB: fb, Camera: cam, View: e.dl.Views[0], Mode: mode, Stats: e.renderer.Stats(), Draw: ds}, nil
 }
 
 // syncGround uploads the ground meshes of the loaded chunks and frees those of unloaded

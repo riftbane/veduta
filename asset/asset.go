@@ -22,7 +22,7 @@ import (
 
 // CompilerVersion is stored in every .vda META chunk; changing it invalidates cooked
 // assets.
-const CompilerVersion = "veduta-asset/0.3.0"
+const CompilerVersion = "veduta-asset/0.4.0"
 
 // Source format headers (the value of the "veduta" field).
 const (
@@ -171,6 +171,28 @@ type Model struct {
 	TriangleBudget int
 	Pivot          string
 	PivotOffset    gmath.Vec3 // translation applied to every vertex to honour Pivot
+	// LODs are the levels of detail beyond the base mesh, by increasing Distance.
+	LODs []LOD
+	// DrawDistance is the distance beyond which the model is not drawn; 0 draws it at any
+	// distance the camera's far plane allows.
+	DrawDistance float32
+}
+
+// LOD is one level of detail of a model: from Distance meters on (as seen through a 60°
+// lens, docs/model.md), the model draws Mesh or, when Model is set, that model's base mesh.
+type LOD struct {
+	Distance float32
+	Model    string       // another model drawn at this level; "" draws Mesh
+	Mesh     gfx.MeshData // the level's geometry, parts parallel to the base mesh's; empty when Model is set
+}
+
+// Triangles returns the number of triangles the model draws at level (0 is the base
+// mesh); a level that draws another model counts 0.
+func (m *Model) Triangles(level int) int {
+	if level <= 0 || level > len(m.LODs) {
+		return len(m.Mesh.Indices) / 3
+	}
+	return len(m.LODs[level-1].Mesh.Indices) / 3
 }
 
 // PartInfo describes one source part of a compiled model.

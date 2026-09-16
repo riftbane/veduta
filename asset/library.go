@@ -63,6 +63,11 @@ func (l *Library) References() []string {
 				w = append(w, fmt.Sprintf("model %s: material %q not found", name, m))
 			}
 		}
+		for i, lod := range l.Models[name].LODs {
+			if lod.Model != "" && l.Models[lod.Model] == nil {
+				w = append(w, fmt.Sprintf("model %s: lod[%d]: model %q not found", name, i, lod.Model))
+			}
+		}
 	}
 	entities := func(what, name string, ents []Entity) {
 		for _, e := range ents {

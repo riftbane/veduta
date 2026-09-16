@@ -1517,6 +1517,31 @@ func (a *mdlAnalysis) modelIssues(r *Report) {
 		}
 	}
 
+	prev := len(m.Mesh.Indices) / 3
+	for i, l := range m.LODs {
+		switch {
+		case l.Model != "":
+			if a.lib == nil {
+				continue
+			}
+			o := a.lib.Models[l.Model]
+			if o == nil {
+				r.Add(Error, "MESH_LOD_MODEL_MISSING", 1, map[string]any{"level": i + 1, "model": l.Model},
+					fmt.Sprintf("Level of detail %d (from %v m) draws model %q, which does not exist: add assets/models/%s.model.json or remove \"model\" from lod[%d] to draw this model with fewer segments.",
+						i+1, l.Distance, l.Model, l.Model, i))
+				continue
+			}
+			prev = len(o.Mesh.Indices) / 3
+		default:
+			n := len(l.Mesh.Indices) / 3
+			if n >= prev {
+				r.Add(Warning, "MESH_LOD_NO_GAIN", 1, map[string]any{"level": i + 1, "triangles": n, "previous": prev},
+					fmt.Sprintf("Level of detail %d (from %v m) has %d triangles, no fewer than the level before (%d): only cylinders, spheres and lathes lose segments. Raise their \"segments\"/\"rings\", name a simpler \"model\" in lod[%d], or remove the level.",
+						i+1, l.Distance, n, prev, i))
+			}
+			prev = n
+		}
+	}
 	if m.TriangleBudget > 0 && a.triangles > m.TriangleBudget {
 		big := a.parts[0]
 		for _, p := range a.parts {
@@ -1556,6 +1581,20 @@ type mdlPartStat struct {
 func (a *mdlAnalysis) metrics(mt map[string]any) {
 	m := a.m
 	mt["triangles"] = a.triangles
+	if len(m.LODs) > 0 {
+		lods := []int{a.triangles}
+		for i, l := range m.LODs {
+			n := m.Triangles(i + 1)
+			if l.Model != "" && a.lib != nil && a.lib.Models[l.Model] != nil {
+				n = len(a.lib.Models[l.Model].Mesh.Indices) / 3
+			}
+			lods = append(lods, n)
+		}
+		mt["lod_triangles"] = lods
+	}
+	if m.DrawDistance > 0 {
+		mt["draw_distance"] = m.DrawDistance
+	}
 	mt["vertices"] = len(m.Mesh.Vertices)
 	mt["parts"] = len(a.parts)
 	mt["materials"] = len(m.Materials)

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -404,5 +405,88 @@ func TestGeometryBeyondFloat32(t *testing.T) {
 	es := compileErrs(t, "test.model.json", src)
 	if len(es) != 1 || !strings.Contains(es[0].Error(), "parts[1]: geometry exceeds the float32 range") {
 		t.Fatalf("errors = %v", es)
+	}
+}
+
+// Levels of detail: each automatic level halves the segments and rings of level 0 once
+// more (never below 3 and 2), keeps the base's parts, materials and pivot offset; a level
+// naming another model has no geometry.
+func TestLevelsOfDetail(t *testing.T) {
+	m := compile(t, `{"veduta": "model/1", "pivot": "bottom-center",
+		"lod": [{"distance": 10}, {"distance": 25.5}, {"distance": 40, "model": "far"}, {"distance": 60}], "draw_distance": 90,
+		"parts": [
+			{"shape": "cylinder", "radius": 0.2, "height": 1, "segments": 12, "material": "bark"},
+			{"shape": "sphere", "radius": 0.8, "segments": 16, "rings": 8, "position": [0, 1.2, 0], "material": "leaf"},
+			{"shape": "box", "size": [1, 1, 1]},
+			{"shape": "mirror", "axis": "x", "of": 0}
+		]}`)
+	if m.DrawDistance != 90 || len(m.LODs) != 4 {
+		t.Fatalf("draw distance %v, %d levels", m.DrawDistance, len(m.LODs))
+	}
+	// cylinder 4·seg, sphere 2·seg·(rings−1), box 12, mirror of the cylinder.
+	want := []int{2*4*12 + 2*16*7 + 12, 2*4*6 + 2*8*3 + 12, 2*4*3 + 2*4*1 + 12, 0, 2*4*3 + 2*3*1 + 12}
+	for level, n := range want {
+		if got := m.Triangles(level); got != n {
+			t.Errorf("level %d: %d triangles, want %d", level, got, n)
+		}
+	}
+	for i, l := range m.LODs {
+		if i == 2 {
+			if l.Model != "far" || l.Distance != 40 || len(l.Mesh.Vertices) != 0 || len(l.Mesh.Parts) != 0 {
+				t.Errorf("level 3: %+v", l)
+			}
+			continue
+		}
+		if l.Model != "" || len(l.Mesh.Parts) != len(m.Mesh.Parts) {
+			t.Fatalf("level %d: model %q, %d parts", i+1, l.Model, len(l.Mesh.Parts))
+		}
+		for k, p := range l.Mesh.Parts {
+			if p.Material != m.Mesh.Parts[k].Material {
+				t.Errorf("level %d part %d material %d, base %d", i+1, k, p.Material, m.Mesh.Parts[k].Material)
+			}
+		}
+		// Same pivot: the reduced model still stands on y = 0 and fits the base bounds.
+		if l.Mesh.Bounds.Min.Y != 0 || !m.Mesh.Bounds.ContainsBox(l.Mesh.Bounds) {
+			t.Errorf("level %d bounds %v, base %v", i+1, l.Mesh.Bounds, m.Mesh.Bounds)
+		}
+	}
+	if m.LODs[0].Distance != 10 || m.LODs[1].Distance != 25.5 || m.LODs[3].Distance != 60 {
+		t.Errorf("distances %v %v %v", m.LODs[0].Distance, m.LODs[1].Distance, m.LODs[3].Distance)
+	}
+	if m := compile(t, model(`{"shape": "box", "size": [1, 1, 1]}`)); m.LODs != nil || m.DrawDistance != 0 {
+		t.Errorf("no lod: %+v %v", m.LODs, m.DrawDistance)
+	}
+
+	src := `{
+  "veduta": "model/1",
+  "lod": [{"distance": 0}, {}, {"distance": 5, "model": "lod"}, {"distance": 5, "model": "Bad"}, {"distance": 7}],
+  "draw_distance": 6,
+  "parts": [{"shape": "box", "size": [1, 1, 1]}]
+}`
+	wantErrs := []string{
+		`draw_distance: 6 is not farther than the last level of detail (7)`,
+		`lod: 5 levels, at most 4`,
+		`lod[0].distance: 0 out of range (0, 100000]`,
+		`lod[1].distance: is required`,
+		`lod[2].model: "lod" is this model`,
+		`lod[3].distance: 5 is not farther than the level before (5)`,
+		`lod[3].model: name "Bad" may only contain`,
+	}
+	es := compileErrs(t, "models/lod.model.json", src)
+	var got []string
+	for _, e := range es {
+		got = append(got, e.Msg)
+	}
+	sort.Strings(got)
+	if len(got) != len(wantErrs) {
+		t.Fatalf("errors:\n%s", strings.Join(got, "\n"))
+	}
+	for i, w := range wantErrs {
+		if !strings.HasPrefix(got[i], w) {
+			t.Errorf("error %d = %q, want %q", i, got[i], w)
+		}
+	}
+	if es := compileErrs(t, "models/d.model.json", model(`{"shape": "box", "size": [1, 1, 1]}`)[:len(`{"veduta": "model/1",`)]+` "draw_distance": -2, "parts": [{"shape": "box", "size": [1, 1, 1]}]}`); len(es) != 1 || !strings.Contains(es[0].Msg, "-2 out of range") {
+		t.Errorf("negative draw distance: %v", es)
 	}
 }

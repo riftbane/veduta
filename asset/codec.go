@@ -205,7 +205,77 @@ func EncodeModel(m *Model) Chunk {
 		w.bool(p.FlipNormals)
 		w.i64(p.Of)
 	}
+	w.f32(m.DrawDistance)
+	w.count(len(m.LODs))
+	for i := range m.LODs {
+		l := &m.LODs[i]
+		w.f32(l.Distance)
+		w.str(l.Model)
+		w.vec3(l.Mesh.Bounds.Min)
+		w.vec3(l.Mesh.Bounds.Max)
+		w.meshGeometry(&l.Mesh)
+	}
 	return Chunk{Type: ChunkMesh, Data: w.b}
+}
+
+// meshGeometry writes vertices, indices and mesh parts.
+func (w *wbuf) meshGeometry(md *gfx.MeshData) {
+	w.count(len(md.Vertices))
+	for _, v := range md.Vertices {
+		w.vec3(v.Pos)
+		w.vec3(v.Normal)
+		w.vec2(v.UV)
+	}
+	w.count(len(md.Indices))
+	for _, i := range md.Indices {
+		w.u32(i)
+	}
+	w.count(len(md.Parts))
+	for _, p := range md.Parts {
+		w.i64(p.First)
+		w.i64(p.Count)
+		w.i64(p.Material)
+	}
+}
+
+// meshGeometry reads what wbuf.meshGeometry writes and checks every index and range.
+func (r *rbuf) meshGeometry(md *gfx.MeshData, materials int) {
+	if n := r.count(32); n > 0 {
+		md.Vertices = make([]gfx.Vertex, n)
+		for i := range md.Vertices {
+			md.Vertices[i] = gfx.Vertex{Pos: r.vec3(), Normal: r.vec3(), UV: r.vec2()}
+		}
+	}
+	if n := r.count(4); n > 0 {
+		if n%3 != 0 {
+			r.failf("index count %d is not a multiple of 3", n)
+		}
+		md.Indices = make([]uint32, n)
+		for i := range md.Indices {
+			v := r.u32()
+			if r.err == nil && uint64(v) >= uint64(len(md.Vertices)) {
+				r.failf("index %d is %d, but there are %d vertices", i, v, len(md.Vertices))
+			}
+			md.Indices[i] = v
+		}
+	}
+	if n := r.count(24); n > 0 {
+		md.Parts = make([]gfx.MeshPart, n)
+		for i := range md.Parts {
+			md.Parts[i] = gfx.MeshPart{First: r.i64(), Count: r.i64(), Material: r.i64()}
+		}
+	}
+	if r.err != nil {
+		return
+	}
+	for i, p := range md.Parts {
+		switch {
+		case !validRange(p.First, p.Count, len(md.Indices)):
+			r.failf("part %d range [%d, +%d) is outside the %d indices or not whole triangles", i, p.First, p.Count, len(md.Indices))
+		case p.Material < 0 || p.Material >= max(1, materials):
+			r.failf("part %d material index %d is outside the %d materials", i, p.Material, materials)
+		}
+	}
 }
 
 // DecodeModel parses a MESH chunk and checks that its indices and ranges are consistent
@@ -289,6 +359,34 @@ func DecodeModel(c Chunk) (*Model, error) {
 			case p.Of < -1:
 				r.failf("part %d mirrors part %d", i, p.Of)
 			}
+		}
+	}
+	r.field = "draw_distance"
+	m.DrawDistance = r.f32()
+	if !(m.DrawDistance >= 0) {
+		r.failf("%v is negative or not a number", m.DrawDistance)
+	}
+	r.field = "lods"
+	if n := r.count(4 + 4 + 24 + 12); n > 0 {
+		m.LODs = make([]LOD, n)
+		var last float32
+		for i := range m.LODs {
+			l := &m.LODs[i]
+			l.Distance = r.f32()
+			l.Model = r.str()
+			l.Mesh.Bounds.Min = r.vec3()
+			l.Mesh.Bounds.Max = r.vec3()
+			r.meshGeometry(&l.Mesh, len(m.Materials))
+			switch {
+			case r.err != nil:
+			case !(l.Distance > last):
+				r.failf("level %d distance %v is not farther than %v", i, l.Distance, last)
+			case l.Model == "" && len(l.Mesh.Parts) != len(m.Mesh.Parts):
+				r.failf("level %d has %d mesh parts, the base mesh %d", i, len(l.Mesh.Parts), len(m.Mesh.Parts))
+			case l.Model != "" && (len(l.Mesh.Vertices) > 0 || len(l.Mesh.Parts) > 0):
+				r.failf("level %d draws model %q and has geometry of its own", i, l.Model)
+			}
+			last = l.Distance
 		}
 	}
 	if err := r.done(); err != nil {

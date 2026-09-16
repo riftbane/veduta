@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- Levels of detail and a draw distance for models (`docs/model.md`): `lod` lists up to
+  four levels, nearest first, each drawn from its `distance` on, either the same model
+  rebuilt with `segments` and `rings` halved once more per level or another `model`;
+  beyond `draw_distance` the model is not drawn. Distances are measured per entity, from
+  the camera to the nearest point of its drawn bounds, as through a 60° lens (an
+  orthographic camera counts 0.866 × `size`). `inspect model` reports `lod_triangles`,
+  `draw_distance`, `MESH_LOD_NO_GAIN` and `MESH_LOD_MODEL_MISSING`.
+- `scene.Draw` skips entities whose drawn bounds lie wholly outside the camera's view
+  volume (1 mm margin, so no pixel changes) and chooses levels of detail;
+  `DrawOptions.Stats` counts culled, distant and reduced entities, and `render` reports
+  them as `draw`.
+
+### Changed
+
+- `asset.CompilerVersion` is `veduta-asset/0.4.0`: `MESH` chunks end with the draw
+  distance and the levels (`docs/vda.md`), so every asset is recompiled once.
+
 ## v1.2.0 — 2026-09-15
 
 ### Added

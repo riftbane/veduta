@@ -23,44 +23,79 @@ type tri [3]corner
 
 // build turns a validated spec into the compiled model.
 func build(name string, s *spec) *asset.Model {
-	geo := make([][]tri, len(s.parts))
-	for i := range s.parts {
-		ps := &s.parts[i]
-		if ps.shape == "mirror" {
-			geo[i] = mirrorTris(geo[ps.of], ps.axis)
-		} else {
-			geo[i] = partTris(ps)
-		}
-	}
-
 	m := &asset.Model{
 		Name:           name,
 		SmoothAngleDeg: s.smoothDeg,
 		Symmetry:       s.symmetry,
 		TriangleBudget: s.budget,
 		Pivot:          s.pivot,
+		DrawDistance:   s.drawDist,
 	}
 	cosLim := gmath.Cos64((float64(s.smoothDeg) + smoothTolDeg) * gmath.Deg2Rad)
-	for i, tris := range geo {
-		ps := &s.parts[i]
-		mat := indexOf(m.Materials, ps.material)
-		if mat < 0 {
-			mat = len(m.Materials)
-			m.Materials = append(m.Materials, ps.material)
+	m.Mesh, m.Materials, m.Parts = buildMesh(s.parts, cosLim)
+	if len(nonFiniteParts(m)) > 0 {
+		return m
+	}
+	applyPivot(m)
+	for i, l := range s.lods {
+		lod := asset.LOD{Distance: l.distance, Model: l.model}
+		if l.model == "" {
+			lod.Mesh, _, _ = buildMesh(reduced(s.parts, i+1), cosLim)
+			movePivot(&lod.Mesh, m.PivotOffset)
 		}
-		first := len(m.Mesh.Indices)
-		appendPart(&m.Mesh, tris, smoothNormals(tris, cosLim))
-		count := len(m.Mesh.Indices) - first
-		m.Mesh.Parts = append(m.Mesh.Parts, gfx.MeshPart{First: first, Count: count, Material: mat})
-		m.Parts = append(m.Parts, asset.PartInfo{
+		m.LODs = append(m.LODs, lod)
+	}
+	return m
+}
+
+// buildMesh builds the mesh of parts: one mesh part per source part, materials in
+// first-use order.
+func buildMesh(parts []partSpec, cosLim float64) (gfx.MeshData, []string, []asset.PartInfo) {
+	geo := make([][]tri, len(parts))
+	for i := range parts {
+		ps := &parts[i]
+		if ps.shape == "mirror" {
+			geo[i] = mirrorTris(geo[ps.of], ps.axis)
+		} else {
+			geo[i] = partTris(ps)
+		}
+	}
+	var mesh gfx.MeshData
+	var materials []string
+	var infos []asset.PartInfo
+	for i, tris := range geo {
+		ps := &parts[i]
+		mat := indexOf(materials, ps.material)
+		if mat < 0 {
+			mat = len(materials)
+			materials = append(materials, ps.material)
+		}
+		first := len(mesh.Indices)
+		appendPart(&mesh, tris, smoothNormals(tris, cosLim))
+		count := len(mesh.Indices) - first
+		mesh.Parts = append(mesh.Parts, gfx.MeshPart{First: first, Count: count, Material: mat})
+		infos = append(infos, asset.PartInfo{
 			Index: i, Shape: ps.shape, First: first, Count: count, Material: ps.material,
 			UV: ps.uv, FlipNormals: ps.flip, Of: ps.of,
 		})
 	}
-	if len(nonFiniteParts(m)) == 0 {
-		applyPivot(m)
+	return mesh, materials, infos
+}
+
+// reduced returns parts with the segments and rings of level halved level times,
+// rounding to nearest and never below the format's minimums.
+func reduced(parts []partSpec, level int) []partSpec {
+	out := append([]partSpec(nil), parts...)
+	half := 1 << (level - 1)
+	for i := range out {
+		if out[i].segments > 0 {
+			out[i].segments = max(MinSegments, (out[i].segments+half)>>level)
+		}
+		if out[i].rings > 0 {
+			out[i].rings = max(MinRings, (out[i].rings+half)>>level)
+		}
 	}
-	return m
+	return out
 }
 
 // nonFiniteParts returns the indices of the parts with a vertex that is not finite.
@@ -417,16 +452,19 @@ func applyPivot(m *asset.Model) {
 	case "bottom-center":
 		pt = gmath.V3(mid(0), b.Min.Y, mid(2))
 	}
-	off := gmath.Zero3.Sub(pt)
+	m.PivotOffset = gmath.Zero3.Sub(pt)
+	movePivot(&m.Mesh, m.PivotOffset)
+}
+
+// movePivot translates every vertex of mesh by off and sets its bounds.
+func movePivot(mesh *gfx.MeshData, off gmath.Vec3) {
 	if off != gmath.Zero3 {
-		for i := range m.Mesh.Vertices {
-			p := m.Mesh.Vertices[i].Pos.Add(off)
-			m.Mesh.Vertices[i].Pos = gmath.V3(canon32(p.X), canon32(p.Y), canon32(p.Z))
+		for i := range mesh.Vertices {
+			p := mesh.Vertices[i].Pos.Add(off)
+			mesh.Vertices[i].Pos = gmath.V3(canon32(p.X), canon32(p.Y), canon32(p.Z))
 		}
-		b = bounds(m.Mesh.Vertices)
 	}
-	m.PivotOffset = off
-	m.Mesh.Bounds = b
+	mesh.Bounds = bounds(mesh.Vertices)
 }
 
 func bounds(vs []gfx.Vertex) gmath.AABB {

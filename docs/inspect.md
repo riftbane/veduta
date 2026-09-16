@@ -50,12 +50,16 @@ material, or a material with a texture.
 | `MESH_SCALE_SUSPICIOUS` | warning | Largest extent outside 0.05–100 m. | `size`, `radius`, `height`, `profile`, `scale` (units are meters). |
 | `MESH_ASYMMETRIC` | warning | Only when `symmetry` is set: fewer than 98% of vertices mirror onto the surface (within 0.1% of the diagonal) across the source plane `<axis> = 0`. `where` lists the parts involved. | Centre those parts, use a `mirror` part, or remove `symmetry`. |
 | `MESH_TRIANGLE_BUDGET` | warning | More triangles than `triangle_budget`; `where` names the largest part. | Its `segments` / `rings`, or `triangle_budget`. |
+| `MESH_LOD_NO_GAIN` | warning | A `lod` level without `model` has no fewer triangles than the level before (only cylinders, spheres and lathes lose segments). | Their `segments` / `rings`, a simpler `model` for the level, or remove the level. |
+| `MESH_LOD_MODEL_MISSING` | error | A `lod` level names a `model` that does not exist. | Add the model, or remove `model` from the level. |
 
 Metrics: `triangles`, `vertices`, `parts`, `materials`, `aabb`, `size`, `pivot`,
 `pivot_offset`, `surface_area`, `volume` (closed parts), `watertight`,
 `texel_density_cv` (area-weighted coefficient of variation of UV area per m² over
 eligible parts), `symmetry_x` and `symmetry_<axis>`, `triangle_budget`, `part_stats` (per
-part: triangles, closed, area, signed volume — negative means inside out).
+part: triangles, closed, area, signed volume — negative means inside out), and with levels
+of detail `lod_triangles` (the base and every level; another model's base mesh for a level
+naming it) and `draw_distance`.
 
 Sheets:
 - `summary` (default): iso lit, front, right, normals, wireframe, UV checker.

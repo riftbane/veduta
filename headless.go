@@ -363,7 +363,7 @@ func (h *headless) render(args []string) error {
 	rep := map[string]any{
 		"ok": true, "out": path, "scene": target.Scene, "tick": *tick, "seed": *seed,
 		"mode": m.String(), "width": *width, "height": *height, "camera": camReport(*camera, cam),
-		"stats": f.Stats, "entities": visibleEntities(e.ctx.Scene, f.FB), "trace_hash": e.rec.Hash(),
+		"stats": f.Stats, "draw": f.Draw, "entities": visibleEntities(e.ctx.Scene, f.FB), "trace_hash": e.rec.Hash(),
 	}
 	if target.World != "" {
 		rep["world"], rep["at"] = target.World, target.At

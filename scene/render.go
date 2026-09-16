@@ -22,6 +22,7 @@ type Resources struct {
 type ModelRes struct {
 	Mesh  gfx.MeshID
 	Model *asset.Model
+	LODs  []gfx.MeshID // parallel to Model.LODs; 0 for a level that draws another model
 }
 
 // Bounds returns the local bounds of a model, for use as a Scene BoundsFunc.
@@ -44,12 +45,9 @@ func Upload(b gfx.Backend, models map[string]*asset.Model, textures map[string]*
 		r.Textures[name] = id
 	}
 	for _, name := range sortedKeys(models) {
-		m := models[name]
-		id, err := b.CreateMesh(&m.Mesh)
-		if err != nil {
-			return nil, fmt.Errorf("upload model %s: %w", name, err)
+		if err := r.AddModel(b, name, models[name]); err != nil {
+			return nil, err
 		}
-		r.Models[name] = &ModelRes{Mesh: id, Model: m}
 	}
 	for name, m := range materials {
 		r.Materials[name] = m
@@ -57,38 +55,60 @@ func Upload(b gfx.Backend, models map[string]*asset.Model, textures map[string]*
 	return r, nil
 }
 
-// AddModel uploads a model created at runtime (a world chunk's ground) under name,
-// replacing a model of that name and reusing the handle of a removed model when one is
-// free.
+// AddModel uploads a model and its levels of detail under name. A model created at
+// runtime (a world chunk's ground) replaces the model of that name, reusing its mesh
+// handles and then those of removed models.
 func (r *Resources) AddModel(b gfx.Backend, name string, m *asset.Model) error {
+	var reuse []gfx.MeshID
 	if old := r.Models[name]; old != nil {
-		if err := b.UpdateMesh(old.Mesh, &m.Mesh); err != nil {
-			return fmt.Errorf("upload model %s: %w", name, err)
-		}
-		old.Model = m
-		return nil
+		reuse = old.handles()
 	}
-	if n := len(r.free); n > 0 {
-		id := r.free[n-1]
-		if err := b.UpdateMesh(id, &m.Mesh); err != nil {
-			return fmt.Errorf("upload model %s: %w", name, err)
+	upload := func(md *gfx.MeshData) (gfx.MeshID, error) {
+		var id gfx.MeshID
+		switch {
+		case len(reuse) > 0:
+			id, reuse = reuse[0], reuse[1:]
+		case len(r.free) > 0:
+			id, r.free = r.free[len(r.free)-1], r.free[:len(r.free)-1]
+		default:
+			return b.CreateMesh(md)
 		}
-		r.free = r.free[:n-1]
-		r.Models[name] = &ModelRes{Mesh: id, Model: m}
-		return nil
+		return id, b.UpdateMesh(id, md)
 	}
-	id, err := b.CreateMesh(&m.Mesh)
-	if err != nil {
+	res := &ModelRes{Model: m}
+	var err error
+	if res.Mesh, err = upload(&m.Mesh); err != nil {
 		return fmt.Errorf("upload model %s: %w", name, err)
 	}
-	r.Models[name] = &ModelRes{Mesh: id, Model: m}
+	for i := range m.LODs {
+		var id gfx.MeshID
+		if m.LODs[i].Model == "" {
+			if id, err = upload(&m.LODs[i].Mesh); err != nil {
+				return fmt.Errorf("upload model %s level %d: %w", name, i+1, err)
+			}
+		}
+		res.LODs = append(res.LODs, id)
+	}
+	r.free = append(r.free, reuse...)
+	r.Models[name] = res
 	return nil
 }
 
-// Remove forgets the model called name and keeps its mesh handle for the next AddModel.
+// handles returns the mesh handles of the model's base mesh and levels.
+func (m *ModelRes) handles() []gfx.MeshID {
+	out := []gfx.MeshID{m.Mesh}
+	for _, id := range m.LODs {
+		if id != 0 {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// Remove forgets the model called name and keeps its mesh handles for the next AddModel.
 func (r *Resources) Remove(name string) {
 	if m := r.Models[name]; m != nil {
-		r.free = append(r.free, m.Mesh)
+		r.free = append(r.free, m.handles()...)
 		delete(r.Models, name)
 	}
 }
@@ -124,6 +144,16 @@ type DrawOptions struct {
 	Width  int
 	Height int
 	Mode   gfx.RenderMode
+	Stats  *DrawStats // when set, receives what Draw left out
+}
+
+// DrawStats counts the entities with a model that Draw considered and what it did with
+// them.
+type DrawStats struct {
+	Entities int `json:"entities"` // visible entities with an uploaded model
+	Culled   int `json:"culled"`   // drawn bounds wholly outside the camera's view volume
+	Distant  int `json:"distant"`  // farther than their model's draw_distance
+	Reduced  int `json:"reduced"`  // drawn at a level of detail above 0
 }
 
 type pending struct {
@@ -137,15 +167,22 @@ type pending struct {
 
 // Draw appends the scene to dl: clear to the background, one view for the camera, one
 // command per visible model part, and in collision mode the AABB of every entity as debug
-// lines. Parts are ordered by entity Layer (lower first); within a layer opaque parts come
-// first in id order, then blended parts back to front by the depth of their bounds' center
-// along the camera's view axis.
+// lines. An entity whose drawn bounds lie wholly outside the view volume is skipped (it
+// would add no pixel); a model with levels of detail is drawn at the level its distance
+// selects, and not at all beyond its draw_distance (docs/model.md). Parts are ordered by
+// entity Layer (lower first); within a layer opaque parts come first in id order, then
+// blended parts back to front by the depth of their bounds' center along the camera's
+// view axis.
 func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 	dl.Clear = true
 	dl.ClearColor = s.Background
 	dl.Mode = opt.Mode
 	dl.Light = s.Light
-	view := dl.AddView(opt.Camera.GfxView(opt.Width, opt.Height))
+	gv := opt.Camera.GfxView(opt.Width, opt.Height)
+	view := dl.AddView(gv)
+	fr := newFrustum(gv.Proj.Mul(gv.View))
+	lod := opt.Camera.lodMeasure()
+	var st DrawStats
 	// Blended parts are sorted by depth along the view axis, not by distance from the eye:
 	// under an orthographic camera every point of a plane facing it is equally deep, and a
 	// sprite off to the side is no farther away than one in the middle.
@@ -163,19 +200,50 @@ func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 		if e.Hitbox != nil { // the drawing's bounds, not the collision box
 			box = mr.Model.Mesh.Bounds.Transform(e.world)
 		}
+		st.Entities++
+		if !box.IsEmpty() && fr.outside(box) {
+			st.Culled++
+			continue
+		}
+		m := mr.Model
+		mesh, md, materials := mr.Mesh, &m.Mesh, m.Materials
+		if m.DrawDistance > 0 || len(m.LODs) > 0 {
+			d := lod.distance(opt.Camera.Position, box)
+			if m.DrawDistance > 0 && d > m.DrawDistance {
+				st.Distant++
+				continue
+			}
+			level := 0
+			for i := range m.LODs {
+				if d >= m.LODs[i].Distance {
+					level = i + 1
+				}
+			}
+			if level > 0 {
+				switch l := &m.LODs[level-1]; {
+				case l.Model == "" && level <= len(mr.LODs):
+					mesh, md = mr.LODs[level-1], &l.Mesh
+					st.Reduced++
+				case l.Model != "" && res.Models[l.Model] != nil:
+					o := res.Models[l.Model]
+					mesh, md, materials = o.Mesh, &o.Model.Mesh, o.Model.Materials
+					st.Reduced++
+				}
+			}
+		}
 		dist := box.Center().Sub(opt.Camera.Position).Dot(forward)
-		for pi, part := range mr.Model.Mesh.Parts {
+		for pi, part := range md.Parts {
 			if part.Count == 0 {
 				continue
 			}
 			partMat := ""
-			if part.Material >= 0 && part.Material < len(mr.Model.Materials) {
-				partMat = mr.Model.Materials[part.Material]
+			if part.Material >= 0 && part.Material < len(materials) {
+				partMat = materials[part.Material]
 			}
 			mat := res.Material(partMat, e.Material)
 			cmd := gfx.DrawCmd{
 				View:   view,
-				Mesh:   mr.Mesh,
+				Mesh:   mesh,
 				First:  part.First,
 				Count:  part.Count,
 				Model:  e.world,
@@ -210,6 +278,9 @@ func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 	})
 	for i := range cmds {
 		dl.Add(cmds[i].cmd)
+	}
+	if opt.Stats != nil {
+		*opt.Stats = st
 	}
 	if opt.Mode == gfx.ModeCollision {
 		for _, e := range s.entities {

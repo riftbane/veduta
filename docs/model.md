@@ -34,6 +34,8 @@ Units and axes: lengths are meters, angles are degrees. Coordinates are right-ha
 | `smooth_angle_deg` | number | `30` | In [0, 180]. Faces meeting at an angle ≤ this are shaded smoothly (see [Normals](#normals)). |
 | `symmetry` | string | `""` | `""` (none), `x`, `y` or `z`: asks `inspect` to check that the model is mirror-symmetric across the plane perpendicular to that axis (issue `MESH_ASYMMETRIC`). It does not change the geometry. |
 | `triangle_budget` | integer | `20000` | In [1, 1000000]. `inspect` reports `MESH_TRIANGLE_BUDGET` above it. The compiler never refuses a model for exceeding it. |
+| `lod` | array | `[]` | Up to 4 levels of detail, nearest first (see [Levels of detail](#levels-of-detail)). Since v1.3.0. |
+| `draw_distance` | number | none | In (0, 100000] meters, farther than the last `lod` level: beyond it the model is not drawn at all. Since v1.3.0. |
 | `parts` | array | required | At least one part object (see below). |
 
 ## Parts
@@ -157,6 +159,47 @@ mirrored. The copy inherits the source's `uv` mode and `flip_normals` (a copy of
 flipped part is flipped too). No other fields are allowed: `position`, `rotation_deg`,
 `scale`, `uv` and `flip_normals` are errors on a mirror. To mirror a part in place,
 build it on one side of the plane and mirror it: both halves meet exactly.
+
+## Levels of detail
+
+Far away a model covers a few pixels, so it can be drawn with fewer triangles, or not at
+all. Each `lod` level is an object:
+
+| Field | Type | Default | Meaning |
+|-------|------|---------|---------|
+| `distance` | number | required | Meters from which the level is drawn, in (0, 100000], each level farther than the one before. |
+| `model` | string | none | Another model drawn at this level (its base mesh, with its own materials). Without it the level is this model rebuilt with fewer segments. |
+
+A level without `model` number k (1 for the first level) rebuilds every `cylinder`,
+`sphere` and `lathe` with `segments` halved k times and a sphere's `rings` halved k
+times, rounding to the nearest integer and never below 3 segments and 2 rings; boxes,
+planes and extrusions keep their triangles. The level has the same parts, materials and
+pivot offset as the model. Example: `segments: 16` draws 16, then 8, 4, 3 segments.
+
+The distance a level is chosen by is measured every frame, per entity, from the camera to
+the nearest point of the entity's drawn bounds, **as seen through a 60° lens**: a
+perspective camera's distance is scaled by tan(fov/2) / tan(30°), so zooming in (a smaller
+`fov_deg`) keeps detail farther away; an orthographic camera counts every entity at
+0.866 × `size`, the distance at which a 60° lens sees `size` meters, so zooming out drops
+detail everywhere at once. `draw_distance` uses the same measure. A world's ground and
+flora use the same rules (`world` topic).
+
+```json
+{
+  "veduta": "model/1",
+  "pivot": "bottom-center",
+  "lod": [ { "distance": 15 }, { "distance": 35, "model": "tree_far" } ],
+  "draw_distance": 80,
+  "parts": [
+    { "shape": "cylinder", "radius": 0.15, "height": 1.2, "segments": 8, "position": [0, 0.6, 0], "material": "bark" },
+    { "shape": "sphere", "radius": 0.7, "segments": 12, "rings": 6, "position": [0, 1.6, 0], "material": "leaf" }
+  ]
+}
+```
+
+Beyond 15 m the trunk has 4 segments and the crown 6 segments and 3 rings (40 triangles
+instead of 152), beyond 35 m it is `tree_far`, beyond 80 m it is not drawn. `inspect model` reports the triangles
+of every level (`lod_triangles`) and a level that saves nothing (`MESH_LOD_NO_GAIN`).
 
 ## Winding and orientation
 
@@ -291,6 +334,7 @@ part; `name`, when present, equal to the file name.
 | profile points (extrude, lathe) | extrude 3–1024, lathe 2–1024 |
 | `smooth_angle_deg` | 0–180, default 30 |
 | `triangle_budget` | 1–1000000, default 20000 |
+| `lod` levels | 0–4; `distance` and `draw_distance` in (0, 100000] m |
 
 ## Full example
 

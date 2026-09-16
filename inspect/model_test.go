@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -686,5 +687,36 @@ func TestModelEdgeCases(t *testing.T) {
 	}
 	if _, err := Model(nil, "empty", Options{}); err == nil {
 		t.Error("nil renderer must fail")
+	}
+}
+
+// Levels of detail: the triangles of every level, a level that saves nothing and a level
+// naming a missing model.
+func TestModelLevelsOfDetail(t *testing.T) {
+	lib := mdlTestLib(t)
+	mdlTestAdd(t, lib, "models/pine.model.json", []byte(`{"veduta": "model/1", "pivot": "bottom-center",
+		"lod": [{"distance": 10}, {"distance": 20, "model": "crate"}, {"distance": 30}, {"distance": 40, "model": "nowhere"}], "draw_distance": 50,
+		"parts": [{"shape": "cylinder", "radius": 0.2, "height": 1, "segments": 8}, {"shape": "box", "size": [1, 1, 1], "position": [0, 1, 0]}]}`))
+	ir := &Renderer{Lib: lib}
+	rep := mdlTestInspect(t, ir, "pine", Options{Sheets: []string{"none"}})
+	crate := len(lib.Models["crate"].Mesh.Indices) / 3
+	if got, want := rep.Metrics["lod_triangles"], []int{44, 28, crate, 24, 0}; !reflect.DeepEqual(got, want) {
+		t.Errorf("lod_triangles %v, want %v", got, want)
+	}
+	if rep.Metrics["draw_distance"] != float32(50) {
+		t.Errorf("draw_distance %v", rep.Metrics["draw_distance"])
+	}
+	missing := mdlTestIssues(rep, "MESH_LOD_MODEL_MISSING")
+	if len(missing) != 1 || missing[0].Severity != Error || missing[0].Where["level"] != 4 {
+		t.Errorf("missing model: %v", rep.Issues)
+	}
+	// Level 3 (24 triangles) follows the crate level: only a gain against its own model counts.
+	if gain := mdlTestIssues(rep, "MESH_LOD_NO_GAIN"); crate > 24 && len(gain) != 0 || crate <= 24 && len(gain) != 1 {
+		t.Errorf("no gain with crate %d: %v", crate, rep.Issues)
+	}
+	mdlTestAdd(t, lib, "models/cube.model.json", []byte(`{"veduta": "model/1", "lod": [{"distance": 10}], "parts": [{"shape": "box", "size": [1, 1, 1]}]}`))
+	rep = mdlTestInspect(t, ir, "cube", Options{Sheets: []string{"none"}})
+	if gain := mdlTestIssues(rep, "MESH_LOD_NO_GAIN"); len(gain) != 1 || gain[0].Where["triangles"] != 12 || gain[0].Where["previous"] != 12 {
+		t.Errorf("box level: %v", rep.Issues)
 	}
 }

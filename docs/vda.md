@@ -45,12 +45,12 @@ escaping, `deps` sorted without duplicates and `[]` when empty. Readers reject M
 is not byte-for-byte canonical, so equal metadata always has equal bytes.
 
 ```json
-{"compiler":"veduta-asset/0.3.0","deps":[],"kind":"model","name":"crate","source":"models/crate.model.json","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
+{"compiler":"veduta-asset/0.4.0","deps":[],"kind":"model","name":"crate","source":"models/crate.model.json","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
 ```
 
 | Key | Meaning |
 |-----|---------|
-| `compiler` | Compiler version (`asset.CompilerVersion`: `veduta-asset/0.3.0` since prefabs and worlds, `veduta-asset/0.2.0` since scene entities carry a hitbox and a layer, `veduta-asset/0.1.0` before). A different version forces a recompile. |
+| `compiler` | Compiler version (`asset.CompilerVersion`: `veduta-asset/0.4.0` since model levels of detail and world terrain and vegetation, `veduta-asset/0.3.0` since prefabs and worlds, `veduta-asset/0.2.0` since scene entities carry a hitbox and a layer, `veduta-asset/0.1.0` before). A different version forces a recompile. |
 | `deps` | Other input files the compiled output depends on besides the source (for example the PNG of a texture `image` layer), as paths relative to the assets directory. |
 | `kind` | `model`, `texture`, `material`, `scene`, `prefab` or `world`. |
 | `name` | Asset name (the source file name without its suffix). |
@@ -92,15 +92,23 @@ must be consumed exactly: missing bytes and trailing bytes are errors.
 | 10 | mesh_parts | `list<mesh_part>` | mesh_part = `i64` first index, `i64` index count, `i64` material (index into materials) |
 | 11 | materials | `list<str>` | material names in first-use order; `""` = the entity's material or the default |
 | 12 | parts | `list<part>` | one per source part, see below |
+| 13 | draw_distance | `f32` | meters beyond which the model is not drawn; 0 for no limit (since v1.3.0) |
+| 14 | lods | `list<lod>` | levels of detail, nearest first (since v1.3.0) |
 
 part = `i64` index (source part index), `str` shape, `i64` first index, `i64` index
 count, `str` material (`""` for none), `str` uv mapping, `bool` flip_normals, `i64` of
 (mirror: mirrored source part index; −1 otherwise).
 
+lod = `f32` distance, `str` model (`""` when the level has its own geometry), `aabb`
+bounds, `list<vertex>` vertices, `list<u32>` indices, `list<mesh_part>` mesh parts (both
+empty when model is set; otherwise one mesh part per base mesh part, materials indexing
+the base's materials).
+
 Readers check: the index count is a multiple of 3; every index is below the vertex count;
 every mesh part and part range lies within the indices and its count is a multiple of 3;
 every mesh part's material is a valid index into materials (or 0 when materials is
-empty); every `of` is ≥ −1.
+empty); every `of` is ≥ −1; draw_distance is ≥ 0; lod distances increase; a level has
+as many mesh parts as the base mesh, or none and a model.
 
 ## `TEXR` — compiled texture
 
