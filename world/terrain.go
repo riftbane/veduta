@@ -109,7 +109,7 @@ func weight(d, inner, outer int64) int64 {
 // Structures' pads are not included.
 func (g *Gen) natural(x, z int32, feats []feature) (h, water int64) {
 	if g.relief != 0 {
-		h = (int64(g.reliefField.value(x, z)) - 1<<31) * g.relief >> 31
+		h = (int64(g.reliefField.smoothValue(x, z)) - 1<<31) * g.relief >> 31
 	}
 	water = g.seaLevel
 	for i := range feats {
@@ -285,14 +285,17 @@ func (gr *Grid) CellWater(x, z int32) bool {
 	return wet(h, w)
 }
 
-// HeightAt returns the ground height under (px, pz) meters, on the triangles of the
-// ground's finest level, from gr, which must hold the cell's corners.
-func (gr *Grid) HeightAt(px, pz float32, cell float32) float32 {
+// heightAt returns the ground height under (px, pz) meters on a grid of step cells
+// whose quads start at vertex (ox, oz), each split along its diagonal from its (x0, z1)
+// corner to its (x1, z0) corner, as the ground mesh is.
+func (gr *Grid) heightAt(px, pz, cell float32, step, ox, oz int32) float32 {
 	x, z := cellOf(px, cell), cellOf(pz, cell)
-	fx := float64(px)/float64(cell) - float64(x)
-	fz := float64(pz)/float64(cell) - float64(z)
+	x0, z0 := ox+floorDiv(x-ox, step)*step, oz+floorDiv(z-oz, step)*step
+	s := float64(step)
+	fx := (float64(px)/float64(cell) - float64(x0)) / s
+	fz := (float64(pz)/float64(cell) - float64(z0)) / s
 	m := func(x, z int32) float64 { h, _ := gr.At(x, z); return float64(h) / 1000 }
-	h00, h10, h01, h11 := m(x, z), m(x+1, z), m(x, z+1), m(x+1, z+1)
+	h00, h10, h01, h11 := m(x0, z0), m(x0+step, z0), m(x0, z0+step), m(x0+step, z0+step)
 	// Products rounded explicitly so arm64 cannot fuse them into the sums.
 	if fx+fz <= 1 {
 		return float32(h00 + float64((h10-h00)*fx) + float64((h01-h00)*fz))
@@ -300,30 +303,40 @@ func (gr *Grid) HeightAt(px, pz float32, cell float32) float32 {
 	return float32(h11 + float64((h01-h11)*(1-fx)) + float64((h10-h11)*(1-fz)))
 }
 
+// HeightAt returns the ground height under (px, pz) meters, on the triangles of the
+// chunk's finest drawn level: a hero set to it stands exactly on the ground.
+func (c *Chunk) HeightAt(px, pz, cell float32) float32 {
+	return c.Grid.heightAt(px, pz, cell, c.Step, c.Rect.X, c.Rect.Z)
+}
+
 // WaterAt returns the water level over (px, pz) meters and whether the ground there is
 // under it.
-func (gr *Grid) WaterAt(px, pz float32, cell float32) (float32, bool) {
+func (c *Chunk) WaterAt(px, pz, cell float32) (float32, bool) {
 	x, z := cellOf(px, cell), cellOf(pz, cell)
 	var w int32 = NoWater
-	for _, c := range [4][2]int32{{x, z}, {x + 1, z}, {x, z + 1}, {x + 1, z + 1}} {
-		_, cw := gr.At(c[0], c[1])
+	for _, v := range [4][2]int32{{x, z}, {x + 1, z}, {x, z + 1}, {x + 1, z + 1}} {
+		_, cw := c.Grid.At(v[0], v[1])
 		w = max(w, cw)
 	}
 	if w == NoWater {
 		return 0, false
 	}
 	level := mmMeters(int64(w))
-	return level, gr.HeightAt(px, pz, cell) < level
+	return level, c.HeightAt(px, pz, cell) < level
 }
 
-// HeightAt returns the ground height under pos (its x and z) in meters.
+// ChunkAt returns the chunk holding pos, generated.
+func (g *Gen) ChunkAt(pos gmath.Vec3) *Chunk {
+	return g.Chunk(g.ChunkOf(g.CellOf(pos)))
+}
+
+// HeightAt returns the ground height under pos (its x and z) in meters. It generates the
+// chunk: a game asks its loaded World instead.
 func (g *Gen) HeightAt(pos gmath.Vec3) float32 {
-	x, z := g.CellOf(pos)
-	return g.Grid(Rect{x, z, 1, 1}, 0).HeightAt(pos.X, pos.Z, g.W.Cell)
+	return g.ChunkAt(pos).HeightAt(pos.X, pos.Z, g.W.Cell)
 }
 
 // WaterAt returns the water level over pos and whether the ground there is under it.
 func (g *Gen) WaterAt(pos gmath.Vec3) (float32, bool) {
-	x, z := g.CellOf(pos)
-	return g.Grid(Rect{x, z, 1, 1}, 0).WaterAt(pos.X, pos.Z, g.W.Cell)
+	return g.ChunkAt(pos).WaterAt(pos.X, pos.Z, g.W.Cell)
 }

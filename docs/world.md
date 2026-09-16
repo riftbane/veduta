@@ -58,6 +58,7 @@ on the authoring machine and on the console.
 | `biomes` | array of objects | required, at least one | See Biomes. |
 | `terrain` | object | flat | See Terrain. Since v1.3.0. |
 | `features` | array of objects | `[]` | Hills, plains, lakes and seas; see Features. Since v1.3.0. |
+| `vegetation` | array of objects | `[]` | Trees, grass and flowers, everywhere or in round areas; see Vegetation. Since v1.3.0. |
 | `scatter` | array of objects | `[]` | See Scatter. |
 | `sites` | array of objects | `[]` | See Sites. |
 | `places` | array of objects | `[]` | See Places. |
@@ -131,6 +132,34 @@ whose centre is under water; a place in water is reported (`WORLD_PLACE_WATER`).
 drawn as flat quads at its level over every cell with a corner under it: the ground hides
 the part that lies above it. Nothing collides with water: a game asks `WaterAt`.
 
+### Vegetation
+
+Named rules that plant the world, everywhere or in a round area. `world_vegetation` adds
+them (it reports how many plants the area gets and what they cost to draw);
+`world_remove` removes them.
+
+| Field | Type | Default | Meaning |
+|-------|------|---------|---------|
+| `name` | string | required | Unique among places, features and vegetation rules; not starting with `chunk_`, `site_` or `place_`. |
+| `prefab` | string | one of the two | A **one-cell prefab** (a tree, a rock): entities that collide, exactly like `scatter`. |
+| `model` | string | one of the two | A **flora model** (grass, flowers, pebbles): drawn as part of its chunk, no entity, no collision, not in the trace. |
+| `density` | number | required | Share of the cells that get one, more than 0 and at most 1. |
+| `biomes` | array of strings | any | Biomes to plant on (a prefab's own `rules.biomes` also apply). |
+| `cell` | `[x, z]` | none | With `radius`: the centre of the area (a vertex inside the world). |
+| `radius` | integer | none | With `cell`: cells from the centre, 1 to 16384. The edge wanders by ±15% of it. |
+| `scale` | `[min, max]` | `[0.8, 1.2]` | `model` only: each plant is scaled by a seeded factor between them (0 < min ≤ max ≤ 16). |
+
+- A **prefab** rule competes for cells with the scatter rules and the prefab rules before
+  it: the first rule that fires owns the cell (scatter rules first, then vegetation rules
+  in file order). It keeps its prefab's `min_distance` from sites and places.
+- A **model** rule plants at most one plant per cell, somewhere in the middle 60% of the
+  cell, turned by a quarter turn and mirrored by the seed, standing on the ground. Any
+  number of model rules may plant the same cell (grass and flowers together). Flora skips
+  water and the footprints of sites and places.
+- A flora model is an ordinary model (`model` topic): keep it to a handful of triangles
+  (a `lathe` cone of 3–4 segments is a tuft of grass) and give it a `draw_distance`, and a
+  `lod` level or two: flora is thinned with distance (next section).
+
 ### Scatter
 
 Each rule puts a **one-cell prefab** (footprint at most `cell` × `cell`) on a share of
@@ -181,7 +210,8 @@ run, so scenarios and traces can refer to it:
 | Entity | Name |
 |--------|------|
 | Ground of chunk `[cx, cz]` | `chunk_<cx>_<cz>_ground` (one static entity per chunk, tagged `ground`, no collision box; it draws the chunk's water too) |
-| Scatter at cell `[x, z]` | `chunk_<cx>_<cz>_c<i>_<entity>`, `i` the cell's index in the chunk (row-major) |
+| Flora of model `m` on chunk `[cx, cz]` | `chunk_<cx>_<cz>_flora_<m>` (one static entity per flora model present, tagged `flora`, no collision box) |
+| Scatter or vegetation prefab at cell `[x, z]` | `chunk_<cx>_<cz>_c<i>_<entity>`, `i` the cell's index in the chunk (row-major) |
 | Site of rule `r` in region `[rx, rz]` | `site_<r>_<rx>_<rz>_<entity>` |
 | Place | `place_<name>_<entity>` |
 
@@ -213,8 +243,8 @@ func (g *Game) Update(ctx *veduta.Context, in veduta.Input) {
 
 `ctx.World()` is nil until a world is loaded. `Focus` sets the point the window is kept
 around; `CellOf(pos)` returns the cell of a position; `Loaded()` lists the loaded chunks;
-`HeightAt(pos)` returns the height of the ground under a position (exactly on the drawn
-triangles, so a hero set to it stands on the ground) and `WaterAt(pos)` the water level
+`HeightAt(pos)` returns the height of the ground under a position (exactly on the
+triangles of the chunk's finest drawn level, so a hero set to it stands on the ground) and `WaterAt(pos)` the water level
 over it and whether the ground there is under water:
 
 ```go
@@ -240,12 +270,19 @@ savings, both automatic:
   volume costs nothing, and nothing beyond the camera's `far` plane is drawn: a chunk
   behind the camera or past `far` is skipped whole. Keep `far` (perspective) or `size`
   (orthographic) within the loaded chunks (`WORLD_VIEW_SHORT`).
-- **Fewer triangles far away.** Each chunk's ground has levels of detail: level k samples
-  every 2^k-th vertex (1, 2, 4, 8, 16 cells) and is drawn from `lod_distance` × 2^(k−1)
-  meters on; flat runs of cells merge into one quad at every level. Neighbouring chunks
-  drawn at different levels would leave cracks along their shared edge, so each level
-  hangs a skirt below every edge that is not straight, as deep as the edge's height range.
-  Models get the same saving from their own `lod` and `draw_distance` (`model` topic).
+- **Fewer triangles far away.** Each chunk's ground has levels of detail on grids of 1, 2,
+  4, 8 and 16 cells. The finest level a chunk is drawn with is the coarsest grid that
+  passes within 6 cm of every vertex (and keeps its biome edges: flat ground at 1 cell
+  where biomes meet, uneven ground at up to 2), so gentle ground costs few triangles even
+  up close; `HeightAt` follows that grid. Each coarser level is drawn from `lod_distance`
+  × 2^(k−1) meters on (k = 1 for the first coarser level); flat runs merge into one quad
+  at every level. Neighbouring chunks drawn with different grids would leave cracks along
+  their shared edge, so each level hangs a skirt below every edge that is not straight,
+  as deep as the edge's height range. Flora follows its model's `lod` and `draw_distance`:
+  at the model's level k a chunk draws one plant in 2^k (a seeded half, then a quarter)
+  with that level's geometry, and none beyond the draw distance. Trees and every other
+  entity get the same savings from their own model's `lod` and `draw_distance` (`model`
+  topic).
 
 Distances are measured from the camera to the nearest point of an entity's bounds, as
 seen through a 60° lens (an orthographic camera counts 0.866 × `size` for everything).

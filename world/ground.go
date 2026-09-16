@@ -15,24 +15,91 @@ const WaterMaterial = "world:water"
 // DefaultWater is the built-in water: opaque, a lake blue, lit like the ground.
 var DefaultWater = asset.Material{Name: WaterMaterial, Albedo: 0xff3b76b0, Alpha: "opaque", Cutoff: 0.5, Cull: gfx.CullBack, Filter: gfx.FilterBilinear}
 
-// groundLevels returns the grid steps of a chunk's levels of detail: 1, 2, 4, … while
-// they divide the chunk, at most 1 + asset.MaxLODs (model.MaxLODs) levels.
-func groundLevels(n int32) []int32 {
+// groundTolerance is how far, in millimeters, a chunk's finest drawn level may pass from
+// its vertices: gentle ground is drawn with a coarser grid even up close. 6 cm is well
+// under a pixel of a 240-line frame for ground more than a few meters away.
+const groundTolerance = 60
+
+// groundSteps returns the grid steps a chunk of n cells can be drawn with: 1, 2, 4, …
+// while they divide the chunk, at most 16.
+func groundSteps(n int32) []int32 {
 	steps := []int32{1}
-	for s := int32(2); s <= n && n%s == 0 && len(steps) < 5; s *= 2 {
+	for s := int32(2); s <= min(n, 16) && n%s == 0; s *= 2 {
 		steps = append(steps, s)
 	}
 	return steps
 }
 
+// BaseStep returns the grid step of chunk c's finest drawn level: the coarsest step whose
+// triangles pass within 6 cm of every vertex and whose quads each cover cells of one
+// ground material, except that on uneven ground a 2-cell quad may cover several (it takes
+// the material of its middle cell: four times fewer triangles are worth a blockier biome
+// edge). Flat ground and gentle relief are drawn with fewer triangles even up close;
+// HeightAt follows the same triangles.
+func (g *Gen) BaseStep(c *Chunk) int32 {
+	n := c.Rect.W
+	matOf := func(x, z int32) string { return g.W.Biomes[c.Biomes[z*n+x]].Ground }
+	uneven := false
+	h0, _ := c.Grid.At(c.Rect.X, c.Rect.Z)
+	for z := c.Rect.Z; z <= c.Rect.Z+n && !uneven; z++ {
+		for x := c.Rect.X; x <= c.Rect.X+n; x++ {
+			if h, _ := c.Grid.At(x, z); h != h0 {
+				uneven = true
+				break
+			}
+		}
+	}
+	best := int32(1)
+	for _, s := range groundSteps(n)[1:] {
+		for qz := int32(0); qz < n; qz += s {
+			for qx := int32(0); qx < n; qx += s {
+				if !g.quadFits(c, qx, qz, s, matOf, uneven && s == 2) {
+					return best
+				}
+			}
+		}
+		best = s
+	}
+	return best
+}
+
+// quadFits reports whether the quad of step s at chunk-local (qx, qz) covers one ground
+// material (unless mixed) and interpolates every vertex it covers within
+// groundTolerance.
+func (g *Gen) quadFits(c *Chunk, qx, qz, s int32, matOf func(x, z int32) string, mixed bool) bool {
+	m := matOf(qx, qz)
+	h := func(x, z int32) int64 { v, _ := c.Grid.At(c.Rect.X+x, c.Rect.Z+z); return int64(v) }
+	h00, h10, h01, h11 := h(qx, qz), h(qx+s, qz), h(qx, qz+s), h(qx+s, qz+s)
+	for dz := int32(0); dz <= s; dz++ {
+		for dx := int32(0); dx <= s; dx++ {
+			if !mixed && dx < s && dz < s && matOf(qx+dx, qz+dz) != m {
+				return false
+			}
+			// The interpolated height times s, on the triangle holding the vertex.
+			var at int64
+			if dx+dz <= s {
+				at = h00*int64(s) + (h10-h00)*int64(dx) + (h01-h00)*int64(dz)
+			} else {
+				at = h11*int64(s) + (h01-h11)*int64(s-dx) + (h10-h11)*int64(s-dz)
+			}
+			if d := h(qx+dx, qz+dz)*int64(s) - at; d > groundTolerance*int64(s) || d < -groundTolerance*int64(s) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // Ground builds the ground model of chunk c: one mesh per level of detail, each with a
-// part per ground material and a part for the water. Level k samples every 2^k-th
-// vertex; flat runs of cells at one height become one quad; every level hangs skirts
+// part per ground material and a part for the water. The finest level samples every
+// c.Step-th vertex (BaseStep), each next level every other vertex of the one before;
+// flat runs of quads at one height become one quad; every level hangs skirts
 // below the chunk's edges that are not straight, deep enough to close the cracks between
 // neighbouring chunks drawn at different levels. The water is the same at every level:
 // one quad per run of wet cells at one level. Vertices are local to the chunk's min
-// corner; one texture repeat per cell. Level k is drawn from the terrain's lod_distance ×
-// 2^(k-1) on; a level with no fewer triangles than the one before is left out.
+// corner; one texture repeat per cell. The k-th coarser level is drawn from the terrain's
+// lod_distance × 2^(k-1) on; a level with no fewer triangles than the one before is left
+// out.
 func (g *Gen) Ground(c *Chunk) *asset.Model {
 	cx, cz := c.X, c.Z
 	m := &asset.Model{Name: GroundName(cx, cz), Pivot: "origin"}
@@ -56,19 +123,24 @@ func (g *Gen) Ground(c *Chunk) *asset.Model {
 	}
 	b := groundBuilder{g: g, c: c, matOf: matOf, water: water, materials: len(m.Materials)}
 	normals := b.normals()
-	var prev int
-	for k, s := range groundLevels(n) {
+	var prev, k int
+	for _, s := range groundSteps(n) {
+		if s < c.Step {
+			continue
+		}
 		mesh := b.level(s, normals)
 		tris := len(mesh.Indices) / 3
 		switch {
 		case k == 0:
 			m.Mesh = mesh
-		case tris < prev:
+		case tris < prev && len(m.LODs) < 4:
 			m.LODs = append(m.LODs, asset.LOD{Distance: float32(float64(g.W.Terrain.LODDistance) * float64(int(1)<<(k-1))), Mesh: mesh})
 		default:
+			k++
 			continue
 		}
 		prev = tris
+		k++
 	}
 	bounds := m.Mesh.Bounds
 	for _, l := range m.LODs {

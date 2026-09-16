@@ -142,8 +142,8 @@ func TestTerrainStructuresAndScatter(t *testing.T) {
 				continue
 			}
 			if ok {
-				if h, _ := c.Grid.cellGround(x, z); s.Ground != h {
-					t.Fatalf("bush at %d,%d stands at %d, ground %d", x, z, s.Ground, h)
+				if centre := g.Center(x, z); s.Ground != int32(mm(c.HeightAt(centre.X, centre.Z, 1))) {
+					t.Fatalf("bush at %d,%d stands at %d, ground %v", x, z, s.Ground, c.HeightAt(centre.X, centre.Z, 1))
 				}
 			}
 		}
@@ -174,7 +174,7 @@ func TestHeightAtFollowsTheMesh(t *testing.T) {
 			// The centroid lies inside the triangle.
 			p := gmath.V3(float32((float64(a.X)+float64(b.X)+float64(d.X))/3), 0, float32((float64(a.Z)+float64(b.Z)+float64(d.Z))/3))
 			want := float64(a.Y+b.Y+d.Y) / 3
-			got := c.Grid.HeightAt(p.X+origin.X, p.Z+origin.Z, g.W.Cell)
+			got := c.HeightAt(p.X+origin.X, p.Z+origin.Z, g.W.Cell)
 			if math.Abs(float64(got)-want) > 1e-3 {
 				t.Fatalf("height at %v: %v, triangle says %v", p, got, want)
 			}

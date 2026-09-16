@@ -38,3 +38,12 @@ func (f field) value(x, z int32) uint32 {
 	fine := f.octave(1, x, z, max(1, f.scale/4))
 	return uint32((3*coarse + fine) / 4)
 }
+
+// smoothValue returns the noise of cell (x, z) in [0, 2^32) with a gentler second octave
+// (twice as fine, a quarter of the weight): the relief, whose slopes a hero walks and
+// whose chunks are drawn with a coarser grid when they are gentle enough.
+func (f field) smoothValue(x, z int32) uint32 {
+	coarse := f.octave(0, x, z, f.scale)
+	fine := f.octave(1, x, z, max(1, f.scale/2))
+	return uint32((3*coarse + fine) / 4)
+}

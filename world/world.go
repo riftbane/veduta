@@ -51,9 +51,11 @@ type Struct struct {
 	Rotation int      // degrees about +Y: 0, 90, 180 or 270
 	Tags     []string // the prefab's tags, plus the site rule's tag for a site
 	Place    string   // the place's name, "" for a site or a scatter item
-	Site     int      // the site rule's index, -1 for a place or a scatter item
-	Cell     [2]int32 // scatter: the cell; site: the region; place: the cell
-	Ground   int32    // millimeters: the height the structure stands on
+	// Vegetation is the vegetation rule's name for a prefab it scattered.
+	Vegetation string
+	Site       int      // the site rule's index, -1 for a place or a scatter item
+	Cell       [2]int32 // scatter: the cell; site: the region; place: the cell
+	Ground     int32    // millimeters: the height the structure stands on
 }
 
 // Chunk is the generated content of one chunk: its cells' biomes, its vertices and the
@@ -64,14 +66,20 @@ type Chunk struct {
 	Rect    Rect
 	Biomes  []int    // per cell, row-major
 	Grid    *Grid    // heights and water, from one cell before the chunk to one after it
+	Step    int32    // grid step of the finest drawn level (Gen.BaseStep)
 	Scatter []Struct // in cell order (row-major)
+	Flora   []Flora  // in cell order, then rule order
 }
 
+// scatterRule is a scatter rule or a vegetation rule with a prefab: one prefab per cell.
 type scatterRule struct {
-	asset.Scatter
-	prefab *asset.Prefab // nil when missing
-	cut    uint64
-	biomes []bool // allowed biome indices
+	prefab     *asset.Prefab // nil when missing
+	vegetation string        // the vegetation rule's name, "" for a scatter rule
+	salt       uint64        // hash stream: a scatter rule's index, a vegetation rule's name
+	index      int64
+	cut        uint64
+	biomes     []bool    // allowed biome indices
+	area       *areaRule // nil: everywhere
 }
 
 type siteRule struct {
@@ -99,6 +107,7 @@ type Gen struct {
 	reliefField field
 	seaLevel    int64 // millimeters, NoWater without a sea
 	features    []feature
+	flora       []floraRule
 }
 
 // New prepares a generator for w. prefabs resolves prefab names (nil: none known);
@@ -123,14 +132,15 @@ func New(w *asset.World, prefabs func(string) *asset.Prefab) *Gen {
 	}
 	g.cum = g.thresholds()
 	g.initTerrain()
-	for _, s := range w.Scatter {
+	for i, s := range w.Scatter {
 		p := lookup(s.Prefab)
-		r := scatterRule{Scatter: s, prefab: p, cut: share(s.Density)}
+		r := scatterRule{prefab: p, salt: saltScatter, index: int64(i), cut: share(s.Density)}
 		if p != nil {
 			r.biomes = g.allowed(s.Biomes, p.Biomes)
 		}
 		g.scatter = append(g.scatter, r)
 	}
+	g.initVegetation(lookup)
 	for _, s := range w.Sites {
 		r := siteRule{Site: s, cut: share(s.Chance)}
 		var dist float32
@@ -445,7 +455,8 @@ func (g *Gen) Chunk(cx, cz int32) *Chunk {
 		}
 	}
 	c.Biomes = biomes
-	if len(g.scatter) == 0 {
+	c.Step = g.BaseStep(c)
+	if len(g.scatter) == 0 && len(g.flora) == 0 {
 		return c
 	}
 	// Structures that keep scatter away: those within reach of the chunk.
@@ -475,16 +486,19 @@ func (g *Gen) Chunk(cx, cz int32) *Chunk {
 			if wet(ground, water) {
 				continue
 			}
+			g.floraCell(c, cell, b, near)
 			for r := range g.scatter {
 				rule := &g.scatter[r]
-				if rule.prefab == nil || !rule.biomes[b] {
+				if rule.prefab == nil || !rule.biomes[b] || rule.area != nil && !rule.area.contains(cell[0], cell[1]) {
 					continue
 				}
-				h := hash(g.W.Seed, saltScatter, int64(r), int64(cell[0]), int64(cell[1]))
+				h := hash(g.W.Seed, rule.salt, rule.index, int64(cell[0]), int64(cell[1]))
 				if uint64(uint32(h)) >= rule.cut {
 					continue
 				}
-				s := Struct{Key: prefix + strconv.Itoa(int(z*n+x)), Prefab: rule.prefab, Rect: Rect{cell[0], cell[1], 1, 1}, Tags: rule.prefab.Tags, Site: -1, Cell: cell, Ground: ground}
+				centre := g.Center(cell[0], cell[1])
+				s := Struct{Key: prefix + strconv.Itoa(int(z*n+x)), Prefab: rule.prefab, Rect: Rect{cell[0], cell[1], 1, 1}, Tags: rule.prefab.Tags, Site: -1, Cell: cell,
+					Ground: int32(mm(c.HeightAt(centre.X, centre.Z, g.W.Cell))), Vegetation: rule.vegetation}
 				free := true
 				for i := range near {
 					if g.conflicts(&s, &near[i]) {

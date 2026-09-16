@@ -23,14 +23,15 @@ type World struct {
 	focus   [2]int32
 	chunks  map[[2]int32]*loadedChunk
 	structs map[string]*loadedStruct
-	models  map[string]*asset.Model  // ground models of the loaded chunks, by model name
-	grids   map[[2]int32]*world.Grid // heights and water of the loaded chunks
-	loaded  [][2]int32               // sorted keys of chunks
+	models  map[string]*asset.Model   // ground models of the loaded chunks, by model name
+	grids   map[[2]int32]*world.Chunk // the loaded chunks' vertices, for HeightAt and WaterAt
+	loaded  [][2]int32                // sorted keys of chunks
 }
 
 type loadedChunk struct {
 	ids     []uint32
 	structs []string
+	models  []string // runtime models: the ground and the flora
 }
 
 type loadedStruct struct {
@@ -62,13 +63,13 @@ func (w *World) CellOf(pos gmath.Vec3) [2]int32 {
 // Loaded returns the loaded chunks, sorted by z then x.
 func (w *World) Loaded() [][2]int32 { return w.loaded }
 
-// grid returns the vertices around pos: the loaded chunk's, else generated.
-func (w *World) grid(pos gmath.Vec3) *world.Grid {
+// chunkAt returns the chunk holding pos: the loaded one, else generated.
+func (w *World) chunkAt(pos gmath.Vec3) *world.Chunk {
 	x, z := w.gen.CellOf(pos)
-	if gr := w.grids[w.chunkOf(x, z)]; gr != nil {
-		return gr
+	if c := w.grids[w.chunkOf(x, z)]; c != nil {
+		return c
 	}
-	return w.gen.Grid(world.Rect{X: x, Z: z, W: 1, D: 1}, 0)
+	return w.gen.ChunkAt(pos)
 }
 
 func (w *World) chunkOf(x, z int32) [2]int32 {
@@ -79,13 +80,13 @@ func (w *World) chunkOf(x, z int32) [2]int32 {
 // HeightAt returns the height of the ground under pos (its x and z), on the triangles of
 // the ground's finest level: a hero walking on hills sets its y to it.
 func (w *World) HeightAt(pos gmath.Vec3) float32 {
-	return w.grid(pos).HeightAt(pos.X, pos.Z, w.gen.W.Cell)
+	return w.chunkAt(pos).HeightAt(pos.X, pos.Z, w.gen.W.Cell)
 }
 
 // WaterAt returns the level of the water over pos (its x and z) and whether the ground
 // there lies under it: a lake or a sea.
 func (w *World) WaterAt(pos gmath.Vec3) (level float32, ok bool) {
-	return w.grid(pos).WaterAt(pos.X, pos.Z, w.gen.W.Cell)
+	return w.chunkAt(pos).WaterAt(pos.X, pos.Z, w.gen.W.Cell)
 }
 
 // bounds is the scene's BoundsFunc: a chunk ground's model, else the library's.
@@ -110,7 +111,7 @@ func newWorld(e *engine, wd *asset.World, at [2]int32) *World {
 	return &World{
 		Name: wd.Name, Start: at, gen: world.New(wd, e.assets.Prefab), eng: e, focus: at,
 		chunks: map[[2]int32]*loadedChunk{}, structs: map[string]*loadedStruct{}, models: map[string]*asset.Model{},
-		grids: map[[2]int32]*world.Grid{},
+		grids: map[[2]int32]*world.Chunk{},
 	}
 }
 
@@ -164,7 +165,9 @@ func (w *World) stream() bool {
 		}
 		delete(w.chunks, key)
 		delete(w.grids, key)
-		delete(w.models, world.GroundName(key[0], key[1]))
+		for _, name := range c.models {
+			delete(w.models, name)
+		}
 		e.emit("chunk_unload", map[string]any{"x": key[0], "z": key[1]})
 		changed = true
 	}
@@ -197,12 +200,15 @@ func (w *World) stream() bool {
 func (w *World) loadChunk(key [2]int32) {
 	e := w.eng
 	c := w.gen.Chunk(key[0], key[1])
-	w.grids[key] = c.Grid
-	model := w.gen.Ground(c)
-	w.models[model.Name] = model
-	lc := &loadedChunk{}
+	w.grids[key] = c
+	lc := &loadedChunk{models: w.addModels(c)}
 	first := e.ctx.Scene.NextID()
 	lc.ids = append(lc.ids, w.spawn([]asset.Entity{w.gen.GroundEntity(c)})...)
+	for _, name := range w.gen.FloraModels(c) {
+		if w.models[world.FloraName(name, c.X, c.Z)] != nil {
+			lc.ids = append(lc.ids, w.spawn([]asset.Entity{w.gen.FloraEntity(c, name)})...)
+		}
+	}
 	for i := range c.Scatter {
 		lc.ids = append(lc.ids, w.spawn(w.gen.Instantiate(&c.Scatter[i]))...)
 	}
@@ -221,6 +227,22 @@ func (w *World) loadChunk(key [2]int32) {
 		n += len(w.structs[k].ids)
 	}
 	e.emit("chunk_load", map[string]any{"x": key[0], "z": key[1], "entities": n, "first_id": first})
+}
+
+// addModels builds the ground and flora models of chunk c and returns their names.
+// Flora whose model the project lacks is left out (inspect world reports it).
+func (w *World) addModels(c *world.Chunk) []string {
+	ground := w.gen.Ground(c)
+	w.models[ground.Name] = ground
+	names := []string{ground.Name}
+	lookup := func(name string) *asset.Model { return w.eng.assets.Models[name] }
+	for _, name := range w.gen.FloraModels(c) {
+		if m := w.gen.Flora(c, name, lookup); m != nil {
+			w.models[m.Name] = m
+			names = append(names, m.Name)
+		}
+	}
+	return names
 }
 
 // spawn adds entities in order, resolving parents by name, and returns their ids.
@@ -289,10 +311,9 @@ func (w *World) snapshot() ([]snapChunk, []snapStruct) {
 func (w *World) restore(chunks []snapChunk, structs []snapStruct) {
 	for _, c := range chunks {
 		key := [2]int32{c.X, c.Z}
-		w.chunks[key] = &loadedChunk{ids: c.IDs, structs: c.Structs}
 		ch := w.gen.Chunk(c.X, c.Z)
-		w.grids[key] = ch.Grid
-		w.models[world.GroundName(c.X, c.Z)] = w.gen.Ground(ch)
+		w.grids[key] = ch
+		w.chunks[key] = &loadedChunk{ids: c.IDs, structs: c.Structs, models: w.addModels(ch)}
 		w.loaded = append(w.loaded, key)
 	}
 	for _, s := range structs {

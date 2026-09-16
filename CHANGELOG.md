@@ -25,6 +25,14 @@ All notable changes to this project are documented here. The format follows
   cells) with skirts closing the cracks between levels, and its water as flat quads
   (built-in material `world:water`). `World.HeightAt` and `World.WaterAt` (also on
   `world.Gen`) give the ground and the water under a position.
+- Vegetation for worlds (`docs/world.md`): named `vegetation` rules plant a one-cell
+  `prefab` (trees: entities, like scatter) or a flora `model` (grass, flowers: drawn with
+  the chunk as one `chunk_<cx>_<cz>_flora_<model>` entity per model, no collision, not
+  in the trace) at a `density`, optionally on `biomes` and inside a round area (`cell`,
+  `radius`), flora with a seeded `scale`. Flora follows its model's `lod` (level k keeps
+  one plant in 2^k) and `draw_distance`. Each chunk's ground is drawn with the coarsest
+  grid within 6 cm of its vertices (gentle ground costs a quarter of the triangles or
+  less), and `HeightAt` follows it.
 - `scene.Draw` skips entities whose drawn bounds lie wholly outside the camera's view
   volume (1 mm margin, so no pixel changes) and chooses levels of detail;
   `DrawOptions.Stats` counts culled, distant and reduced entities, and `render` reports
