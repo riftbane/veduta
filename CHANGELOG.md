@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## v1.4.1 — 2026-09-16
+
 ### Fixed
 
 - `bench` measures with nanosecond resolution; its test no longer expects an update of a
