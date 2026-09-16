@@ -60,8 +60,8 @@ func (goBenchGame) Init(ctx *veduta.Context) error {
 	}
 	return nil
 }
-func (goBenchGame) Update(*veduta.Context, veduta.Input)  {}
-func (goBenchGame) Draw(*veduta.Context, *gfx.DrawList) {}
+func (goBenchGame) Update(*veduta.Context, veduta.Input) {}
+func (goBenchGame) Draw(*veduta.Context, *gfx.DrawList)  {}
 
 func init() {
 	veduta.RegisterKind("gomover", func(e *scene.Entity) veduta.Behaviour {
