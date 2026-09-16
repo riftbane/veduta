@@ -42,6 +42,8 @@ All notable changes to this project are documented here. The format follows
   `tests/scenarios/recorded-<time>.scenario.json`; F9 reads the scripts (`veduta.Reloader`)
   and assets again and restarts. The simulator reloads by itself when a script, an asset
   source or veduta.json changes (`VEDUTA_WATCH=1` does it on Linux too).
+- The Lua API level: `script.APILevel` (1), `engine.api` in scripts, and `"api"` in a script
+  game's `veduta.json`; a runtime with a lower level refuses the game up front, naming both.
 - Engine hooks for games that are not Go code: `veduta.Starter`, `KindProvider` and
   `Failer`; `sim.Canonicaler` for state that encodes itself in the trace.
 

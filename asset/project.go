@@ -24,6 +24,7 @@ type Project struct {
 	Engine            string     // engine version the project targets, "vX.Y.Z[-pre][+build]"
 	Entry             string     // Go package of the game binary, "./cmd/game"
 	Script            string     // the game's main Lua file, "main.lua"; set, the game is a script game and Entry is not used
+	API               int        // the Lua API level a script game needs (1 when unset); 0 for a Go game
 	Resolution        [2]int     // the frame the game is designed for: default player and render size (width, height)
 	InspectResolution [2]int     // default inspection image size
 	TickRate          int        // simulation ticks per second
@@ -110,7 +111,11 @@ func CompileProject(src *ProjectSource, loc *Locator) (*Project, error) {
 	} else if e != "." {
 		checkRelPath(c, "entry", strings.TrimPrefix(e, "./"))
 	}
+	if src.API != 0 && src.Script == "" {
+		c.Errorf("api", "only a script game (with script) declares an API level")
+	}
 	if src.Script != "" {
+		p.API = c.Int("api", src.API, 1, 1<<16, 1)
 		checkRelPath(c, "script", src.Script)
 		if !strings.HasSuffix(src.Script, ".lua") {
 			c.Errorf("script", "%q must be a .lua file", src.Script)

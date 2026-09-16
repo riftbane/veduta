@@ -149,7 +149,9 @@ A color is `"#rrggbb"`, `"#rrggbbaa"` or an integer `0xrrggbb`; the default is w
 
 `engine.tick` (0 in `game.init`), `engine.dt` (seconds per tick), `engine.width`,
 `engine.height` (the frame: the project resolution, or in `game.draw` the frame being
-drawn), `engine.headless`, and the project's `engine.name` and `engine.title`.
+drawn), `engine.headless`, the project's `engine.name` and `engine.title`, and `engine.api`,
+the API level of the runtime (1 in v2.0.0). A game that needs a later level says so with
+`"api"` in `veduta.json`, and an older console refuses it with a message.
 
 ## trace, invariant, require
 

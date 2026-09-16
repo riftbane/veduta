@@ -27,6 +27,11 @@ import (
 	"github.com/riftbane/veduta/sprite"
 )
 
+// APILevel is the level of the Lua API this runtime provides. It grows by one whenever a
+// release adds to the API, so a game can say what it needs (veduta.json "api") and a console
+// with an older runtime can refuse it up front.
+const APILevel = 1
+
 // Budget is how many steps (loop iterations and calls) one callback may run before it is
 // stopped as an endless loop.
 const Budget = 20_000_000
@@ -59,6 +64,9 @@ type Game struct {
 func Load(root string, p *asset.Project, stderr io.Writer) (*Game, error) {
 	if p.Script == "" {
 		return nil, fmt.Errorf("script: %s names no script", asset.ProjectFile)
+	}
+	if p.API > APILevel {
+		return nil, fmt.Errorf("script: the game needs Lua API level %d, and this runtime (engine %s) has level %d: update the console", p.API, veduta.Version, APILevel)
 	}
 	g := &Game{root: root, main: p.Script, sources: map[string]string{}, stderr: stderr}
 	cooked := filepath.Clean(filepath.Join(root, p.Cooked))
@@ -169,6 +177,7 @@ func (g *Game) Start(ctx *veduta.Context) error {
 	g.vm.SetGlobal("kinds", lua.TableValue(g.kinds))
 	g.vm.SetGlobal("engine", lua.TableValue(g.engine))
 	g.install()
+	g.engine.SetString("api", lua.Int(APILevel))
 	g.engine.SetString("name", lua.String(ctx.Project.Name))
 	g.engine.SetString("title", lua.String(ctx.Project.Title))
 	g.syncEngine()

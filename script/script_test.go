@@ -3,6 +3,7 @@ package script
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -208,5 +209,14 @@ func TestReload(t *testing.T) {
 	}
 	if !strings.Contains(g.sources["main.lua"], "kinds.hero") {
 		t.Fatal("a failed reload replaced the scripts")
+	}
+}
+
+// TestAPILevel: a game that needs a later API level is refused before it runs.
+func TestAPILevel(t *testing.T) {
+	dir := copyGame(t, map[string]string{"veduta.json": `{"veduta": "project/1", "name": "later", "engine": "v9.0.0", "script": "main.lua", "api": 99}`})
+	r, _, code := run(t, dir, "simulate", "--scene", "main", "--ticks", "1", "--out", t.TempDir())
+	if code == 0 || !strings.Contains(r.Error, "needs Lua API level 99") || !strings.Contains(r.Error, fmt.Sprintf("has level %d", APILevel)) {
+		t.Fatalf("exit %d: %s", code, r.Error)
 	}
 }
