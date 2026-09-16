@@ -31,7 +31,6 @@ type FuzzOptions struct {
 	Parallel   int      // concurrent games (default: GOMAXPROCS)
 }
 
-
 // FuzzViolation is the first invariant violation of one random game.
 type FuzzViolation struct {
 	Game      int    `json:"game"`

@@ -219,8 +219,8 @@ type inputSource struct {
 	open  []openDevice
 	down  [sim.NumButtons]int // button → how many buttons and axes, over every device, hold it
 	out   []Event             // what the last poll returned, reused so an idle poll allocates nothing
-	next  time.Time        // when to look again
-	now   func() time.Time // replaced in tests
+	next  time.Time           // when to look again
+	now   func() time.Time    // replaced in tests
 	tried bool
 
 	log     io.Writer // where a change in what can be read is reported: stderr

@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
 )
 
 func TestParseScenarioSample(t *testing.T) {
