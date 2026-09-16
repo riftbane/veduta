@@ -41,11 +41,13 @@
 			$releases = Invoke-RestMethod -Headers $headers "https://api.github.com/repos/$repo/releases?per_page=30"
 			foreach ($r in $releases) {
 				if ($r.tag_name -notmatch '^v(\d+)\.(\d+)\.(\d+)(?:-(.+))?$') { continue }
+				# Taken before the suffix is looked at: every -match there replaces $Matches.
+				$key = '{0:D10}{1:D10}{2:D10}' -f [long]$Matches[1], [long]$Matches[2], [long]$Matches[3]
 				$pre = '~'
 				if ($Matches[4]) {
 					$pre = ($Matches[4].Split('.') | ForEach-Object { if ($_ -match '^\d+$') { '{0:D10}' -f [long]$_ } else { $_ } }) -join '.'
 				}
-				$key = '{0:D10}{1:D10}{2:D10}{3}' -f [long]$Matches[1], [long]$Matches[2], [long]$Matches[3], $pre
+				$key += $pre
 				if ($null -eq $bestKey -or [string]::CompareOrdinal($key, $bestKey) -gt 0) {
 					$best = $r.tag_name
 					$bestKey = $key
