@@ -329,7 +329,7 @@ func TestMCPEndToEnd(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"status", "build", "cook", "render", "simulate", "trace", "query", "diff", "test", "fuzz", "docs", "inspect", "world_map", "world_query", "world_place", "world_remove"} {
+	for _, want := range []string{"status", "build", "cook", "render", "simulate", "trace", "query", "diff", "test", "fuzz", "docs", "inspect", "world_map", "world_query", "world_place", "world_remove", "world_terrain", "world_vegetation"} {
 		if !names[want] {
 			t.Errorf("missing tool %s", want)
 		}
@@ -380,6 +380,16 @@ func TestMCPEndToEnd(t *testing.T) {
 	}
 	if bad, _, isErr := c.tool("world_place", map[string]any{"world": "overworld", "prefab": "village", "name": "far", "cell": []int{8190, 0}}); !isErr || bad["valid"] != false {
 		t.Fatalf("world_place outside: %v", bad)
+	}
+	wt, imgs, isErr := c.tool("world_terrain", map[string]any{"world": "overworld", "name": "bay", "kind": "sea", "cell": []int{-60, 0}, "radius": 40, "depth": 5, "dry_run": true})
+	if isErr || imgs != 1 || wt["written"] != false || wt["after"].(map[string]any)["water_cells"].(float64) == 0 {
+		t.Fatalf("world_terrain: %v", wt)
+	}
+	if bad, _, isErr := c.tool("world_terrain", map[string]any{"world": "overworld", "name": "hill", "kind": "hill", "cell": []int{0, 0}, "radius": 5}); !isErr || !strings.Contains(fmt.Sprint(bad), "height") {
+		t.Fatalf("world_terrain without height: %v", bad)
+	}
+	if wv, imgs, isErr := c.tool("world_vegetation", map[string]any{"world": "overworld", "name": "grove", "prefab": "tree", "density": 0.4, "cell": []int{0, -40}, "radius": 12, "dry_run": true}); isErr || imgs != 1 || wv["plants"].(float64) == 0 {
+		t.Fatalf("world_vegetation: %v", wv)
 	}
 	if wr, imgs, isErr := c.tool("render", map[string]any{"world": "overworld", "at": []int{16, 16}}); isErr || imgs != 1 || wr["world"] != "overworld" {
 		t.Fatalf("render world: %v", wr)

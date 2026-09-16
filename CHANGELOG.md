@@ -33,6 +33,16 @@ All notable changes to this project are documented here. The format follows
   one plant in 2^k) and `draw_distance`. Each chunk's ground is drawn with the coarsest
   grid within 6 cm of its vertices (gentle ground costs a quarter of the triangles or
   less), and `HeightAt` follows it.
+- Tools to shape and plant a world (`docs/world.md`): MCP `world_terrain` and CLI `veduta
+  world terrain` add a hill, plain, lake or sea (refused with the compiler's reasons when
+  invalid) and report the ground before and after, the chunks changed, places now in
+  water and sites removed; `world_vegetation` / `world vegetation` add a tree or flora
+  rule and report its plants, triangles and budget warnings; both write only the new
+  array element and take `dry_run`. `world_remove` removes places, features and
+  vegetation rules by name. `world_map` reports the ground, features and plants and
+  shades its image by the relief with water and labelled circles; `world_query` reports
+  the height, water, features and plants of a cell. Inspection adds `WORLD_PLACE_WATER`
+  and checks water materials and vegetation models and prefabs.
 - `scene.Draw` skips entities whose drawn bounds lie wholly outside the camera's view
   volume (1 mm margin, so no pixel changes) and chooses levels of detail;
   `DrawOptions.Stats` counts culled, distant and reduced entities, and `render` reports

@@ -340,3 +340,42 @@ func (g *Gen) HeightAt(pos gmath.Vec3) float32 {
 func (g *Gen) WaterAt(pos gmath.Vec3) (float32, bool) {
 	return g.ChunkAt(pos).WaterAt(pos.X, pos.Z, g.W.Cell)
 }
+
+// FeatureLevel returns the resolved level of the feature called name in meters: a
+// plain's level, a lake's or sea's water level, a hill's height.
+func (g *Gen) FeatureLevel(name string) (float32, bool) {
+	for i := range g.features {
+		if f := &g.features[i]; f.Name == name {
+			if f.Kind == asset.FeatureHill {
+				return mmMeters(f.height), true
+			}
+			return mmMeters(f.level), true
+		}
+	}
+	return 0, false
+}
+
+// FeaturesAt returns the names of the features that can shape vertex (x, z), in file
+// order.
+func (g *Gen) FeaturesAt(x, z int32) []string {
+	var out []string
+	for i := range g.features {
+		f := &g.features[i]
+		dx, dz := int64(x-f.Cell[0]), int64(z-f.Cell[1])
+		if dx*dx+dz*dz < f.reach*f.reach {
+			out = append(out, f.Name)
+		}
+	}
+	return out
+}
+
+// FeatureReach returns how many cells from its centre the feature called name can
+// change the ground (0 for none).
+func (g *Gen) FeatureReach(name string) int32 {
+	for i := range g.features {
+		if g.features[i].Name == name {
+			return int32(g.features[i].reach)
+		}
+	}
+	return 0
+}

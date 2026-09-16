@@ -13,7 +13,7 @@ type Region struct {
 	Structs []Struct  // sites and places overlapping the region, by key
 	Scatter []Struct  // scatter items inside the region, in chunk then cell order
 	Heights []int32   // millimeters at the centre of each cell, row-major
-	Water   []bool    // whether each cell is water, row-major
+	Water   []int32   // millimeters: the water level over each cell whose centre lies under water, else NoWater
 	Flora   []int     // flora instances inside the region per vegetation rule (0 for prefab rules)
 }
 
@@ -26,7 +26,7 @@ func (g *Gen) Region(center [2]int32, radius int32) *Region {
 	x1, z1 := min(r.X+r.W, b.X+b.W), min(r.Z+r.D, b.Z+b.D)
 	r = Rect{x0, z0, max(0, x1-x0), max(0, z1-z0)}
 	out := &Region{Rect: r, Biomes: make([]int, r.W*r.D), Shares: make([]float64, len(g.W.Biomes)),
-		Heights: make([]int32, r.W*r.D), Water: make([]bool, r.W*r.D), Flora: make([]int, len(g.W.Vegetation))}
+		Heights: make([]int32, r.W*r.D), Water: make([]int32, r.W*r.D), Flora: make([]int, len(g.W.Vegetation))}
 	for z := int32(0); z < r.D; z++ {
 		for x := int32(0); x < r.W; x++ {
 			bi := g.Biome(r.X+x, r.Z+z)
@@ -67,8 +67,12 @@ func (g *Gen) Region(center [2]int32, radius int32) *Region {
 			for z := max(c.Rect.Z, r.Z); z < min(c.Rect.Z+c.Rect.D, r.Z+r.D); z++ {
 				for x := max(c.Rect.X, r.X); x < min(c.Rect.X+c.Rect.W, r.X+r.W); x++ {
 					i := (z-r.Z)*r.W + (x - r.X)
-					out.Heights[i], _ = c.Grid.cellGround(x, z)
-					out.Water[i] = c.Grid.CellWater(x, z)
+					var level int32
+					out.Heights[i], level = c.Grid.cellGround(x, z)
+					out.Water[i] = NoWater
+					if wet(out.Heights[i], level) {
+						out.Water[i] = level
+					}
 				}
 			}
 		}

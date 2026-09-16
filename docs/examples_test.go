@@ -58,3 +58,46 @@ func TestTwoDExamplesCompile(t *testing.T) {
 		t.Fatalf("found %d JSON examples, want at least 4", n)
 	}
 }
+
+// Every JSON example of the world and model topics compiles, so the formats an agent
+// copies are valid.
+func TestWorldAndModelExamplesCompile(t *testing.T) {
+	for _, topic := range []string{"world", "model", "prefab"} {
+		text, err := docs.Get(topic)
+		if err != nil {
+			t.Fatal(err)
+		}
+		n := 0
+		for rest := text; ; {
+			i := strings.Index(rest, "```json\n")
+			if i < 0 {
+				break
+			}
+			rest = rest[i+len("```json\n"):]
+			j := strings.Index(rest, "\n```")
+			block := rest[:j]
+			rest = rest[j:]
+			var h struct{ Veduta string }
+			if json.Unmarshal([]byte(block), &h) != nil {
+				continue // fragments and error examples
+			}
+			switch h.Veduta {
+			case asset.TypeWorld:
+				_, err = asset.ParseWorld("overworld.world.json", []byte(block), nil)
+			case asset.TypePrefab:
+				_, err = asset.ParsePrefab("house.prefab.json", []byte(block))
+			case asset.TypeScenario:
+				_, err = asset.ParseScenario("walk.scenario.json", []byte(block))
+			default:
+				continue
+			}
+			if err != nil {
+				t.Errorf("%s example %d (%s): %v", topic, n, h.Veduta, err)
+			}
+			n++
+		}
+		if topic != "model" && n == 0 {
+			t.Errorf("%s: no example compiled", topic)
+		}
+	}
+}

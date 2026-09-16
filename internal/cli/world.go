@@ -5,9 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/riftbane/veduta/asset"
@@ -82,6 +85,19 @@ type WorldMapReport struct {
 	Scatter int            `json:"scatter"`
 	Missing []string       `json:"missing_prefabs"`
 	Sheet   string         `json:"sheet"`
+	// Ground is the region's lowest and highest cell centre and its water cells.
+	Ground     GroundStats         `json:"ground"`
+	Features   []FeatureReport     `json:"features"`   // features whose area touches the region
+	Vegetation []VegetationSummary `json:"vegetation"` // every rule, with its plants in the region
+}
+
+// VegetationSummary is a vegetation rule and its plants in a region.
+type VegetationSummary struct {
+	Name   string    `json:"name"`
+	Prefab string    `json:"prefab,omitempty"`
+	Model  string    `json:"model,omitempty"`
+	Area   *[3]int32 `json:"area,omitempty"` // x, z, radius
+	Plants int       `json:"plants"`
 }
 
 // BiomeShare is a biome's share of a region.
@@ -103,6 +119,13 @@ func (r *WorldMapReport) Human() string {
 	}
 	for _, p := range r.Sites {
 		fmt.Fprintf(&b, "  site  %-12s %-12s at [%d, %d] %d×%d\n", p.Key, p.Prefab, p.Cell[0], p.Cell[1], p.Footprint[0], p.Footprint[1])
+	}
+	fmt.Fprintf(&b, "  ground %.2f..%.2f m, %d water cells\n", r.Ground.Min, r.Ground.Max, r.Ground.WaterCells)
+	for _, f := range r.Features {
+		fmt.Fprintf(&b, "  feature %-12s %-6s at [%d, %d] radius %d level %.2f\n", f.Name, f.Kind, f.Cell[0], f.Cell[1], f.Radius, f.Level)
+	}
+	for _, v := range r.Vegetation {
+		fmt.Fprintf(&b, "  vegetation %-12s %s%s: %d plants\n", v.Name, v.Prefab, v.Model, v.Plants)
 	}
 	fmt.Fprintf(&b, "  scatter: %d\nsheet: %s\n", r.Scatter, r.Sheet)
 	return b.String()
@@ -138,6 +161,32 @@ func (s *Session) WorldMap(name string, center [2]int32, radius int32) (*WorldMa
 			rep.Sites = append(rep.Sites, r)
 		}
 	}
+	rep.Ground = groundStats(reg, center)
+	rep.Features, rep.Vegetation = []FeatureReport{}, []VegetationSummary{}
+	for _, f := range g.W.Features {
+		reach := g.FeatureReach(f.Name)
+		if !reg.Rect.Overlaps(world.Rect{X: f.Cell[0] - reach, Z: f.Cell[1] - reach, W: 2 * reach, D: 2 * reach}) {
+			continue
+		}
+		level, _ := g.FeatureLevel(f.Name)
+		fr := FeatureReport{Name: f.Name, Kind: f.Kind, Cell: f.Cell, Radius: f.Radius, Level: level, Falloff: f.Falloff, Roughness: f.Roughness}
+		if f.IsWater() {
+			fr.Depth = f.Depth
+		}
+		rep.Features = append(rep.Features, fr)
+	}
+	for i, v := range g.W.Vegetation {
+		vs := VegetationSummary{Name: v.Name, Prefab: v.Prefab, Model: v.Model, Plants: reg.Flora[i]}
+		if v.Area {
+			vs.Area = &[3]int32{v.Cell[0], v.Cell[1], v.Radius}
+		}
+		for _, st := range reg.Scatter {
+			if st.Vegetation == v.Name {
+				vs.Plants++
+			}
+		}
+		rep.Vegetation = append(rep.Vegetation, vs)
+	}
 	img := inspect.MapImage(g, center, radius)
 	p := s.Out(name + ".map.png")
 	if err := writePNGFile(p, img); err != nil {
@@ -156,6 +205,12 @@ type WorldQueryReport struct {
 	Ground   string          `json:"ground"`
 	Occupant *StructReport   `json:"occupant,omitempty"`
 	Nearest  []world.Nearest `json:"nearest"`
+	// Height is the ground at the cell's centre in meters; Water the level of the water
+	// over it when the centre lies under water.
+	Height     float64  `json:"height"`
+	Water      *float64 `json:"water,omitempty"`
+	Features   []string `json:"features"`   // features that shape the cell's corner, in file order
+	Vegetation []string `json:"vegetation"` // vegetation rules with a plant on the cell
 }
 
 // WorldQuery describes one cell.
@@ -169,7 +224,28 @@ func (s *Session) WorldQuery(name string, cell [2]int32) (*WorldQueryReport, err
 		return nil, usagef("world query: cell [%d, %d] is outside %s (cells -%d to %d)", cell[0], cell[1], name, span, span-1)
 	}
 	info := g.Query(cell[0], cell[1], 4)
-	rep := &WorldQueryReport{World: name, Cell: info.Cell, Chunk: info.Chunk, Biome: info.Biome, Ground: info.Ground, Nearest: info.Nearest}
+	rep := &WorldQueryReport{World: name, Cell: info.Cell, Chunk: info.Chunk, Biome: info.Biome, Ground: info.Ground, Nearest: info.Nearest,
+		Features: g.FeaturesAt(cell[0], cell[1]), Vegetation: []string{}}
+	if rep.Features == nil {
+		rep.Features = []string{}
+	}
+	c := g.Chunk(info.Chunk[0], info.Chunk[1])
+	centre := g.Center(cell[0], cell[1])
+	rep.Height = math.Round(float64(c.HeightAt(centre.X, centre.Z, g.W.Cell))*1000) / 1000
+	if level, wet := c.WaterAt(centre.X, centre.Z, g.W.Cell); wet {
+		l := math.Round(float64(level)*1000) / 1000
+		rep.Water = &l
+	}
+	for _, f := range c.Flora {
+		if f.Cell == cell && !slices.Contains(rep.Vegetation, g.W.Vegetation[f.Rule].Name) {
+			rep.Vegetation = append(rep.Vegetation, g.W.Vegetation[f.Rule].Name)
+		}
+	}
+	for _, st := range c.Scatter {
+		if st.Cell == cell && st.Vegetation != "" {
+			rep.Vegetation = append(rep.Vegetation, st.Vegetation)
+		}
+	}
 	if info.Occupant != nil {
 		r := structReport(g, info.Occupant)
 		rep.Occupant = &r
@@ -322,65 +398,124 @@ func (s *Session) WorldPlace(o WorldPlaceOptions) (*WorldPlaceReport, error) {
 type WorldRemoveReport struct {
 	World   string `json:"world"`
 	Name    string `json:"name"`
+	Kind    string `json:"kind"` // place, feature or vegetation
 	Removed bool   `json:"removed"`
 	File    string `json:"file"`
 }
 
-// WorldRemove deletes a place from the world's file.
-func (s *Session) WorldRemove(name, place string) (*WorldRemoveReport, error) {
+// WorldRemove deletes a place, a terrain feature or a vegetation rule from the world's
+// file.
+func (s *Session) WorldRemove(name, what string) (*WorldRemoveReport, error) {
 	g, lib, err := s.worldGen(name)
 	if err != nil {
 		return nil, err
 	}
-	found := false
+	rep := &WorldRemoveReport{World: name, Name: what, File: s.worldFile(name)}
 	for _, p := range g.W.Places {
-		found = found || p.Name == place
+		if p.Name == what {
+			rep.Kind = "place"
+		}
 	}
-	if !found {
-		return nil, usagef("world remove: %s has no place called %q", name, place)
+	for _, f := range g.W.Features {
+		if f.Name == what {
+			rep.Kind = "feature"
+		}
 	}
-	if err := s.editWorldPlaces(name, nil, place, lib); err != nil {
+	for _, v := range g.W.Vegetation {
+		if v.Name == what {
+			rep.Kind = "vegetation"
+		}
+	}
+	switch rep.Kind {
+	case "":
+		return nil, usagef("world remove: %s has no place, feature or vegetation rule called %q", name, what)
+	case "place":
+		err = s.editWorldPlaces(name, nil, what, lib)
+	case "feature":
+		_, err = s.editWorld(name, "features", "", what, lib, false)
+	default:
+		_, err = s.editWorld(name, "vegetation", "", what, lib, false)
+	}
+	if err != nil {
 		return nil, err
 	}
-	return &WorldRemoveReport{World: name, Name: place, Removed: true,
-		File: s.Rel(filepath.Join(s.Root, filepath.FromSlash(s.Project.Assets), asset.KindWorld.Dir(), name+asset.KindWorld.Ext()))}, nil
+	rep.Removed = true
+	return rep, nil
+}
+
+// editWorld rewrites the world's source file with an element appended to (add, JSON
+// text) or removed from (the element named remove) its array field, touching no other
+// byte, and checks that the result compiles. The compiled world is returned; nothing is
+// written when dryRun is set.
+func (s *Session) editWorld(name, field, add, remove string, lib *asset.Library, dryRun bool) (*asset.World, error) {
+	file := filepath.Join(s.Root, filepath.FromSlash(s.Project.Assets), asset.KindWorld.Dir(), name+asset.KindWorld.Ext())
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	out, err := editNamed(data, field, add, remove)
+	if err != nil {
+		return nil, fmt.Errorf("edit %s: %w", s.Rel(file), err)
+	}
+	w, err := asset.ParseWorld(s.Rel(file), out, lib.Prefab)
+	if err != nil {
+		return nil, usagef("%s: %w", name, err)
+	}
+	if !dryRun {
+		if err := writeFileAtomic(file, out); err != nil {
+			return nil, err
+		}
+	}
+	return w, nil
 }
 
 // editWorldPlaces rewrites the world's source file with a place appended or removed,
 // touching no other byte, and checks that the result compiles to what was asked.
 func (s *Session) editWorldPlaces(name string, add *asset.PlaceSource, remove string, lib *asset.Library) error {
-	file := filepath.Join(s.Root, filepath.FromSlash(s.Project.Assets), asset.KindWorld.Dir(), name+asset.KindWorld.Ext())
-	data, err := os.ReadFile(file)
+	elem := placeElem(add)
+	w, err := s.editWorld(name, "places", elem, remove, lib, true)
 	if err != nil {
 		return err
-	}
-	out, err := editPlaces(data, add, remove)
-	if err != nil {
-		return fmt.Errorf("edit %s: %w", s.Rel(file), err)
-	}
-	w, err := asset.ParseWorld(s.Rel(file), out, lib.Prefab)
-	if err != nil {
-		return fmt.Errorf("edit %s: the result does not compile: %w", s.Rel(file), err)
 	}
 	for _, p := range w.Places {
 		if add != nil && p.Name == add.Name && p.Prefab == add.Prefab && int(p.Cell[0]) == add.Cell[0] && int(p.Cell[1]) == add.Cell[1] && p.Rotation == add.Rotation {
 			add = nil
 		}
 		if remove != "" && p.Name == remove {
-			return fmt.Errorf("edit %s: place %q is still there", s.Rel(file), remove)
+			return fmt.Errorf("edit %s: place %q is still there", name, remove)
 		}
 	}
 	if add != nil {
-		return fmt.Errorf("edit %s: the place did not land in the file", s.Rel(file))
+		return fmt.Errorf("edit %s: the place did not land in the file", name)
 	}
-	return writeFileAtomic(file, out)
+	_, err = s.editWorld(name, "places", elem, remove, lib, false)
+	return err
 }
 
-// editPlaces edits the "places" array of a world source in place: add appends an
-// element, remove deletes the element named remove. Formatting, key order and every
-// other byte of the file stay as they are; a missing "places" field is inserted after the
-// nearest field that precedes it in the documented key order.
+// placeElem writes a place as one line of JSON ("" for nil).
+func placeElem(p *asset.PlaceSource) string {
+	if p == nil {
+		return ""
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, `{ "name": %q, "prefab": %q, "cell": [%d, %d]`, p.Name, p.Prefab, p.Cell[0], p.Cell[1])
+	if p.Rotation != 0 {
+		fmt.Fprintf(&b, `, "rotation": %d`, p.Rotation)
+	}
+	b.WriteString(" }")
+	return b.String()
+}
+
+// editPlaces edits the "places" array of a world source in place (see editNamed).
 func editPlaces(data []byte, add *asset.PlaceSource, remove string) ([]byte, error) {
+	return editNamed(data, "places", placeElem(add), remove)
+}
+
+// editNamed edits an array field of a world source in place: add (the JSON text of one
+// element) is appended, or the element whose "name" is remove is deleted. Formatting, key
+// order and every other byte of the file stay as they are; a missing field is inserted
+// after the nearest field that precedes it in the documented key order.
+func editNamed(data []byte, field, add, remove string) ([]byte, error) {
 	fields, err := manifestFields(data)
 	if err != nil {
 		return nil, err
@@ -389,27 +524,14 @@ func editPlaces(data []byte, add *asset.PlaceSource, remove string) ([]byte, err
 	if l := lineLead(fields[0].lead); strings.TrimLeft(l, "\r\n") != "" {
 		unit = strings.TrimLeft(l, "\r\n")
 	}
-	elem := func(indent string) string {
-		if add == nil {
-			return ""
-		}
-		var b strings.Builder
-		fmt.Fprintf(&b, `{ "name": %q, "prefab": %q, "cell": [%d, %d]`, add.Name, add.Prefab, add.Cell[0], add.Cell[1])
-		if add.Rotation != 0 {
-			fmt.Fprintf(&b, `, "rotation": %d`, add.Rotation)
-		}
-		b.WriteString(" }")
-		_ = indent
-		return b.String()
-	}
-	i := findField(fields, "places")
+	i := findField(fields, field)
 	if i < 0 {
-		if add == nil {
-			return nil, fmt.Errorf("no places field")
+		if add == "" {
+			return nil, fmt.Errorf("no %s field", field)
 		}
-		// Insert after the last field that documents before "places".
+		// Insert after the last field that documents before this one.
 		order := worldKeyOrder()
-		at := indexOf(order, "places")
+		at := indexOf(order, field)
 		after := -1
 		for k, f := range fields {
 			if idx := indexOf(order, strings.ToLower(f.key)); idx >= 0 && idx < at {
@@ -429,7 +551,7 @@ func editPlaces(data []byte, add *asset.PlaceSource, remove string) ([]byte, err
 		if strings.ContainsAny(colon, "\r\n") {
 			colon = ": "
 		}
-		text := "," + lead + `"places"` + colon + "[" + inner + elem("") + lead + "]"
+		text := "," + lead + `"` + field + `"` + colon + "[" + inner + add + lead + "]"
 		out := append([]byte{}, data[:f.valEnd]...)
 		out = append(out, text...)
 		return append(out, data[f.valEnd:]...), nil
@@ -437,11 +559,11 @@ func editPlaces(data []byte, add *asset.PlaceSource, remove string) ([]byte, err
 	f := fields[i]
 	val := data[f.valStart:f.valEnd]
 	if len(val) == 0 || val[0] != '[' {
-		return nil, fmt.Errorf("places is not an array")
+		return nil, fmt.Errorf("%s is not an array", field)
 	}
 	elems, err := arrayElems(val)
 	if err != nil {
-		return nil, fmt.Errorf("places: %w", err)
+		return nil, fmt.Errorf("%s: %w", field, err)
 	}
 	fieldLead := lineLead(f.lead)
 	inner := fieldLead + unit
@@ -450,10 +572,10 @@ func editPlaces(data []byte, add *asset.PlaceSource, remove string) ([]byte, err
 	}
 	var out []byte
 	switch {
-	case add != nil && len(elems) == 0:
-		out = append(append([]byte{}, data[:f.valStart]...), "["+inner+elem("")+fieldLead+"]"...)
+	case add != "" && len(elems) == 0:
+		out = append(append([]byte{}, data[:f.valStart]...), "["+inner+add+fieldLead+"]"...)
 		out = append(out, data[f.valEnd:]...)
-	case add != nil:
+	case add != "":
 		last := elems[len(elems)-1]
 		// The new element copies the indentation of the last one.
 		prevEnd := 1
@@ -465,18 +587,20 @@ func editPlaces(data []byte, add *asset.PlaceSource, remove string) ([]byte, err
 			lead = " "
 		}
 		pos := f.valStart + last[1]
-		out = append(append([]byte{}, data[:pos]...), ","+lead+elem("")...)
+		out = append(append([]byte{}, data[:pos]...), ","+lead+add...)
 		out = append(out, data[pos:]...)
 	default:
 		k := -1
 		for j, e := range elems {
-			var p asset.PlaceSource
+			var p struct {
+				Name string `json:"name"`
+			}
 			if json.Unmarshal(val[e[0]:e[1]], &p) == nil && p.Name == remove {
 				k = j
 			}
 		}
 		if k < 0 {
-			return nil, fmt.Errorf("no place named %q", remove)
+			return nil, fmt.Errorf("no element of %s named %q", field, remove)
 		}
 		start, end := elems[k][0], elems[k][1]
 		switch {
@@ -583,12 +707,12 @@ func parseCellFlag(s string) (*[2]int32, error) {
 func init() {
 	register(command{
 		name:    "world",
-		usage:   "world map|query|place|remove NAME [flags]",
-		summary: "describe and edit a world: its map (--center x,z --radius N), one cell (query --cell x,z), a landmark placed where the rules allow (place --prefab P --name N [--cell x,z | --near x,z --within N] [--rotation R] [--dry-run]), or removed (remove --name N)",
+		usage:   "world map|query|place|terrain|vegetation|remove NAME [flags]",
+		summary: "describe and edit a world: its map (--center x,z --radius N), one cell (query --cell x,z), a landmark placed where the rules allow (place --prefab P --name N [--cell x,z | --near x,z --within N] [--rotation R] [--dry-run]), a hill, plain, lake or sea (terrain --kind K --name N --cell x,z --radius R [--height H] [--depth D] [--falloff F] [--roughness X] [--dry-run]), trees or flora (vegetation --name N --prefab P|--model M --density D [--biomes a,b] [--cell x,z --radius R] [--scale min,max] [--dry-run]), or any of them removed (remove --name N)",
 		project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) {
 			if len(args) < 2 {
-				return nil, usagef("world: want map|query|place|remove NAME")
+				return nil, usagef("world: want map|query|place|terrain|vegetation|remove NAME")
 			}
 			sub, name, rest := args[0], args[1], args[2:]
 			fs := newFlags("world "+sub, env.Stderr)
@@ -641,8 +765,75 @@ func init() {
 				}
 				o.Near, o.Within = *n, int32(*within)
 				return s.WorldPlace(o)
+			case "terrain":
+				o := WorldTerrainOptions{World: name}
+				var cell, height, depth, roughness string
+				falloff := fs.Int("falloff", -1, "cells of the edge's blend (hill, plain) or of the shore (lake, sea)")
+				fs.StringVar(&o.Kind, "kind", "", "hill, plain, lake or sea")
+				fs.StringVar(&o.Name, "name", "", "name of the feature")
+				fs.StringVar(&cell, "cell", "", "centre vertex x,z")
+				radius := fs.Int("radius", 0, "cells from the centre to the edge")
+				fs.StringVar(&height, "height", "", "hill: meters at the top; plain: level; lake, sea: water level")
+				fs.StringVar(&depth, "depth", "", "lake, sea: meters deep at the centre")
+				fs.StringVar(&roughness, "roughness", "", "0 to 1: how far the edge wanders")
+				fs.BoolVar(&o.DryRun, "dry-run", false, "report without writing")
+				if err := parseFlags(fs, rest); err != nil {
+					return nil, err
+				}
+				c, err := parseCellFlag(cell)
+				if err != nil || c == nil || o.Kind == "" || o.Name == "" || *radius == 0 {
+					return nil, usagef("world terrain: --kind, --name, --cell x,z and --radius are required")
+				}
+				o.Cell, o.Radius = *c, int32(*radius)
+				for _, f := range []struct {
+					flag string
+					dst  **float32
+				}{{height, &o.Height}, {depth, &o.Depth}, {roughness, &o.Roughness}} {
+					if f.flag != "" {
+						v, err := strconv.ParseFloat(f.flag, 32)
+						if err != nil {
+							return nil, usagef("world terrain: %q is not a number", f.flag)
+						}
+						x := float32(v)
+						*f.dst = &x
+					}
+				}
+				if *falloff >= 0 {
+					o.Falloff = falloff
+				}
+				return s.WorldTerrain(o)
+			case "vegetation":
+				o := WorldVegetationOptions{World: name}
+				var cell, biomes, scale string
+				fs.StringVar(&o.Name, "name", "", "name of the rule")
+				fs.StringVar(&o.Prefab, "prefab", "", "one-cell prefab to plant (trees)")
+				fs.StringVar(&o.Model, "model", "", "flora model to plant (grass, flowers)")
+				density := fs.Float64("density", 0, "share of the cells that get a plant")
+				fs.StringVar(&biomes, "biomes", "", "biomes to plant on, comma-separated")
+				fs.StringVar(&cell, "cell", "", "centre x,z of the area")
+				radius := fs.Int("radius", 0, "cells from the centre")
+				fs.StringVar(&scale, "scale", "", "model: min,max scale")
+				fs.BoolVar(&o.DryRun, "dry-run", false, "report without writing")
+				if err := parseFlags(fs, rest); err != nil {
+					return nil, err
+				}
+				if o.Name == "" || *density == 0 {
+					return nil, usagef("world vegetation: --name, --density and --prefab or --model are required")
+				}
+				var err error
+				if o.Cell, err = parseCellFlag(cell); err != nil {
+					return nil, err
+				}
+				if o.Scale, err = parseFloatList(scale); err != nil {
+					return nil, err
+				}
+				if biomes != "" {
+					o.Biomes = strings.Split(biomes, ",")
+				}
+				o.Density, o.Radius = float32(*density), int32(*radius)
+				return s.WorldVegetation(o)
 			case "remove":
-				place := fs.String("name", "", "name of the place to remove")
+				place := fs.String("name", "", "name of the place, feature or vegetation rule to remove")
 				if err := parseFlags(fs, rest); err != nil {
 					return nil, err
 				}
@@ -651,7 +842,7 @@ func init() {
 				}
 				return s.WorldRemove(name, *place)
 			}
-			return nil, usagef("world: unknown subcommand %q (want map, query, place or remove)", sub)
+			return nil, usagef("world: unknown subcommand %q (want map, query, place, terrain, vegetation or remove)", sub)
 		},
 	})
 	prev := mcpExtraTools
@@ -662,7 +853,7 @@ func init() {
 		return append(prev(m),
 			mcp.Tool{
 				Name:        "world_map",
-				Description: "Describe a world around a cell: biome shares, the places and sites in the region with their cell rectangles, the number of scattered prefabs, and one image of the map (biomes in colour, sites in orange, places in red with their names, north up). Cells are integers; the world's cell size is in its file.",
+				Description: "Describe a world around a cell: biome shares, the ground's lowest and highest point and its water cells, the features (hills, plains, lakes, seas) touching the region with their resolved levels, every vegetation rule with its plants in the region, the places and sites with their cell rectangles, the number of scattered prefabs, and one image of the map (biomes shaded by the relief, water in blue, features and vegetation areas as labelled circles, sites in orange, places in red, north up). Cells are integers; the world's cell size is in its file.",
 				InputSchema: schema(map[string]any{
 					"world":  str("world name"),
 					"center": cell("centre cell [x, z] (default [0, 0])"),
@@ -686,7 +877,7 @@ func init() {
 			},
 			mcp.Tool{
 				Name:        "world_query",
-				Description: "What is at a cell of a world: its biome and ground, its chunk, the place, site or scattered prefab occupying it (with its cell rectangle), and the nearest place of each name and site of each tag with the free cells between. Exact and cheap: ask before and after placing.",
+				Description: "What is at a cell of a world: its biome and ground material, its chunk, the ground's height at its centre and the water level when it is under water, the features shaping it, the vegetation rules with a plant on it, the place, site or scattered prefab occupying it (with its cell rectangle), and the nearest place of each name and site of each tag with the free cells between. Exact and cheap: ask before and after placing.",
 				InputSchema: schema(map[string]any{"world": str("world name"), "cell": cell("cell [x, z]")}, "world", "cell"),
 				Handler: m.sessionTool(func(ctx context.Context, s *Session, args json.RawMessage) (*mcp.Result, error) {
 					var a struct {
@@ -741,8 +932,8 @@ func init() {
 			},
 			mcp.Tool{
 				Name:        "world_remove",
-				Description: "Remove a place from a world's file (the sites it displaced come back).",
-				InputSchema: schema(map[string]any{"world": str("world name"), "name": str("name of the place")}, "world", "name"),
+				Description: "Remove a place, a terrain feature or a vegetation rule from a world's file by name (the sites a place displaced come back).",
+				InputSchema: schema(map[string]any{"world": str("world name"), "name": str("name of the place, feature or vegetation rule")}, "world", "name"),
 				Handler: m.sessionTool(func(ctx context.Context, s *Session, args json.RawMessage) (*mcp.Result, error) {
 					var a struct {
 						World string `json:"world"`

@@ -295,39 +295,49 @@ level.
 
 | Code | Severity | Meaning |
 |------|----------|---------|
-| `WORLD_MISSING_PREFAB` | error | A scatter, site or place names a prefab that does not exist. |
-| `WORLD_MISSING_ASSET` | error | A ground or water material, or a model or material of a persistent entity, does not exist. |
+| `WORLD_MISSING_PREFAB` | error | A scatter, site, place or vegetation rule names a prefab that does not exist. |
+| `WORLD_MISSING_ASSET` | error | A ground or water material, a vegetation model, or a model or material of a persistent entity, does not exist. |
 | `WORLD_GROUND_NOT_TILING` | error | A biome's ground material has no texture or one that is not `tiling`. |
 | `WORLD_PLACE_OVERLAP` | error | Two places' footprints overlap. |
 | `WORLD_PLACE_OUTSIDE` | error | A place's footprint leaves the world. |
 | `WORLD_PLACE_BIOME` | warning | A place stands on a biome its prefab (or the biome list) does not allow. |
 | `WORLD_PLACE_WATER` | warning | A vertex of a place's footprint lies under water. |
 | `WORLD_PLACE_TOO_CLOSE` | warning | Two places are closer than a `min_distance` rule allows. |
-| `WORLD_CHUNK_BUDGET` | warning | The densest sampled chunk, scaled to what the camera sees, exceeds the console's triangle budget. |
+| `WORLD_CHUNK_BUDGET` | warning | The densest sampled chunk (ground at its finest level, flora, scatter, structures), scaled to what the camera sees, exceeds the console's triangle budget. |
 | `WORLD_VIEW_SHORT` | warning | The camera sees farther than `view` chunks, so unloaded ground is visible. |
 
-Sheet: `map`, the top-down map around the origin (biome colors, footprints, names).
+Sheet: `map`, the top-down map around the origin (biome colours shaded by the relief,
+water, features and vegetation areas as labelled circles, footprints, names).
 
 MCP tools (CLI `veduta world …`), all cell-based:
 
 | Tool | Input | Output |
 |------|-------|--------|
-| `world_map` | `{ world, center?: [x, z], radius?: cells }` | Biome shares, places and sites in the region with their cell rectangles, counts; one image (biomes, footprints, names). |
-| `world_query` | `{ world, cell: [x, z] }` | Biome, ground, chunk, what occupies the cell (place, site or scatter, with its rectangle), nearest place and site per tag with distances. |
+| `world_map` | `{ world, center?: [x, z], radius?: cells }` | Biome shares, `ground` (lowest and highest cell, water cells), the `features` touching the region with their resolved `level`, every `vegetation` rule with its `plants` in the region, places and sites with their cell rectangles, counts; one image (relief, water, circles, footprints, names). |
+| `world_query` | `{ world, cell: [x, z] }` | Biome, ground material, chunk, `height` at the cell's centre, `water` level when it is under water, the `features` shaping it, the `vegetation` rules with a plant on it, what occupies the cell (place, site or scatter, with its rectangle), nearest place and site per tag with distances. |
 | `world_place` | `{ world, prefab, name, cell?: [x, z], near?: [x, z], within?: cells, rotation?, dry_run? }` | With `cell`: validates it. Without: searches outward from `near` (default `[0, 0]`, rings up to `within`, default 64 cells, +X first then clockwise) for the first cell where every rule holds. A valid place is appended to the file's `places` (other bytes untouched) and returned; an invalid one is refused with every reason and nothing is written. |
-| `world_remove` | `{ world, name }` | Removes the place from the file. |
+| `world_terrain` | `{ world, name, kind, cell, radius, height?, depth?, falloff?, roughness?, dry_run? }` | Appends a hill, plain, lake or sea to `features` when the world still compiles (else refused with the compiler's reasons, nothing written). Reports the feature as resolved (its `level`), the `chunks` it changes, the ground `before` and `after` (min, max, centre, water cells) within 96 cells of its centre, `places_in_water`, `sites_removed` and `sites_added`; one map image. |
+| `world_vegetation` | `{ world, name, prefab? \| model?, density, biomes?, cell?, radius?, scale?, dry_run? }` | Appends a vegetation rule when valid. Reports the `plants` in its area (or within 64 cells of the origin for a world-wide rule), their `triangles`, the most in one chunk (`max_chunk_triangles`), the flora model's `draw_distance`, and `warnings` (no draw distance, a heavy flora model, a chunk over half the budget, no plant at all); one map image. |
+| `world_remove` | `{ world, name }` | Removes the place, feature or vegetation rule of that name from the file (an emptied array stays as `[]`). |
 | `render`, `simulate` | `{ world, at?: [x, z], … }` | As for a scene, starting at cell `at`. |
 
 ## Authoring loop
 
-1. Write the prefabs (`prefab` topic); `inspect prefab <name>` until clean.
-2. Write the world's biomes, scatter and sites; `cook`; `world_map` and look.
-3. Add landmarks with `world_place` (let it choose the cell with `near`); `world_query`
-   to check a cell you care about.
-4. `inspect world <name>` until it reports no error; heed `WORLD_CHUNK_BUDGET`.
-5. `render { world, at }` at a landmark and look; `simulate { world, at, ticks }` walking
-   across a chunk border, expecting `chunk_load` events and no invariant violation.
-6. Keep that simulation as a scenario:
+1. Write the prefabs (`prefab` topic) and the flora models (a few triangles each, with a
+   `draw_distance`); `inspect prefab <name>` and `inspect model <name>` until clean.
+2. Write the world's biomes, `terrain` (a gentle `relief`), scatter and sites; `cook`;
+   `world_map` and look.
+3. Shape the land with `world_terrain`: hills and hollows, a `plain` where a town will
+   stand, lakes, a sea off a coast. Read `after` and `places_in_water`; `world_map` again.
+4. Plant it with `world_vegetation`: groves of trees (`prefab`), grass on a biome, flowers
+   in a meadow (`model`, `cell`, `radius`). Heed its `warnings`.
+5. Add landmarks with `world_place` (let it choose the cell with `near`); `world_query`
+   to check a cell you care about (its height, water, plants).
+6. `inspect world <name>` until it reports no error; heed `WORLD_CHUNK_BUDGET`.
+7. `render { world, at }` at a landmark and look (`draw` in the report says what the view
+   limit and the levels of detail saved); `simulate { world, at, ticks }` walking across a
+   chunk border, expecting `chunk_load` events and no invariant violation.
+8. Keep that simulation as a scenario:
 
 ```json
 {
@@ -358,6 +368,14 @@ MCP tools (CLI `veduta world …`), all cell-based:
   "background": "#202830",
   "biomes":  [ { "name": "plain",  "ground": "grass", "weight": 3 },
                { "name": "forest", "ground": "moss",  "weight": 2 } ],
+  "terrain": { "relief": 1.5, "relief_scale": 48, "lod_distance": 24 },
+  "features": [ { "name": "north_hills", "kind": "hill", "cell": [10, -60], "radius": 24, "height": 9 },
+                { "name": "town_ground", "kind": "plain", "cell": [126, -34], "radius": 14 },
+                { "name": "mirror_lake", "kind": "lake", "cell": [-30, 20], "radius": 9, "depth": 2.5 },
+                { "name": "west_sea", "kind": "sea", "cell": [-700, 0], "radius": 560, "height": -0.5 } ],
+  "vegetation": [ { "name": "grass", "model": "grass_tuft", "density": 0.3, "biomes": ["plain"] },
+                  { "name": "oak_grove", "prefab": "oak", "density": 0.25, "cell": [40, 10], "radius": 12 },
+                  { "name": "poppies", "model": "poppy", "density": 0.5, "cell": [-12, 8], "radius": 6, "scale": [0.7, 1.3] } ],
   "scatter": [ { "prefab": "tree", "biomes": ["forest"], "density": 0.06 } ],
   "sites":   [ { "tag": "village", "prefabs": ["village"], "biomes": ["plain"], "spacing": 48, "chance": 0.5 } ],
   "places":  [ { "name": "capital", "prefab": "city", "cell": [120, -40], "rotation": 90 } ],
