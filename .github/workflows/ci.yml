@@ -52,13 +52,20 @@ jobs:
             echo "rasterizer benchmark allocates"; exit 1
           fi
 
-      - name: template smoke test (veduta init tmp && cd tmp && veduta test)
+      - name: template smoke test (veduta init, Lua and Go, then veduta test)
         run: |
           go build -o "$RUNNER_TEMP/veduta${{ runner.os == 'Windows' && '.exe' || '' }}" ./cmd/veduta
           cd "$RUNNER_TEMP"
-          ./veduta init tmp --engine-dir "$GITHUB_WORKSPACE"
-          cd tmp
-          ../veduta test
+          ./veduta init tmp
+          (cd tmp && ../veduta test)
+          ./veduta init tmpgo --go --engine-dir "$GITHUB_WORKSPACE"
+          (cd tmpgo && ../veduta test)
+
+      - name: simulator window (Windows)
+        if: runner.os == 'Windows'
+        env:
+          VEDUTA_DISPLAY_TEST: "1"
+        run: go test -run TestSimulatorWindow -v ./platform/
 
       - name: install.sh installs from both channels
         if: runner.os == 'Linux'

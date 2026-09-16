@@ -28,6 +28,12 @@ All notable changes to this project are documented here. The format follows
   `camera`, `world`, `hud`, `engine`, `trace`, `invariant` and `require`; an entity's
   `state` table appears in the trace, so scenarios check it. A Lua error stops the run with
   its position and traceback. The `lua` docs topic is the reference.
+- The simulator: on Windows, `veduta sim` (and `veduta run`, and a Go game's binary) plays
+  the game in a window showing the console's 320×240 panel at a whole scale (`VEDUTA_SCALE`,
+  3 by default, the largest that fits when resized), centered on black, in the panel's
+  RGB565 colors (`VEDUTA_PANEL=0` shows the frame's own). The keyboard presses the eight
+  buttons as on the console (arrows or W A S D, Space or Z, X or Shift, Enter or Tab, Escape
+  or Backspace); closing the window or Ctrl+Q leaves. Pure Go through `syscall`, no cgo.
 - Engine hooks for games that are not Go code: `veduta.Starter`, `KindProvider` and
   `Failer`; `sim.Canonicaler` for state that encodes itself in the trace.
 

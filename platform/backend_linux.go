@@ -8,11 +8,10 @@ import (
 // Backends of the player on Linux. There is one: the panel's framebuffer, with input from
 // the kernel's event devices. The names stay so VEDUTA_BACKEND keeps its meaning.
 const (
-	BackendFB    = "fbdev"
-	BackendAuto  = "auto"
-	backendEnv   = "VEDUTA_BACKEND"
-	fbDeviceEnv  = "VEDUTA_FB"
-	renderScaleE = "VEDUTA_SCALE"
+	BackendFB   = "fbdev"
+	BackendAuto = "auto"
+	backendEnv  = "VEDUTA_BACKEND"
+	fbDeviceEnv = "VEDUTA_FB"
 )
 
 // backendX11 is the value VEDUTA_BACKEND had for the X11 window, recognised only to say

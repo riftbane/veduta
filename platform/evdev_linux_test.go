@@ -36,24 +36,6 @@ func decodeAll(t *testing.T, size int, recs ...[]byte) []Event {
 	return out
 }
 
-// describePad describes buttons and closing as "down a,up left,close".
-func describePad(evs []Event) string {
-	var s []string
-	for _, e := range evs {
-		switch e.Kind {
-		case Press:
-			s = append(s, "down "+e.Button.String())
-		case Release:
-			s = append(s, "up "+e.Button.String())
-		case Close:
-			s = append(s, "close")
-		default:
-			s = append(s, "other")
-		}
-	}
-	return strings.Join(s, ",")
-}
-
 // TestPadDecoder covers both record sizes, because a 32-bit board writes 16-byte records
 // and a 64-bit one 24-byte records.
 func TestPadDecoder(t *testing.T) {

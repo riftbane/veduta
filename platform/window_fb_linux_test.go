@@ -25,7 +25,7 @@ func fakePanel(t *testing.T, w, h, stride int) string {
 	}
 	t.Setenv(backendEnv, BackendFB)
 	t.Setenv(fbDeviceEnv, "")
-	t.Setenv(renderScaleE, "")
+	t.Setenv(renderScaleEnv, "")
 	return dev
 }
 
@@ -138,7 +138,7 @@ func TestFBWindowCloseFlushesTerminal(t *testing.T) {
 // each one covers two by two on the glass.
 func TestFBWindowScale(t *testing.T) {
 	dev := fakePanel(t, 320, 240, 640)
-	t.Setenv(renderScaleE, "2")
+	t.Setenv(renderScaleEnv, "2")
 	win, err := Open(Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -166,11 +166,11 @@ func TestFBWindowScale(t *testing.T) {
 
 func TestFBWindowRejections(t *testing.T) {
 	fakePanel(t, 320, 240, 640)
-	t.Setenv(renderScaleE, "0")
+	t.Setenv(renderScaleEnv, "0")
 	if _, err := Open(Options{}); err == nil || !strings.Contains(err.Error(), "VEDUTA_SCALE") {
 		t.Fatalf("scale 0: %v", err)
 	}
-	t.Setenv(renderScaleE, "")
+	t.Setenv(renderScaleEnv, "")
 	t.Setenv(fbDeviceEnv, "fb7")
 	if _, err := Open(Options{}); err == nil || !strings.Contains(err.Error(), "no framebuffer matches") {
 		t.Fatalf("unknown framebuffer: %v", err)

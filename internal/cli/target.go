@@ -79,8 +79,11 @@ func runRefusal(engine string) string {
 		}
 		return "run: no display on this machine, and the project's engine " + engine + " plays in a window; use render and simulate, or veduta upgrade to move the game to the console's framebuffer player"
 	}
+	if runtime.GOOS == "windows" {
+		return "" // the simulator window
+	}
 	if runtime.GOOS != "linux" {
-		return fmt.Sprintf("run: the player draws on a Linux framebuffer and this is %s/%s; build, render, simulate and test here, and play the game on the console (its release builds %s/%s)",
+		return fmt.Sprintf("run: the player draws on a Linux framebuffer, or on Windows in the simulator, and this is %s/%s; build, render, simulate and test here, and play the game on the console (its release builds %s/%s)",
 			runtime.GOOS, runtime.GOARCH, targetOS, targetArch)
 	}
 	if findPanel() == "" {

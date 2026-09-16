@@ -49,7 +49,7 @@ func openFB(o Options) (Window, error) {
 		return nil, fmt.Errorf("platform: %s is %d bits per pixel; 16 (RGB565) and 32 are supported", info, info.Bits)
 	}
 	scale := 1
-	if s := os.Getenv(renderScaleE); s != "" {
+	if s := os.Getenv(renderScaleEnv); s != "" {
 		if scale, err = strconv.Atoi(s); err != nil || scale < 1 || scale > 8 {
 			return nil, fmt.Errorf("platform: VEDUTA_SCALE %q (want 1 to 8)", s)
 		}

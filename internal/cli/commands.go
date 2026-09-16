@@ -194,27 +194,40 @@ func init() {
 		},
 	})
 	register(command{
-		name: "run", usage: "run", summary: "build and run the player on this machine's framebuffer; refuses where there is none (no 16 or 32 bpp /sys/class/graphics/fbN, no VEDUTA_FB)", project: true,
+		name: "run", usage: "run", summary: "build and run the player: on Windows the simulator window, on Linux the framebuffer; refuses where there is none (no 16 or 32 bpp /sys/class/graphics/fbN, no VEDUTA_FB)", project: true,
+		run: func(env *Env, s *Session, args []string) (any, error) { return runGameCommand(env, s, "run", args) },
+	})
+	register(command{
+		name: "sim", usage: "sim", summary: "play the game in the simulator (Windows): the console's panel at a whole scale (VEDUTA_SCALE, 3), its 16-bit colors (VEDUTA_PANEL=0 turns them off) and its buttons on the keyboard", project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) {
-			if len(args) > 0 {
-				return nil, usagef("run takes no arguments")
+			if runtime.GOOS != "windows" {
+				return nil, fmt.Errorf("sim: the simulator is a Windows window, and this is %s/%s; on Linux, veduta run plays on a framebuffer", runtime.GOOS, runtime.GOARCH)
 			}
-			if why := runRefusal(s.Project.Engine); why != "" {
-				return nil, errors.New(why)
-			}
-			bin, err := s.ensureGame()
-			if err != nil {
-				return nil, err
-			}
-			if s.IsScript() {
-				if code := script.Run([]string{"-project", s.Root}, env.Stdout, env.Stderr); code != 0 {
-					return nil, fmt.Errorf("the game stopped with exit code %d", code)
-				}
-				return nil, nil
-			}
-			cmd := exec.Command(bin, "-project", s.Root)
-			cmd.Dir, cmd.Stdout, cmd.Stderr, cmd.Stdin = s.Root, env.Stdout, env.Stderr, env.Stdin
-			return nil, cmd.Run()
+			return runGameCommand(env, s, "sim", args)
 		},
 	})
+}
+
+// runGameCommand builds the game and plays it: a Go game's binary, or a script game in this
+// process.
+func runGameCommand(env *Env, s *Session, name string, args []string) (any, error) {
+	if len(args) > 0 {
+		return nil, usagef("%s takes no arguments", name)
+	}
+	if why := runRefusal(s.Project.Engine); why != "" {
+		return nil, errors.New(why)
+	}
+	bin, err := s.ensureGame()
+	if err != nil {
+		return nil, err
+	}
+	if s.IsScript() {
+		if code := script.Run([]string{"-project", s.Root}, env.Stdout, env.Stderr); code != 0 {
+			return nil, fmt.Errorf("the game stopped with exit code %d", code)
+		}
+		return nil, nil
+	}
+	cmd := exec.Command(bin, "-project", s.Root)
+	cmd.Dir, cmd.Stdout, cmd.Stderr, cmd.Stdin = s.Root, env.Stdout, env.Stderr, env.Stdin
+	return nil, cmd.Run()
 }

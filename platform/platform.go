@@ -7,10 +7,10 @@
 // and gamepads and keyboards are read from the kernel's event devices, their buttons and
 // keys translated to the eight game buttons (sim.Button) and Home, and the devices taken
 // for the player alone while it polls, so a keyboard does not also type into the text
-// console (window_fb_linux.go, fb_linux.go, evdev_linux.go, padsource_linux.go). No window
-// system is involved, so nothing here needs a particular OS thread. On every other GOOS,
-// Open fails at runtime (window_other.go): Windows and macOS build, test and cross-compile
-// games, and play them only headless.
+// console (window_fb_linux.go, fb_linux.go, evdev_linux.go, padsource_linux.go). On
+// Windows the player opens the simulator, a window that shows the panel at a whole scale in
+// its 16-bit colors and reads the keyboard as the console's buttons (window_windows.go,
+// sim.go). On every other GOOS, Open fails at runtime (window_other.go).
 package platform
 
 import (
