@@ -311,7 +311,7 @@ func TestReleaseWorkflowScript(t *testing.T) {
 		}
 	}
 	card, err := flatObject(files["demo/card.json"])
-	if err != nil || card["version"] != "v0.3.0" || card["veduta"] != "card/1" {
+	if _, ok := card["exec"]; err != nil || card["version"] != "v0.3.0" || card["veduta"] != "card/1" || ok {
 		t.Fatalf("card.json %v: %v", card, err)
 	}
 }

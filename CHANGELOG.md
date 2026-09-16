@@ -53,7 +53,9 @@ All notable changes to this project are documented here. The format follows
   v2 on: a Go game imports `github.com/riftbane/veduta/v2/...`. `veduta upgrade` across a
   major version rewrites the game's engine imports before `go get`, and names the files;
   `veduta init --go` refuses an `--engine` of another major version than its template's
-  code. `doctor` reads the engine's version from go.mod under either path.
+  code, and a dev build's `init` names the engine source's version. `doctor` reads the
+  engine's version from go.mod under either path.
+- A Lua game's `card.json` names no `exec`: the console runs its script.
 - **The console has eight game buttons** (breaking): the D-pad, A, B, Select (the game's
   menu) and Cancel (back); Home leaves the game and never reaches it. `veduta.Input` is
   `Pressed`, `Held` and `Released` button sets with `Down`, `JustPressed`, `JustReleased`
