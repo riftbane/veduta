@@ -1,0 +1,11 @@
+{
+  "veduta": "model/1",
+  "name": "grass",
+  "pivot": "bottom-center",
+  "smooth_angle_deg": 90,
+  "lod": [ { "distance": 9 } ],
+  "draw_distance": 18,
+  "parts": [
+    { "shape": "lathe", "profile": [[0.12, 0], [0, 0.45]], "segments": 4, "material": "blade" }
+  ]
+}

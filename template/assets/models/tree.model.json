@@ -2,6 +2,8 @@
   "veduta": "model/1",
   "name": "tree",
   "pivot": "bottom-center",
+  "lod": [ { "distance": 25 } ],
+  "draw_distance": 80,
   "parts": [
     { "shape": "cylinder", "radius": 0.15, "height": 1.2, "segments": 6, "position": [0, 0.6, 0], "material": "bark" },
     { "shape": "box", "size": [1, 0.9, 1], "position": [0, 1.55, 0], "material": "leaf" }

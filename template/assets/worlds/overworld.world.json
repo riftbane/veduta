@@ -13,6 +13,17 @@
     { "name": "plain", "ground": "grass", "weight": 3 },
     { "name": "forest", "ground": "moss", "weight": 2 }
   ],
+  "terrain": { "relief": 1, "relief_scale": 40 },
+  "features": [
+    { "name": "lookout", "kind": "hill", "cell": [3, -16], "radius": 8, "height": 3 },
+    { "name": "pond", "kind": "lake", "cell": [-8, 1], "radius": 4, "depth": 1.5 },
+    { "name": "south_sea", "kind": "sea", "cell": [0, 700], "radius": 600, "height": -0.5 }
+  ],
+  "vegetation": [
+    { "name": "grass", "model": "grass", "density": 0.12, "biomes": ["plain"] },
+    { "name": "meadow", "model": "flower", "density": 0.35, "cell": [5, 5], "radius": 6 },
+    { "name": "grove", "prefab": "tree", "density": 0.3, "cell": [22, -30], "radius": 7 }
+  ],
   "scatter": [
     { "prefab": "tree", "density": 0.06 },
     { "prefab": "gem", "density": 0.01 }

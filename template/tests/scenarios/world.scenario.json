@@ -11,6 +11,7 @@
     { "tick": 180, "release": ["ArrowRight"] }
   ],
   "expect": [
+    { "tick": 100, "entity": "player", "path": "position.y", "op": ">", "value": 1 },
     { "tick": 120, "entity": "player", "path": "position.z", "op": "<", "value": -20 },
     { "tick": 200, "trace": "chunk_load", "count_min": 12 },
     { "tick": 200, "trace": "chunk_unload", "count_min": 3 },

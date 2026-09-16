@@ -1,0 +1,11 @@
+{
+  "veduta": "model/1",
+  "name": "flower",
+  "pivot": "bottom-center",
+  "lod": [ { "distance": 9 } ],
+  "draw_distance": 20,
+  "parts": [
+    { "shape": "lathe", "profile": [[0.03, 0], [0, 0.4]], "segments": 3, "material": "blade" },
+    { "shape": "sphere", "radius": 0.14, "segments": 5, "rings": 2, "position": [0, 0.4, 0], "scale": [1, 0.6, 1], "material": "petal" }
+  ]
+}

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -251,18 +252,18 @@ func TestWorldTerrainAndVegetation(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(rep.Sheet))); err != nil || !strings.Contains(rep.Human(), "hill peak") {
 		t.Fatalf("sheet %v %s", err, rep.Human())
 	}
-	// A lake at the origin: written, water where there was none, its level resolved.
-	lake, err := s.WorldTerrain(WorldTerrainOptions{World: "overworld", Name: "pond", Kind: "lake", Cell: [2]int32{0, 0}, Radius: 6})
+	// A lake: written, water where there was none, its level resolved.
+	lake, err := s.WorldTerrain(WorldTerrainOptions{World: "overworld", Name: "tarn", Kind: "lake", Cell: [2]int32{40, 30}, Radius: 6})
 	if err != nil || !lake.Written || lake.Before.WaterCells != 0 || lake.After.WaterCells < 60 || lake.Feature.Depth != 2 || lake.After.Centre > -1.5 {
 		t.Fatalf("lake: %v %+v", err, lake)
 	}
 	after, _ := os.ReadFile(file)
-	if !strings.Contains(string(after), "\"features\": [\n    { \"name\": \"pond\", \"kind\": \"lake\", \"cell\": [0, 0], \"radius\": 6 }\n  ],") {
+	if !strings.Contains(string(after), "\"height\": -0.5 },\n    { \"name\": \"tarn\", \"kind\": \"lake\", \"cell\": [40, 30], \"radius\": 6 }\n  ],") {
 		t.Fatalf("feature not written:\n%s", after)
 	}
 	// The same name, a bad kind or a bad radius is refused with the compiler's reason.
 	for _, o := range []WorldTerrainOptions{
-		{World: "overworld", Name: "pond", Kind: "hill", Cell: [2]int32{5, 5}, Radius: 4, Height: &h},
+		{World: "overworld", Name: "tarn", Kind: "hill", Cell: [2]int32{5, 5}, Radius: 4, Height: &h},
 		{World: "overworld", Name: "x", Kind: "volcano", Cell: [2]int32{5, 5}, Radius: 4},
 		{World: "overworld", Name: "x", Kind: "plain", Cell: [2]int32{5, 5}, Radius: 0},
 		{World: "overworld", Name: "x", Kind: "hill", Cell: [2]int32{5, 5}, Radius: 4},
@@ -271,8 +272,8 @@ func TestWorldTerrainAndVegetation(t *testing.T) {
 			t.Fatalf("accepted %+v", o)
 		}
 	}
-	q, err := s.WorldQuery("overworld", [2]int32{0, 0})
-	if err != nil || q.Water == nil || q.Height > *q.Water || !reflect.DeepEqual(q.Features, []string{"pond"}) {
+	q, err := s.WorldQuery("overworld", [2]int32{40, 30})
+	if err != nil || q.Water == nil || q.Height > *q.Water || !slices.Contains(q.Features, "tarn") {
 		t.Fatalf("query in the pond: %v %+v", err, q)
 	}
 
@@ -280,17 +281,17 @@ func TestWorldTerrainAndVegetation(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "assets", "models", "tuft.model.json"), []byte(`{"veduta": "model/1", "pivot": "bottom-center", "draw_distance": 15,
 		"parts": [{"shape": "lathe", "profile": [[0.1, 0], [0, 0.3]], "segments": 4, "material": "leaf"}]}`), 0o644)
 	cell := [2]int32{-12, 10}
-	veg, err := s.WorldVegetation(WorldVegetationOptions{World: "overworld", Name: "meadow", Model: "tuft", Density: 0.5, Cell: &cell, Radius: 6})
+	veg, err := s.WorldVegetation(WorldVegetationOptions{World: "overworld", Name: "tuft_meadow", Model: "tuft", Density: 0.5, Cell: &cell, Radius: 6})
 	if err != nil || !veg.Written || veg.Plants < 20 || veg.Triangles != 4*veg.Plants || veg.DrawDistance != 15 || len(veg.Warnings) != 0 {
 		t.Fatalf("vegetation: %v %+v", err, veg)
 	}
 	// Trees: the prefab allows forest only, so a plain-only rule plants nothing and says so.
 	north := [2]int32{0, -40}
-	grove, err := s.WorldVegetation(WorldVegetationOptions{World: "overworld", Name: "grove", Prefab: "tree", Density: 0.3, Cell: &north, Radius: 10, DryRun: true})
+	grove, err := s.WorldVegetation(WorldVegetationOptions{World: "overworld", Name: "north_grove", Prefab: "tree", Density: 0.3, Cell: &north, Radius: 10, DryRun: true})
 	if err != nil || grove.Written || grove.Plants == 0 || grove.MaxChunkTriangles == 0 || grove.Triangles%grove.Plants != 0 {
 		t.Fatalf("grove: %v %+v", err, grove)
 	}
-	none, err := s.WorldVegetation(WorldVegetationOptions{World: "overworld", Name: "grove", Prefab: "tree", Density: 0.3, Biomes: []string{"plain"}, Cell: &north, Radius: 10, DryRun: true})
+	none, err := s.WorldVegetation(WorldVegetationOptions{World: "overworld", Name: "north_grove", Prefab: "tree", Density: 0.3, Biomes: []string{"plain"}, Cell: &north, Radius: 10, DryRun: true})
 	if err != nil || none.Plants != 0 || len(none.Warnings) != 1 {
 		t.Fatalf("plain grove: %v %+v", err, none)
 	}
@@ -298,26 +299,26 @@ func TestWorldTerrainAndVegetation(t *testing.T) {
 		{World: "overworld", Name: "a", Model: "nowhere", Density: 0.1},
 		{World: "overworld", Name: "a", Prefab: "village", Density: 0.1},
 		{World: "overworld", Name: "a", Model: "tuft", Density: 0},
-		{World: "overworld", Name: "meadow", Model: "tuft", Density: 0.1},
+		{World: "overworld", Name: "tuft_meadow", Model: "tuft", Density: 0.1},
 	} {
 		if _, err := s.WorldVegetation(o); err == nil {
 			t.Fatalf("accepted %+v", o)
 		}
 	}
-	m, err := s.WorldMap("overworld", [2]int32{-6, 4}, 24)
-	if err != nil || len(m.Features) != 1 || m.Ground.WaterCells == 0 || len(m.Vegetation) != 1 || m.Vegetation[0].Plants < 20 {
+	m, err := s.WorldMap("overworld", [2]int32{-12, 10}, 12)
+	if err != nil || len(m.Features) == 0 || m.Features[0].Name != "pond" || m.Ground.WaterCells == 0 || m.Vegetation[len(m.Vegetation)-1].Name != "tuft_meadow" || m.Vegetation[len(m.Vegetation)-1].Plants < 20 {
 		t.Fatalf("map: %v %+v", err, m)
 	}
-	// Remove both: the file is back to its bytes but for the two empty arrays.
-	for _, name := range []string{"meadow", "pond"} {
+	// Remove both: the file is back to its bytes.
+	for _, name := range []string{"tuft_meadow", "tarn"} {
 		if r, err := s.WorldRemove("overworld", name); err != nil || !r.Removed || r.Kind == "place" {
 			t.Fatalf("remove %s: %v %+v", name, err, r)
 		}
 	}
-	if after, _ := os.ReadFile(file); strings.Replace(string(after), "  \"features\": [],\n  \"vegetation\": [],\n", "", 1) != string(before) {
+	if after, _ := os.ReadFile(file); string(after) != string(before) {
 		t.Fatalf("file after removals:\n%s", after)
 	}
-	if _, err := s.WorldRemove("overworld", "pond"); err == nil {
+	if _, err := s.WorldRemove("overworld", "tarn"); err == nil {
 		t.Fatal("removed a feature twice")
 	}
 }

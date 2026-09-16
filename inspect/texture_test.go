@@ -446,7 +446,7 @@ func TestTextureSheets(t *testing.T) {
 			t.Errorf("sheets %v: no error", bad)
 			continue
 		}
-		if !strings.Contains(err.Error(), "single") && !strings.Contains(err.Error(), "crate, gem") {
+		if !strings.Contains(err.Error(), "single") && !strings.Contains(err.Error(), "have: crate, ") {
 			t.Errorf("sheets %v: error does not list the valid values: %v", bad, err)
 		}
 	}

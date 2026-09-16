@@ -48,6 +48,12 @@ All notable changes to this project are documented here. The format follows
   `DrawOptions.Stats` counts culled, distant and reduced entities, and `render` reports
   them as `draw`.
 
+- The template's `overworld` has relief, a hill (`lookout`), a lake (`pond`), a sea far
+  south, grass on the plain, a flower meadow and a grove; `grass` and `flower` flora
+  models and a `tree` with a level of detail and a draw distance. Its hero walks on the
+  terrain (`World.HeightAt`) and stops at the shore (`World.WaterAt`); a new `shore`
+  scenario checks it and the `world` scenario checks the climb.
+
 ### Changed
 
 - `asset.CompilerVersion` is `veduta-asset/0.4.0`: `MESH` chunks end with the draw

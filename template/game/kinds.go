@@ -40,10 +40,19 @@ func newPlayer(e *scene.Entity) veduta.Behaviour {
 	return veduta.BehaviourFunc(updatePlayer)
 }
 
+// ground returns the height of the ground under p: the world's terrain, or 0 in a scene.
+func ground(ctx *veduta.Context, p gmath.Vec3) float32 {
+	if w := ctx.World(); w != nil {
+		return w.HeightAt(p)
+	}
+	return 0
+}
+
 // updatePlayer moves the hero with WASD, the arrows or the stick relative to the world
-// (up = -Z), turns it to face the direction of travel, and handles jumping. A console's
-// D-pad arrives as the arrow keys and its A button as Space, so the same code plays on the
-// pad; its stick walks as fast as it is pushed.
+// (up = -Z), turns it to face the direction of travel, and handles jumping. In a world the
+// hero walks on the terrain and does not wade into lakes and seas. A console's D-pad
+// arrives as the arrow keys and its A button as Space, so the same code plays on the pad;
+// its stick walks as fast as it is pushed.
 func updatePlayer(ctx *veduta.Context, e *scene.Entity, in veduta.Input) {
 	st := e.State.(*PlayerState)
 	dir := gmath.V3(in.Axis("KeyA", "KeyD")+in.Axis("ArrowLeft", "ArrowRight"), 0,
@@ -55,7 +64,13 @@ func updatePlayer(ctx *veduta.Context, e *scene.Entity, in veduta.Input) {
 		dir = gmath.V3(in.Stick.X, 0, -in.Stick.Y).Scale(1 / max(l, 1))
 	}
 	if dir != (gmath.Vec3{}) {
-		e.Transform.Position = e.Transform.Position.Add(dir.Scale(PlayerSpeed * ctx.DT))
+		next := e.Transform.Position.Add(dir.Scale(PlayerSpeed * ctx.DT))
+		if w := ctx.World(); w != nil {
+			if _, wet := w.WaterAt(next); wet {
+				next = e.Transform.Position // the shore stops the hero
+			}
+		}
+		e.Transform.Position = next
 		// Facing -Z is yaw 0; atan2(-x, -z) gives the yaw of the travel direction.
 		st.Heading = gmath.Degrees(gmath.Atan2(-dir.X, -dir.Z))
 		e.Transform.Rotation = gmath.QuatEulerDeg(gmath.V3(0, st.Heading, 0))
@@ -65,11 +80,14 @@ func updatePlayer(ctx *veduta.Context, e *scene.Entity, in veduta.Input) {
 		st.OnGround = false
 		ctx.Trace("jump", map[string]any{"at": e.Transform.Position})
 	}
-	if !st.OnGround {
+	floor := ground(ctx, e.Transform.Position)
+	if st.OnGround {
+		e.Transform.Position.Y = floor
+	} else {
 		st.VelY -= float32(Gravity * ctx.DT)
 		e.Transform.Position.Y += float32(st.VelY * ctx.DT)
-		if e.Transform.Position.Y <= 0 {
-			e.Transform.Position.Y = 0
+		if e.Transform.Position.Y <= floor {
+			e.Transform.Position.Y = floor
 			st.VelY = 0
 			st.OnGround = true
 			ctx.Trace("land", map[string]any{"at": e.Transform.Position})
