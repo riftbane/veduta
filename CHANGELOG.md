@@ -12,6 +12,11 @@ All notable changes to this project are documented here. The format follows
   chunk's mesh after a block changes) and entities draw them like asset models, with
   culling, levels of detail and draw distance; they are uploaded when a frame is rendered
   and re-uploaded only when a new model replaces one.
+- Performance tests for games: `game -headless bench`, `veduta bench` and the MCP tool
+  `bench` run a scenario the way the player does and report update, render and frame
+  milliseconds (mean, p50, p95, max) against the tick budget, the slowest tick, and
+  triangles, drawn triangles, culled and reduced entities per frame; `--cpus` limits the
+  renderer's processors.
 
 ## v1.3.0 — 2026-09-16
 

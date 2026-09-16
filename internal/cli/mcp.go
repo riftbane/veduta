@@ -310,6 +310,46 @@ func (m *mcpServer) tools() []mcp.Tool {
 			}),
 		},
 		{
+			Name:        "bench",
+			Description: "Time the game the way the console's player runs it: a scenario (or a scene with ticks) without recording a trace, each tick's update and its frame at the project's resolution. Returns mean, p50, p95 and max milliseconds for update, render and both, the ticks over the tick budget (1000 / tick_rate), the slowest tick, and triangles submitted and drawn per frame. Timings are this machine's; cpus limits the renderer's processors (the console has 4, far slower).",
+			InputSchema: schema(map[string]any{
+				"scenario": str("scenario name (\"move\" = tests/scenarios/move.scenario.json) or file path"),
+				"scene":    str("scene (without scenario)"),
+				"world":    str("world instead of a scene (without scenario)"),
+				"at":       map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "with world: start cell [x, z]"},
+				"ticks":    num("ticks (without scenario, default 200)"),
+				"seed":     num("RNG seed (without scenario)"),
+				"width":    num("frame width (default: the project's resolution)"),
+				"height":   num("frame height"),
+				"cpus":     num("processors the renderer may use"),
+			}),
+			Handler: withSession(func(ctx context.Context, s *Session, args json.RawMessage) (*mcp.Result, error) {
+				var a struct {
+					Scenario string    `json:"scenario"`
+					Scene    string    `json:"scene"`
+					World    string    `json:"world"`
+					At       *[2]int32 `json:"at"`
+					Ticks    int       `json:"ticks"`
+					Seed     uint64    `json:"seed"`
+					Width    int       `json:"width"`
+					Height   int       `json:"height"`
+					CPUs     int       `json:"cpus"`
+				}
+				if err := mcp.Strict(args, &a); err != nil {
+					return nil, err
+				}
+				scenario := a.Scenario
+				if scenario != "" && !filepath.IsAbs(s.scenarioPath(scenario)) {
+					scenario = filepath.Join(s.Root, filepath.FromSlash(s.scenarioPath(scenario)))
+				}
+				rep, err := s.Bench(BenchOptions{Scenario: scenario, Scene: a.Scene, World: a.World, At: a.At, Ticks: a.Ticks, Seed: a.Seed, Width: a.Width, Height: a.Height, CPUs: a.CPUs})
+				if err != nil {
+					return nil, err
+				}
+				return textResult(rep), nil
+			}),
+		},
+		{
 			Name:        "trace",
 			Description: "A slice of the trace of a previous simulate (run_id from its result): at most 200 ticks per call; with events, only ticks containing those events (and only the events).",
 			InputSchema: schema(map[string]any{

@@ -39,6 +39,7 @@ const (
 //	game -headless query    --frame F --at x,y | --coverage
 //	game -headless snapshot --scene S | --world W --at x,z  --tick T --out F   (and --restore F --ticks N)
 //	game -headless describe
+//	game -headless bench    --scenario F | --scene S | --world W --at x,z  --ticks N --seed N --input F --width W --height H --cpus N
 //
 // Headless subcommands print one JSON report on stdout. Run does not return.
 func Run(g Game) {
@@ -61,7 +62,7 @@ var (
 func runMain(g Game, args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("game", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	headlessMode := fs.Bool("headless", false, "run a headless subcommand: render, simulate, query, snapshot or describe")
+	headlessMode := fs.Bool("headless", false, "run a headless subcommand: render, simulate, query, snapshot, describe or bench")
 	dir := fs.String("project", ".", "project directory containing veduta.json")
 	showVersion := fs.Bool("version", false, "print the engine version and exit")
 	if err := fs.Parse(args); err != nil {
@@ -72,7 +73,7 @@ func runMain(g Game, args []string, stdout, stderr io.Writer) int {
 		return exitOK
 	}
 	if *headlessMode && fs.NArg() == 0 {
-		fmt.Fprintln(stderr, "usage: game -headless render|simulate|query|snapshot|describe [flags]")
+		fmt.Fprintln(stderr, "usage: game -headless render|simulate|query|snapshot|describe|bench [flags]")
 		return exitUsage
 	}
 	p, a, err := loadProjectFunc(*dir)
@@ -100,6 +101,8 @@ func runMain(g Game, args []string, stdout, stderr io.Writer) int {
 		err = h.snapshot(rest)
 	case "describe":
 		err = h.describe(rest)
+	case "bench":
+		err = h.bench(rest)
 	default:
 		fmt.Fprintf(stderr, "unknown headless subcommand %q\n", sub)
 		return exitUsage

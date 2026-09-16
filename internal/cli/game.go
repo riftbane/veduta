@@ -314,6 +314,74 @@ func (s *Session) Simulate(o SimulateOptions) (SimResult, error) {
 	return SimResult(rep), nil
 }
 
+// BenchOptions are the flags of bench.
+type BenchOptions struct {
+	Scenario string
+	Scene    string
+	World    string
+	At       *[2]int32
+	Ticks    int
+	Seed     uint64
+	Input    string
+	Width    int
+	Height   int
+	CPUs     int
+}
+
+// BenchResult is the report of bench.
+type BenchResult map[string]any
+
+// Human summarizes the timings.
+func (r BenchResult) Human() string {
+	var b strings.Builder
+	line := func(name string) {
+		m, _ := r[name].(map[string]any)
+		fmt.Fprintf(&b, "  %-10s mean %7.2f  p50 %7.2f  p95 %7.2f  max %7.2f ms\n", name, m["mean"], m["p50"], m["p95"], m["max"])
+	}
+	fmt.Fprintf(&b, "%v ticks at %vx%v on %v cpus (%v), budget %v ms per tick\n", r["ticks"], r["width"], r["height"], r["cpus"], r["goarch"], r["budget_ms"])
+	line("update_ms")
+	line("render_ms")
+	line("frame_ms")
+	tri, _ := r["triangles"].(map[string]any)
+	drawn, _ := r["drawn"].(map[string]any)
+	fmt.Fprintf(&b, "  over budget %v ticks, slowest tick %v; triangles mean %v max %v, drawn mean %v max %v\n",
+		r["over_budget"], r["slowest_tick"], tri["mean"], tri["max"], drawn["mean"], drawn["max"])
+	return b.String()
+}
+
+// Bench runs a scenario (or a scene) through the game the way the player does and times
+// each tick's update and frame.
+func (s *Session) Bench(o BenchOptions) (BenchResult, error) {
+	args := []string{"bench"}
+	if o.Scenario != "" {
+		args = append(args, "--scenario", absFrom(s.scenarioPath(o.Scenario)))
+	} else {
+		args = append(args, targetArgs(o.Scene, o.World, o.At)...)
+		if o.Ticks > 0 {
+			args = append(args, "--ticks", strconv.Itoa(o.Ticks))
+		}
+		if o.Seed != 0 {
+			args = append(args, "--seed", strconv.FormatUint(o.Seed, 10))
+		}
+		if o.Input != "" {
+			args = append(args, "--input", absFrom(o.Input))
+		}
+	}
+	for _, f := range []struct {
+		name string
+		v    int
+	}{{"--width", o.Width}, {"--height", o.Height}, {"--cpus", o.CPUs}} {
+		if f.v > 0 {
+			args = append(args, f.name, strconv.Itoa(f.v))
+		}
+	}
+	rep, _, err := s.runGame(args...)
+	if err != nil {
+		return nil, err
+	}
+	return BenchResult(rep), nil
+}
+
 // newRun allocates out/runs/<name>-<n>.
 func (s *Session) newRun(name string) (id, dir string, err error) {
 	runs := s.Out("runs")
@@ -439,6 +507,35 @@ func init() {
 				return nil, err
 			}
 			return s.Render(o)
+		},
+	})
+	register(command{
+		name:    "bench",
+		usage:   "bench --scenario F | --scene S | --world W --at x,z  --ticks N --seed N [--input script.json] [--width W --height H] [--cpus N]",
+		summary: "time every tick's update and frame the way the player runs them: mean, p50, p95 and max in ms against the tick budget, triangles per frame",
+		project: true,
+		run: func(env *Env, s *Session, args []string) (any, error) {
+			fs := newFlags("bench", env.Stderr)
+			var o BenchOptions
+			var at string
+			fs.StringVar(&o.Scenario, "scenario", "", "scenario name (tests/scenarios/<name>.scenario.json) or file")
+			fs.StringVar(&o.Scene, "scene", "", "scene")
+			fs.StringVar(&o.World, "world", "", "world instead of a scene")
+			fs.StringVar(&at, "at", "", "with --world: start cell x,z")
+			fs.IntVar(&o.Ticks, "ticks", 200, "ticks")
+			fs.Uint64Var(&o.Seed, "seed", 0, "seed")
+			fs.StringVar(&o.Input, "input", "", "input script file")
+			fs.IntVar(&o.Width, "width", 0, "frame width (default: the project's resolution)")
+			fs.IntVar(&o.Height, "height", 0, "frame height")
+			fs.IntVar(&o.CPUs, "cpus", 0, "processors the renderer may use (the console has 4)")
+			if err := parseFlags(fs, args); err != nil {
+				return nil, err
+			}
+			var err error
+			if o.At, err = parseCellFlag(at); err != nil {
+				return nil, err
+			}
+			return s.Bench(o)
 		},
 	})
 	register(command{

@@ -25,7 +25,8 @@ Rules
   plants), `world_map` shows a region, `inspect world` ranks the problems. Walk heroes
   with `World.HeightAt` and keep them out of `WaterAt`. Render and simulate it with
   `world` and `at`; keep a world scenario.
-- Run `fuzz` before every release; add minimized repros as scenarios.
+- Run `fuzz` before every release; add minimized repros as scenarios. Run `bench` on the
+  heaviest scenario before a release too: frame_ms must stay well under budget_ms.
 - Commit small, message in imperative mood. Tag releases with `release` only when `test` is green.
 - Do not add third-party Go modules.
 - When something in the engine blocks you, write it down in ENGINE-NOTES.md with a repro,

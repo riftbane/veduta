@@ -329,7 +329,7 @@ func TestMCPEndToEnd(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"status", "build", "cook", "render", "simulate", "trace", "query", "diff", "test", "fuzz", "docs", "inspect", "world_map", "world_query", "world_place", "world_remove", "world_terrain", "world_vegetation"} {
+	for _, want := range []string{"status", "build", "cook", "render", "simulate", "trace", "query", "diff", "test", "fuzz", "docs", "inspect", "world_map", "world_query", "world_place", "world_remove", "world_terrain", "world_vegetation", "bench"} {
 		if !names[want] {
 			t.Errorf("missing tool %s", want)
 		}
@@ -403,6 +403,9 @@ func TestMCPEndToEnd(t *testing.T) {
 	d, imgs, isErr := c.tool("diff", map[string]any{"a": r["out"], "b": bundle})
 	if isErr || imgs != 1 || d["changed_pixels"].(float64) != 0 {
 		t.Fatalf("diff: %v", d)
+	}
+	if bn, _, isErr := c.tool("bench", map[string]any{"scenario": "move", "cpus": 1}); isErr || bn["ticks"] != float64(60) || bn["frame_ms"].(map[string]any)["max"].(float64) <= 0 {
+		t.Fatalf("bench: %v", bn)
 	}
 	sim, imgs, isErr := c.tool("simulate", map[string]any{"scenario": "collect"}) // a bare name resolves under tests/scenarios
 	if isErr || imgs != 1 || sim["verdict"] != "pass" {

@@ -247,6 +247,7 @@ game -headless query    --frame F --at x,y | --coverage
 game -headless snapshot --scene S --tick T --out F [--input F]
 game -headless snapshot --restore F --ticks N [--input F] [--out trace.jsonl]
 game -headless describe
+game -headless bench    --scenario F | --scene S --ticks N --seed N [--input F] [--width W --height H] [--cpus N]
 ```
 
 - Each prints one JSON report on stdout. Errors print `{"ok":false,"error":...,"errors":[{file,line,col,msg}]}`.
@@ -260,5 +261,13 @@ game -headless describe
   directory. The verdict is `fail` when an expectation fails or an invariant is violated.
 - An input file (`--input`) is a JSON array of input events or an object with an
   `inputs` array (a scenario file works).
+- `bench` runs a scenario (or a scene with an input script) the way the player does,
+  without recording a trace, and times each tick's update and its frame rendered with the
+  scene camera at the project's resolution (or `--width`×`--height`), the renderer limited
+  to `--cpus` processors. It reports `update_ms`, `render_ms` and `frame_ms` (`mean`,
+  `p50`, `p95`, `max`), `budget_ms` (1000 / `tick_rate`), `over_budget` ticks,
+  `slowest_tick`, and per frame `triangles` and `drawn` (submitted and rasterized) and
+  `culled` and `reduced` entities (`mean`, `max`). The times are the machine's that runs it,
+  not the console's.
 - `describe` lists registered kinds with their state fields, game invariants, whether a
   state codec is registered, scenes, render modes and camera presets.
