@@ -37,6 +37,10 @@ jobs:
           GOARCH: arm64
         run: go test -exec qemu-aarch64-static ./...
 
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+
       - name: build archives
         run: |
           set -eu
@@ -61,6 +65,8 @@ jobs:
               tar -C "$stage" -czf "dist/${name}.tar.gz" "$exe" LICENSE README.md
             fi
           done
+          # The VS Code extension, which install.ps1 installs when VS Code is there.
+          (cd editors/vscode && npm ci --no-audit --no-fund && npx vsce package --no-dependencies -o ../../dist/veduta-vscode.vsix)
           (cd dist && sha256sum * > checksums.txt)
           cat dist/checksums.txt
 

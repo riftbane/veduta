@@ -30,9 +30,11 @@ irm https://raw.githubusercontent.com/riftbane/veduta/main/install.ps1 | iex
 ```
 
 It puts `veduta.exe` (SHA-256 verified) in `%LOCALAPPDATA%\Programs\veduta` and that folder
-on the user's PATH; running it again updates in place. `$env:VEDUTA_VERSION`,
-`$env:VEDUTA_CHANNEL` (`stable` or `beta`) and `$env:VEDUTA_HOME` choose before it runs.
-Then, in a new terminal: `veduta init mygame`, `cd mygame`, `code .`, `veduta sim`.
+on the user's PATH, and installs the Veduta extension into VS Code when VS Code is there
+([editors/vscode](editors/vscode/README.md)); running it again updates in place.
+`$env:VEDUTA_VERSION`, `$env:VEDUTA_CHANNEL` (`stable` or `beta`), `$env:VEDUTA_HOME` and
+`$env:VEDUTA_VSCODE = "0"` choose before it runs. Then, in a new terminal: `veduta init
+mygame`, `code mygame`, and F5 plays it in the simulator.
 
 On Linux:
 

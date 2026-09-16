@@ -10,6 +10,8 @@
 #   $env:VEDUTA_VERSION = "v2.0.0"   a version (default: the newest of the channel)
 #   $env:VEDUTA_CHANNEL = "beta"     stable (default) or beta, which includes release candidates
 #   $env:VEDUTA_HOME    = "D:\veduta" another folder
+#   $env:VEDUTA_VSCODE  = "0"         leave VS Code alone (default: when the code command is
+#                                     there, install the release's Veduta extension into it)
 & {
 	$ErrorActionPreference = 'Stop'
 	$ProgressPreference = 'SilentlyContinue' # Invoke-WebRequest is many times slower with it
@@ -60,6 +62,8 @@
 	if ($version -notmatch '^v') { $version = "v$version" }
 
 	$archive = "veduta_${version}_windows_amd64.zip"
+	$vsix = 'veduta-vscode.vsix'
+	$code = if ($env:VEDUTA_VSCODE -ne '0') { Get-Command code -ErrorAction SilentlyContinue }
 	$base = "https://github.com/$repo/releases/download/$version"
 	$tmp = Join-Path ([IO.Path]::GetTempPath()) ("veduta-" + [Guid]::NewGuid())
 	New-Item -ItemType Directory -Path $tmp | Out-Null
@@ -88,6 +92,23 @@
 		Copy-Item (Join-Path $tmp 'x\veduta.exe') $exe
 		Remove-Item -Force -ErrorAction SilentlyContinue "$exe.old"
 		Write-Host "Installed $exe"
+
+		# The extension, from the same release and checked the same way; a release made before
+		# it existed has none, and that is not an error.
+		$vsixSum = $null
+		foreach ($line in Get-Content (Join-Path $tmp 'checksums.txt')) {
+			$parts = $line -split '\s+'
+			if ($parts.Count -ge 2 -and $parts[1] -eq $vsix) { $vsixSum = $parts[0].ToLowerInvariant() }
+		}
+		if ($code -and $vsixSum) {
+			Invoke-WebRequest -UseBasicParsing -Uri "$base/$vsix" -OutFile (Join-Path $tmp $vsix)
+			$got = (Get-FileHash -Algorithm SHA256 (Join-Path $tmp $vsix)).Hash.ToLowerInvariant()
+			if ($got -ne $vsixSum) { throw "install.ps1: checksum mismatch for $vsix" }
+			& $code.Source --install-extension (Join-Path $tmp $vsix) --force | Out-Null
+			Write-Host 'Installed the Veduta extension into VS Code'
+		} elseif (-not $code -and $vsixSum) {
+			Write-Host "VS Code was not found: install it (https://code.visualstudio.com), then run this again for the Veduta extension"
+		}
 	} finally {
 		Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $tmp
 	}
@@ -109,5 +130,5 @@
 		Write-Host "Lua games need nothing else. For a Go game (veduta init --go), install Go 1.25 or newer: https://go.dev/dl/"
 	}
 	Write-Host ''
-	Write-Host 'Next: veduta init mygame; cd mygame; veduta sim'
+	Write-Host 'Next: veduta init mygame; cd mygame; code .   (F5 plays the game in the simulator)'
 }
