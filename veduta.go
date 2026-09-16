@@ -14,7 +14,7 @@ import (
 )
 
 // Version is the engine version.
-const Version = "v1.2.0"
+const Version = "v1.3.0"
 
 // Input is everything the player did during one tick: pressed, held and released keys
 // (W3C KeyboardEvent.code names such as KeyW, Space, ArrowLeft), the mouse position and

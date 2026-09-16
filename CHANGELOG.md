@@ -56,6 +56,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `veduta.Version` is `v1.3.0` (snapshots of v1.2.0 do not restore).
 - `asset.CompilerVersion` is `veduta-asset/0.4.0`: `MESH` chunks end with the draw
   distance and the levels (`docs/vda.md`), so every asset is recompiled once.
 
