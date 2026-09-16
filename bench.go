@@ -160,7 +160,7 @@ func (h *headless) bench(args []string) error {
 			return err
 		}
 		t2 := time.Now()
-		u, r := float64(t1.Sub(t0).Microseconds())/1000, float64(t2.Sub(t1).Microseconds())/1000
+		u, r := float64(t1.Sub(t0).Nanoseconds())/1e6, float64(t2.Sub(t1).Nanoseconds())/1e6
 		update, render, frame = append(update, u), append(render, r), append(frame, u+r)
 		if u+r > res.BudgetMS {
 			res.OverBudget++

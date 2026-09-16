@@ -15,11 +15,16 @@ func TestHeadlessBench(t *testing.T) {
 	if rep["ticks"] != float64(120) || rep["cpus"] != float64(2) || rep["width"] != float64(96) || rep["budget_ms"] != float64(16.667) {
 		t.Fatalf("report %v", rep)
 	}
+	// A tiny scene may update faster than a coarse clock ticks (Windows), so only the
+	// order of the statistics is checked, and that rendering took some time.
 	for _, k := range []string{"update_ms", "render_ms", "frame_ms"} {
 		s, ok := rep[k].(map[string]any)
-		if !ok || s["max"].(float64) < s["p50"].(float64) || s["mean"].(float64) <= 0 {
+		if !ok || s["max"].(float64) < s["p95"].(float64) || s["p95"].(float64) < s["p50"].(float64) || s["mean"].(float64) < 0 {
 			t.Fatalf("%s %v", k, rep[k])
 		}
+	}
+	if rep["frame_ms"].(map[string]any)["max"].(float64) <= 0 {
+		t.Fatalf("frames took no time: %v", rep["frame_ms"])
 	}
 	if tri := rep["triangles"].(map[string]any); tri["max"].(float64) <= 0 {
 		t.Fatalf("triangles %v", tri)

@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- `bench` measures with nanosecond resolution; its test no longer expects an update of a
+  tiny scene to outlast a coarse clock tick (CI on Windows failed on `main`).
+
 ## v1.4.0 — 2026-09-16
 
 ### Added
