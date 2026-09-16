@@ -15,7 +15,7 @@ import (
 // WorldCodes are the issue codes of World, in the order they are documented.
 var WorldCodes = []string{
 	world.CodeMissingPrefab, world.CodeMissingAsset, world.CodeNotTiling, world.CodePlaceOverlap,
-	world.CodePlaceOutside, world.CodePlaceBiome, world.CodePlaceTooClose, world.CodeBudget, world.CodeViewShort,
+	world.CodePlaceOutside, world.CodePlaceBiome, world.CodePlaceWater, world.CodePlaceTooClose, world.CodeBudget, world.CodeViewShort,
 }
 
 // WorldSheets are the sheets World can write.

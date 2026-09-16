@@ -16,6 +16,7 @@ import (
 	"github.com/riftbane/veduta/scene"
 	"github.com/riftbane/veduta/sim"
 	"github.com/riftbane/veduta/sprite"
+	"github.com/riftbane/veduta/world"
 )
 
 // Assets is every compiled asset of a project, by name.
@@ -375,6 +376,9 @@ func (e *engine) syncGround() error {
 	var want map[string]*asset.Model
 	if e.world != nil {
 		want = e.world.models
+		if e.res.Materials[world.WaterMaterial] == nil {
+			e.res.Materials[world.WaterMaterial] = &world.DefaultWater
+		}
 	}
 	for _, name := range sortedNames(e.res.Models) {
 		if strings.HasPrefix(name, "world:") && want[name] == nil {

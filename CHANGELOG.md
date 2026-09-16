@@ -15,6 +15,16 @@ All notable changes to this project are documented here. The format follows
   the camera to the nearest point of its drawn bounds, as through a 60° lens (an
   orthographic camera counts 0.866 × `size`). `inspect model` reports `lod_triangles`,
   `draw_distance`, `MESH_LOD_NO_GAIN` and `MESH_LOD_MODEL_MISSING`.
+- Terrain for worlds (`docs/world.md`): `terrain` (seeded `relief`, `relief_scale`,
+  `sea_level`, a `water` material, `lod_distance`) and named `features` applied in file
+  order: `hill`, `plain`, `lake` and `sea`, each around a vertex with a `radius`, optional
+  `height`, `depth`, `falloff` and `roughness`. Heights are whole millimeters per vertex,
+  computed with integers; sites and places stand on pads levelled to the ground at their
+  centre; sites avoid water, scatter skips it, a place in water is `WORLD_PLACE_WATER`.
+  Each chunk's ground is drawn at up to five levels of detail (every 1, 2, 4, 8, 16
+  cells) with skirts closing the cracks between levels, and its water as flat quads
+  (built-in material `world:water`). `World.HeightAt` and `World.WaterAt` (also on
+  `world.Gen`) give the ground and the water under a position.
 - `scene.Draw` skips entities whose drawn bounds lie wholly outside the camera's view
   volume (1 mm margin, so no pixel changes) and chooses levels of detail;
   `DrawOptions.Stats` counts culled, distant and reduced entities, and `render` reports

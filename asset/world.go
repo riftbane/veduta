@@ -21,6 +21,18 @@ const (
 	MaxWeight      = 1000 // biome weight
 	MinSpacing     = 2    // cells between site regions
 	MaxSpacing     = 4096
+
+	MaxRelief          = 256   // terrain.relief, meters
+	MinReliefScale     = 4     // terrain.relief_scale, cells
+	MaxReliefScale     = 4096  //
+	DefaultReliefScale = 48    //
+	MaxLevel           = 1024  // sea level, plain and water levels, meters from 0
+	MaxHill            = 256   // hill height, meters
+	MaxDepth           = 256   // lake and sea depth, meters
+	MaxRadius          = 16384 // feature and vegetation radius, cells
+	MaxFeatures        = 4096
+	MaxVegetation      = 256
+	MaxFloraScale      = 16
 )
 
 // WorldDefaults holds the defaults of the optional world fields.
@@ -259,6 +271,32 @@ func CompileWorld(name string, src *WorldSource, loc *Locator, prefabs func(stri
 		}
 		w.Places = append(w.Places, pl)
 	}
+	w.Terrain = compileTerrain(c, src.Terrain, w)
+	compileFeatures(c, src, w)
+	compileVegetation(c, src, w, biomeList, share, prefabs)
+	// Places, features and vegetation rules share one namespace (world_remove takes a name).
+	named := map[string]string{} // lookup only: name → path of its first use
+	claim := func(path, name string) {
+		if name == "" || ValidName(name) != nil {
+			return
+		}
+		if first, dup := named[name]; dup {
+			c.Errorf(path, "name %q is already used by %s: places, features and vegetation rules need distinct names", name, first)
+			return
+		}
+		named[name] = path
+	}
+	for i, pl := range src.Places {
+		if places[pl.Name] == i {
+			claim(Path(Path("places", i), "name"), pl.Name)
+		}
+	}
+	for i, f := range src.Features {
+		claim(Path(Path("features", i), "name"), f.Name)
+	}
+	for i, v := range src.Vegetation {
+		claim(Path(Path("vegetation", i), "name"), v.Name)
+	}
 	w.Entities = compileEntities(c, src.Entities, "world")
 	for i, e := range w.Entities {
 		if pre := Reserved(e.Name); pre != "" {
@@ -269,6 +307,198 @@ func CompileWorld(name string, src *WorldSource, loc *Locator, prefabs func(stri
 		return nil, err
 	}
 	return w, nil
+}
+
+// compileTerrain validates the optional terrain object.
+func compileTerrain(c *Checker, src *TerrainSource, w *World) Terrain {
+	t := Terrain{ReliefScale: DefaultReliefScale, LODDistance: float32(2 * float64(w.Chunk) * float64(w.Cell))}
+	if src == nil {
+		return t
+	}
+	t.Relief = c.Float("terrain.relief", src.Relief, 0, MaxRelief, 0)
+	t.ReliefScale = c.Int("terrain.relief_scale", src.ReliefScale, MinReliefScale, MaxReliefScale, DefaultReliefScale)
+	if src.SeaLevel != nil {
+		t.Sea = true
+		t.SeaLevel = c.Float("terrain.sea_level", src.SeaLevel, -MaxLevel, MaxLevel, 0)
+	}
+	if src.Water != "" && c.Name("terrain.water", src.Water) {
+		t.Water = src.Water
+	}
+	if src.LODDistance != nil {
+		if d := *src.LODDistance; !gmath.IsFinite(d) || d <= 0 || d > 100000 {
+			c.Errorf("terrain.lod_distance", "%v out of range (0, 100000]", d)
+		} else {
+			t.LODDistance = d
+		}
+	}
+	return t
+}
+
+// compileFeatures validates the terrain features and resolves their defaults
+// (docs/world.md).
+func compileFeatures(c *Checker, src *WorldSource, w *World) {
+	if len(src.Features) > MaxFeatures {
+		c.Errorf("features", "%d features, at most %d", len(src.Features), MaxFeatures)
+	}
+	span := w.Span()
+	for i, fs := range src.Features {
+		p := Path("features", i)
+		f := Feature{Name: fs.Name, Kind: fs.Kind}
+		nameField(c, Path(p, "name"), fs.Name)
+		if fs.Kind == "" {
+			c.Errorf(Path(p, "kind"), "is required (one of %v)", FeatureKinds)
+		} else if indexOf(FeatureKinds, fs.Kind) < 0 {
+			c.Errorf(Path(p, "kind"), "unknown value %q (want one of %v)", fs.Kind, FeatureKinds)
+		}
+		f.Cell = cellField(c, Path(p, "cell"), fs.Cell, span, true)
+		switch {
+		case fs.Radius == 0:
+			c.Errorf(Path(p, "radius"), "is required (cells from the centre to the edge, 1 to %d)", MaxRadius)
+			f.Radius = 1
+		case fs.Radius < 1 || fs.Radius > MaxRadius:
+			c.Errorf(Path(p, "radius"), "%d out of range [1, %d]", fs.Radius, MaxRadius)
+			f.Radius = 1
+		default:
+			f.Radius = int32(fs.Radius)
+		}
+		r := f.Radius
+		water := f.IsWater()
+		if fs.Height != nil {
+			f.HasHeight = true
+			lim := float32(MaxLevel)
+			if f.Kind == FeatureHill {
+				lim = MaxHill
+			}
+			f.Height = c.Float(Path(p, "height"), fs.Height, -lim, lim, 0)
+		} else if f.Kind == FeatureHill {
+			c.Errorf(Path(p, "height"), "is required for a hill (meters added at the top, negative digs a hollow)")
+		}
+		if fs.Depth != nil && !water && f.Kind != "" {
+			c.Errorf(Path(p, "depth"), "not used by kind %s (only lake and sea hold water)", f.Kind)
+		}
+		f.Depth = c.Float(Path(p, "depth"), fs.Depth, 0, MaxDepth, map[bool]float32{true: 8, false: 2}[f.Kind == FeatureSea])
+		if fs.Depth != nil && *fs.Depth == 0 {
+			c.Errorf(Path(p, "depth"), "0 out of range (0, %d]", MaxDepth)
+		}
+		switch f.Kind {
+		case FeatureHill:
+			f.Falloff, f.Roughness = r, 0.2
+		case FeaturePlain:
+			f.Falloff, f.Roughness = max(1, r/3), 0.1
+		case FeatureLake:
+			f.Falloff, f.Roughness = min(max(2, r/4), 16), 0.3
+		case FeatureSea:
+			f.Falloff, f.Roughness = min(max(4, r/8), 32), 0.3
+		}
+		if fs.Falloff != nil {
+			lim := r
+			if water {
+				lim = MaxRadius
+			}
+			if v := *fs.Falloff; v < 0 || v > int(lim) {
+				c.Errorf(Path(p, "falloff"), "%d out of range [0, %d]", v, lim)
+			} else {
+				f.Falloff = int32(v)
+			}
+		}
+		f.Roughness = c.Float(Path(p, "roughness"), fs.Roughness, 0, 1, f.Roughness)
+		w.Features = append(w.Features, f)
+	}
+}
+
+// compileVegetation validates the vegetation rules.
+func compileVegetation(c *Checker, src *WorldSource, w *World, biomeList func(string, []string) []string, share func(string, *float32, bool, float32) float32, prefabs func(string) *Prefab) {
+	if len(src.Vegetation) > MaxVegetation {
+		c.Errorf("vegetation", "%d rules, at most %d", len(src.Vegetation), MaxVegetation)
+	}
+	span := w.Span()
+	for i, vs := range src.Vegetation {
+		p := Path("vegetation", i)
+		v := Vegetation{Name: vs.Name, Density: share(Path(p, "density"), vs.Density, true, 0.01)}
+		nameField(c, Path(p, "name"), vs.Name)
+		switch {
+		case vs.Prefab == "" && vs.Model == "":
+			c.Errorf(p, "needs a prefab (trees and other entities) or a model (grass, flowers: drawn with the ground)")
+		case vs.Prefab != "" && vs.Model != "":
+			c.Errorf(Path(p, "model"), "a rule has a prefab or a model, not both")
+		case vs.Prefab != "":
+			if c.Name(Path(p, "prefab"), vs.Prefab) {
+				v.Prefab = vs.Prefab
+				if pf := prefabs(vs.Prefab); pf != nil && (pf.Footprint.X > w.Cell || pf.Footprint.Y > w.Cell) {
+					c.Errorf(Path(p, "prefab"), "prefab %q is %v×%v m, larger than one cell (%v m): vegetation prefabs fit one cell",
+						vs.Prefab, pf.Footprint.X, pf.Footprint.Y, w.Cell)
+				}
+			}
+		default:
+			if c.Name(Path(p, "model"), vs.Model) {
+				v.Model = vs.Model
+			}
+		}
+		v.Biomes = biomeList(Path(p, "biomes"), vs.Biomes)
+		switch {
+		case vs.Cell == nil && vs.Radius == 0:
+		case vs.Cell == nil:
+			c.Errorf(Path(p, "cell"), "is required with radius (the centre [x, z] of the area)")
+		case vs.Radius == 0:
+			c.Errorf(Path(p, "radius"), "is required with cell (cells from the centre, 1 to %d)", MaxRadius)
+		case vs.Radius < 1 || vs.Radius > MaxRadius:
+			c.Errorf(Path(p, "radius"), "%d out of range [1, %d]", vs.Radius, MaxRadius)
+		default:
+			v.Area, v.Cell, v.Radius = true, cellField(c, Path(p, "cell"), vs.Cell, span, true), int32(vs.Radius)
+		}
+		v.Scale = [2]float32{0.8, 1.2}
+		if vs.Scale != nil {
+			switch {
+			case vs.Prefab != "":
+				c.Errorf(Path(p, "scale"), "only a model rule is scaled (a prefab keeps its entities' scale)")
+			case len(vs.Scale) != 2:
+				c.Errorf(Path(p, "scale"), "want [min, max], got %d numbers", len(vs.Scale))
+			case !gmath.IsFinite(vs.Scale[0]) || !gmath.IsFinite(vs.Scale[1]) || vs.Scale[0] <= 0 || vs.Scale[0] > vs.Scale[1] || vs.Scale[1] > MaxFloraScale:
+				c.Errorf(Path(p, "scale"), "[%v, %v] must satisfy 0 < min <= max <= %d", vs.Scale[0], vs.Scale[1], MaxFloraScale)
+			default:
+				v.Scale = [2]float32{vs.Scale[0], vs.Scale[1]}
+			}
+		}
+		w.Vegetation = append(w.Vegetation, v)
+	}
+}
+
+// nameField validates a required name that generated entity names may not shadow.
+func nameField(c *Checker, path, name string) {
+	switch {
+	case name == "":
+		c.Errorf(path, "is required")
+	case !c.Name(path, name):
+	case Reserved(name) != "":
+		c.Errorf(path, "name %q starts with %q, which is reserved for generated entities", name, Reserved(name))
+	}
+}
+
+// cellField validates a required [x, z] within the world's cells (-span to span-1), or
+// its vertices (-span to span) when vertex is set.
+func cellField(c *Checker, path string, v []int, span int, vertex bool) [2]int32 {
+	hi := span - 1
+	if vertex {
+		hi = span
+	}
+	switch {
+	case v == nil:
+		c.Errorf(path, "is required ([x, z] in cells)")
+	case len(v) != 2:
+		c.Errorf(path, "want [x, z], got %d numbers", len(v))
+	default:
+		ok := true
+		for k, x := range v {
+			if x < -span || x > hi {
+				c.Errorf(Path(path, k), "%d is outside the world (%d to %d)", x, -span, hi)
+				ok = false
+			}
+		}
+		if ok {
+			return [2]int32{int32(v[0]), int32(v[1])}
+		}
+	}
+	return [2]int32{}
 }
 
 // WorldDeps returns the prefab source files a world is compiled against (relative to the
@@ -293,6 +523,9 @@ func WorldDeps(src *WorldSource) []string {
 	}
 	for _, p := range src.Places {
 		add(p.Prefab)
+	}
+	for _, v := range src.Vegetation {
+		add(v.Prefab)
 	}
 	sort.Strings(out)
 	return out

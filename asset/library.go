@@ -92,6 +92,9 @@ func (l *Library) References() []string {
 				w = append(w, fmt.Sprintf("world %s: biome %s: ground material %q not found", name, b.Name, b.Ground))
 			}
 		}
+		if wd.Terrain.Water != "" && l.Materials[wd.Terrain.Water] == nil {
+			w = append(w, fmt.Sprintf("world %s: terrain: water material %q not found", name, wd.Terrain.Water))
+		}
 		for i, s := range wd.Scatter {
 			if l.Prefabs[s.Prefab] == nil {
 				w = append(w, fmt.Sprintf("world %s: scatter[%d]: prefab %q not found", name, i, s.Prefab))

@@ -316,10 +316,65 @@ type World struct {
 	Light      gfx.Light
 	Background uint32
 	Biomes     []Biome
+	Terrain    Terrain
+	Features   []Feature
+	Vegetation []Vegetation
 	Scatter    []Scatter
 	Sites      []Site
 	Places     []Place
 	Entities   []Entity // persistent entities, positions relative to the start cell
+}
+
+// Terrain shapes the ground of a world (docs/world.md).
+type Terrain struct {
+	Relief      float32 // meters: generated ground spans -Relief to +Relief
+	ReliefScale int     // cells per period of the relief noise
+	Sea         bool    // SeaLevel is set: ground below it is sea
+	SeaLevel    float32
+	Water       string  // material of water surfaces; "" for the built-in water
+	LODDistance float32 // meters from which the ground is drawn at its first coarser level
+}
+
+// Feature kinds.
+const (
+	FeatureHill  = "hill"
+	FeaturePlain = "plain"
+	FeatureLake  = "lake"
+	FeatureSea   = "sea"
+)
+
+// FeatureKinds lists the terrain feature kinds in documentation order.
+var FeatureKinds = []string{FeatureHill, FeaturePlain, FeatureLake, FeatureSea}
+
+// Feature is a terrain feature: a hill, a plain, a lake or a sea around Cell.
+type Feature struct {
+	Name      string
+	Kind      string
+	Cell      [2]int32 // centre, in cells (the corner of cells shared by [x, z] and [x-1, z-1])
+	Radius    int32    // cells
+	HasHeight bool     // Height was given (plain, lake and sea default to the ground)
+	Height    float32  // hill: added at the top (negative digs); plain: the level; lake, sea: the water level
+	Depth     float32  // lake, sea: meters below the water at the centre
+	Falloff   int32    // hill, plain: cells over which the edge blends; lake, sea: width of the shore
+	Roughness float32  // 0 to 1: how much the edge wanders
+}
+
+// IsWater reports whether the feature holds water.
+func (f *Feature) IsWater() bool { return f.Kind == FeatureLake || f.Kind == FeatureSea }
+
+// Vegetation is a vegetation rule: a one-cell Prefab (entities, like scatter) or a flora
+// Model (drawn as part of the chunk, no entities) on a share of the cells of its biomes,
+// everywhere or within Radius cells of Cell.
+type Vegetation struct {
+	Name    string
+	Prefab  string
+	Model   string
+	Density float32
+	Biomes  []string // nil for any
+	Area    bool     // Cell and Radius bound the rule
+	Cell    [2]int32
+	Radius  int32
+	Scale   [2]float32 // model: smallest and largest scale
 }
 
 // Biome is one band of the biome noise: Weight shares of the noise range, painted with

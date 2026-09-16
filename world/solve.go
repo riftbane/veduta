@@ -12,6 +12,7 @@ const (
 	CodePlaceBiome    = "WORLD_PLACE_BIOME"
 	CodePlaceOverlap  = "WORLD_PLACE_OVERLAP"
 	CodePlaceTooClose = "WORLD_PLACE_TOO_CLOSE"
+	CodePlaceWater    = "WORLD_PLACE_WATER"
 	CodeMissingPrefab = "WORLD_MISSING_PREFAB"
 	CodeMissingAsset  = "WORLD_MISSING_ASSET"
 	CodeNotTiling     = "WORLD_GROUND_NOT_TILING"
@@ -29,8 +30,8 @@ type Issue struct {
 
 // Validate checks a place of prefab p with its footprint's min corner at cell, turned by
 // rotation, against the world and the other places (except the one called except): it
-// must lie inside the world, stand on an allowed biome, and neither overlap another
-// place nor come closer to one than their min_distance rules allow. Sites and scatter
+// must lie inside the world, stand on an allowed biome and on dry ground, and neither
+// overlap another place nor come closer to one than their min_distance rules allow. Sites and scatter
 // are not checked: they yield to places.
 func (g *Gen) Validate(p *asset.Prefab, cell [2]int32, rotation int, except string) []Issue {
 	fw, fd := g.W.Footprint(p, rotation)
@@ -56,6 +57,10 @@ func (g *Gen) Validate(p *asset.Prefab, cell [2]int32, rotation int, except stri
 			out = append(out, Issue{CodePlaceBiome, "warning",
 				fmt.Sprintf("cell [%d, %d] is in biome %q; prefab %q allows %v", cx, cz, b, p.Name, p.Biomes), where("biome", b)})
 		}
+	}
+	if !g.dryFootprint(s.Rect) {
+		out = append(out, Issue{CodePlaceWater, "warning",
+			fmt.Sprintf("the %d×%d cell footprint at [%d, %d] stands in water (a lake, a sea or ground below the sea level)", fw, fd, cell[0], cell[1]), where()})
 	}
 	for i := range g.places {
 		o := &g.places[i]

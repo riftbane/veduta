@@ -1,8 +1,10 @@
 # World — `assets/worlds/<name>.world.json`
 
 A world is a map too large to write by hand: a seeded generator paints biomes over an
-integer grid of cells, scatters one-cell prefabs, places sites (villages, cities, ruins)
-on a jittered grid, and puts the landmarks you name (`places`) exactly where you say. The
+integer grid of cells, raises rolling ground and the hills, plains, lakes and seas you
+name (`terrain`, `features`), scatters one-cell prefabs, places sites (villages, cities,
+ruins) on a jittered grid, and puts the landmarks you name (`places`) exactly where you
+say. The
 game streams the chunks around a focus (the hero, usually), so the world is as large as
 `extent` allows (up to ±8192 m from the origin, 268 million cells at the defaults) while
 only a few chunks exist at a time. Since v1.2.0.
@@ -26,7 +28,10 @@ on the authoring machine and on the console.
 ## Cells and chunks
 
 - A **cell** is `cell` meters square; cell `[x, z]` covers x in `[x·cell, (x+1)·cell)`,
-  z in `[z·cell, (z+1)·cell)` at y = 0. +X is east, −Z is north (up on a top-down render).
+  z in `[z·cell, (z+1)·cell)`. +X is east, −Z is north (up on a top-down render).
+- A **vertex** `[x, z]` is the min corner of cell `[x, z]`: the ground has one height per
+  vertex (whole millimeters, computed with integers so every machine agrees) and each cell
+  is two triangles between its four corners.
 - A **chunk** is `chunk` × `chunk` cells; chunk `[cx, cz]` starts at cell
   `[cx·chunk, cz·chunk]`.
 - The world spans chunks `-extent` to `extent-1` on each axis, so cells `-extent·chunk`
@@ -51,6 +56,8 @@ on the authoring machine and on the console.
 | `light` | object | scene default | As in a scene. |
 | `background` | color | `"#202830"` | As in a scene. |
 | `biomes` | array of objects | required, at least one | See Biomes. |
+| `terrain` | object | flat | See Terrain. Since v1.3.0. |
+| `features` | array of objects | `[]` | Hills, plains, lakes and seas; see Features. Since v1.3.0. |
 | `scatter` | array of objects | `[]` | See Scatter. |
 | `sites` | array of objects | `[]` | See Sites. |
 | `places` | array of objects | `[]` | See Places. |
@@ -73,6 +80,56 @@ adjacent biomes in the list are adjacent on the map.
 | `name` | string | required | Unique biome name, referred to by `scatter`, `sites` and prefab rules. |
 | `ground` | string | required | Material painted on the biome's cells. Its texture must be `tiling`: the ground is one mesh per chunk with one tile per cell. |
 | `weight` | integer | `1` | Share of the noise range, 1 to 1000. |
+
+### Terrain
+
+The ground's shape. Without `terrain` (or with `relief` 0 and no features) the ground is
+flat at y = 0.
+
+| Field | Type | Default | Meaning |
+|-------|------|---------|---------|
+| `relief` | number | `0` | Meters, 0 to 256: seeded rolling ground between −relief and +relief. |
+| `relief_scale` | integer | `48` | Cells per period of the relief noise, 4 to 4096: larger values make wider hills. |
+| `sea_level` | number | none | Meters, −1024 to 1024: wherever the ground lies below it, it is sea. Without it only lakes and seas hold water. |
+| `water` | string | built-in | Material of water surfaces. The built-in water (`world:water`) is an opaque lake blue. |
+| `lod_distance` | number | 2 × `chunk` × `cell` | Meters from which a chunk's ground is drawn at its first coarser level; each next level from twice as far (see Rendering). |
+
+### Features
+
+Named changes to the ground, applied **in file order** on top of the relief: a later
+feature works on the ground the earlier ones left. `world_terrain` adds them (it reports
+the heights before and after and what now stands in water); `world_remove` removes them.
+
+| Field | Type | Default | Meaning |
+|-------|------|---------|---------|
+| `name` | string | required | Unique among places, features and vegetation rules; not starting with `chunk_`, `site_` or `place_`. |
+| `kind` | string | required | `hill`, `plain`, `lake` or `sea`. |
+| `cell` | `[x, z]` | required | The centre: a vertex inside the world. |
+| `radius` | integer | required | Cells from the centre to the edge, 1 to 16384. |
+| `height` | number | see below | `hill`: meters added at the top, −256 to 256, required (negative digs a hollow). `plain`: the level, default the ground at the centre. `lake`, `sea`: the water level, default the ground at the centre (lake) or `sea_level`, else 0 (sea). |
+| `depth` | number | lake 2, sea 8 | `lake`, `sea`: meters from the water down to the bottom at the centre, (0, 256]. |
+| `falloff` | integer | see below | `hill`, `plain`: cells inside the edge over which the feature fades into the ground around it, 0 to `radius` (hill default `radius`: a dome; plain default `radius`/3; 0 cuts a step). `lake`, `sea`: width of the shore outside the rim over which the ground returns to its own height (lake default `radius`/4 in 2..16, sea `radius`/8 in 4..32). |
+| `roughness` | number | hill 0.2, plain 0.1, lake and sea 0.3 | 0 to 1: how far the edge wanders from a circle (the radius varies by up to ± roughness/2, smoothly). |
+
+- A **hill** adds `height` at the centre, fading to nothing at the edge.
+- A **plain** levels the ground to its level within `radius − falloff`, blending out to
+  the edge: flatten a hillside before placing a town, or cut a mesa into a hill.
+- A **lake** or a **sea** is a bowl: water at its level out to the (wandering) radius, the
+  bottom `depth` below it at the centre, a dry rim 2 cells wide just above the water
+  (5 cm), then the shore back to the ground. A sea is a big lake: centre it off the coast
+  with a radius that reaches the shore (`cell: [-600, 0], radius: 500` makes the west
+  a sea from about x = −100 on).
+- With `sea_level`, any ground below it is sea too, lakes and seas included.
+
+**Pads.** Every site and place stands on a pad: the vertices of its footprint are levelled
+to the ground at the footprint's centre (features and relief included), blending into the
+ground over 2 cells around it. Its entities' `y` is measured from the pad; a scattered
+prefab's from the ground at the centre of its cell.
+
+**Water.** A site whose footprint has a vertex under water is dropped; scatter skips cells
+whose centre is under water; a place in water is reported (`WORLD_PLACE_WATER`). Water is
+drawn as flat quads at its level over every cell with a corner under it: the ground hides
+the part that lies above it. Nothing collides with water: a game asks `WaterAt`.
 
 ### Scatter
 
@@ -123,7 +180,7 @@ run, so scenarios and traces can refer to it:
 
 | Entity | Name |
 |--------|------|
-| Ground of chunk `[cx, cz]` | `chunk_<cx>_<cz>_ground` (one static entity per chunk, tagged `ground`, no collision box) |
+| Ground of chunk `[cx, cz]` | `chunk_<cx>_<cz>_ground` (one static entity per chunk, tagged `ground`, no collision box; it draws the chunk's water too) |
 | Scatter at cell `[x, z]` | `chunk_<cx>_<cz>_c<i>_<entity>`, `i` the cell's index in the chunk (row-major) |
 | Site of rule `r` in region `[rx, rz]` | `site_<r>_<rx>_<rz>_<entity>` |
 | Place | `place_<name>_<entity>` |
@@ -155,10 +212,45 @@ func (g *Game) Update(ctx *veduta.Context, in veduta.Input) {
 ```
 
 `ctx.World()` is nil until a world is loaded. `Focus` sets the point the window is kept
-around; `CellOf(pos)` returns the cell of a position; `Loaded()` lists the loaded chunks.
+around; `CellOf(pos)` returns the cell of a position; `Loaded()` lists the loaded chunks;
+`HeightAt(pos)` returns the height of the ground under a position (exactly on the drawn
+triangles, so a hero set to it stands on the ground) and `WaterAt(pos)` the water level
+over it and whether the ground there is under water:
+
+```go
+if w := ctx.World(); w != nil {
+	p := hero.Transform.Position
+	next := p.Add(step)
+	if _, wet := w.WaterAt(next); !wet { // keep out of lakes and seas
+		next.Y = w.HeightAt(next)
+		hero.Transform.Position = next
+	}
+}
+```
 While a world is loaded the `within_bounds` invariant uses the world's extent (and the
 project's Y range) instead of the project's `bounds`. Snapshots carry the loaded window,
 so `Restore` continues the same streaming.
+
+## Rendering
+
+A console draws about 1200 triangles a frame at 20 Hz, so a world is drawn with two
+savings, both automatic:
+
+- **Limited view.** An entity whose drawn bounds lie wholly outside the camera's view
+  volume costs nothing, and nothing beyond the camera's `far` plane is drawn: a chunk
+  behind the camera or past `far` is skipped whole. Keep `far` (perspective) or `size`
+  (orthographic) within the loaded chunks (`WORLD_VIEW_SHORT`).
+- **Fewer triangles far away.** Each chunk's ground has levels of detail: level k samples
+  every 2^k-th vertex (1, 2, 4, 8, 16 cells) and is drawn from `lod_distance` × 2^(k−1)
+  meters on; flat runs of cells merge into one quad at every level. Neighbouring chunks
+  drawn at different levels would leave cracks along their shared edge, so each level
+  hangs a skirt below every edge that is not straight, as deep as the edge's height range.
+  Models get the same saving from their own `lod` and `draw_distance` (`model` topic).
+
+Distances are measured from the camera to the nearest point of an entity's bounds, as
+seen through a 60° lens (an orthographic camera counts 0.866 × `size` for everything).
+`render` reports `draw`: the entities considered, culled, too far, and drawn at a lower
+level.
 
 ## Inspection and tools
 
@@ -167,11 +259,12 @@ so `Restore` continues the same streaming.
 | Code | Severity | Meaning |
 |------|----------|---------|
 | `WORLD_MISSING_PREFAB` | error | A scatter, site or place names a prefab that does not exist. |
-| `WORLD_MISSING_ASSET` | error | A ground material, or a model or material of a persistent entity, does not exist. |
+| `WORLD_MISSING_ASSET` | error | A ground or water material, or a model or material of a persistent entity, does not exist. |
 | `WORLD_GROUND_NOT_TILING` | error | A biome's ground material has no texture or one that is not `tiling`. |
 | `WORLD_PLACE_OVERLAP` | error | Two places' footprints overlap. |
 | `WORLD_PLACE_OUTSIDE` | error | A place's footprint leaves the world. |
 | `WORLD_PLACE_BIOME` | warning | A place stands on a biome its prefab (or the biome list) does not allow. |
+| `WORLD_PLACE_WATER` | warning | A vertex of a place's footprint lies under water. |
 | `WORLD_PLACE_TOO_CLOSE` | warning | Two places are closer than a `min_distance` rule allows. |
 | `WORLD_CHUNK_BUDGET` | warning | The densest sampled chunk, scaled to what the camera sees, exceeds the console's triangle budget. |
 | `WORLD_VIEW_SHORT` | warning | The camera sees farther than `view` chunks, so unloaded ground is visible. |

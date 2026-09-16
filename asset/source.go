@@ -225,21 +225,24 @@ type RulesSource struct {
 
 // WorldSource is assets/worlds/<name>.world.json.
 type WorldSource struct {
-	Veduta     string          `json:"veduta"`
-	Seed       uint64          `json:"seed,omitempty"`
-	Cell       *float32        `json:"cell,omitempty"`        // default 1
-	Chunk      int             `json:"chunk,omitempty"`       // default 16
-	Extent     int             `json:"extent,omitempty"`      // default 512
-	View       int             `json:"view,omitempty"`        // default 1
-	BiomeScale int             `json:"biome_scale,omitempty"` // default 64
-	Camera     CameraSource    `json:"camera"`
-	Light      *LightSource    `json:"light,omitempty"`
-	Background string          `json:"background,omitempty"`
-	Biomes     []BiomeSource   `json:"biomes"`
-	Scatter    []ScatterSource `json:"scatter,omitempty"`
-	Sites      []SiteSource    `json:"sites,omitempty"`
-	Places     []PlaceSource   `json:"places,omitempty"`
-	Entities   []EntitySource  `json:"entities,omitempty"`
+	Veduta     string             `json:"veduta"`
+	Seed       uint64             `json:"seed,omitempty"`
+	Cell       *float32           `json:"cell,omitempty"`        // default 1
+	Chunk      int                `json:"chunk,omitempty"`       // default 16
+	Extent     int                `json:"extent,omitempty"`      // default 512
+	View       int                `json:"view,omitempty"`        // default 1
+	BiomeScale int                `json:"biome_scale,omitempty"` // default 64
+	Camera     CameraSource       `json:"camera"`
+	Light      *LightSource       `json:"light,omitempty"`
+	Background string             `json:"background,omitempty"`
+	Biomes     []BiomeSource      `json:"biomes"`
+	Terrain    *TerrainSource     `json:"terrain,omitempty"`
+	Features   []FeatureSource    `json:"features,omitempty"`
+	Vegetation []VegetationSource `json:"vegetation,omitempty"`
+	Scatter    []ScatterSource    `json:"scatter,omitempty"`
+	Sites      []SiteSource       `json:"sites,omitempty"`
+	Places     []PlaceSource      `json:"places,omitempty"`
+	Entities   []EntitySource     `json:"entities,omitempty"`
 }
 
 // BiomeSource is one biome of a world.
@@ -247,6 +250,41 @@ type BiomeSource struct {
 	Name   string `json:"name"`
 	Ground string `json:"ground"`           // material name
 	Weight int    `json:"weight,omitempty"` // default 1
+}
+
+// TerrainSource shapes the ground of a world: generated relief, the sea level, the water
+// material and the ground's levels of detail.
+type TerrainSource struct {
+	Relief      *float32 `json:"relief,omitempty"`       // meters above and below 0, default 0 (flat)
+	ReliefScale int      `json:"relief_scale,omitempty"` // cells per period, default 48
+	SeaLevel    *float32 `json:"sea_level,omitempty"`    // ground below it is sea (default: no sea)
+	Water       string   `json:"water,omitempty"`        // material of water surfaces (default: built-in)
+	LODDistance *float32 `json:"lod_distance,omitempty"` // meters to the first coarser level, default 2 chunks
+}
+
+// FeatureSource is one terrain feature of a world: a hill, a plain, a lake or a sea.
+type FeatureSource struct {
+	Name      string   `json:"name"`
+	Kind      string   `json:"kind"`
+	Cell      []int    `json:"cell"`   // centre [x, z]
+	Radius    int      `json:"radius"` // cells
+	Height    *float32 `json:"height,omitempty"`
+	Depth     *float32 `json:"depth,omitempty"`
+	Falloff   *int     `json:"falloff,omitempty"`
+	Roughness *float32 `json:"roughness,omitempty"`
+}
+
+// VegetationSource is one vegetation rule of a world: trees (a prefab) or flora (a
+// model), everywhere or in a round area.
+type VegetationSource struct {
+	Name    string    `json:"name"`
+	Prefab  string    `json:"prefab,omitempty"`
+	Model   string    `json:"model,omitempty"`
+	Density *float32  `json:"density"`
+	Biomes  []string  `json:"biomes,omitempty"`
+	Cell    []int     `json:"cell,omitempty"`
+	Radius  int       `json:"radius,omitempty"`
+	Scale   []float32 `json:"scale,omitempty"` // model: [min, max], default [0.8, 1.2]
 }
 
 // ScatterSource is one scatter rule of a world.

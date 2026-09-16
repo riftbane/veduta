@@ -117,7 +117,7 @@ func TestChunkIndependentOfOrderAndRun(t *testing.T) {
 	if !reflect.DeepEqual(chunkSummary(ca0), chunkSummary(cb0)) || !reflect.DeepEqual(chunkSummary(ca1), chunkSummary(cb1)) {
 		t.Fatal("scatter depends on generation order")
 	}
-	if !bytes.Equal(asset.EncodeModel(ca0.Ground).Data, asset.EncodeModel(cb0.Ground).Data) {
+	if !bytes.Equal(asset.EncodeModel(a.Ground(ca0)).Data, asset.EncodeModel(b.Ground(cb0)).Data) || !reflect.DeepEqual(ca1.Grid, cb1.Grid) {
 		t.Fatal("ground mesh differs between runs")
 	}
 	sa, sb := a.Structures(-1, -1), b.Structures(-1, -1)
@@ -294,7 +294,7 @@ func TestInstantiateRotation(t *testing.T) {
 func TestGroundMesh(t *testing.T) {
 	g := newGen(t)
 	c := g.Chunk(-1, 2)
-	m := c.Ground
+	m := g.Ground(c)
 	if m.Name != "world:ground:-1:2" || len(m.Mesh.Indices)%3 != 0 || len(m.Parts) != len(m.Mesh.Parts) || len(m.Parts) == 0 {
 		t.Fatalf("model %+v", m)
 	}
@@ -325,10 +325,16 @@ func TestGroundMesh(t *testing.T) {
 	if e.Name != "chunk_n1_2_ground" || e.Model != m.Name || e.Position != gmath.V3(-16, 0, 32) || e.Hitbox == nil || !e.Hitbox.IsEmpty() {
 		t.Fatalf("ground entity %+v", e)
 	}
-	// Materials index parts in biome order and every part draws something.
-	for _, p := range m.Mesh.Parts {
-		if p.Count == 0 || p.Material < 0 || p.Material >= len(m.Materials) {
+	// Materials index parts in biome order, one part per material.
+	for k, p := range m.Mesh.Parts {
+		if p.Material != k || len(m.Mesh.Parts) != len(m.Materials) {
 			t.Fatalf("part %+v", p)
+		}
+	}
+	// Flat ground has no skirts and the same heights everywhere.
+	for _, h := range c.Grid.Height {
+		if h != 0 {
+			t.Fatalf("flat world has height %d", h)
 		}
 	}
 }

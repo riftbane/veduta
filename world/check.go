@@ -42,6 +42,9 @@ func (g *Gen) Check(lib *asset.Library) *Report {
 			add(CodeNotTiling, "error", fmt.Sprintf("biome %q: texture %q of ground material %q is not tiling (set \"tiling\": true)", b.Name, m.Texture, b.Ground), map[string]any{"biome": b.Name, "material": b.Ground, "texture": m.Texture})
 		}
 	}
+	if name := w.Terrain.Water; name != "" && lib.Materials[name] == nil {
+		add(CodeMissingAsset, "error", fmt.Sprintf("terrain: water material %q does not exist", name), map[string]any{"material": name})
+	}
 	for _, e := range w.Entities {
 		if e.Model != "" && lib.Models[e.Model] == nil {
 			add(CodeMissingAsset, "error", fmt.Sprintf("entity %q: model %q does not exist", e.Name, e.Model), map[string]any{"entity": e.Name, "model": e.Model})
@@ -89,7 +92,7 @@ func (g *Gen) Check(lib *asset.Library) *Report {
 		}
 		seen[[2]int32{cx, cz}] = true
 		c := g.Chunk(cx, cz)
-		n := len(c.Ground.Mesh.Indices) / 3
+		n := len(g.Ground(c).Mesh.Indices) / 3
 		for i := range c.Scatter {
 			n += structTris(&c.Scatter[i])
 		}

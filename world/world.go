@@ -53,15 +53,18 @@ type Struct struct {
 	Place    string   // the place's name, "" for a site or a scatter item
 	Site     int      // the site rule's index, -1 for a place or a scatter item
 	Cell     [2]int32 // scatter: the cell; site: the region; place: the cell
+	Ground   int32    // millimeters: the height the structure stands on
 }
 
-// Chunk is the generated content of one chunk: the ground mesh and the scatter items.
-// Sites and places touching the chunk come from Gen.Structures.
+// Chunk is the generated content of one chunk: its cells' biomes, its vertices and the
+// scatter items. The ground model comes from Gen.Ground, the sites and places touching
+// the chunk from Gen.Structures.
 type Chunk struct {
 	X, Z    int32
 	Rect    Rect
-	Ground  *asset.Model // one mesh, one part per ground material present
-	Scatter []Struct     // in cell order (row-major)
+	Biomes  []int    // per cell, row-major
+	Grid    *Grid    // heights and water, from one cell before the chunk to one after it
+	Scatter []Struct // in cell order (row-major)
 }
 
 type scatterRule struct {
@@ -91,6 +94,11 @@ type Gen struct {
 	sites   []siteRule
 	places  []Struct
 	memo    map[[3]int32]*Struct // site memo: rule, rx, rz → the kept site or nil
+
+	relief      int64 // millimeters
+	reliefField field
+	seaLevel    int64 // millimeters, NoWater without a sea
+	features    []feature
 }
 
 // New prepares a generator for w. prefabs resolves prefab names (nil: none known);
@@ -114,6 +122,7 @@ func New(w *asset.World, prefabs func(string) *asset.Prefab) *Gen {
 		return p
 	}
 	g.cum = g.thresholds()
+	g.initTerrain()
 	for _, s := range w.Scatter {
 		p := lookup(s.Prefab)
 		r := scatterRule{Scatter: s, prefab: p, cut: share(s.Density)}
@@ -140,9 +149,10 @@ func New(w *asset.World, prefabs func(string) *asset.Prefab) *Gen {
 			continue
 		}
 		fw, fd := w.Footprint(p, pl.Rotation)
+		rect := Rect{pl.Cell[0], pl.Cell[1], int32(fw), int32(fd)}
 		g.places = append(g.places, Struct{
-			Key: "place_" + pl.Name, Prefab: p, Rect: Rect{pl.Cell[0], pl.Cell[1], int32(fw), int32(fd)},
-			Rotation: pl.Rotation, Tags: p.Tags, Place: pl.Name, Site: -1, Cell: pl.Cell,
+			Key: "place_" + pl.Name, Prefab: p, Rect: rect,
+			Rotation: pl.Rotation, Tags: p.Tags, Place: pl.Name, Site: -1, Cell: pl.Cell, Ground: g.padLevel(rect),
 		})
 	}
 	for name := range missing {
@@ -302,7 +312,8 @@ func siteTags(p *asset.Prefab, tag string) []string {
 }
 
 // site returns the site of rule r in region (rx, rz), or nil: none by chance, a
-// wrong biome, outside the world, or yielding to a place or a site of an earlier rule.
+// wrong biome, outside the world, on water, or yielding to a place or a site of an
+// earlier rule.
 func (g *Gen) site(r int, rx, rz int32) *Struct {
 	key := [3]int32{int32(r), rx, rz}
 	if s, ok := g.memo[key]; ok {
@@ -346,9 +357,12 @@ func (g *Gen) siteCandidate(r int, rx, rz int32) *Struct {
 	if b := g.W.Biomes[g.Biome(cx, cz)].Name; !(len(rule.Biomes) == 0 || contains(rule.Biomes, b)) || !(len(p.Biomes) == 0 || contains(p.Biomes, b)) {
 		return nil
 	}
+	if !g.dryFootprint(rect) {
+		return nil
+	}
 	return &Struct{
 		Key: fmt.Sprintf("site_%d_%s_%s", r, coord(rx), coord(rz)), Prefab: p, Rect: rect,
-		Tags: siteTags(p, rule.Tag), Site: r, Cell: [2]int32{rx, rz},
+		Tags: siteTags(p, rule.Tag), Site: r, Cell: [2]int32{rx, rz}, Ground: g.padLevel(rect),
 	}
 }
 
@@ -418,10 +432,11 @@ func (g *Gen) Structures(cx, cz int32) []Struct {
 	return out
 }
 
-// Chunk generates chunk (cx, cz): its ground mesh and scatter items.
+// Chunk generates chunk (cx, cz): its biomes, vertices and scatter items. Scatter
+// skips cells under water.
 func (g *Gen) Chunk(cx, cz int32) *Chunk {
 	rect := g.ChunkRect(cx, cz)
-	c := &Chunk{X: cx, Z: cz, Rect: rect}
+	c := &Chunk{X: cx, Z: cz, Rect: rect, Grid: g.Grid(rect, 1)}
 	n := int32(g.W.Chunk)
 	biomes := make([]int, n*n)
 	for z := int32(0); z < n; z++ {
@@ -429,7 +444,7 @@ func (g *Gen) Chunk(cx, cz int32) *Chunk {
 			biomes[z*n+x] = g.Biome(rect.X+x, rect.Z+z)
 		}
 	}
-	c.Ground = g.ground(rect, biomes)
+	c.Biomes = biomes
 	if len(g.scatter) == 0 {
 		return c
 	}
@@ -456,6 +471,10 @@ func (g *Gen) Chunk(cx, cz int32) *Chunk {
 		for x := int32(0); x < n; x++ {
 			cell := [2]int32{rect.X + x, rect.Z + z}
 			b := biomes[z*n+x]
+			ground, water := c.Grid.cellGround(cell[0], cell[1])
+			if wet(ground, water) {
+				continue
+			}
 			for r := range g.scatter {
 				rule := &g.scatter[r]
 				if rule.prefab == nil || !rule.biomes[b] {
@@ -465,7 +484,7 @@ func (g *Gen) Chunk(cx, cz int32) *Chunk {
 				if uint64(uint32(h)) >= rule.cut {
 					continue
 				}
-				s := Struct{Key: prefix + strconv.Itoa(int(z*n+x)), Prefab: rule.prefab, Rect: Rect{cell[0], cell[1], 1, 1}, Tags: rule.prefab.Tags, Site: -1, Cell: cell}
+				s := Struct{Key: prefix + strconv.Itoa(int(z*n+x)), Prefab: rule.prefab, Rect: Rect{cell[0], cell[1], 1, 1}, Tags: rule.prefab.Tags, Site: -1, Cell: cell, Ground: ground}
 				free := true
 				for i := range near {
 					if g.conflicts(&s, &near[i]) {
@@ -501,12 +520,14 @@ func (g *Gen) GroundEntity(c *Chunk) asset.Entity {
 }
 
 // Instantiate returns the entities of a structure in world space, in prefab order,
-// named "<key>_<entity>"; parents refer to those names.
+// named "<key>_<entity>"; parents refer to those names. Root entities stand on the
+// structure's ground.
 func (g *Gen) Instantiate(s *Struct) []asset.Entity {
 	p := s.Prefab
 	out := make([]asset.Entity, len(p.Entities))
 	fw, fd := float64(p.Footprint.X), float64(p.Footprint.Y)
 	ox, oz := float64(meters(s.Rect.X, g.W.Cell)), float64(meters(s.Rect.Z, g.W.Cell))
+	oy := float64(s.Ground) / 1000
 	for i := range p.Entities {
 		e := p.Entities[i]
 		e.Name = s.Key + "_" + e.Name
@@ -532,7 +553,7 @@ func (g *Gen) Instantiate(s *Struct) []asset.Entity {
 			x, z = -z, x
 			cx, cz = hd, hw
 		}
-		e.Position = gmath.V3(float32(ox+cx+x), e.Position.Y, float32(oz+cz+z))
+		e.Position = gmath.V3(float32(ox+cx+x), float32(oy+float64(e.Position.Y)), float32(oz+cz+z))
 		e.RotationDeg.Y += float32(s.Rotation)
 		out[i] = e
 	}

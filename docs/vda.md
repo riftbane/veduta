@@ -194,6 +194,9 @@ none), `vec3` position, `vec3` rotation_deg, `vec3` scale, `list<str>` tags, `st
 | 21 | sites | `list<site>` | `str` tag, `list<str>` prefabs, `list<str>` biomes, `i64` spacing in [2, 4096], `f32` chance in (0, 1] |
 | 22 | places | `list<place>` | `str` name, `str` prefab, `i64` x, `i64` z (cells inside the world), `i64` rotation (0, 90, 180 or 270) |
 | 23 | entities | `list<entity>` | persistent entities, as in `SCEN` |
+| 24–29 | terrain | `f32` relief in [0, 256], `i64` relief_scale in [4, 4096], `bool` sea, `f32` sea_level in [−1024, 1024], `str` water material (`""` built-in), `f32` lod_distance > 0 | since v1.3.0 |
+| 30 | features | `list<feature>` | `str` name, `str` kind (hill, plain, lake, sea), `i64` x, `i64` z (inside the world's vertices), `i64` radius in [1, 16384], `bool` has_height, `f32` height in [−1024, 1024], `f32` depth in (0, 256], `i64` falloff in [0, 16384], `f32` roughness in [0, 1]; since v1.3.0 |
+| 31 | vegetation | `list<vegetation>` | `str` name, `str` prefab, `str` model (exactly one non-empty), `f32` density in (0, 1], `list<str>` biomes, `bool` area, `i64` x, `i64` z, `i64` radius (checked with area), `f32` scale min, `f32` scale max (0 < min ≤ max ≤ 16); since v1.3.0 |
 
 `u64` is an unsigned 64-bit little-endian integer.
 

@@ -778,6 +778,40 @@ func EncodeWorld(wd *World) Chunk {
 		w.i64(p.Rotation)
 	}
 	w.entities(wd.Entities)
+	t := &wd.Terrain
+	w.f32(t.Relief)
+	w.i64(t.ReliefScale)
+	w.bool(t.Sea)
+	w.f32(t.SeaLevel)
+	w.str(t.Water)
+	w.f32(t.LODDistance)
+	w.count(len(wd.Features))
+	for _, f := range wd.Features {
+		w.str(f.Name)
+		w.str(f.Kind)
+		w.i64(int(f.Cell[0]))
+		w.i64(int(f.Cell[1]))
+		w.i64(int(f.Radius))
+		w.bool(f.HasHeight)
+		w.f32(f.Height)
+		w.f32(f.Depth)
+		w.i64(int(f.Falloff))
+		w.f32(f.Roughness)
+	}
+	w.count(len(wd.Vegetation))
+	for _, v := range wd.Vegetation {
+		w.str(v.Name)
+		w.str(v.Prefab)
+		w.str(v.Model)
+		w.f32(v.Density)
+		w.strs(v.Biomes)
+		w.bool(v.Area)
+		w.i64(int(v.Cell[0]))
+		w.i64(int(v.Cell[1]))
+		w.i64(int(v.Radius))
+		w.f32(v.Scale[0])
+		w.f32(v.Scale[1])
+	}
 	return Chunk{Type: ChunkWorld, Data: w.b}
 }
 
@@ -895,6 +929,84 @@ func DecodeWorld(c Chunk) (*World, error) {
 	}
 	r.field = "entities"
 	wd.Entities = r.entities()
+	r.field = "terrain"
+	t := &wd.Terrain
+	t.Relief = r.f32()
+	t.ReliefScale = r.i64()
+	t.Sea = r.bool()
+	t.SeaLevel = r.f32()
+	t.Water = r.str()
+	t.LODDistance = r.f32()
+	if r.err == nil {
+		switch {
+		case !(t.Relief >= 0 && t.Relief <= MaxRelief):
+			r.failf("relief %v out of range [0, %d]", t.Relief, MaxRelief)
+		case t.ReliefScale < MinReliefScale || t.ReliefScale > MaxReliefScale:
+			r.failf("relief_scale %d out of range [%d, %d]", t.ReliefScale, MinReliefScale, MaxReliefScale)
+		case !(t.SeaLevel >= -MaxLevel && t.SeaLevel <= MaxLevel):
+			r.failf("sea_level %v out of range [-%d, %d]", t.SeaLevel, MaxLevel, MaxLevel)
+		case !(t.LODDistance > 0):
+			r.failf("lod_distance %v is not positive", t.LODDistance)
+		}
+	}
+	span := wd.Extent * wd.Chunk
+	cellOK := func(x, z int) bool { return x >= -span && x <= span && z >= -span && z <= span }
+	r.field = "features"
+	if n := r.count(4 + 4 + 8*3 + 1 + 4 + 4 + 8 + 4); n > 0 {
+		wd.Features = make([]Feature, n)
+		for i := range wd.Features {
+			f := &wd.Features[i]
+			f.Name = r.str()
+			f.Kind = r.str()
+			x, z, radius := r.i64(), r.i64(), r.i64()
+			f.HasHeight = r.bool()
+			f.Height = r.f32()
+			f.Depth = r.f32()
+			falloff := r.i64()
+			f.Roughness = r.f32()
+			if r.err == nil {
+				switch {
+				case indexOf(FeatureKinds, f.Kind) < 0:
+					r.failf("feature %d kind %q is not one of %v", i, f.Kind, FeatureKinds)
+				case !cellOK(x, z):
+					r.failf("feature %d centre [%d, %d] is outside the world", i, x, z)
+				case radius < 1 || radius > MaxRadius || falloff < 0 || falloff > MaxRadius:
+					r.failf("feature %d radius %d or falloff %d out of range [1, %d]", i, radius, falloff, MaxRadius)
+				case !(f.Height >= -MaxLevel && f.Height <= MaxLevel) || !(f.Depth > 0 && f.Depth <= MaxDepth) || !(f.Roughness >= 0 && f.Roughness <= 1):
+					r.failf("feature %d height %v, depth %v or roughness %v out of range", i, f.Height, f.Depth, f.Roughness)
+				}
+			}
+			f.Cell, f.Radius, f.Falloff = [2]int32{int32(x), int32(z)}, int32(radius), int32(falloff)
+		}
+	}
+	r.field = "vegetation"
+	if n := r.count(4*3 + 4 + 4 + 1 + 8*3 + 8); n > 0 {
+		wd.Vegetation = make([]Vegetation, n)
+		for i := range wd.Vegetation {
+			v := &wd.Vegetation[i]
+			v.Name = r.str()
+			v.Prefab = r.str()
+			v.Model = r.str()
+			v.Density = r.f32()
+			v.Biomes = r.strs()
+			v.Area = r.bool()
+			x, z, radius := r.i64(), r.i64(), r.i64()
+			v.Scale = [2]float32{r.f32(), r.f32()}
+			if r.err == nil {
+				switch {
+				case (v.Prefab == "") == (v.Model == ""):
+					r.failf("rule %d needs exactly one of prefab and model", i)
+				case !(v.Density > 0 && v.Density <= 1):
+					r.failf("rule %d density %v out of range (0, 1]", i, v.Density)
+				case v.Area && (!cellOK(x, z) || radius < 1 || radius > MaxRadius):
+					r.failf("rule %d area [%d, %d] radius %d is out of range", i, x, z, radius)
+				case !(v.Scale[0] > 0 && v.Scale[0] <= v.Scale[1] && v.Scale[1] <= MaxFloraScale):
+					r.failf("rule %d scale %v out of range", i, v.Scale)
+				}
+			}
+			v.Cell, v.Radius = [2]int32{int32(x), int32(z)}, int32(radius)
+		}
+	}
 	if err := r.done(); err != nil {
 		return nil, err
 	}

@@ -53,6 +53,7 @@ func TestParseWorldFull(t *testing.T) {
 		Scatter:    []Scatter{{"tree", []string{"forest"}, 0.08}},
 		Sites:      []Site{{"city", []string{"city_small"}, []string{"plain"}, 24, 0.5}},
 		Places:     []Place{{"capital", "city_small", [2]int32{120, -40}, 90}},
+		Terrain:    Terrain{ReliefScale: 48, LODDistance: 32},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got  %+v\nwant %+v", got, want)
@@ -308,5 +309,108 @@ func TestWorldDocExamples(t *testing.T) {
 		if err != nil {
 			t.Errorf("docs/world.md example %d: %v", i, err)
 		}
+	}
+}
+
+func TestParseWorldTerrainAndVegetation(t *testing.T) {
+	src := `{"veduta": "world/1", "chunk": 8, "extent": 64, "camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]},
+	  "biomes": [{"name": "plain", "ground": "grass"}, {"name": "forest", "ground": "moss"}],
+	  "terrain": {"relief": 2.5, "relief_scale": 32, "sea_level": -1, "water": "sea_water", "lod_distance": 40},
+	  "features": [
+	    {"name": "peak", "kind": "hill", "cell": [10, -4], "radius": 12, "height": 6},
+	    {"name": "meadow", "kind": "plain", "cell": [0, 0], "radius": 9},
+	    {"name": "pond", "kind": "lake", "cell": [-20, 5], "radius": 6, "depth": 1.5, "roughness": 0},
+	    {"name": "bay", "kind": "sea", "cell": [512, 0], "radius": 300, "height": -1, "falloff": 40},
+	    {"name": "mesa", "kind": "hill", "cell": [-512, -512], "radius": 20, "height": -3, "falloff": 2}
+	  ],
+	  "vegetation": [
+	    {"name": "grass", "model": "grass_tuft", "density": 0.5, "biomes": ["plain"]},
+	    {"name": "oaks", "prefab": "tree", "density": 0.2, "cell": [30, 30], "radius": 15},
+	    {"name": "tulips", "model": "tulip", "density": 1, "cell": [3, 4], "radius": 5, "scale": [0.5, 2]}
+	  ],
+	  "places": [{"name": "home", "prefab": "tree", "cell": [2, 2]}]}`
+	w, err := ParseWorld("w.world.json", []byte(src), testPrefabs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (Terrain{Relief: 2.5, ReliefScale: 32, Sea: true, SeaLevel: -1, Water: "sea_water", LODDistance: 40}); w.Terrain != want {
+		t.Fatalf("terrain %+v", w.Terrain)
+	}
+	wantF := []Feature{
+		{Name: "peak", Kind: "hill", Cell: [2]int32{10, -4}, Radius: 12, HasHeight: true, Height: 6, Depth: 2, Falloff: 12, Roughness: 0.2},
+		{Name: "meadow", Kind: "plain", Cell: [2]int32{0, 0}, Radius: 9, Depth: 2, Falloff: 3, Roughness: 0.1},
+		{Name: "pond", Kind: "lake", Cell: [2]int32{-20, 5}, Radius: 6, Depth: 1.5, Falloff: 2, Roughness: 0},
+		{Name: "bay", Kind: "sea", Cell: [2]int32{512, 0}, Radius: 300, HasHeight: true, Height: -1, Depth: 8, Falloff: 40, Roughness: 0.3},
+		{Name: "mesa", Kind: "hill", Cell: [2]int32{-512, -512}, Radius: 20, HasHeight: true, Height: -3, Depth: 2, Falloff: 2, Roughness: 0.2},
+	}
+	if !reflect.DeepEqual(w.Features, wantF) {
+		t.Fatalf("features\n got %+v\nwant %+v", w.Features, wantF)
+	}
+	wantV := []Vegetation{
+		{Name: "grass", Model: "grass_tuft", Density: 0.5, Biomes: []string{"plain"}, Scale: [2]float32{0.8, 1.2}},
+		{Name: "oaks", Prefab: "tree", Density: 0.2, Area: true, Cell: [2]int32{30, 30}, Radius: 15, Scale: [2]float32{0.8, 1.2}},
+		{Name: "tulips", Model: "tulip", Density: 1, Area: true, Cell: [2]int32{3, 4}, Radius: 5, Scale: [2]float32{0.5, 2}},
+	}
+	if !reflect.DeepEqual(w.Vegetation, wantV) {
+		t.Fatalf("vegetation\n got %+v\nwant %+v", w.Vegetation, wantV)
+	}
+	var s WorldSource
+	if err := json.Unmarshal([]byte(src), &s); err != nil {
+		t.Fatal(err)
+	}
+	if got := WorldDeps(&s); !reflect.DeepEqual(got, []string{"prefabs/tree.prefab.json"}) {
+		t.Fatalf("deps %v", got)
+	}
+	back, err := DecodeWorld(EncodeWorld(w))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(back, w) {
+		t.Fatalf("round trip\n got %+v\nwant %+v", back, w)
+	}
+}
+
+func TestParseWorldTerrainErrors(t *testing.T) {
+	cam := `"camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]}, "extent": 8`
+	bio := `"biomes": [{"name": "plain", "ground": "grass"}]`
+	world := func(extra string) string { return `{"veduta": "world/1", ` + cam + `, ` + bio + extra + `}` }
+	cases := []struct {
+		name, src string
+		wants     []wantErr
+	}{
+		{"relief", world(`, "terrain": {"relief": 300, "relief_scale": 2, "sea_level": 2000, "water": "Blue", "lod_distance": 0}`),
+			[]wantErr{{`terrain.relief: 300 out of range [0, 256]`, `300`}, {`terrain.relief_scale: 2 out of range [4, 4096]`, `2,`},
+				{`terrain.sea_level: 2000 out of range [-1024, 1024]`, `2000`}, {`terrain.water: name "Blue" may only contain`, `"Blue"`},
+				{`terrain.lod_distance: 0 out of range (0, 100000]`, `0}`}}},
+		{"feature basics", world(`, "features": [{"kind": "volcano", "cell": [200, 0], "radius": 0}]`),
+			[]wantErr{{`features[0].name: is required`, `{"kind"`}, {`features[0].kind: unknown value "volcano"`, `"volcano"`},
+				{`features[0].cell[0]: 200 is outside the world (-128 to 128)`, `200`}, {`features[0].radius: is required`, `0}`}}},
+		{"hill fields", world(`, "features": [{"name": "h", "kind": "hill", "cell": [0, 0], "radius": 4, "depth": 1, "falloff": 5}]`),
+			[]wantErr{{`features[0].height: is required for a hill`, `{"name": "h"`}, {`features[0].depth: not used by kind hill`, `1,`},
+				{`features[0].falloff: 5 out of range [0, 4]`, `5}`}}},
+		{"lake fields", world(`, "features": [{"name": "l", "kind": "lake", "cell": [0, 0], "radius": 4, "height": 5000, "depth": 0, "roughness": 2}]`),
+			[]wantErr{{`features[0].height: 5000 out of range [-1024, 1024]`, `5000`}, {`features[0].depth: 0 out of range (0, 256]`, `0, "roughness"`},
+				{`features[0].roughness: 2 out of range [0, 1]`, `2}`}}},
+		{"reserved and duplicate names", world(`, "places": [{"name": "home", "prefab": "tree", "cell": [0, 0]}],
+			"features": [{"name": "chunk_1", "kind": "plain", "cell": [0, 0], "radius": 4}, {"name": "home", "kind": "plain", "cell": [0, 0], "radius": 4}],
+			"vegetation": [{"name": "home", "model": "grass", "density": 0.1}]`),
+			[]wantErr{{`features[0].name: name "chunk_1" starts with "chunk_"`, `"chunk_1"`},
+				{`features[1].name: name "home" is already used by places[0].name`, `"home", "kind"`},
+				{`vegetation[0].name: name "home" is already used by places[0].name`, `"home", "model"`}}},
+		{"vegetation", world(`, "vegetation": [{"name": "a", "density": 0.1}, {"name": "b", "prefab": "tree", "model": "grass", "density": 2},
+			{"name": "c", "prefab": "big", "density": 0.1, "scale": [1, 2]}, {"name": "d", "model": "grass", "density": 0.1, "radius": 3, "biomes": ["sea"]},
+			{"name": "e", "model": "grass", "density": 0.1, "cell": [0, 0]}, {"name": "f", "model": "grass", "density": 0.1, "scale": [2, 1]}]`),
+			[]wantErr{{`vegetation[0]: needs a prefab`, `{"name": "a"`}, {`vegetation[1].density: 2 out of range (0, 1]`, `2}`},
+				{`vegetation[1].model: a rule has a prefab or a model, not both`, `"grass", "density": 2`},
+				{`vegetation[2].prefab: prefab "big" is 40×40 m, larger than one cell`, `"big"`},
+				{`vegetation[2].scale: only a model rule is scaled`, `[1, 2]`},
+				{`vegetation[3].biomes[0]: unknown biome "sea"`, `"sea"`}, {`vegetation[3].cell: is required with radius`, `{"name": "d"`},
+				{`vegetation[4].radius: is required with cell`, `{"name": "e"`}, {`vegetation[5].scale: [2, 1] must satisfy 0 < min <= max <= 16`, `[2, 1]`}}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := ParseWorld("w.world.json", []byte(c.src), testPrefabs())
+			checkErrs(t, c.src, err, c.wants...)
+		})
 	}
 }
