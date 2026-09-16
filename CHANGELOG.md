@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## v1.3.0 — 2026-09-16
+
 ### Added
 
 - Levels of detail and a draw distance for models (`docs/model.md`): `lod` lists up to
