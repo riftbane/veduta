@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/v2/gfx"
 )
 
 // fakePanel builds a sysfs tree with one 16-bit framebuffer and a file standing in for its

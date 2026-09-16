@@ -3,7 +3,7 @@ package platform
 import (
 	"testing"
 
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // keyMax is KEY_MAX from linux/input-event-codes.h: no key code is larger.

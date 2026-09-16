@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/internal/golden"
+	"github.com/riftbane/veduta/v2/internal/golden"
 )
 
 type docBlock struct{ section, lang, body string }

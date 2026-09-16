@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/v2/asset"
 )
 
 // v0Defaults are the manifest defaults every engine before v1.0.0 filled in. They are

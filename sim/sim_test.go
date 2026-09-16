@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 func TestRNGReferenceVector(t *testing.T) {

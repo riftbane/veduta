@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/v2/asset"
 )
 
 // copyTemplate copies the engine's test game (internal/testgame) into a temporary directory.

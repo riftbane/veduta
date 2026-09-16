@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/riftbane/veduta/sprite/internal/fontsrc"
+	"github.com/riftbane/veduta/v2/sprite/internal/fontsrc"
 )
 
 func TestRunWritesGeneratedAtlas(t *testing.T) {

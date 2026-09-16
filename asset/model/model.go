@@ -14,8 +14,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Defaults and limits of the model format (docs/model.md).

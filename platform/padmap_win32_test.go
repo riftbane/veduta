@@ -3,7 +3,7 @@ package platform
 import (
 	"testing"
 
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 func TestXInputButtons(t *testing.T) {

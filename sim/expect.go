@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 // Expectation is one scenario check at a tick: either an entity path comparison

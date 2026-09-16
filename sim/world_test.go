@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 func boxBounds(string) (gmath.AABB, bool) {

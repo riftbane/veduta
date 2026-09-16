@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/internal/sheet"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/internal/sheet"
 )
 
 // DiffReport compares two images (spec §9.4).

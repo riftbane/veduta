@@ -5,8 +5,8 @@ import (
 	"math"
 	"sort"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // NoWater marks a vertex without water.

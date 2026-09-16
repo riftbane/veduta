@@ -10,11 +10,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/internal/sheet"
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/internal/sheet"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 // ModelSheets lists the sheet kinds of Model in the order they are written. "summary" is

@@ -8,7 +8,7 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Colors are BGRA8 packed in a uint32 as 0xAARRGGBB, which is B, G, R, A in little-endian

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/v2/gfx"
 )
 
 // wantErr describes one expected located error: Msg must contain msg; when at is not

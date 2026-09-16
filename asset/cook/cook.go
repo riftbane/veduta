@@ -21,9 +21,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/asset/model"
-	"github.com/riftbane/veduta/asset/texture"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/model"
+	"github.com/riftbane/veduta/v2/asset/texture"
 )
 
 // Status of one asset after Run.

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // PixelInfo answers "what is at this pixel" for a frame.

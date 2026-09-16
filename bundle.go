@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/inspect"
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/inspect"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 // writeBundle writes the frame bundle of f: color, depth, ids, normals, camera, and for

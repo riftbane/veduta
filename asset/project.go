@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // ProjectFile is the file name of the project manifest at the project root.

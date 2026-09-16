@@ -1,6 +1,6 @@
 package platform
 
-import "github.com/riftbane/veduta/sim"
+import "github.com/riftbane/veduta/v2/sim"
 
 // The pad becomes the console's buttons: the D-pad, A, B, Select and Cancel go to the game
 // as sim.Button, and Home closes the player. A gamepad has more buttons than that (X, Y,

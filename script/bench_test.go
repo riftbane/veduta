@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 // The same game logic in Lua and in Go: movers that walk, bounce off the bounds, count their

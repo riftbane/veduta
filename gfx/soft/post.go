@@ -3,8 +3,8 @@ package soft
 import (
 	"math"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 func sqrtf(x float32) float32 { return float32(math.Sqrt(float64(x))) }

@@ -1,6 +1,6 @@
 package model
 
-import "github.com/riftbane/veduta/gmath"
+import "github.com/riftbane/veduta/v2/gmath"
 
 // ltri is a triangle in a part's local, unscaled coordinates, counter-clockwise seen
 // from outside (outward normal = cross(b-a, c-a)).

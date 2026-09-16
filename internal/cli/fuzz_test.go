@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // TestFuzzRepro: a random player's holds, cut at any tick, become scenario events a repro

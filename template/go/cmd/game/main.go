@@ -3,8 +3,8 @@
 package main
 
 import (
-	"github.com/riftbane/veduta"
-	"github.com/riftbane/veduta/template/go/game"
+	"github.com/riftbane/veduta/v2"
+	"github.com/riftbane/veduta/v2/template/go/game"
 )
 
 func main() { veduta.Run(&game.Game{}) }

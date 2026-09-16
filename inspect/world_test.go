@@ -6,10 +6,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/asset/cook"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/world"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/cook"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/world"
 )
 
 var (

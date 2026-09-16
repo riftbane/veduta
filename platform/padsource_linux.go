@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // Finding what the player holds, and surviving it being unplugged. Discovery is reading

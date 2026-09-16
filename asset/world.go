@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // World limits and defaults (docs/world.md).

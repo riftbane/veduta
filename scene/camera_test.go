@@ -3,7 +3,7 @@ package scene
 import (
 	"testing"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Camera2D frames height units vertically around its center, +X right and +Y up, and sees

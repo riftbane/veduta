@@ -11,12 +11,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/asset/texture"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/internal/sheet"
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/texture"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/internal/sheet"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 // TexSource is the source of a texture, needed for the per-layer analysis: File is the

@@ -4,9 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // drawResources is one single-part unit box model ("box") and two materials, "solid"

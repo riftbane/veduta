@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta"
-	"github.com/riftbane/veduta/internal/golden"
-	"github.com/riftbane/veduta/lua"
+	"github.com/riftbane/veduta/v2"
+	"github.com/riftbane/veduta/v2/internal/golden"
+	"github.com/riftbane/veduta/v2/lua"
 )
 
 const testGame = "testdata/game"

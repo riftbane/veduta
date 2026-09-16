@@ -49,6 +49,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The module path is `github.com/riftbane/veduta/v2`** (breaking), as Go requires from
+  v2 on: a Go game imports `github.com/riftbane/veduta/v2/...`. `veduta upgrade` across a
+  major version rewrites the game's engine imports before `go get`, and names the files;
+  `veduta init --go` refuses an `--engine` of another major version than its template's
+  code. `doctor` reads the engine's version from go.mod under either path.
 - **The console has eight game buttons** (breaking): the D-pad, A, B, Select (the game's
   menu) and Cancel (back); Home leaves the game and never reaches it. `veduta.Input` is
   `Pressed`, `Held` and `Released` button sets with `Down`, `JustPressed`, `JustReleased`
@@ -68,8 +73,8 @@ All notable changes to this project are documented here. The format follows
   packages the scripts and assets into one archive); `veduta init --go` creates the empty
   Go game. Both have an empty scene showing the game's name, the `quad` model and `sprite`
   material, and one scenario (`start`). `doctor` and `release` check a script game's scripts
-  instead of a console build, and need no Go; `upgrade` leaves its missing go.mod alone. The demo game (hero, gems,
-  village, world) is no longer shipped; it moved to `internal/testgame`, the fixture the
+  instead of a console build, and need no Go; `upgrade` leaves its missing go.mod alone.
+  The demo game (hero, gems, village, world) is no longer shipped; it moved to `internal/testgame`, the fixture the
   engine's own scenarios, goldens and benchmarks run on.
 
 ### Decisions

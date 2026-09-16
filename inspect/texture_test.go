@@ -9,11 +9,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/asset/cook"
-	"github.com/riftbane/veduta/asset/texture"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/internal/golden"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/cook"
+	"github.com/riftbane/veduta/v2/asset/texture"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/internal/golden"
 )
 
 // Crafted texture sources, each exercising one check.

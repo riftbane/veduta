@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/v2/gfx"
 )
 
 // ScenarioResult is one scenario of a test run.

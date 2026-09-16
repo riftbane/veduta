@@ -5,8 +5,8 @@ package game
 import (
 	"encoding/gob"
 
-	"github.com/riftbane/veduta"
-	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/v2"
+	"github.com/riftbane/veduta/v2/gfx"
 )
 
 // Game is the game's global state: everything outside the scene.

@@ -9,14 +9,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gfx/soft"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/scene"
-	"github.com/riftbane/veduta/sim"
-	"github.com/riftbane/veduta/sprite"
-	"github.com/riftbane/veduta/world"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gfx/soft"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/scene"
+	"github.com/riftbane/veduta/v2/sim"
+	"github.com/riftbane/veduta/v2/sprite"
+	"github.com/riftbane/veduta/v2/world"
 )
 
 // Assets is every compiled asset of a project, by name.

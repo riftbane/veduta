@@ -18,13 +18,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/riftbane/veduta"
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/asset/cook"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/lua"
-	"github.com/riftbane/veduta/scene"
-	"github.com/riftbane/veduta/sprite"
+	"github.com/riftbane/veduta/v2"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/cook"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/lua"
+	"github.com/riftbane/veduta/v2/scene"
+	"github.com/riftbane/veduta/v2/sprite"
 )
 
 // APILevel is the level of the Lua API this runtime provides. It grows by one whenever a

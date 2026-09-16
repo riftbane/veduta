@@ -3,7 +3,7 @@ package asset
 import (
 	"sort"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Prefab limits (docs/prefab.md).

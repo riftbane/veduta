@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/asset/cook"
+	"github.com/riftbane/veduta/v2/asset/cook"
 )
 
 // Check is one doctor finding.
@@ -129,10 +129,10 @@ func (s *Session) engineCheck(env *Env) Check {
 	mod, err := os.ReadFile(filepath.Join(s.Root, "go.mod"))
 	required := ""
 	if err == nil {
-		if m := regexp.MustCompile(`github\.com/riftbane/veduta\s+(v\S+)`).FindSubmatch(mod); m != nil {
-			required = string(m[1])
+		if m := engineRequire.FindSubmatch(mod); m != nil {
+			required = string(m[2])
 		}
-		if bytes.Contains(mod, []byte("replace github.com/riftbane/veduta")) {
+		if bytes.Contains(mod, []byte("replace "+engineRepo)) {
 			required += " (replaced by a local checkout)"
 		}
 	}

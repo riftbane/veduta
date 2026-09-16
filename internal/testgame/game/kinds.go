@@ -1,9 +1,9 @@
 package game
 
 import (
-	"github.com/riftbane/veduta"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 // Tunables of the test game. PlayerSpeed × 100 is the "deliberately broken build" of the

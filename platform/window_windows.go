@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/v2/gfx"
 )
 
 // The simulator: on Windows the player draws in a window that shows the console's panel. The

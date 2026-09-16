@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/asset/cook"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/cook"
 )
 
 // Session is a project the tool operates on.
@@ -110,7 +110,7 @@ func goEnv(base []string) []string {
 		env = append(env, "GOPROXY=direct")
 	}
 	if !has("GONOSUMDB") && !has("GOSUMDB") {
-		env = append(env, "GONOSUMDB=github.com/riftbane/veduta")
+		env = append(env, "GONOSUMDB="+engineRepo)
 	}
 	return env
 }

@@ -10,7 +10,7 @@ in the game binary; the tool never contains game code.
 package main
 
 import (
-	"github.com/riftbane/veduta"
+	"github.com/riftbane/veduta/v2"
 	"mygame/game"
 )
 

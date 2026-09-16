@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 func TestButtons(t *testing.T) {

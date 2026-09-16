@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/internal/golden"
-	"github.com/riftbane/veduta/internal/testgame/game"
-	"github.com/riftbane/veduta/script"
-	skeleton "github.com/riftbane/veduta/template/go/game"
+	"github.com/riftbane/veduta/v2"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/internal/golden"
+	"github.com/riftbane/veduta/v2/internal/testgame/game"
+	"github.com/riftbane/veduta/v2/script"
+	skeleton "github.com/riftbane/veduta/v2/template/go/game"
 )
 
 // TestGameScenarios runs every scenario of the engine's test game (internal/testgame)

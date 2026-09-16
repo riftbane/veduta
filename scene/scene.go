@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Built-in entity kinds. Other kinds are game behaviours registered with

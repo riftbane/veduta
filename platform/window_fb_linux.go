@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/v2/gfx"
 )
 
 // fbWindow presents frames on a panel through its framebuffer device. There is no window

@@ -15,8 +15,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // A frame bundle (.vframe) holds one rendered frame with everything needed to answer

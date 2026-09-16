@@ -4,7 +4,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // The operations of the language with their slow paths: coercions, metamethods and errors.

@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/inspect"
-	"github.com/riftbane/veduta/mcp"
-	"github.com/riftbane/veduta/world"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/inspect"
+	"github.com/riftbane/veduta/v2/mcp"
+	"github.com/riftbane/veduta/v2/world"
 )
 
 // MaxEditRadius bounds the region world_terrain and world_vegetation describe: a sea may

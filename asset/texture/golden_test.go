@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/internal/golden"
-	"github.com/riftbane/veduta/internal/sheet"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/internal/golden"
+	"github.com/riftbane/veduta/v2/internal/sheet"
 )
 
 // testdataDir returns the module's testdata directory, the assets directory of the

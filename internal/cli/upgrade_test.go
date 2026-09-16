@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/v2/asset"
 )
 
 // upgradeProject writes a project holding manifest, with a go.mod that already requires

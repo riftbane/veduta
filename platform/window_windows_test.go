@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/v2/gfx"
 )
 
 var procGetPixel = gdi32.NewProc("GetPixel")

@@ -16,7 +16,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/v2/asset"
 )
 
 // Env is the environment of one tool invocation.

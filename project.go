@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/asset/cook"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/cook"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 // projectDir is the directory of the project: dir, or for "." without a manifest there, the

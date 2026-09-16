@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/riftbane/veduta/sprite/internal/fontsrc"
+	"github.com/riftbane/veduta/v2/sprite/internal/fontsrc"
 )
 
 func main() {

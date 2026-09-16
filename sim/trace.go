@@ -8,7 +8,7 @@ import (
 	"io"
 	"sort"
 
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 // Built-in trace events.

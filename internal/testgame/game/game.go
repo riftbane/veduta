@@ -6,9 +6,9 @@ import (
 	"encoding/gob"
 	"fmt"
 
-	"github.com/riftbane/veduta"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Game is the test game's global state: everything outside the scene.

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Button is one of the console's eight game buttons. Home is not one: it returns to the

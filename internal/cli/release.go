@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/internal/update"
-	"github.com/riftbane/veduta/mcp"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/internal/update"
+	"github.com/riftbane/veduta/v2/mcp"
 )
 
 // ReleaseOptions configures release.
@@ -338,7 +338,7 @@ func arm64Suite(root string) (skipped bool, out string, err error) {
 func isEngineRepo(dir string) bool {
 	for d := dir; ; {
 		if data, err := os.ReadFile(filepath.Join(d, "go.mod")); err == nil {
-			return bytes.HasPrefix(bytes.TrimSpace(data), []byte("module github.com/riftbane/veduta"))
+			return bytes.HasPrefix(bytes.TrimSpace(data), []byte("module "+engineRepo))
 		}
 		parent := filepath.Dir(d)
 		if parent == d {

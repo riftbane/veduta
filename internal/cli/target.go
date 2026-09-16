@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/internal/fused"
+	"github.com/riftbane/veduta/v2/internal/fused"
 )
 
 // The player target of this release line: a console built on a 64-bit ARM board with a
@@ -178,12 +178,14 @@ func (s *Session) fusedSites(bin string) ([]string, error) {
 }
 
 // engineFile shortens a file of the engine module, as a -trimpath build records it with or
-// without a version, to its path inside the engine (gmath/vec.go). Other files are kept.
+// without a version and under any major version, to its path inside the engine (gmath/vec.go). Other files are kept.
 func engineFile(f string) string {
-	const engine = "github.com/riftbane/veduta"
-	rest, ok := strings.CutPrefix(f, engine)
+	rest, ok := strings.CutPrefix(f, engineRepo)
 	if !ok {
 		return f
+	}
+	if m := regexp.MustCompile(`^/v\d+[/@]`).FindString(rest); m != "" {
+		rest = rest[len(m)-1:]
 	}
 	if strings.HasPrefix(rest, "@") {
 		_, rest, _ = strings.Cut(rest, "/")

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Binary codecs for the body chunks of .vda files. Layouts are specified field by field

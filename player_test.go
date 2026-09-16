@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/platform"
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/platform"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // fakeWindow hands the player one batch of events per poll and keeps the frames it gets.

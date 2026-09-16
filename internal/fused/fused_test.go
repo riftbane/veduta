@@ -16,7 +16,7 @@ import (
 )
 
 // engineModule is the module path of the engine, as a -trimpath build records its files.
-const engineModule = "github.com/riftbane/veduta"
+const engineModule = "github.com/riftbane/veduta/v2"
 
 func TestIsFused(t *testing.T) {
 	for _, c := range []struct {
@@ -51,8 +51,8 @@ func TestInModule(t *testing.T) {
 		{"demo/game", "demo", true},
 		{"demolition/game/kinds.go", "demo", false},
 		{"demo@v1.2.0/game/kinds.go", "demo", false},
-		{"github.com/riftbane/veduta/gmath/vec.go", engineModule, true},
-		{"github.com/riftbane/veduta@v1.0.0/gmath/vec.go", engineModule, false},
+		{"github.com/riftbane/veduta/v2/gmath/vec.go", engineModule, true},
+		{"github.com/riftbane/veduta/v2@v2.0.0/gmath/vec.go", engineModule, false},
 		{"/home/me/veduta/gmath/vec.go", engineModule, false},
 		{"runtime/proc.go", "", false},
 	} {

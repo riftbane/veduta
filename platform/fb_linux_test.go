@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/v2/gfx"
 )
 
 // fakeSys builds a sysfs tree of framebuffers and points sysRoot at it. Each entry is

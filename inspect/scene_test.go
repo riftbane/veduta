@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/asset/cook"
-	"github.com/riftbane/veduta/asset/model"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/internal/golden"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/cook"
+	"github.com/riftbane/veduta/v2/asset/model"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/internal/golden"
 )
 
 // Models added to the test game library: a 2×2 plane facing +Y (a decal) and a box whose

@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gfx/soft"
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gfx/soft"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 // Severities, from most to least severe.

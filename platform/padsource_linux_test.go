@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // fakeInputs builds a /sys/class/input tree. Each entry is "node name|key-bitmap", optionally

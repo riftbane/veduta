@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // useTestProject points the loaders at the in-memory test game.

@@ -6,7 +6,7 @@ package main
 import (
 	"os"
 
-	"github.com/riftbane/veduta/internal/cli"
+	"github.com/riftbane/veduta/v2/internal/cli"
 )
 
 // Set by the release build: -ldflags "-X main.version=vX.Y.Z -X main.commit=… -X main.date=…".

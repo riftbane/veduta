@@ -6,8 +6,8 @@ import (
 	"image"
 	"sync"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Font is a monospaced bitmap font stored in an atlas of equal cells. The glyph of rune

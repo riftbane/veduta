@@ -3,10 +3,10 @@ package veduta
 import (
 	"sort"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/scene"
-	"github.com/riftbane/veduta/world"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/scene"
+	"github.com/riftbane/veduta/v2/world"
 )
 
 // World is a loaded world (Context.World): the generator and the chunks streamed around

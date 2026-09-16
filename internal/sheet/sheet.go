@@ -3,8 +3,8 @@
 package sheet
 
 import (
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/sprite"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/sprite"
 )
 
 // Colors used by sheets.

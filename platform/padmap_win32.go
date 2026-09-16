@@ -1,6 +1,6 @@
 package platform
 
-import "github.com/riftbane/veduta/sim"
+import "github.com/riftbane/veduta/v2/sim"
 
 // Pads on Windows, read by the simulator: XInput for Xbox controllers, WinMM's joystick API
 // for any other pad (the SNES-style USB pads among them). The tables below turn what each

@@ -8,10 +8,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/internal/update"
+	"github.com/riftbane/veduta/v2/internal/update"
 )
 
 // fakeReleases points the update package at a server offering one release on both routes,
@@ -151,6 +152,9 @@ func TestGoModRequires(t *testing.T) {
 		{"require github.com/riftbane/veduta v1.0.0-rc.1.2\n", "v1.0.0-rc.1", false},
 		{"require github.com/riftbane/veduta v0.2.0\n", "v1.0.0", false},
 		{"require github.com/riftbane/vedutax v1.0.0\n", "v1.0.0", false},
+		{"require github.com/riftbane/veduta/v2 v2.0.0\n", "v2.0.0", true},
+		{"require github.com/riftbane/veduta v2.0.0\n", "v2.0.0", false},
+		{"require github.com/riftbane/veduta/v2 v1.0.0\n", "v1.0.0", false},
 		{"", "v1.0.0", false},
 	} {
 		if got := goModRequires([]byte(c.mod), c.version); got != c.want {
@@ -174,5 +178,46 @@ func TestUpdateChannelFlag(t *testing.T) {
 	}
 	if strings.Contains(printed, "connect") || strings.Contains(printed, "127.0.0.1") {
 		t.Fatalf("the channel was validated after a network call: %q", printed)
+	}
+}
+
+// TestRewriteEngineImports checks that an upgrade across a major version moves every engine
+// import, and nothing else, to the new module path.
+func TestRewriteEngineImports(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"game/game.go":     "package game\n\nimport (\n\t\"github.com/riftbane/veduta\"\n\t\"github.com/riftbane/veduta/gmath\"\n\t\"github.com/riftbane/veduta-extra/x\"\n)\n",
+		"cmd/game/main.go": "package main\n\nimport \"github.com/riftbane/veduta/v2/sim\"\n",
+		"out/gen.go":       "package out\n\nimport \"github.com/riftbane/veduta\"\n",
+		"notes.txt":        "\"github.com/riftbane/veduta\"\n",
+	}
+	for name, src := range files {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(src), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	changed, err := rewriteEngineImports(dir, "github.com/riftbane/veduta/v2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(changed, []string{"game/game.go"}) {
+		t.Fatalf("changed %v, want [game/game.go]", changed)
+	}
+	got, _ := os.ReadFile(filepath.Join(dir, "game", "game.go"))
+	want := "package game\n\nimport (\n\t\"github.com/riftbane/veduta/v2\"\n\t\"github.com/riftbane/veduta/v2/gmath\"\n\t\"github.com/riftbane/veduta-extra/x\"\n)\n"
+	if string(got) != want {
+		t.Fatalf("game.go:\n%s\nwant\n%s", got, want)
+	}
+	for _, name := range []string{"out/gen.go", "notes.txt"} {
+		if got, _ := os.ReadFile(filepath.Join(dir, filepath.FromSlash(name))); string(got) != files[name] {
+			t.Errorf("%s changed:\n%s", name, got)
+		}
+	}
+	if engineModule("v1.4.1") != "github.com/riftbane/veduta" || engineModule("v2.0.0-rc.2") != "github.com/riftbane/veduta/v2" || engineModule("v10.1.0") != "github.com/riftbane/veduta/v10" {
+		t.Error("engineModule maps versions to the wrong module paths")
 	}
 }

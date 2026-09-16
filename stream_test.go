@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // runWorld starts the test world at cell at and walks the script for ticks.

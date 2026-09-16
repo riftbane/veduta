@@ -1,6 +1,6 @@
 package soft
 
-import "github.com/riftbane/veduta/gfx"
+import "github.com/riftbane/veduta/v2/gfx"
 
 // rasterTile clears (if requested) and rasterizes every triangle binned into tile t.
 // Only this call writes the tile's pixels, so tiles can run concurrently.

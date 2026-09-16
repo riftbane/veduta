@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/v2/asset"
 )
 
 // fakeGraphics builds a /sys/class/graphics under a temporary root and points sysRoot at
@@ -96,10 +96,12 @@ func TestModulePathAndEngineFile(t *testing.T) {
 		}
 	}
 	for in, want := range map[string]string{
-		"github.com/riftbane/veduta/gmath/vec.go":        "gmath/vec.go",
-		"github.com/riftbane/veduta@v1.0.0/gmath/vec.go": "gmath/vec.go",
-		"github.com/riftbane/veduta-extra/x.go":          "github.com/riftbane/veduta-extra/x.go",
-		"example.com/lib@v1.2.0/lib.go":                  "example.com/lib@v1.2.0/lib.go",
+		"github.com/riftbane/veduta/gmath/vec.go":           "gmath/vec.go",
+		"github.com/riftbane/veduta/v2/gmath/vec.go":        "gmath/vec.go",
+		"github.com/riftbane/veduta/v2@v2.0.0/gmath/vec.go": "gmath/vec.go",
+		"github.com/riftbane/veduta@v1.0.0/gmath/vec.go":    "gmath/vec.go",
+		"github.com/riftbane/veduta-extra/x.go":             "github.com/riftbane/veduta-extra/x.go",
+		"example.com/lib@v1.2.0/lib.go":                     "example.com/lib@v1.2.0/lib.go",
 	} {
 		if got := engineFile(in); got != want {
 			t.Errorf("engineFile(%q) = %q, want %q", in, got, want)

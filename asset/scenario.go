@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // MaxTicks is the longest scenario, in ticks (about 13.9 hours at 20 Hz).

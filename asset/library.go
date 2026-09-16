@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Library holds every compiled asset of a project by name. It is what cook.Load returns,

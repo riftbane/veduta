@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/inspect"
-	"github.com/riftbane/veduta/mcp"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/inspect"
+	"github.com/riftbane/veduta/v2/mcp"
 )
 
 // InspectResult wraps an inspection report for printing.

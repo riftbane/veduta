@@ -1,8 +1,8 @@
 package soft
 
 import (
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // cubeMesh returns a unit cube centered at the origin: 24 vertices, 12 CCW triangles,

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 // Built-in invariant names (spec §6.5). Parameterized ones are written name:args.

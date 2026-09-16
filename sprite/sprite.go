@@ -19,8 +19,8 @@ package sprite
 import (
 	"image"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // quadIndices are the two triangles of a quad whose corners are stored top-left,

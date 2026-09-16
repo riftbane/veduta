@@ -9,12 +9,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/riftbane/veduta/asset/cook"
-	"github.com/riftbane/veduta/docs"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/inspect"
-	"github.com/riftbane/veduta/internal/sheet"
-	"github.com/riftbane/veduta/mcp"
+	"github.com/riftbane/veduta/v2/asset/cook"
+	"github.com/riftbane/veduta/v2/docs"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/inspect"
+	"github.com/riftbane/veduta/v2/internal/sheet"
+	"github.com/riftbane/veduta/v2/mcp"
 )
 
 // Image size limits of MCP results (spec §11), sized after the 320×240 console panel.

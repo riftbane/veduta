@@ -5,8 +5,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // tris returns the triangle positions of part i (every part when i < 0).

@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/asset/model"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/model"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 const vegetationWorldSrc = `{

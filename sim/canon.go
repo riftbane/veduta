@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Canonicaler is a value that stands for another in canonical JSON: the state of an entity

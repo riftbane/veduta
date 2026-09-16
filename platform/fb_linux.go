@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/v2/gfx"
 )
 
 // This file is the pixel path of the appliance: finding the small panel among the

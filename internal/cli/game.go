@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/script"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/script"
 )
 
 // GameError is a failed headless command of the game binary.

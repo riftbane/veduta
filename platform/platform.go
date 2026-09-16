@@ -14,8 +14,8 @@
 package platform
 
 import (
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // EventKind classifies an input event.

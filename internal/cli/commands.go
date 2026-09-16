@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/asset/cook"
-	"github.com/riftbane/veduta/inspect"
-	"github.com/riftbane/veduta/script"
+	"github.com/riftbane/veduta/v2/asset/cook"
+	"github.com/riftbane/veduta/v2/inspect"
+	"github.com/riftbane/veduta/v2/script"
 )
 
 // CookResult wraps the cook report for printing.

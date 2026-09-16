@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gfx/soft"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/internal/golden"
-	"github.com/riftbane/veduta/sprite"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gfx/soft"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/internal/golden"
+	"github.com/riftbane/veduta/v2/sprite"
 )
 
 // Contact sheets of the sample models in testdata/models, compared with

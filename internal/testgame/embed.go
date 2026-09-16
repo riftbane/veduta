@@ -12,4 +12,4 @@ var FS embed.FS
 
 // GamePackage is the import path of the game package inside the engine module, rewritten
 // to "<module>/game" when a project is created from FS.
-const GamePackage = "github.com/riftbane/veduta/internal/testgame/game"
+const GamePackage = "github.com/riftbane/veduta/v2/internal/testgame/game"

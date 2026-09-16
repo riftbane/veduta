@@ -9,7 +9,7 @@ package gfx
 import (
 	"fmt"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // TextureID is a backend texture handle; 0 means "no texture".

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/lua"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/lua"
 )
 
 // TestDefaultsQuoted checks the manifest defaults the references quote against

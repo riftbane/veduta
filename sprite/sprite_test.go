@@ -4,8 +4,8 @@ import (
 	"image"
 	"testing"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 func near(a, b float32) bool { return gmath.Abs(a-b) < 1e-5 }

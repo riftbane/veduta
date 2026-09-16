@@ -7,10 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/internal/sheet"
-	"github.com/riftbane/veduta/world"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/internal/sheet"
+	"github.com/riftbane/veduta/v2/world"
 )
 
 // WorldCodes are the issue codes of World, in the order they are documented.

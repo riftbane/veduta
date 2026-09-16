@@ -1,6 +1,6 @@
 package soft
 
-import "github.com/riftbane/veduta/gfx"
+import "github.com/riftbane/veduta/v2/gfx"
 
 type texture struct {
 	levels []level

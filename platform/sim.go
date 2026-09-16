@@ -1,6 +1,6 @@
 package platform
 
-import "github.com/riftbane/veduta/sim"
+import "github.com/riftbane/veduta/v2/sim"
 
 // Environment variables of the player.
 const (

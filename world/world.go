@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Rect is a rectangle of cells: x in [X, X+W), z in [Z, Z+D).

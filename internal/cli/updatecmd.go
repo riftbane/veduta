@@ -8,11 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/internal/update"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/internal/update"
 )
 
 // UpdateReport is the result of update.
@@ -197,7 +198,17 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 	}
 	mod, err := os.ReadFile(filepath.Join(s.Root, "go.mod"))
 	if !(s.IsScript() && os.IsNotExist(err)) && !goModRequires(mod, to) {
-		for _, args := range [][]string{{"get", "github.com/riftbane/veduta@" + to}, {"mod", "tidy"}} {
+		// Another major version is another module path: the imports move to it first,
+		// so go mod tidy drops the old one.
+		files, err := rewriteEngineImports(s.Root, engineModule(to))
+		if err != nil {
+			return nil, fmt.Errorf("upgrade: %w", err)
+		}
+		if len(files) > 0 {
+			r.Changed = append(r.Changed, files...)
+			r.Migrations = append(r.Migrations, fmt.Sprintf("import %s in %d Go files", engineModule(to), len(files)))
+		}
+		for _, args := range [][]string{{"get", engineModule(to) + "@" + to}, {"mod", "tidy"}} {
 			cmd := s.goCmd(args...)
 			if out, err := cmd.CombinedOutput(); err != nil {
 				return nil, fmt.Errorf("upgrade: go %s: %v: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
@@ -243,10 +254,68 @@ func (s *Session) consoleNext() []string {
 	return next
 }
 
-// goModRequires reports whether a go.mod names the engine at exactly version. The version
-// must end the word: v1.0.0-rc.1 is not v1.0.0, nor is v1.0.0-rc.10 v1.0.0-rc.1.
+// engineRepo is the engine's module path up to v1; from v2 on the path ends in /vN.
+const engineRepo = "github.com/riftbane/veduta"
+
+// engineModule is the engine's module path at version: github.com/riftbane/veduta/v2 for
+// v2.x.
+func engineModule(version string) string {
+	major, _, _ := strings.Cut(strings.TrimPrefix(version, "v"), ".")
+	if n, err := strconv.Atoi(major); err == nil && n >= 2 {
+		return engineRepo + "/v" + major
+	}
+	return engineRepo
+}
+
+// engineRequire matches the engine in a go.mod, at any major version; the second group is
+// the version.
+var engineRequire = regexp.MustCompile(`github\.com/riftbane/veduta(/v\d+)?\s+(v\S+)`)
+
+// goModRequires reports whether a go.mod names the engine at exactly version, under the
+// module path of that version. The version must end the word: v1.0.0-rc.1 is not v1.0.0,
+// nor is v1.0.0-rc.10 v1.0.0-rc.1.
 func goModRequires(mod []byte, version string) bool {
-	return regexp.MustCompile(`github\.com/riftbane/veduta\s+` + regexp.QuoteMeta(version) + `(\s|$)`).Match(mod)
+	return regexp.MustCompile(regexp.QuoteMeta(engineModule(version)) + `\s+` + regexp.QuoteMeta(version) + `(\s|$)`).Match(mod)
+}
+
+// engineImport matches a quoted engine package path at any major version; the second group
+// is the package inside the engine.
+var engineImport = regexp.MustCompile(`"github\.com/riftbane/veduta(/v\d+)?(/[^"]*)?"`)
+
+// rewriteEngineImports makes every engine import of the project's Go files use module, and
+// returns the files it changed, slash-separated and relative to root. Hidden directories,
+// out, bin and vendor are skipped.
+func rewriteEngineImports(root, module string) ([]string, error) {
+	var changed []string
+	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if p != root && (strings.HasPrefix(d.Name(), ".") || d.Name() == "out" || d.Name() == "bin" || d.Name() == "vendor") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(p, ".go") {
+			return nil
+		}
+		src, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		next := engineImport.ReplaceAll(src, []byte(`"`+module+`$2"`))
+		if string(next) == string(src) {
+			return nil
+		}
+		if err := os.WriteFile(p, next, 0o644); err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, p)
+		changed = append(changed, filepath.ToSlash(rel))
+		return nil
+	})
+	return changed, err
 }
 
 // addChangelogEntry adds a line under "## Unreleased", creating the file or section.

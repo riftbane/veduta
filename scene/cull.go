@@ -3,7 +3,7 @@ package scene
 import (
 	"math"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // frustum holds the six planes of a view volume in world space, each normalized so that

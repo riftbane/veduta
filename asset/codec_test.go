@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // gen produces random compiled assets from a fixed seed. With special set, floats are

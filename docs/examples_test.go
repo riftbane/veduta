@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/docs"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/docs"
 )
 
 // Every JSON example of the 2d topic compiles with the parser its "veduta" header names,

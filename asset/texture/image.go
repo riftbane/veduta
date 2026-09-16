@@ -8,7 +8,7 @@ import (
 	"io/fs"
 	"math"
 
-	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/v2/gfx"
 )
 
 // loadImage reads and decodes the PNG at p (a valid path) from fsys, refusing files

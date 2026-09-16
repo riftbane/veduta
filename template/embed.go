@@ -17,4 +17,4 @@ var FS embed.FS
 
 // GamePackage is the import path of the Go game package inside the engine module,
 // rewritten to "<module>/game" by init.
-const GamePackage = "github.com/riftbane/veduta/template/go/game"
+const GamePackage = "github.com/riftbane/veduta/v2/template/go/game"

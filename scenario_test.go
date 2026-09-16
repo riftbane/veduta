@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 func TestLoadScenarioFile(t *testing.T) {

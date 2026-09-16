@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // Reading a pad needs no C: the kernel hands out fixed-size records on an ordinary file

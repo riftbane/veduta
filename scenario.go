@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // loadScenario reads and validates a scenario file.

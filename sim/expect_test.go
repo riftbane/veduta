@@ -3,8 +3,8 @@ package sim
 import (
 	"testing"
 
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 type playerState struct {

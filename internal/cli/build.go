@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/asset/cook"
-	"github.com/riftbane/veduta/script"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/cook"
+	"github.com/riftbane/veduta/v2/script"
 )
 
 // CompileError is a located compiler or vet message.

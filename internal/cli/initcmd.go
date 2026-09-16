@@ -12,8 +12,9 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/riftbane/veduta/asset"
-	projtemplate "github.com/riftbane/veduta/template"
+	veduta "github.com/riftbane/veduta/v2"
+	"github.com/riftbane/veduta/v2/asset"
+	projtemplate "github.com/riftbane/veduta/v2/template"
 )
 
 // InitOptions configures init.
@@ -21,7 +22,7 @@ type InitOptions struct {
 	Dir       string // target directory (created; must be empty if it exists)
 	Name      string // game name (default: base of Dir)
 	Module    string // Go module path of a Go game (default: Name)
-	Engine    string // engine version to require (default: the tool's version, or the template's for dev builds)
+	Engine    string // engine version to require (default: the tool's version, or the engine source's for dev builds)
 	EngineDir string // local engine checkout: adds a replace directive to a Go game's go.mod (development and CI)
 	NoTidy    bool   // skip `go mod tidy` for a Go game
 	Go        bool   // create a Go game instead of a Lua one
@@ -70,17 +71,6 @@ var semver = regexp.MustCompile(`^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
 // templateManifests are the template's manifests, whose engine field a release moves.
 var templateManifests = []string{"lua/" + asset.ProjectFile, "go/" + asset.ProjectFile}
 
-// templateEngine is the engine version the embedded template's manifests name.
-func templateEngine() string {
-	data, err := projtemplate.FS.ReadFile(templateManifests[0])
-	if err == nil {
-		if m := regexp.MustCompile(`"engine":\s*"([^"]+)"`).FindSubmatch(data); m != nil {
-			return string(m[1])
-		}
-	}
-	return "v1.0.0"
-}
-
 // projectFiles maps templated project files to their destination.
 var projectFiles = map[string]string{
 	"go.mod.tmpl":       "go.mod",
@@ -126,8 +116,11 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 	if o.Engine == "" {
 		o.Engine = env.Version
 		if !semver.MatchString(o.Engine) {
-			o.Engine = templateEngine()
+			o.Engine = veduta.Version
 		}
+	}
+	if module := strings.TrimSuffix(projtemplate.GamePackage, "/template/go/game"); o.Go && engineModule(o.Engine) != module {
+		return nil, usagef("init: engine %s is the module %s, and the template's Go code imports %s", o.Engine, engineModule(o.Engine), module)
 	}
 	if o.EngineDir != "" {
 		abs, err := filepath.Abs(o.EngineDir)
@@ -147,7 +140,7 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 		return nil, fmt.Errorf("init: %s exists and is not empty", dir)
 	}
 	r := &InitReport{Dir: dir, Name: o.Name, Language: lang, Module: o.Module, Engine: o.Engine, Warnings: []string{}}
-	data := map[string]string{"Name": o.Name, "Module": o.Module, "Engine": o.Engine, "EngineDir": o.EngineDir}
+	data := map[string]string{"Name": o.Name, "Module": o.Module, "Engine": o.Engine, "EngineModule": engineModule(o.Engine), "EngineDir": o.EngineDir}
 	gamePackage := projtemplate.GamePackage
 	if o.game != nil {
 		gamePackage = o.gamePackage

@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // FuzzOptions configures fuzz (spec §10).

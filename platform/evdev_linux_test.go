@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // record builds one evdev record of the given size, as the kernel writes them.

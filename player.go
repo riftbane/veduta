@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/internal/sheet"
-	"github.com/riftbane/veduta/platform"
-	"github.com/riftbane/veduta/sim"
-	"github.com/riftbane/veduta/world"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/internal/sheet"
+	"github.com/riftbane/veduta/v2/platform"
+	"github.com/riftbane/veduta/v2/sim"
+	"github.com/riftbane/veduta/v2/world"
 )
 
 // Reloader is implemented by a game that can read its code again while the player runs (a

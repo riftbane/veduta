@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/sprite/internal/fontsrc"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/sprite/internal/fontsrc"
 )
 
 func TestDefaultFont(t *testing.T) {

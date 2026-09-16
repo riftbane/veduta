@@ -1,6 +1,6 @@
 package platform
 
-import "github.com/riftbane/veduta/sim"
+import "github.com/riftbane/veduta/v2/sim"
 
 // Keyboards, read the same way as the pad. These are the kernel's own KEY_* codes from
 // linux/input-event-codes.h, the numbers that arrive on /dev/input/eventN.

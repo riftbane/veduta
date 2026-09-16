@@ -3,8 +3,8 @@ package asset
 import (
 	"fmt"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Checker accumulates located validation errors while a source is compiled. Its helpers

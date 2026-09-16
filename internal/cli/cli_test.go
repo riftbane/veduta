@@ -16,10 +16,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/docs"
-	"github.com/riftbane/veduta/inspect"
-	"github.com/riftbane/veduta/internal/golden"
-	"github.com/riftbane/veduta/internal/testgame"
+	"github.com/riftbane/veduta/v2/docs"
+	"github.com/riftbane/veduta/v2/inspect"
+	"github.com/riftbane/veduta/v2/internal/golden"
+	"github.com/riftbane/veduta/v2/internal/testgame"
 )
 
 // The docs tool's description names every topic, so an agent reading the tool list learns

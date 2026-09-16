@@ -3,7 +3,7 @@ package world
 import (
 	"fmt"
 
-	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/v2/asset"
 )
 
 // Issue codes of Validate and Check.

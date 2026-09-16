@@ -3,7 +3,7 @@ package sim
 import (
 	"sort"
 
-	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/v2/scene"
 )
 
 // Pair is an unordered pair of entity ids with A < B.

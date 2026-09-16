@@ -3,7 +3,7 @@ package model
 import (
 	"math"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // Setup math is float64. Products are wrapped in explicit float64 conversions so the

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/v2/asset"
 )
 
 // gameSession copies the engine's test game into a temp dir (no build) and opens it.

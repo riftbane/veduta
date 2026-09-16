@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	projtemplate "github.com/riftbane/veduta/v2/template"
 )
 
 func TestReleaseChangelog(t *testing.T) {
@@ -173,8 +175,18 @@ func TestReleaseTemplate(t *testing.T) {
 	}
 }
 
-// The template's engine is the latest released engine: init falls back to it when the tool
-// has no version, and the template's code is written against it.
+// templateEngine is the engine version the embedded template's manifests name.
+func templateEngine() string {
+	data, err := projtemplate.FS.ReadFile(templateManifests[0])
+	if err == nil {
+		if m := regexp.MustCompile(`"engine":\s*"([^"]+)"`).FindSubmatch(data); m != nil {
+			return string(m[1])
+		}
+	}
+	return ""
+}
+
+// The template's engine is the latest released engine: veduta release moves it.
 func TestTemplateEngineIsTheLatestRelease(t *testing.T) {
 	cl, err := os.ReadFile(filepath.Join("..", "..", "CHANGELOG.md"))
 	if err != nil {

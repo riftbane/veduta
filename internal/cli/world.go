@@ -13,11 +13,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/riftbane/veduta/asset"
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/inspect"
-	"github.com/riftbane/veduta/mcp"
-	"github.com/riftbane/veduta/world"
+	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/inspect"
+	"github.com/riftbane/veduta/v2/mcp"
+	"github.com/riftbane/veduta/v2/world"
 )
 
 // MaxMapRadius bounds world_map: a 481×481 cell region fits one pixel per cell.

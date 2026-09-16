@@ -3,9 +3,9 @@ package soft
 import (
 	"testing"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/internal/golden"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/internal/golden"
 )
 
 // cubeScene renders the lit textured cube used by the golden tests.

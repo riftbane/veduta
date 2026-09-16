@@ -3,7 +3,7 @@ package lua
 import (
 	"math"
 
-	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/v2/gmath"
 )
 
 // The math library, on gmath's deterministic functions. math.random draws from a Random

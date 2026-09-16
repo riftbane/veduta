@@ -42,7 +42,7 @@ Go ≥ 1.25, naming the version so `veduta upgrade` and the update checks know i
 build cannot update itself, since no macOS archive is published):
 
 ```sh
-go install -ldflags "-X main.version=vX.Y.Z" github.com/riftbane/veduta/cmd/veduta@vX.Y.Z
+go install -ldflags "-X main.version=vX.Y.Z" github.com/riftbane/veduta/v2/cmd/veduta@vX.Y.Z
 ```
 
 ## Quick start

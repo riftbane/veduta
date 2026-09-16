@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/sim"
 )
 
 // BenchStats summarizes per-tick durations in milliseconds.

@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/gfx"
-	"github.com/riftbane/veduta/gfx/soft"
-	"github.com/riftbane/veduta/gmath"
-	"github.com/riftbane/veduta/internal/golden"
+	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gfx/soft"
+	"github.com/riftbane/veduta/v2/gmath"
+	"github.com/riftbane/veduta/v2/internal/golden"
 )
 
 // renderScene is a stand-in for the scene package: every entity with a model is drawn

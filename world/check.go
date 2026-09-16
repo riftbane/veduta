@@ -5,7 +5,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/v2/asset"
 )
 
 // Budget is the console's triangle budget per frame (spec §15.8).
