@@ -6,6 +6,8 @@ Headless deterministic game engine + asset toolchain, pure Go. User: AI agent on
 display-less server. Target: linux/arm64 console, 320×240, 20 Hz, gamepad.
 Spec `SPEC-v1.0.0.md` wins over this file (`SPEC-v0.1.0.md`: frozen). Spec silent →
 simplest deterministic headless option, logged in `CHANGELOG.md` → Decisions.
+v2 in progress: `V2.md` is the plan and wins over the spec where they conflict (8-button
+input, Lua games, Windows simulator). Tick its boxes as steps land.
 
 ## Environment
 - Linux VPS, no display/GPU: never open windows.
