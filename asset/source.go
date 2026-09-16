@@ -150,29 +150,12 @@ type ScenarioSource struct {
 	At          []int          `json:"at,omitempty"`    // start cell of a world, default [0, 0]
 }
 
-// InputSource is one input event of a scenario or input script. Keys use W3C
-// KeyboardEvent.code names (KeyW, Space, ArrowLeft, …); buttons are left, right, middle.
+// InputSource is one input event of a scenario or input script: the buttons (ButtonNames)
+// that go down and up at Tick.
 type InputSource struct {
-	Tick    int          `json:"tick"`
-	Press   []string     `json:"press,omitempty"`
-	Release []string     `json:"release,omitempty"`
-	Mouse   *MouseSource `json:"mouse,omitempty"`
-	Buttons []string     `json:"buttons,omitempty"`
-	Text    string       `json:"text,omitempty"`
-	Stick   *StickSource `json:"stick,omitempty"`
-}
-
-// StickSource is a position of the analog stick: each axis -1…1, +X right, +Y up; an axis
-// left out is at rest.
-type StickSource struct {
-	X float32 `json:"x"`
-	Y float32 `json:"y"`
-}
-
-// MouseSource is a mouse position in frame pixels.
-type MouseSource struct {
-	X float32 `json:"x"`
-	Y float32 `json:"y"`
+	Tick    int      `json:"tick"`
+	Press   []string `json:"press,omitempty"`
+	Release []string `json:"release,omitempty"`
 }
 
 // ExpectSource is one expectation of a scenario: either an entity path comparison or a

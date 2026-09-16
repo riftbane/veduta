@@ -4,12 +4,12 @@
   "seed": 3,
   "ticks": 60,
   "inputs": [
-    { "tick": 3, "press": ["ArrowUp"] },
-    { "tick": 23, "release": ["ArrowUp"] },
-    { "tick": 27, "press": ["ArrowRight"] },
-    { "tick": 37, "release": ["ArrowRight"] },
-    { "tick": 40, "press": ["Space"] },
-    { "tick": 41, "release": ["Space"] }
+    { "tick": 3, "press": ["up"] },
+    { "tick": 23, "release": ["up"] },
+    { "tick": 27, "press": ["right"] },
+    { "tick": 37, "release": ["right"] },
+    { "tick": 40, "press": ["a"] },
+    { "tick": 41, "release": ["a"] }
   ],
   "expect": [
     { "tick": 20, "trace": "gem_collected", "count_min": 1 },

@@ -346,7 +346,7 @@ MCP tools (CLI `veduta world …`), all cell-based:
   "at": [0, 0],
   "seed": 1,
   "ticks": 200,
-  "inputs": [ { "tick": 0, "press": ["ArrowRight"] } ],
+  "inputs": [ { "tick": 0, "press": ["right"] } ],
   "expect": [ { "tick": 200, "trace": "chunk_load", "count_min": 12 } ],
   "invariants": ["no_overlap:player,obstacle", "entity_count_max:2000"]
 }

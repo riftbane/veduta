@@ -5,8 +5,8 @@
   "seed": 1,
   "ticks": 60,
   "inputs": [
-    { "tick": 0, "press": ["ArrowLeft"] },
-    { "tick": 60, "release": ["ArrowLeft"] }
+    { "tick": 0, "press": ["left"] },
+    { "tick": 60, "release": ["left"] }
   ],
   "expect": [
     { "tick": 20, "entity": "player", "path": "position.x", "op": "<", "value": -2 },

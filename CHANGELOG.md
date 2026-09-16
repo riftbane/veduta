@@ -8,6 +8,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The console has eight game buttons** (breaking): the D-pad, A, B, Select (the game's
+  menu) and Cancel (back); Home leaves the game and never reaches it. `veduta.Input` is
+  `Pressed`, `Held` and `Released` button sets with `Down`, `JustPressed`, `JustReleased`
+  and `DPad()`; the constants are `veduta.ButtonUp` … `veduta.ButtonCancel`. Scenarios and
+  input scripts press `up`, `down`, `left`, `right`, `a`, `b`, `select`, `cancel`; a W3C
+  key code of v1 is reported with the button it now is. Gone: key codes, the analog stick,
+  the mouse, typed text, `Context.LockPointer`, `Input.Axis`, and the scenario fields
+  `stick`, `mouse`, `buttons` and `text`.
+- The player maps a keyboard to the buttons (arrows or W A S D, Space or Z, X or Shift,
+  Enter or Tab, Escape or Backspace; Ctrl+Q leaves) and a gamepad (A, B, Select, Start as
+  Cancel, Home; Select+Start leaves on a pad without Home); the handheld's `KEY_BACK` is
+  Cancel and `KEY_HOMEPAGE` is Home. Mice and tablets are no longer read, a stick counts
+  only as the D-pad of a pad without D-pad buttons, and X, Y and shoulders are ignored.
+- `fuzz` players press buttons: `--buttons` replaces `--keys`.
+
 - `veduta init` creates an empty game: an empty scene showing the game's name, the `quad`
   model and `sprite` material, and one scenario (`start`). The demo game (hero, gems,
   village, world) is no longer shipped; it moved to `internal/testgame`, the fixture the

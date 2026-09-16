@@ -98,7 +98,7 @@ func TestInitAndCommands(t *testing.T) {
 		t.Fatalf("build: %+v %v", b, err)
 	}
 	tr, err := s.Test(false)
-	if err != nil || !tr.OK || len(tr.Scenarios) != 7 {
+	if err != nil || !tr.OK || len(tr.Scenarios) != 6 {
 		t.Fatalf("test: %s %v", tr.Human(), err)
 	}
 	// Break the game: compile errors come back located.
@@ -416,7 +416,7 @@ func TestMCPEndToEnd(t *testing.T) {
 	if sz := c.sizes[0]; sz.X != mcpSheetMaxW || sz.Y > mcpSheetMaxH {
 		t.Errorf("simulate sheet is %v, want %d wide and at most %d tall", sz, mcpSheetMaxW, mcpSheetMaxH)
 	}
-	sim2, imgs, _ := c.tool("simulate", map[string]any{"scene": "main", "ticks": 90, "inputs": []any{map[string]any{"tick": 5, "press": []string{"KeyW"}}}})
+	sim2, imgs, _ := c.tool("simulate", map[string]any{"scene": "main", "ticks": 90, "inputs": []any{map[string]any{"tick": 5, "press": []string{"up"}}}})
 	if imgs != 1 || sim2["verdict"] != "pass" {
 		t.Fatalf("simulate inline inputs: %v", sim2)
 	}

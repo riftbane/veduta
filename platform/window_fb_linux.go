@@ -11,9 +11,8 @@ import (
 )
 
 // fbWindow presents frames on a panel through its framebuffer device. There is no window
-// system on an appliance: the panel is the whole screen, it never resizes, and the cursor
-// it does not have cannot be locked. Input arrives from elsewhere (the pad), which this
-// window only passes on.
+// system on an appliance: the panel is the whole screen and it never resizes. Input arrives
+// from elsewhere (the pad), which this window only passes on.
 type fbWindow struct {
 	info   fbInfo
 	file   *os.File
@@ -33,7 +32,7 @@ type events interface {
 
 var errFBClosed = errors.New("platform: the panel is closed")
 
-// closeSettle bounds how long Close waits for the keys that closed the player to be let go.
+// closeSettle bounds how long Close waits for the buttons that closed the player to be let go.
 const closeSettle = 500 * time.Millisecond
 
 // openFB opens the panel named by VEDUTA_FB (or the one findFramebuffer picks) and renders
@@ -116,14 +115,6 @@ func (w *fbWindow) Size() (int, int) {
 	return w.w, w.h
 }
 
-// SetPointerLock does nothing: a panel has no cursor to hide or to keep anywhere.
-func (w *fbWindow) SetPointerLock(bool) error {
-	if w.closed {
-		return errFBClosed
-	}
-	return nil
-}
-
 // terminal is the descriptor of the terminal the player may have been started from: its
 // standard input. A test replaces it.
 var terminal uintptr = 0
@@ -136,7 +127,7 @@ var terminal uintptr = 0
 // would run those keys once the player quits. The console's cursor is left alone: hiding
 // it could not be undone for a player killed outright, and a cursor that stays hidden at
 // the shell is worse than one blinking over the game. Before the devices are given back,
-// Close waits up to closeSettle for the keys that closed the player to be let go, so
+// Close waits up to closeSettle for the buttons that closed the player to be let go, so
 // neither they nor the kernel's repeats of them reach the console.
 func (w *fbWindow) Close() error {
 	if w.closed {

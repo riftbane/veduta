@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/riftbane/veduta/gmath"
 )
 
 func TestParseScenarioSample(t *testing.T) {
@@ -16,19 +15,15 @@ func TestParseScenarioSample(t *testing.T) {
 	if sc.Name != "move" || sc.Scene != "main" || sc.Seed != 42 || sc.Ticks != 300 {
 		t.Fatalf("header %+v", sc)
 	}
-	mouse := gmath.V2(320, 180)
 	wantInputs := []Input{
-		{Tick: 10, Press: []string{"KeyW"}},
-		{Tick: 70, Release: []string{"KeyW"}},
-		{Tick: 80, Press: []string{"Space"}},
-		{Tick: 81, Release: []string{"Space"}, Mouse: &mouse, Buttons: []string{"left"}},
-		{Tick: 82, Buttons: []string{}, Text: "hi"},
+		{Tick: 10, Press: []string{"up"}},
+		{Tick: 70, Release: []string{"up"}},
+		{Tick: 80, Press: []string{"a", "select"}},
+		{Tick: 81, Release: []string{"a"}},
+		{Tick: 82, Press: []string{"cancel"}, Release: []string{"select"}},
 	}
 	if !reflect.DeepEqual(sc.Inputs, wantInputs) {
 		t.Fatalf("inputs %+v", sc.Inputs)
-	}
-	if sc.Inputs[4].Buttons == nil {
-		t.Fatal(`"buttons": [] must stay distinct from an absent field`)
 	}
 	one, zero := 1, 0
 	wantExpect := []Expectation{
@@ -48,21 +43,6 @@ func TestParseScenarioSample(t *testing.T) {
 	}
 	if !reflect.DeepEqual(sc.Screenshots, []int{0, 60, 120, 300}) {
 		t.Fatalf("screenshots %v", sc.Screenshots)
-	}
-}
-
-// TestParseScenarioStick: the stick holds a position from its tick on, so it is an input
-// event on its own; either axis left out is at rest.
-func TestParseScenarioStick(t *testing.T) {
-	sc, err := ParseScenario("stick.scenario.json", []byte(`{"veduta": "scenario/1", "scene": "main", "ticks": 10,
-  "inputs": [{"tick": 1, "stick": {"x": -1, "y": 0.5}}, {"tick": 5, "stick": {"y": 1}}, {"tick": 9, "stick": {}}]}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	a, b, rest := gmath.V2(-1, 0.5), gmath.V2(0, 1), gmath.Vec2{}
-	want := []Input{{Tick: 1, Stick: &a}, {Tick: 5, Stick: &b}, {Tick: 9, Stick: &rest}}
-	if !reflect.DeepEqual(sc.Inputs, want) {
-		t.Fatalf("inputs %+v", sc.Inputs)
 	}
 }
 
@@ -96,38 +76,33 @@ func TestParseScenarioErrors(t *testing.T) {
 			[]wantErr{{`ticks: -3 out of range`, `-3`}}},
 		{"seed negative", `{"veduta": "scenario/1", "scene": "main", "ticks": 3, "seed": -1}`,
 			[]wantErr{{`seed: cannot use JSON number`, `-1`}}},
-		{"input tick after end", with(`"inputs": [{"tick": 101, "press": ["KeyW"]}]`),
+		{"input tick after end", with(`"inputs": [{"tick": 101, "press": ["up"]}]`),
 			[]wantErr{{`inputs[0].tick: 101 is after the last tick (ticks = 100)`, `101`}}},
-		{"input tick negative", with(`"inputs": [{"tick": -1, "press": ["KeyW"]}]`),
+		{"input tick negative", with(`"inputs": [{"tick": -1, "press": ["up"]}]`),
 			[]wantErr{{`inputs[0].tick: -1 must not be negative`, `-1`}}},
-		{"inputs out of order", with(`"inputs": [{"tick": 50, "press": ["KeyW"]}, {"tick": 5, "release": ["KeyW"]}]`),
+		{"inputs out of order", with(`"inputs": [{"tick": 50, "press": ["up"]}, {"tick": 5, "release": ["up"]}]`),
 			[]wantErr{{`inputs[1].tick: tick 5 is before the previous input's tick 50`, `5,`}}},
-		{"unknown key with suggestion", with(`"inputs": [{"tick": 1, "press": ["w", "space", "up", "1"]}]`),
+		{"unknown button with suggestion", with(`"inputs": [{"tick": 1, "press": ["KeyW", "Space", "A", "Escape"]}]`),
 			[]wantErr{
-				{`inputs[0].press[0]: unknown key "w" (did you mean "KeyW"?`, `"w"`},
-				{`inputs[0].press[1]: unknown key "space" (did you mean "Space"?`, `"space"`},
-				{`did you mean "ArrowUp"?`, `"up"`},
-				{`did you mean "Digit1"?`, `"1"`},
+				{`inputs[0].press[0]: unknown button "KeyW" (did you mean "up"? the buttons are up, down, left, right, a, b, select, cancel)`, `"KeyW"`},
+				{`inputs[0].press[1]: unknown button "Space" (did you mean "a"?`, `"Space"`},
+				{`did you mean "a"?`, `"A"`},
+				{`did you mean "cancel"?`, `"Escape"`},
 			}},
-		{"unknown key", with(`"inputs": [{"tick": 1, "press": ["Jump"]}]`),
-			[]wantErr{{`unknown key "Jump" (keys are W3C KeyboardEvent.code names`, `"Jump"`}}},
-		{"duplicate key", with(`"inputs": [{"tick": 1, "press": ["KeyA", "KeyA"]}]`),
-			[]wantErr{{`inputs[0].press[1]: duplicate key "KeyA"`, `"KeyA"]`}}},
-		{"press held key", with(`"inputs": [{"tick": 1, "press": ["KeyA"]}, {"tick": 2, "press": ["KeyA"]}]`),
-			[]wantErr{{`inputs[1].press[0]: key "KeyA" is already held (pressed at tick 1)`, `"KeyA"]}]`}}},
-		{"release not held", with(`"inputs": [{"tick": 1, "release": ["KeyA"]}]`),
-			[]wantErr{{`inputs[0].release[0]: key "KeyA" is released but not held`, `"KeyA"`}}},
-		{"press and release together", with(`"inputs": [{"tick": 1, "press": ["KeyA"], "release": ["KeyA"]}]`),
-			[]wantErr{{`inputs[0].press[0]: key "KeyA" is both pressed and released`, `"KeyA"`}}},
-		{"bad buttons", with(`"inputs": [{"tick": 1, "buttons": ["left", "back", "left"]}]`),
-			[]wantErr{{`inputs[0].buttons[1]: unknown mouse button "back" (want one of [left middle right])`, `"back"`},
-				{`inputs[0].buttons[2]: duplicate mouse button "left"`, `"left"]`}}},
+		{"unknown button", with(`"inputs": [{"tick": 1, "press": ["home"]}]`),
+			[]wantErr{{`unknown button "home" (the buttons are up, down, left, right, a, b, select, cancel)`, `"home"`}}},
+		{"duplicate button", with(`"inputs": [{"tick": 1, "press": ["left", "left"]}]`),
+			[]wantErr{{`inputs[0].press[1]: duplicate button "left"`, `"left"]`}}},
+		{"press held button", with(`"inputs": [{"tick": 1, "press": ["left"]}, {"tick": 2, "press": ["left"]}]`),
+			[]wantErr{{`inputs[1].press[0]: button "left" is already held (pressed at tick 1)`, `"left"]}]`}}},
+		{"release not held", with(`"inputs": [{"tick": 1, "release": ["left"]}]`),
+			[]wantErr{{`inputs[0].release[0]: button "left" is released but not held`, `"left"`}}},
+		{"press and release together", with(`"inputs": [{"tick": 1, "press": ["left"], "release": ["left"]}]`),
+			[]wantErr{{`inputs[0].press[0]: button "left" is both pressed and released`, `"left"`}}},
 		{"empty event", with(`"inputs": [{"tick": 1}]`),
-			[]wantErr{{`inputs[0]: input event has no press, release, buttons, mouse, stick or text`, `{"tick": 1}`}}},
-		{"stick out of range", with(`"inputs": [{"tick": 1, "stick": {"x": 1.5, "y": -2}}]`),
-			[]wantErr{{`inputs[0].stick: x 1.5 and y -2 must be in [-1, 1]`, `{"x": 1.5`}}},
-		{"stick unknown field", with(`"inputs": [{"tick": 1, "stick": {"x": 1, "z": 0}}]`),
-			[]wantErr{{`inputs[0].stick.z: unknown field`, `"z"`}}},
+			[]wantErr{{`inputs[0]: input event has no press or release`, `{"tick": 1}`}}},
+		{"stick is gone", with(`"inputs": [{"tick": 1, "stick": {"x": 1}}]`),
+			[]wantErr{{`inputs[0].stick: unknown field`, `"stick"`}}},
 		{"mixed expectation", with(`"expect": [{"tick": 1, "entity": "p", "path": "visible", "op": "==", "value": true, "trace": "x", "count_min": 1}]`),
 			[]wantErr{{`expect[0]: mixes an entity comparison`, `{"tick": 1, "entity"`}}},
 		{"empty expectation", with(`"expect": [{"tick": 1}]`),
@@ -214,7 +189,7 @@ func TestParseScenarioErrors(t *testing.T) {
 // Tick ranges are not checked against an invalid ticks value, but every other problem
 // is still reported.
 func TestParseScenarioReportsAll(t *testing.T) {
-	src := "{\n  \"veduta\": \"scenario/1\",\n  \"scene\": \"\",\n  \"ticks\": 0,\n  \"inputs\": [ { \"tick\": 5000, \"press\": [\"KeyQ\", \"q\"] } ],\n  \"expect\": [ { \"tick\": 3, \"trace\": \"x\" } ]\n}"
+	src := "{\n  \"veduta\": \"scenario/1\",\n  \"scene\": \"\",\n  \"ticks\": 0,\n  \"inputs\": [ { \"tick\": 5000, \"press\": [\"left\", \"q\"] } ],\n  \"expect\": [ { \"tick\": 3, \"trace\": \"x\" } ]\n}"
 	_, err := ParseScenario("s.scenario.json", []byte(src))
 	es := sourceErrors(t, err)
 	want := [][2]int{{3, 12}, {4, 12}, {5, 49}, {6, 15}}

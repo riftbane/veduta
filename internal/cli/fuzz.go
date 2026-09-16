@@ -26,13 +26,11 @@ type FuzzOptions struct {
 	Games      int
 	Ticks      int
 	Seed       uint64
-	Keys       []string // keys the random player uses (default: DefaultFuzzKeys)
+	Buttons    []string // buttons the random player uses (default: all of them)
 	Invariants []string // default: the project's
 	Parallel   int      // concurrent games (default: GOMAXPROCS)
 }
 
-// DefaultFuzzKeys are the keys random players press.
-var DefaultFuzzKeys = []string{"KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter", "ShiftLeft", "KeyE", "KeyQ", "KeyR"}
 
 // FuzzViolation is the first invariant violation of one random game.
 type FuzzViolation struct {
@@ -86,29 +84,16 @@ func (r *FuzzReport) Human() string {
 	return b.String()
 }
 
-// hold is a key held from Start to End (End 0: never released) — the unit minimization
+// hold is a button held from Start to End (End 0: never released) — the unit minimization
 // removes, so press and release always stay paired.
 type hold struct {
-	Key        string
+	Button     string
 	Start, End int
 }
 
 // fuzzGame is the random input of one game.
 type fuzzGame struct {
-	holds  []hold
-	mouse  []mouseEv
-	sticks []stickEv
-}
-
-type stickEv struct {
-	Tick int
-	X, Y float32
-}
-
-type mouseEv struct {
-	Tick    int
-	X, Y    float32
-	Buttons []string // nil: unchanged
+	holds []hold
 }
 
 // gameSeed derives the seed of game i from the run seed (splitmix-style mixing).
@@ -119,56 +104,26 @@ func gameSeed(seed uint64, i int) uint64 {
 	return z ^ z>>31
 }
 
-// genGame draws a random player: keys held for random durations, mouse moves and clicks
-// (the stick is drawn by genSticks, from a stream of its own).
-func genGame(rng *sim.RNG, ticks int, keys []string, w, h int) fuzzGame {
+// genGame draws a random player: buttons held for random durations.
+func genGame(rng *sim.RNG, ticks int, buttons []string) fuzzGame {
 	var g fuzzGame
-	held := map[string]int{} // key → index into g.holds (lookup only)
+	held := map[string]int{} // button → index into g.holds (lookup only)
 	for t := 1; t <= ticks; t++ {
 		if rng.Chance(0.06) {
-			k := keys[rng.Intn(len(keys))]
-			if i, ok := held[k]; ok {
+			b := buttons[rng.Intn(len(buttons))]
+			if i, ok := held[b]; ok {
 				g.holds[i].End = t
-				delete(held, k)
+				delete(held, b)
 			} else {
-				held[k] = len(g.holds)
-				g.holds = append(g.holds, hold{Key: k, Start: t})
+				held[b] = len(g.holds)
+				g.holds = append(g.holds, hold{Button: b, Start: t})
 			}
-		}
-		if rng.Chance(0.02) {
-			ev := mouseEv{Tick: t, X: float32(rng.Intn(w)), Y: float32(rng.Intn(h))}
-			if rng.Chance(0.3) {
-				ev.Buttons = []string{}
-				if rng.Bool() {
-					ev.Buttons = []string{"left"}
-				}
-			}
-			g.mouse = append(g.mouse, ev)
 		}
 	}
 	return g
 }
 
-// stickSalt separates the stick's random stream from the keys' and the mouse's, so adding
-// the stick did not change the games an older tool played for the same seed.
-const stickSalt = 0x57_1c_4a_5e_57_1c_4a_5e
-
-// stickPositions are where a random player puts the stick: rest, halfway and the ends,
-// numbers a repro scenario shows as written.
-var stickPositions = []float32{-1, -0.5, 0, 0.5, 1}
-
-// genSticks draws a random player's stick moves.
-func genSticks(rng *sim.RNG, ticks int) []stickEv {
-	var out []stickEv
-	for t := 1; t <= ticks; t++ {
-		if rng.Chance(0.03) {
-			out = append(out, stickEv{Tick: t, X: stickPositions[rng.Intn(len(stickPositions))], Y: stickPositions[rng.Intn(len(stickPositions))]})
-		}
-	}
-	return out
-}
-
-// events turns holds, mouse and stick events (up to tick limit) into scenario input events.
+// events turns holds (up to tick limit) into scenario input events.
 func (g fuzzGame) events(limit int) []asset.InputSource {
 	byTick := map[int]*asset.InputSource{}
 	get := func(t int) *asset.InputSource {
@@ -183,24 +138,9 @@ func (g fuzzGame) events(limit int) []asset.InputSource {
 		if h.Start > limit {
 			continue
 		}
-		get(h.Start).Press = append(get(h.Start).Press, h.Key)
+		get(h.Start).Press = append(get(h.Start).Press, h.Button)
 		if h.End > 0 && h.End <= limit {
-			get(h.End).Release = append(get(h.End).Release, h.Key)
-		}
-	}
-	for _, m := range g.mouse {
-		if m.Tick > limit {
-			continue
-		}
-		e := get(m.Tick)
-		e.Mouse = &asset.MouseSource{X: m.X, Y: m.Y}
-		if m.Buttons != nil {
-			e.Buttons = m.Buttons
-		}
-	}
-	for _, st := range g.sticks {
-		if st.Tick <= limit {
-			get(st.Tick).Stick = &asset.StickSource{X: st.X, Y: st.Y}
+			get(h.End).Release = append(get(h.End).Release, h.Button)
 		}
 	}
 	ticks := make([]int, 0, len(byTick))
@@ -235,12 +175,12 @@ func (s *Session) Fuzz(o FuzzOptions) (*FuzzReport, error) {
 	if o.Games <= 0 || o.Ticks <= 0 {
 		return nil, usagef("fuzz: --games and --ticks must be positive")
 	}
-	if len(o.Keys) == 0 {
-		o.Keys = DefaultFuzzKeys
+	if len(o.Buttons) == 0 {
+		o.Buttons = asset.ButtonNames
 	}
-	for _, k := range o.Keys {
-		if !asset.IsKeyCode(k) {
-			return nil, usagef("fuzz: unknown key %q", k)
+	for _, b := range o.Buttons {
+		if !asset.IsButton(b) {
+			return nil, usagef("fuzz: unknown button %q (the buttons are %s)", b, strings.Join(asset.ButtonNames, ", "))
 		}
 	}
 	if len(o.Invariants) == 0 {
@@ -261,10 +201,8 @@ func (s *Session) Fuzz(o FuzzOptions) (*FuzzReport, error) {
 	games := make([]fuzzGame, o.Games)
 	found := make([]*FuzzViolation, o.Games)
 	errs := make([]error, o.Games)
-	w, h := s.Project.Resolution[0], s.Project.Resolution[1]
 	for i := range games {
-		games[i] = genGame(sim.NewRNG(gameSeed(o.Seed, i)), o.Ticks, o.Keys, w, h)
-		games[i].sticks = genSticks(sim.NewRNG(gameSeed(o.Seed, i)^stickSalt), o.Ticks)
+		games[i] = genGame(sim.NewRNG(gameSeed(o.Seed, i)), o.Ticks, o.Buttons)
 	}
 	var wg sync.WaitGroup
 	next := make(chan int)
@@ -344,8 +282,7 @@ func (s *Session) playGame(bin, dir, name string, o FuzzOptions, seed uint64, g 
 }
 
 // minimize shrinks the first violating game (earliest violation) with delta debugging
-// over key holds, mouse and stick events, keeping the same invariant violated, then writes the
-// repro scenario.
+// over button holds, keeping the same invariant violated, then writes the repro scenario.
 func (s *Session) minimize(bin, dir string, o FuzzOptions, games []fuzzGame, r *FuzzReport) error {
 	first := r.Violations[0]
 	for _, v := range r.Violations[1:] {
@@ -365,40 +302,10 @@ func (s *Session) minimize(bin, dir string, o FuzzOptions, games []fuzzGame, r *
 	}
 	// Only inputs before the violation matter.
 	g = trimGame(g, ticks)
-	// ddmin on the combined list of holds, mouse and stick events.
-	type item struct {
-		h  *hold
-		m  *mouseEv
-		st *stickEv
-	}
-	items := func(c fuzzGame) []item {
-		var out []item
-		for i := range c.holds {
-			out = append(out, item{h: &c.holds[i]})
-		}
-		for i := range c.mouse {
-			out = append(out, item{m: &c.mouse[i]})
-		}
-		for i := range c.sticks {
-			out = append(out, item{st: &c.sticks[i]})
-		}
-		return out
-	}
-	build := func(its []item) fuzzGame {
-		var c fuzzGame
-		for _, it := range its {
-			switch {
-			case it.h != nil:
-				c.holds = append(c.holds, *it.h)
-			case it.m != nil:
-				c.mouse = append(c.mouse, *it.m)
-			default:
-				c.sticks = append(c.sticks, *it.st)
-			}
-		}
-		return c
-	}
-	cur := items(g)
+	// ddmin on the list of holds.
+	type item = hold
+	build := func(its []item) fuzzGame { return fuzzGame{holds: append([]hold(nil), its...)} }
+	cur := append([]item(nil), g.holds...)
 	n := 2
 	for len(cur) >= 2 && runs < 400 {
 		chunk := (len(cur) + n - 1) / n
@@ -465,36 +372,26 @@ func trimGame(g fuzzGame, limit int) fuzzGame {
 		}
 		out.holds = append(out.holds, h)
 	}
-	for _, m := range g.mouse {
-		if m.Tick <= limit {
-			out.mouse = append(out.mouse, m)
-		}
-	}
-	for _, st := range g.sticks {
-		if st.Tick <= limit {
-			out.sticks = append(out.sticks, st)
-		}
-	}
 	return out
 }
 
 func init() {
 	register(command{
 		name:    "fuzz",
-		usage:   "fuzz --scene S | --world W --at x,z  --games N --ticks T --seed N [--keys KeyW,Space] [--invariants a,b]",
+		usage:   "fuzz --scene S | --world W --at x,z  --games N --ticks T --seed N [--buttons up,a] [--invariants a,b]",
 		summary: "play random-input games, report invariant violations, write a minimized repro scenario",
 		project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) {
 			fs := newFlags("fuzz", env.Stderr)
 			var o FuzzOptions
-			var keys, invs, at string
+			var buttons, invs, at string
 			fs.StringVar(&o.Scene, "scene", "", "scene (default: the project's default world or scene)")
 			fs.StringVar(&o.World, "world", "", "world instead of a scene")
 			fs.StringVar(&at, "at", "", "with --world: start cell x,z")
 			fs.IntVar(&o.Games, "games", 200, "number of random games")
 			fs.IntVar(&o.Ticks, "ticks", 200, "ticks per game")
 			fs.Uint64Var(&o.Seed, "seed", 1, "seed of the random players")
-			fs.StringVar(&keys, "keys", "", "comma-separated keys the players use")
+			fs.StringVar(&buttons, "buttons", "", "comma-separated buttons the players use (default: all)")
 			fs.StringVar(&invs, "invariants", "", "comma-separated invariants (default: the project's)")
 			fs.IntVar(&o.Parallel, "parallel", 0, "concurrent games (default: CPUs)")
 			if err := parseFlags(fs, args); err != nil {
@@ -504,8 +401,8 @@ func init() {
 			if o.At, err = parseCellFlag(at); err != nil {
 				return nil, err
 			}
-			if keys != "" {
-				o.Keys = strings.Split(keys, ",")
+			if buttons != "" {
+				o.Buttons = strings.Split(buttons, ",")
 			}
 			if invs != "" {
 				o.Invariants = strings.Split(invs, ",")

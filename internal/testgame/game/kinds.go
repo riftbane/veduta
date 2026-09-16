@@ -6,7 +6,7 @@ import (
 	"github.com/riftbane/veduta/scene"
 )
 
-// Tunables of the demo. PlayerSpeed × 100 is the "deliberately broken build" of the
+// Tunables of the test game. PlayerSpeed × 100 is the "deliberately broken build" of the
 // spec's fuzzing check: the hero then leaves the world bounds within a second.
 const (
 	PlayerSpeed = 4.0  // meters per second
@@ -48,20 +48,15 @@ func ground(ctx *veduta.Context, p gmath.Vec3) float32 {
 	return 0
 }
 
-// updatePlayer moves the hero with WASD, the arrows or the stick relative to the world
-// (up = -Z), turns it to face the direction of travel, and handles jumping. In a world the
-// hero walks on the terrain and does not wade into lakes and seas. A console's D-pad
-// arrives as the arrow keys and its A button as Space, so the same code plays on the pad;
-// its stick walks as fast as it is pushed.
+// updatePlayer moves the hero with the D-pad relative to the world (up = -Z), turns it to
+// face the direction of travel, and jumps with A. In a world the hero walks on the terrain
+// and does not wade into lakes and seas.
 func updatePlayer(ctx *veduta.Context, e *scene.Entity, in veduta.Input) {
 	st := e.State.(*PlayerState)
-	dir := gmath.V3(in.Axis("KeyA", "KeyD")+in.Axis("ArrowLeft", "ArrowRight"), 0,
-		in.Axis("KeyW", "KeyS")+in.Axis("ArrowUp", "ArrowDown"))
+	d := in.DPad()
+	dir := gmath.V3(d.X, 0, -d.Y)
 	if l := dir.Len(); l > 0 {
 		dir = dir.Scale(1 / l)
-	} else if l := in.Stick.Len(); l > 0 {
-		// Stick up is -Z; a push into a corner is no faster than one to an edge.
-		dir = gmath.V3(in.Stick.X, 0, -in.Stick.Y).Scale(1 / max(l, 1))
 	}
 	if dir != (gmath.Vec3{}) {
 		next := e.Transform.Position.Add(dir.Scale(PlayerSpeed * ctx.DT))
@@ -75,7 +70,7 @@ func updatePlayer(ctx *veduta.Context, e *scene.Entity, in veduta.Input) {
 		st.Heading = gmath.Degrees(gmath.Atan2(-dir.X, -dir.Z))
 		e.Transform.Rotation = gmath.QuatEulerDeg(gmath.V3(0, st.Heading, 0))
 	}
-	if st.OnGround && in.JustPressed("Space") {
+	if st.OnGround && in.JustPressed(veduta.ButtonA) {
 		st.VelY = JumpSpeed
 		st.OnGround = false
 		ctx.Trace("jump", map[string]any{"at": e.Transform.Position})

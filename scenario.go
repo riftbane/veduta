@@ -43,9 +43,18 @@ func specFromScenario(sc *asset.Scenario) *scenarioSpec {
 func inputEvents(in []asset.Input) []sim.InputEvent {
 	out := make([]sim.InputEvent, len(in))
 	for i, e := range in {
-		out[i] = sim.InputEvent{Tick: uint64(e.Tick), Press: e.Press, Release: e.Release, Mouse: e.Mouse, Buttons: e.Buttons, Text: e.Text, Stick: e.Stick}
+		out[i] = sim.InputEvent{Tick: uint64(e.Tick), Press: buttonSet(e.Press), Release: buttonSet(e.Release)}
 	}
 	return out
+}
+
+// buttonSet turns validated button names into a set.
+func buttonSet(names []string) sim.Buttons {
+	var s sim.Buttons
+	for _, n := range names {
+		s |= sim.Of(sim.Button(asset.ButtonIndex(n)))
+	}
+	return s
 }
 
 // loadInputFile reads an input script: a JSON array of input events (the "inputs" format

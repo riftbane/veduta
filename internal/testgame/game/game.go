@@ -1,6 +1,5 @@
-// Package game is the Veduta demo: WASD or the arrows (a gamepad's D-pad), or the stick,
-// move the hero on the ground, Space (the pad's A) jumps, gems are collected on contact,
-// KeyR (the pad's Y) resets the level, and the HUD shows score and tick.
+// Package game is the engine's test game: the D-pad moves the hero on the ground, A jumps,
+// gems are collected on contact, Select resets the level, and the HUD shows score and tick.
 package game
 
 import (
@@ -12,7 +11,7 @@ import (
 	"github.com/riftbane/veduta/gmath"
 )
 
-// Game is the demo's global state: everything outside the scene.
+// Game is the test game's global state: everything outside the scene.
 type Game struct {
 	Score     int // gems collected since the last reset
 	Resets    int
@@ -31,10 +30,10 @@ func (g *Game) Init(ctx *veduta.Context) error {
 	return nil
 }
 
-// Update handles the reset key and, in a world (`veduta render --world overworld`),
+// Update handles the reset button and, in a world (`veduta render --world overworld`),
 // keeps the chunks and the camera on the hero; entity logic lives in the kinds (kinds.go).
 func (g *Game) Update(ctx *veduta.Context, in veduta.Input) {
-	if in.JustPressed("KeyR") {
+	if in.JustPressed(veduta.ButtonSelect) {
 		g.Score = 0
 		g.Resets++
 		var err error

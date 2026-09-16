@@ -11,8 +11,8 @@ import (
 )
 
 // runPlayer puts the game on the framebuffer and runs it: one tick per 1/tick_rate
-// seconds, one rendered frame per tick (no interpolation), input from the pad and the
-// keyboard. It returns when the player quits (Home, Select+Start, or Ctrl+Q).
+// seconds, one rendered frame per tick (no interpolation), the buttons from the pad and the
+// keyboard. It returns when the player leaves (Home, Select+Start, or Ctrl+Q).
 func runPlayer(g Game, p *asset.Project, a *Assets) error {
 	win, err := platform.Open(platform.Options{Title: p.Name, Width: p.Resolution[0], Height: p.Resolution[1]})
 	if err != nil {
@@ -34,7 +34,6 @@ func runPlayer(g Game, p *asset.Project, a *Assets) error {
 		return err
 	}
 	var input sim.InputState
-	pointerLocked := false
 	period := time.Second / time.Duration(p.TickRate)
 	next := time.Now()
 	for {
@@ -44,22 +43,10 @@ func runPlayer(g Game, p *asset.Project, a *Assets) error {
 		}
 		for _, ev := range events {
 			switch ev.Kind {
-			case platform.KeyDown:
-				input.KeyDown(ev.Code)
-			case platform.KeyUp:
-				input.KeyUp(ev.Code)
-			case platform.MouseMove:
-				input.MouseMove(ev.X, ev.Y)
-			case platform.ButtonDown:
-				input.MouseMove(ev.X, ev.Y)
-				input.ButtonDown(ev.Button)
-			case platform.ButtonUp:
-				input.MouseMove(ev.X, ev.Y)
-				input.ButtonUp(ev.Button)
-			case platform.Text:
-				input.TypeText(ev.Text)
-			case platform.Stick:
-				input.SetStick(ev.X, ev.Y)
+			case platform.Press:
+				input.Press(ev.Button)
+			case platform.Release:
+				input.Release(ev.Button)
 			case platform.FocusLost:
 				input.ReleaseAll()
 			case platform.Close:
@@ -68,12 +55,6 @@ func runPlayer(g Game, p *asset.Project, a *Assets) error {
 		}
 		if err := e.step(input.Next()); err != nil {
 			return err
-		}
-		if want := e.ctx.PointerLocked(); want != pointerLocked {
-			pointerLocked = want
-			// No backend implements pointer lock (the framebuffer accepts the request and
-			// does nothing), so its answer does not matter: the game plays either way.
-			_ = win.SetPointerLock(want)
 		}
 		w, h := win.Size()
 		if w > 0 && h > 0 {

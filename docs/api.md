@@ -79,55 +79,30 @@ type StateCodec interface {
 
 | Field / method | Meaning |
 |----------------|---------|
-| `Pressed`, `Held`, `Released` | key sets by W3C `KeyboardEvent.code` (`KeyW`, `Space`, `ArrowLeft`, `ShiftLeft`, …) |
-| `Down(code)`, `JustPressed(code)`, `JustReleased(code)` | key queries |
-| `Axis(neg, pos)` | −1, 0 or +1, e.g. `in.Axis("KeyA", "KeyD")` |
-| `Mouse gmath.Vec2` | cursor in frame pixels, origin top-left (scenarios only) |
-| `MouseDelta gmath.Vec2` | how far the cursor moved during this tick, in pixels (mouse look) |
-| `Buttons`, `ButtonsPressed`, `ButtonsReleased`, `Button(name)` | mouse buttons `left`, `middle`, `right` |
-| `Text string` | characters typed during the tick |
-| `Stick gmath.Vec2` | the analog stick: each axis −1…1, +X right, +Y up, (0, 0) at rest |
+| `Pressed`, `Held`, `Released` | button sets (`sim.Buttons`) |
+| `Down(b)`, `JustPressed(b)`, `JustReleased(b)` | button queries, `b` one of the constants below |
+| `DPad() gmath.Vec2` | the D-pad as a direction: X −1 (left), 0 or +1 (right), Y −1 (down), 0 or +1 (up); opposite directions cancel; a diagonal is (±1, ±1) |
 
-A key pressed and released within one tick appears in `Pressed` and `Released` but not
+A button pressed and released within one tick appears in `Pressed` and `Released` but not
 in `Held`.
 
 ### The console's controls
 
-The console has a D-pad, an analog stick, A, B, X, Y, Select, Start and Home. The buttons
-arrive as key codes, so a game written for the keyboard plays on the pad and scenarios
-script it with `press` and `release`; the stick arrives as `Stick` (scenario field
-`stick`). Until the console's own controls exist, a keyboard and a mouse stand in for them:
+The console has a D-pad, A, B, Select, Cancel and Home. A game sees eight buttons; Home
+returns to the console's home, and no game can see or swallow it.
 
-| Control | Game sees | Keyboard and mouse |
-|---------|-----------|--------------------|
-| D-pad | `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight` | the arrows, or W A S D (which also press `KeyW`, `KeyA`, `KeyS`, `KeyD`) |
-| Stick | `Stick` | the mouse |
-| A | `Space` | Space |
-| B | `Escape` | Escape |
-| X | `KeyF` | F |
-| Y | `KeyR` | R |
-| Select | `Tab` | Tab |
-| Start | `Enter` | Enter |
-| Home | nothing: it closes the game | Ctrl+Q |
+| Button | Constant | Scenario name | Meant for | Keyboard | Gamepad |
+|--------|----------|---------------|-----------|----------|---------|
+| D-pad | `veduta.ButtonUp`, `ButtonDown`, `ButtonLeft`, `ButtonRight` | `up`, `down`, `left`, `right` | moving, choosing | arrows, W A S D | D-pad, hat, or a stick where the D-pad is not four buttons |
+| A | `veduta.ButtonA` | `a` | the main action, confirm | Space, Z | A (`BTN_SOUTH`) |
+| B | `veduta.ButtonB` | `b` | the second action | X, Shift | B (`BTN_EAST`) |
+| Select | `veduta.ButtonSelect` | `select` | the game's menu | Enter, Tab | Select |
+| Cancel | `veduta.ButtonCancel` | `cancel` | back, close a menu | Escape, Backspace | Start, or `KEY_BACK` |
+| Home | none | none | leave the game | Ctrl+Q | Home (`BTN_MODE`, `KEY_HOMEPAGE`), or Select and Start held together |
 
-Home, and Select with Start held together, close the game and return to the dashboard; no
-game can see or swallow them, so do not give the Select+Start pair a meaning.
-
-`Stick` reads 0 inside a dead zone of 15% of the travel around rest and grows to ±1 at the
-end, each axis on its own, so a push to a corner is (±1, ±1): clamp its length when a
-direction must not be faster diagonally. On a pad the stick is `ABS_X`/`ABS_Y`; a pad
-whose D-pad is not four `BTN_DPAD_*` buttons also gets the arrows from it, because many
-cheap pads report their D-pad there. A mouse is a stick that stays where it is left: 400
-counts from rest is the end of the travel, and any mouse button brings it back to rest.
-An absolute pointer (a tablet, such as QEMU's `usb-tablet`) is the stick directly: the
-middle of its area is rest and its edges are the ends.
-
-`Mouse`, `MouseDelta` and the mouse buttons are filled only by a scenario's `mouse` and
-`buttons` entries (`MouseDelta` is the difference between consecutive positions), so logic
-that reads them can be simulated and tested; on the console the mouse is the stick, and no
-player backend honours `ctx.LockPointer`. `Camera.LookFrom(eye, yawDeg, pitchDeg)` still builds an
-eye camera from the scene camera, keeping its projection; yaw 0 looks along −Z and grows
-counter-clockwise seen from above, positive pitch looks up.
+A pad without a Home button leaves the game with Select and Start (Cancel) held together,
+so do not give that pair a meaning. A pad's other buttons (X, Y, shoulders) and sticks
+beside a four-button D-pad are ignored.
 
 ## Cameras
 

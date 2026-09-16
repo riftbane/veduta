@@ -14,7 +14,7 @@ import (
 	"github.com/riftbane/veduta/sim"
 )
 
-// testGame is a tiny game: tplayer moves with WASD (plus RNG jitter so seeds matter),
+// testGame is a tiny game: tplayer moves with the D-pad (plus RNG jitter so seeds matter),
 // tgem is collected on contact with the player.
 type testGame struct {
 	score int
@@ -25,7 +25,8 @@ var current *testGame
 func init() {
 	RegisterKind("tplayer", func(e *scene.Entity) Behaviour {
 		return BehaviourFunc(func(ctx *Context, e *scene.Entity, in Input) {
-			dir := gmath.V3(in.Axis("KeyA", "KeyD"), 0, in.Axis("KeyW", "KeyS"))
+			d := in.DPad()
+			dir := gmath.V3(d.X, 0, -d.Y)
 			step := dir.Scale(3 * ctx.DT)
 			step.X += float32((ctx.RNG.Float32() - 0.5) * 0.001)
 			e.Transform.Position = e.Transform.Position.Add(step)
@@ -57,7 +58,7 @@ func (g *testGame) Init(ctx *Context) error {
 }
 
 func (g *testGame) Update(ctx *Context, in Input) {
-	if in.JustPressed("KeyR") {
+	if in.JustPressed(ButtonSelect) {
 		g.score = 0
 		ctx.LoadScene(ctx.Scene.Name)
 	}
@@ -144,10 +145,10 @@ func testAssets() (*asset.Project, *Assets) {
 
 func walkScript(t *testing.T) *sim.Script {
 	sc, err := sim.NewScript([]sim.InputEvent{
-		{Tick: 10, Press: []string{"KeyW"}},
-		{Tick: 70, Release: []string{"KeyW"}},
-		{Tick: 80, Press: []string{"KeyD"}},
-		{Tick: 100, Release: []string{"KeyD"}},
+		{Tick: 10, Press: sim.Of(sim.ButtonUp)},
+		{Tick: 70, Release: sim.Of(sim.ButtonUp)},
+		{Tick: 80, Press: sim.Of(sim.ButtonRight)},
+		{Tick: 100, Release: sim.Of(sim.ButtonRight)},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -260,12 +261,12 @@ func TestEngineInvariantViolationAndReset(t *testing.T) {
 		t.Fatal("violation not traced")
 	}
 	var in sim.InputState
-	in.KeyDown("KeyR")
+	in.Press(sim.ButtonSelect)
 	if err := e.step(in.Next()); err != nil {
 		t.Fatal(err)
 	}
 	if e.rec.Count(sim.EventSceneLoad) != 2 || e.ctx.Scene.Find("gem_1") == nil {
-		t.Fatal("KeyR did not reload the scene")
+		t.Fatal("Select did not reload the scene")
 	}
 	if _, err := ParseKindErr(); err != nil {
 		t.Fatal(err)

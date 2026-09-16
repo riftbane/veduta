@@ -4,12 +4,12 @@
   "seed": 42,
   "ticks": 60,
   "inputs": [
-    { "tick": 3, "press": ["KeyD"] },
-    { "tick": 13, "release": ["KeyD"] },
-    { "tick": 17, "press": ["KeyS"] },
-    { "tick": 27, "release": ["KeyS"] },
-    { "tick": 30, "press": ["Space"] },
-    { "tick": 31, "release": ["Space"] }
+    { "tick": 3, "press": ["right"] },
+    { "tick": 13, "release": ["right"] },
+    { "tick": 17, "press": ["down"] },
+    { "tick": 27, "release": ["down"] },
+    { "tick": 30, "press": ["a"] },
+    { "tick": 31, "release": ["a"] }
   ],
   "expect": [
     { "tick": 13, "entity": "player", "path": "position.x", "op": ">", "value": 1.9 },

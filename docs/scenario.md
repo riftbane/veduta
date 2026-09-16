@@ -50,36 +50,27 @@ first update (tick 1), because no update runs at tick 0.
 | Field | Type | Meaning |
 |-------|------|---------|
 | `tick` | integer | Tick of the event, 0 to `ticks`. |
-| `press` | array of key names | Keys that go down at this tick. A pressed key stays held until a later event releases it. A key that is already held cannot be pressed again. |
-| `release` | array of key names | Held keys that go up at this tick. Releasing a key that is not held is an error. A key cannot be pressed and released in the same event. |
-| `buttons` | array of button names | The complete set of mouse buttons held from this tick on: `left`, `right`, `middle`. `[]` releases all buttons; omitting the field leaves them unchanged. |
-| `mouse` | object `{ "x": number, "y": number }` | Mouse position in frame pixels from this tick on (origin top-left, y down). Omitted: unchanged. The initial position is (0, 0). The game also sees the movement since the previous tick as `in.MouseDelta`, so a jump from `{ "x": 0 }` to `{ "x": 600 }` is a delta of 600 pixels in that tick and 0 in the next. The console reads a mouse as its stick, never as `mouse`, so this exists for logic tested in scenarios. |
-| `text` | string | Characters typed during this tick (for text entry). Text is not derived from `press`: pressing `KeyA` does not type "a". |
-| `stick` | object `{ "x": number, "y": number }` | Position of the console's analog stick from this tick on (`in.Stick`), each axis −1 to 1, +x right and +y up; an axis left out is 0, so `{}` lets the stick go back to rest. Omitted: unchanged. The initial position is (0, 0). Since v1.1.0. |
+| `press` | array of button names | Buttons that go down at this tick. A pressed button stays held until a later event releases it. A button that is already held cannot be pressed again. |
+| `release` | array of button names | Held buttons that go up at this tick. Releasing a button that is not held is an error. A button cannot be pressed and released in the same event. |
 
-Each event must set at least one of `press`, `release`, `buttons`, `mouse`, `stick`, `text`.
-Within a list, names must not repeat.
+Each event must set `press`, `release` or both. Within a list, names must not repeat.
 
-### Key names
+### Button names
 
-Keys are W3C `KeyboardEvent.code` names for a US layout — they name physical keys, not
-characters, and are case-sensitive. The complete list:
+The console's game buttons, case-sensitive:
 
-- Letters: `KeyA` … `KeyZ`
-- Digits row: `Digit0` … `Digit9`
-- Function keys: `F1` … `F12`
-- Whitespace and editing: `Space`, `Enter`, `Tab`, `Backspace`, `Escape`, `Insert`,
-  `Delete`, `Home`, `End`, `PageUp`, `PageDown`, `CapsLock`
-- Modifiers: `ShiftLeft`, `ShiftRight`, `ControlLeft`, `ControlRight`, `AltLeft`,
-  `AltRight`, `MetaLeft`, `MetaRight`
-- Arrows: `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`
-- Punctuation: `Minus`, `Equal`, `BracketLeft`, `BracketRight`, `Backslash`, `Semicolon`,
-  `Quote`, `Backquote`, `Comma`, `Period`, `Slash`
-- Numeric keypad: `Numpad0` … `Numpad9`, `NumpadAdd`, `NumpadSubtract`,
-  `NumpadMultiply`, `NumpadDivide`, `NumpadDecimal`, `NumpadEnter`
+| Name | Button |
+|------|--------|
+| `up`, `down`, `left`, `right` | the D-pad |
+| `a` | A: the main action, confirm |
+| `b` | B: the second action |
+| `select` | Select: the game's menu |
+| `cancel` | Cancel: back, close a menu |
 
-Common mistakes are reported with a suggestion: `"w"` → `KeyW`, `"1"` → `Digit1`,
-`"space"` → `Space`, `"up"` → `ArrowUp`, `"shift"` → `ShiftLeft`.
+Home is not a game button: it returns to the console's home and never reaches a game, so a
+scenario cannot press it. A name from engine v1, a W3C key code, is reported with the
+button that key presses now: `"ArrowUp"` → `up`, `"KeyW"` → `up`, `"Space"` → `a`,
+`"Escape"` → `cancel`.
 
 ## Expectations
 
@@ -158,7 +149,7 @@ one contact sheet image, labelled with their ticks.
 ## Errors (examples)
 
 ```
-move.scenario.json:7:33: inputs[1].press[0]: unknown key "w" (did you mean "KeyW"? keys are W3C KeyboardEvent.code names)
+move.scenario.json:7:33: inputs[1].press[0]: unknown button "Up" (did you mean "up"? the buttons are up, down, left, right, a, b, select, cancel)
 move.scenario.json:9:16: inputs[3].tick: tick 5 is before the previous input's tick 80 (inputs must be in tick order)
 move.scenario.json:13:5: expect[1]: mixes an entity comparison (entity, path, op, value) with a trace count (trace, count_min, count_max); use two expectations
 move.scenario.json:14:75: expect[2].op: op contains needs a string, list or state path (path position.x is a number)
@@ -174,13 +165,12 @@ move.scenario.json:17:47: invariants[2]: invariant "entity_count_max:0": N must 
   "seed": 42,
   "ticks": 300,
   "inputs": [
-    { "tick": 10, "press": ["KeyW"] },
-    { "tick": 70, "release": ["KeyW"] },
-    { "tick": 80, "press": ["Space"] },
-    { "tick": 81, "release": ["Space"], "mouse": { "x": 320, "y": 180 }, "buttons": ["left"] },
-    { "tick": 82, "buttons": [], "text": "hi" },
-    { "tick": 90, "stick": { "x": 1, "y": 0.5 } },
-    { "tick": 110, "stick": {} }
+    { "tick": 10, "press": ["up"] },
+    { "tick": 70, "release": ["up"] },
+    { "tick": 80, "press": ["a"] },
+    { "tick": 81, "release": ["a"] },
+    { "tick": 90, "press": ["up", "right"] },
+    { "tick": 110, "release": ["up", "right"] }
   ],
   "expect": [
     { "tick": 120, "entity": "player", "path": "position.z", "op": "<", "value": -1 },

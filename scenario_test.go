@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/sim"
 )
 
 func TestLoadScenarioFile(t *testing.T) {
@@ -15,7 +16,7 @@ func TestLoadScenarioFile(t *testing.T) {
 	path := filepath.Join(dir, "move.scenario.json")
 	src := `{
   "veduta": "scenario/1", "scene": "main", "seed": 42, "ticks": 300,
-  "inputs": [ {"tick": 10, "press": ["KeyW"]}, {"tick": 70, "release": ["KeyW"]} ],
+  "inputs": [ {"tick": 10, "press": ["up"]}, {"tick": 70, "release": ["up"]} ],
   "expect": [
     {"tick": 120, "entity": "player", "path": "position.z", "op": "<", "value": -1},
     {"tick": 300, "trace": "gem_collected", "count_min": 1}
@@ -40,16 +41,16 @@ func TestLoadScenarioFile(t *testing.T) {
 func TestLoadInputArray(t *testing.T) {
 	dir := t.TempDir()
 	good := filepath.Join(dir, "in.json")
-	os.WriteFile(good, []byte(`[{"tick": 1, "press": ["Space"]}, {"tick": 5, "release": ["Space"], "mouse": {"x": 3, "y": 4}, "stick": {"x": -0.5}}]`), 0o644)
+	os.WriteFile(good, []byte(`[{"tick": 1, "press": ["a", "left"]}, {"tick": 5, "release": ["a"]}]`), 0o644)
 	events, err := loadInputFile(good)
-	if err != nil || len(events) != 2 || events[1].Mouse == nil || events[1].Mouse.Y != 4 || events[1].Stick == nil || events[1].Stick.X != -0.5 {
+	if err != nil || len(events) != 2 || events[0].Press != sim.Of(sim.ButtonA, sim.ButtonLeft) || events[1].Release != sim.Of(sim.ButtonA) {
 		t.Fatalf("events %+v err %v", events, err)
 	}
 	bad := filepath.Join(dir, "bad.json")
-	os.WriteFile(bad, []byte(`[{"tick": 1, "press": ["w"]}]`), 0o644)
+	os.WriteFile(bad, []byte(`[{"tick": 1, "press": ["KeyW"]}]`), 0o644)
 	_, err = loadInputFile(bad)
 	var list asset.Errors
-	if !errors.As(err, &list) || !strings.Contains(err.Error(), `did you mean "KeyW"`) {
-		t.Fatalf("bad key error: %v", err)
+	if !errors.As(err, &list) || !strings.Contains(err.Error(), `did you mean "up"`) {
+		t.Fatalf("bad button error: %v", err)
 	}
 }

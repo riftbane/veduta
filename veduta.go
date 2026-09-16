@@ -17,11 +17,27 @@ import (
 // Version is the engine version.
 const Version = "v1.4.1"
 
-// Input is everything the player did during one tick: pressed, held and released keys
-// (W3C KeyboardEvent.code names such as KeyW, Space, ArrowLeft), the mouse position and
-// buttons, and typed text. It is identical whether it comes from the console or a scenario
-// script.
+// Input is what the player did with the console's buttons during one tick: the buttons
+// pressed, held and released. It is identical whether it comes from the console or a
+// scenario script.
 type Input = sim.Input
+
+// Button is one of the console's eight game buttons: the D-pad, A, B, Select (the game's
+// menu) and Cancel (back). Home is not one: it returns to the console's home and never
+// reaches a game.
+type Button = sim.Button
+
+// The console's game buttons.
+const (
+	ButtonUp     = sim.ButtonUp
+	ButtonDown   = sim.ButtonDown
+	ButtonLeft   = sim.ButtonLeft
+	ButtonRight  = sim.ButtonRight
+	ButtonA      = sim.ButtonA
+	ButtonB      = sim.ButtonB
+	ButtonSelect = sim.ButtonSelect
+	ButtonCancel = sim.ButtonCancel
+)
 
 // Game is implemented by every Veduta game.
 type Game interface {
@@ -123,20 +139,8 @@ type Context struct {
 	Font        *sprite.Font
 	FontTexture gfx.TextureID
 
-	eng         *engine
-	pointerLock bool
+	eng *engine
 }
-
-// LockPointer records a request to hide the cursor and keep it inside the frame, as mouse
-// look would need. No player backend implements pointer lock: the console has no mouse, and
-// its framebuffer player accepts the request and does nothing. Headless runs ignore it too.
-// It is kept for API compatibility and because scenarios and games may still set it;
-// PointerLocked reports the request.
-func (c *Context) LockPointer(on bool) { c.pointerLock = on }
-
-// PointerLocked reports the last LockPointer request. The player loop passes it on to the
-// platform layer, where no backend acts on it.
-func (c *Context) PointerLocked() bool { return c.pointerLock }
 
 // Trace emits a structured game event into the current tick's trace. Field values must
 // be JSON-encodable (numbers, strings, bools, vectors, slices, maps, structs).

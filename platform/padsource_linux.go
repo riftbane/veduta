@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/riftbane/veduta/sim"
 )
 
 // Finding what the player holds, and surviving it being unplugged. Discovery is reading
@@ -23,7 +25,7 @@ var openPad = func(d inputDevice) (events, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.d.stickArrows = d.stickArrows()
+	s.d.stickDPad = !d.DPadButtons
 	return s, nil
 }
 
@@ -51,53 +53,41 @@ const (
 	kindOther    deviceKind = iota // nothing the player reads, unless it is named
 	kindPad                        // buttons of a gamepad, a joystick-style pad or a D-pad
 	kindKeyboard                   // Escape: every keyboard has it and no pad does
-	kindPointer                    // a mouse button and two axes: a mouse or a tablet
 )
 
-// stickArrows reports whether the device's ABS_X and ABS_Y press the arrows as well as
-// moving the stick. On a pad whose D-pad is four buttons they are only the stick; on any
-// other pad they may be the D-pad, as on many cheap pads; on a pointer they are its
-// position.
-func (d inputDevice) stickArrows() bool { return d.Kind != kindPointer && !d.DPadButtons }
-
-// classify tells what a device is from its key, relative-axis and absolute-axis
-// capability bitmaps.
-func classify(keys, rel, abs string) deviceKind {
+// classify tells what a device is from its key capability bitmap.
+func classify(keys string) deviceKind {
 	switch {
 	case hasPadButtons(keys):
 		return kindPad
 	case hasKeyboardKeys(keys):
 		return kindKeyboard
-	case bitmapHas(keys, btnLeft) && (bitmapHas(rel, relX) && bitmapHas(rel, relY) || bitmapHas(abs, absX) && bitmapHas(abs, absY)):
-		return kindPointer
 	}
 	return kindOther
 }
 
-// findInputs returns every device worth reading: gamepads first, then keyboards, then mice
-// and tablets, each group in node order so the same devices are chosen every time. A
-// keyboard counts because a console is often used before its pad is plugged in — on an
-// emulated machine, at a text console, or on the bench the day the panel works and the
-// pad's buttons are still unknown — and a mouse or a tablet stands in for its stick. What
-// a device is, is read from its capabilities in sysfs rather than by opening it.
+// findInputs returns every device worth reading: gamepads first, then keyboards, each group
+// in node order so the same devices are chosen every time. A keyboard counts because a
+// console is often used before its pad is plugged in — on an emulated machine, at a text
+// console, or on the bench the day the panel works and the pad's buttons are still unknown.
+// What a device is, is read from its capabilities in sysfs rather than by opening it.
 func findInputs(want string) ([]inputDevice, error) {
 	dir := filepath.Join(sysRoot, "sys", "class", "input")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("platform: no input devices in %s: %w", dir, err)
 	}
-	var all, matching, pads, keyboards, pointers []inputDevice
+	var all, matching, pads, keyboards []inputDevice
 	for _, e := range entries {
 		if !strings.HasPrefix(e.Name(), "event") {
 			continue
 		}
-		caps := func(kind string) string { return readAttr(dir, e.Name(), "device/capabilities/"+kind) }
-		keys := caps("key")
+		keys := readAttr(dir, e.Name(), "device/capabilities/key")
 		d := inputDevice{
 			Node:        e.Name(),
 			Dev:         filepath.Join(sysRoot, "dev", "input", e.Name()),
 			Name:        readAttr(dir, e.Name(), "device/name"),
-			Kind:        classify(keys, caps("rel"), caps("abs")),
+			Kind:        classify(keys),
 			DPadButtons: bitmapHas(keys, btnDPadUp),
 		}
 		all = append(all, d)
@@ -110,23 +100,20 @@ func findInputs(want string) ([]inputDevice, error) {
 			pads = append(pads, d)
 		case d.Kind == kindKeyboard:
 			keyboards = append(keyboards, d)
-		case d.Kind == kindPointer:
-			pointers = append(pointers, d)
 		}
 	}
 	byNode := func(l []inputDevice) { sort.Slice(l, func(i, j int) bool { return l[i].Node < l[j].Node }) }
 	byNode(matching)
 	byNode(pads)
 	byNode(keyboards)
-	byNode(pointers)
 	if want == "" {
-		matching = append(append(pads, keyboards...), pointers...)
+		matching = append(pads, keyboards...)
 	}
 	if len(matching) == 0 {
 		if want != "" {
 			return nil, fmt.Errorf("platform: no input device matches %q (found %s)", want, describeInputs(all))
 		}
-		return nil, fmt.Errorf("platform: no gamepad, keyboard or mouse among the input devices (found %s); set %s to name one", describeInputs(all), padEnv)
+		return nil, fmt.Errorf("platform: no gamepad or keyboard among the input devices (found %s); set %s to name one", describeInputs(all), padEnv)
 	}
 	return matching, nil
 }
@@ -200,9 +187,8 @@ func bitmapHasWords(bitmap string, bit, wordBits int) bool {
 type openDevice struct {
 	node    string
 	src     events
-	down    map[string]int // W3C code → how many of this device's buttons and axes hold it
-	stick   [2]float32     // where this device last put the stick
-	grabbed bool           // taken for this process alone
+	down    [sim.NumButtons]int // button → how many of this device's buttons and axes hold it
+	grabbed bool                // taken for this process alone
 }
 
 // grabber is a device that can be taken for this process alone (EVIOCGRAB) and given back.
@@ -219,11 +205,9 @@ var grabStall = 2 * time.Second
 // keyboard while its pad is unplugged, and lets the pad take over the moment it appears,
 // without anything having to be restarted.
 //
-// Several things report the same key: a pad's hat, its stick and its D-pad buttons all
-// press the arrows, and a keyboard's Space is the pad's A. A key is therefore held while
+// Several things press the same button: a pad's hat, its stick and its D-pad buttons all
+// press the D-pad, and a keyboard's Space is the pad's A. A button is therefore held while
 // anything holds it, and reported down with the first press and up with the last release.
-// Likewise every device with a stick, a mouse or a tablet moves the one stick: their
-// positions add up, each axis clamped to the end of the travel.
 //
 // Every device is taken for the player alone while it is being read, so a keyboard does not
 // also type into the text console the player draws over. The player must keep polling to
@@ -233,9 +217,8 @@ var grabStall = 2 * time.Second
 type inputSource struct {
 	want  string
 	open  []openDevice
-	down  map[string]int   // W3C code → how many buttons and axes, over every device, hold it
-	stick [2]float32       // the stick as last reported
-	out   []Event          // what the last poll returned, reused so an idle poll allocates nothing
+	down  [sim.NumButtons]int // button → how many buttons and axes, over every device, hold it
+	out   []Event             // what the last poll returned, reused so an idle poll allocates nothing
 	next  time.Time        // when to look again
 	now   func() time.Time // replaced in tests
 	tried bool
@@ -249,7 +232,7 @@ type inputSource struct {
 }
 
 func newInputSource(want string) *inputSource {
-	return &inputSource{want: want, now: time.Now, down: map[string]int{}, log: os.Stderr}
+	return &inputSource{want: want, now: time.Now, log: os.Stderr}
 }
 
 // Devices names what is being read, for diagnostics; empty when nothing is.
@@ -282,9 +265,8 @@ func (p *inputSource) poll() ([]Event, error) {
 		evs, err := d.src.poll()
 		p.pass(d, evs)
 		if err != nil {
-			// Unplugged: evs already carried the keys it had down, released. Whatever it
-			// did not release is let go of here, so no key outlives the device holding it,
-			// and its push on the stick goes with it.
+			// Unplugged: evs already carried the buttons it had down, released. Whatever it
+			// did not release is let go of here, so no button outlives the device holding it.
 			p.forget(d)
 			d.src.close()
 			p.open = append(p.open[:i], p.open[i+1:]...)
@@ -293,25 +275,7 @@ func (p *inputSource) poll() ([]Event, error) {
 		}
 		i++
 	}
-	p.moveStick()
 	return p.out, nil
-}
-
-// moveStick reports the stick, once, after the keys of a poll, when the sum of where the
-// devices put it has changed.
-func (p *inputSource) moveStick() {
-	var s [2]float32
-	for i := range p.open {
-		s[0] += p.open[i].stick[0]
-		s[1] += p.open[i].stick[1]
-	}
-	for i := range s {
-		s[i] = min(max(s[i], -1), 1)
-	}
-	if s != p.stick {
-		p.stick = s
-		p.out = append(p.out, Event{Kind: Stick, X: s[0], Y: s[1]})
-	}
 }
 
 // settle keeps reading, for at most d, until nothing is held. The player closes while the
@@ -330,8 +294,8 @@ func (p *inputSource) settle(d time.Duration) {
 // settleStep is how often settle reads.
 const settleStep = 10 * time.Millisecond
 
-// holding reports whether any key is down, as the game sees it or physically on a device
-// that can tell.
+// holding reports whether any button is down, as the game sees it, or any key physically on
+// a device that can tell.
 func (p *inputSource) holding() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -348,30 +312,26 @@ func (p *inputSource) holding() bool {
 	return false
 }
 
-// pass hands on what one device sent, counting presses by W3C code: a key goes down when
-// the first button or axis anywhere holds it and up when the last one lets go. A release
-// from a device that never pressed the key is not a release at all.
+// pass hands on what one device sent, counting presses by button: a button goes down when
+// the first key or axis anywhere holds it and up when the last one lets go. A release from
+// a device that never pressed the button is not a release at all.
 func (p *inputSource) pass(d *openDevice, evs []Event) {
 	for _, e := range evs {
 		switch e.Kind {
-		case Stick:
-			d.stick = [2]float32{e.X, e.Y}
-		case KeyDown:
-			d.down[e.Code]++
-			if p.down[e.Code]++; p.down[e.Code] == 1 {
-				p.out = append(p.out, e)
-			}
-		case KeyUp:
-			n := d.down[e.Code]
-			if n == 0 {
+		case Press:
+			if e.Button >= sim.NumButtons {
 				continue
 			}
-			if n == 1 {
-				delete(d.down, e.Code)
-			} else {
-				d.down[e.Code] = n - 1
+			d.down[e.Button]++
+			if p.down[e.Button]++; p.down[e.Button] == 1 {
+				p.out = append(p.out, e)
 			}
-			p.release(e.Code, 1)
+		case Release:
+			if e.Button >= sim.NumButtons || d.down[e.Button] == 0 {
+				continue
+			}
+			d.down[e.Button]--
+			p.release(e.Button, 1)
 		default:
 			p.out = append(p.out, e)
 		}
@@ -406,28 +366,25 @@ func (p *inputSource) giveBack() {
 	}
 }
 
-// release lets go of n presses of a key and reports it up when none is left.
-func (p *inputSource) release(code string, n int) {
-	left := p.down[code] - n
-	if left > 0 {
-		p.down[code] = left
+// release lets go of n presses of a button and reports it up when none is left.
+func (p *inputSource) release(b sim.Button, n int) {
+	if p.down[b] == 0 {
 		return
 	}
-	delete(p.down, code)
-	p.out = append(p.out, Event{Kind: KeyUp, Code: code})
+	p.down[b] = max(p.down[b]-n, 0)
+	if p.down[b] == 0 {
+		p.out = append(p.out, Event{Kind: Release, Button: b})
+	}
 }
 
-// forget lets go of everything a departing device still holds, in code order so the same
+// forget lets go of everything a departing device still holds, in button order so the same
 // session gives the same events.
 func (p *inputSource) forget(d *openDevice) {
-	codes := make([]string, 0, len(d.down))
-	for code := range d.down {
-		codes = append(codes, code)
-	}
-	sort.Strings(codes)
-	for _, code := range codes {
-		p.release(code, d.down[code])
-		delete(d.down, code)
+	for b := sim.Button(0); b < sim.NumButtons; b++ {
+		if n := d.down[b]; n > 0 {
+			p.release(b, n)
+			d.down[b] = 0
+		}
 	}
 }
 
@@ -468,7 +425,7 @@ func (p *inputSource) attach() {
 			refused = append(refused, oerr) // a device that will not open is one we do without
 			continue
 		}
-		list = append(list, openDevice{node: d.Node, src: src, down: map[string]int{}})
+		list = append(list, openDevice{node: d.Node, src: src})
 		p.take(&list[len(list)-1])
 	}
 	for i, d := range p.open {

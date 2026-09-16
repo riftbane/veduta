@@ -272,7 +272,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 				"at":          map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "with world: start cell [x, z]"},
 				"ticks":       num("ticks to simulate (without scenario, default 200)"),
 				"seed":        num("RNG seed (without scenario)"),
-				"inputs":      map[string]any{"type": "array", "description": "input events as in scenario files: {tick, press[], release[], mouse{x,y}, buttons[], text, stick{x,y}}", "items": map[string]any{"type": "object"}},
+				"inputs":      map[string]any{"type": "array", "description": "input events as in scenario files: {tick, press[], release[]} with the buttons up, down, left, right, a, b, select, cancel", "items": map[string]any{"type": "object"}},
 				"screenshots": map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "description": "ticks to capture"},
 				"invariants":  strList("invariants to check (default: the scenario's, else the project's)"),
 			}),

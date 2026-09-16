@@ -5,10 +5,10 @@
   "seed": 1,
   "ticks": 200,
   "inputs": [
-    { "tick": 0, "press": ["ArrowUp"] },
-    { "tick": 120, "release": ["ArrowUp"] },
-    { "tick": 121, "press": ["ArrowRight"] },
-    { "tick": 180, "release": ["ArrowRight"] }
+    { "tick": 0, "press": ["up"] },
+    { "tick": 120, "release": ["up"] },
+    { "tick": 121, "press": ["right"] },
+    { "tick": 180, "release": ["right"] }
   ],
   "expect": [
     { "tick": 100, "entity": "player", "path": "position.y", "op": ">", "value": 1 },

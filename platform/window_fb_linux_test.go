@@ -68,9 +68,6 @@ func TestFBWindow(t *testing.T) {
 	if !strings.Contains(log.String(), "no input devices in") {
 		t.Errorf("Poll with nothing to read logged %q", log.String())
 	}
-	if err := win.SetPointerLock(true); err != nil {
-		t.Errorf("SetPointerLock on a panel: %v", err)
-	}
 
 	img := gfx.NewImage(320, 240)
 	for i := range img.Pix {

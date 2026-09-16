@@ -30,17 +30,13 @@ type Scenario struct {
 	At          [2]int32      // start cell of the world (x, z)
 }
 
-// Input is one scripted input event. Keys are W3C KeyboardEvent.code names (KeyCodes).
-// Events of tick t are applied to the Update of tick t, in file order; events at tick 0
-// are applied to the first Update (tick 1), since no Update runs at tick 0.
+// Input is one scripted input event: buttons (ButtonNames) that go down or up. Events of
+// tick t are applied to the Update of tick t, in file order; events at tick 0 are applied
+// to the first Update (tick 1), since no Update runs at tick 0.
 type Input struct {
 	Tick    int
-	Press   []string    // keys that go down at this tick and stay held until released
-	Release []string    // held keys that go up at this tick
-	Buttons []string    // nil: unchanged; otherwise the mouse buttons held from now on (left, right, middle)
-	Mouse   *gmath.Vec2 // nil: unchanged; otherwise the mouse position in frame pixels
-	Text    string      // characters typed during this tick
-	Stick   *gmath.Vec2 // nil: unchanged; otherwise the stick's position from now on, each axis -1…1
+	Press   []string // buttons that go down at this tick and stay held until released
+	Release []string // held buttons that go up at this tick
 }
 
 // Expectation is one check of a scenario. It is either an entity comparison (Entity,
@@ -244,7 +240,7 @@ func compileInputs(c *Checker, src []InputSource, tick func(string, int)) []Inpu
 		return nil
 	}
 	out := make([]Input, len(src))
-	held := map[string]int{} // key → tick it was pressed; lookup only, never iterated
+	held := map[string]int{} // button → tick it was pressed; lookup only, never iterated
 	for i := range src {
 		in := &src[i]
 		p := Path("inputs", i)
@@ -252,86 +248,58 @@ func compileInputs(c *Checker, src []InputSource, tick func(string, int)) []Inpu
 		if i > 0 && in.Tick < src[i-1].Tick {
 			c.Errorf(Path(p, "tick"), "tick %d is before the previous input's tick %d (inputs must be in tick order)", in.Tick, src[i-1].Tick)
 		}
-		ev := Input{Tick: in.Tick, Text: in.Text}
-		if in.Press == nil && in.Release == nil && in.Buttons == nil && in.Mouse == nil && in.Stick == nil && in.Text == "" {
-			c.Errorf(p, "input event has no press, release, buttons, mouse, stick or text")
+		ev := Input{Tick: in.Tick}
+		if in.Press == nil && in.Release == nil {
+			c.Errorf(p, "input event has no press or release")
 		}
-		ev.Press = keyList(c, Path(p, "press"), in.Press)
-		ev.Release = keyList(c, Path(p, "release"), in.Release)
-		for _, key := range ev.Press {
-			if indexOf(ev.Release, key) >= 0 {
-				c.Errorf(Path(Path(p, "press"), indexOf(in.Press, key)), "key %q is both pressed and released in the same event; release it at a later tick", key)
+		ev.Press = buttonList(c, Path(p, "press"), in.Press)
+		ev.Release = buttonList(c, Path(p, "release"), in.Release)
+		for _, b := range ev.Press {
+			if indexOf(ev.Release, b) >= 0 {
+				c.Errorf(Path(Path(p, "press"), indexOf(in.Press, b)), "button %q is both pressed and released in the same event; release it at a later tick", b)
 				continue
 			}
-			if t, ok := held[key]; ok {
-				c.Errorf(Path(Path(p, "press"), indexOf(in.Press, key)), "key %q is already held (pressed at tick %d)", key, t)
+			if t, ok := held[b]; ok {
+				c.Errorf(Path(Path(p, "press"), indexOf(in.Press, b)), "button %q is already held (pressed at tick %d)", b, t)
 				continue
 			}
-			held[key] = in.Tick
+			held[b] = in.Tick
 		}
-		for _, key := range ev.Release {
-			if indexOf(ev.Press, key) >= 0 {
+		for _, b := range ev.Release {
+			if indexOf(ev.Press, b) >= 0 {
 				continue // reported above
 			}
-			if _, ok := held[key]; !ok {
-				c.Errorf(Path(Path(p, "release"), indexOf(in.Release, key)), "key %q is released but not held (press it at an earlier tick)", key)
+			if _, ok := held[b]; !ok {
+				c.Errorf(Path(Path(p, "release"), indexOf(in.Release, b)), "button %q is released but not held (press it at an earlier tick)", b)
 				continue
 			}
-			delete(held, key)
-		}
-		if in.Buttons != nil {
-			ev.Buttons = make([]string, 0, len(in.Buttons))
-			for k, b := range in.Buttons {
-				bp := Path(Path(p, "buttons"), k)
-				switch {
-				case !isMouseButton(b):
-					c.Errorf(bp, "unknown mouse button %q (want one of %v)", b, MouseButtons)
-				case indexOf(ev.Buttons, b) >= 0:
-					c.Errorf(bp, "duplicate mouse button %q", b)
-				default:
-					ev.Buttons = append(ev.Buttons, b)
-				}
-			}
-		}
-		if in.Mouse != nil {
-			m := gmath.V2(in.Mouse.X, in.Mouse.Y)
-			if !gmath.IsFinite(m.X) || !gmath.IsFinite(m.Y) {
-				c.Errorf(Path(p, "mouse"), "not a finite position")
-			}
-			ev.Mouse = &m
-		}
-		if in.Stick != nil {
-			st := gmath.V2(in.Stick.X, in.Stick.Y)
-			if !(st.X >= -1 && st.X <= 1 && st.Y >= -1 && st.Y <= 1) {
-				c.Errorf(Path(p, "stick"), "x %g and y %g must be in [-1, 1]", st.X, st.Y)
-			}
-			ev.Stick = &st
+			delete(held, b)
 		}
 		out[i] = ev
 	}
 	return out
 }
 
-// keyList validates key names at path and returns the valid, distinct ones (nil for an
-// empty list).
-func keyList(c *Checker, path string, keys []string) []string {
-	if len(keys) == 0 {
+// buttonList validates button names at path and returns the valid, distinct ones (nil for
+// an empty list).
+func buttonList(c *Checker, path string, names []string) []string {
+	if len(names) == 0 {
 		return nil
 	}
-	out := make([]string, 0, len(keys))
-	for i, k := range keys {
-		kp := Path(path, i)
+	out := make([]string, 0, len(names))
+	for i, b := range names {
+		bp := Path(path, i)
 		switch {
-		case !IsKeyCode(k):
-			if s := suggestKey(k); s != "" {
-				c.Errorf(kp, "unknown key %q (did you mean %q? keys are W3C KeyboardEvent.code names)", k, s)
+		case !IsButton(b):
+			if s := suggestButton(b); s != "" {
+				c.Errorf(bp, "unknown button %q (did you mean %q? the buttons are %s)", b, s, strings.Join(ButtonNames, ", "))
 			} else {
-				c.Errorf(kp, "unknown key %q (keys are W3C KeyboardEvent.code names such as KeyW, Space, ArrowLeft)", k)
+				c.Errorf(bp, "unknown button %q (the buttons are %s)", b, strings.Join(ButtonNames, ", "))
 			}
-		case indexOf(out, k) >= 0:
-			c.Errorf(kp, "duplicate key %q", k)
+		case indexOf(out, b) >= 0:
+			c.Errorf(bp, "duplicate button %q", b)
 		default:
-			out = append(out, k)
+			out = append(out, b)
 		}
 	}
 	return out

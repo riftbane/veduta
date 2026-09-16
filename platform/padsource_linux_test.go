@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/riftbane/veduta/sim"
 )
 
 // fakeInputs builds a /sys/class/input tree. Each entry is "node name|key-bitmap", optionally
@@ -161,15 +163,15 @@ func TestFindInputs(t *testing.T) {
 			nodes:   []string{"event1"},
 		},
 		{
-			// The mouse and the tablet stand in for the stick, after everything with buttons.
-			name:    "pads, keyboards, then pointers",
+			// A mouse or a tablet presses no button of the console.
+			name:    "pointers are not read",
 			entries: []string{"event0 Mouse|" + mouseBits + "|" + xyBits, "event1 Tablet|" + mouseBits + "||" + xyBits, "event2 Keyboard|" + keyboardBits, "event3 Pad|" + padBits},
-			nodes:   []string{"event3", "event2", "event0", "event1"},
+			nodes:   []string{"event3", "event2"},
 		},
 		{
 			name:    "nothing to read",
-			entries: []string{"event0 Power Button|" + powerBits, "event1 Buttons without axes|" + mouseBits},
-			errHas:  "no gamepad, keyboard or mouse",
+			entries: []string{"event0 Power Button|" + powerBits, "event1 Mouse|" + mouseBits + "|" + xyBits},
+			errHas:  "no gamepad or keyboard",
 		},
 		{
 			name:    "the choice matches nothing",
@@ -204,17 +206,14 @@ func TestFindInputs(t *testing.T) {
 	}
 }
 
-// TestFindInputsSticks: what ABS_X and ABS_Y are depends on the device. On a pad whose D-pad
-// is four buttons they are only the stick; on any other pad they may be its D-pad, as on
-// many cheap pads, and press the arrows as well; on a mouse or a tablet they are a pointer
-// that stands in for the stick and presses nothing.
-func TestFindInputsSticks(t *testing.T) {
+// TestFindInputsDPadButtons: what ABS_X and ABS_Y are depends on the pad. On a pad whose
+// D-pad is four buttons they are a stick, which the console does not have; on any other pad
+// they may be its D-pad, as on many cheap pads.
+func TestFindInputsDPadButtons(t *testing.T) {
 	fakeInputs(t,
 		"event0 Console Pad|"+dpadPadBits+"||"+xyBits,
 		"event1 Clone Pad|"+padBits+"||"+xyBits,
 		"event2 Keyboard|"+keyboardBits,
-		"event3 Mouse|"+mouseBits+"|"+xyBits,
-		"event4 Tablet|"+mouseBits+"||"+xyBits,
 	)
 	got, err := findInputs("")
 	if err != nil {
@@ -222,57 +221,10 @@ func TestFindInputsSticks(t *testing.T) {
 	}
 	var s []string
 	for _, d := range got {
-		s = append(s, fmt.Sprintf("%s:%v", d.Node, d.stickArrows()))
+		s = append(s, fmt.Sprintf("%s:%v", d.Node, d.DPadButtons))
 	}
-	if want := "event0:false,event1:true,event2:true,event3:false,event4:false"; strings.Join(s, ",") != want {
-		t.Fatalf("the stick presses the arrows on %s, want %s", strings.Join(s, ","), want)
-	}
-	// Chosen by name, a device is still what its capabilities say.
-	if got, err := findInputs("tablet"); err != nil || len(got) != 1 || got[0].stickArrows() {
-		t.Fatalf("the tablet chosen by name: %+v, %v", got, err)
-	}
-}
-
-// TestInputSourceSumsSticks: every device with a stick moves the one stick the game has.
-// Their positions add up, clamped to the end of the travel, a poll reports the stick at most
-// once and only when it moved, and a device unplugged takes its push away with it.
-func TestInputSourceSumsSticks(t *testing.T) {
-	fakeInputs(t, "event0 Pad|"+padBits, "event1 Mouse|"+mouseBits+"|"+xyBits)
-	pad := &fakePad{
-		batches: [][]Event{
-			{{Kind: Stick, X: 0.5}},
-			{{Kind: Stick, X: 1, Y: -1}},
-			{},
-			{{Kind: Stick, X: 0.25}, {Kind: KeyDown, Code: "Space"}, {Kind: Stick, X: 0.5}},
-		},
-		err: errors.New("device removed"),
-	}
-	mouse := &fakePad{batches: [][]Event{
-		{{Kind: Stick, X: 0.25, Y: 0.5}},
-		{{Kind: Stick, X: 0.5, Y: 0}},
-	}}
-	byNode := map[string]*fakePad{"event0": pad, "event1": mouse}
-	old := openPad
-	openPad = func(dev inputDevice) (events, error) { return byNode[dev.Node], nil }
-	t.Cleanup(func() { openPad = old })
-
-	p := newInputSource("")
-	now := time.Now()
-	p.now = func() time.Time { return now }
-	for i, want := range []string{
-		"stick 0.75,0.5",
-		"stick 1,-1",           // 1.5 and -1: clamped
-		"",                     // nothing moved
-		"down Space,stick 1,0", // the last position of each device, once, after the keys
-		"up Space,stick 0.5,0", // the pad is gone, the mouse still pushes
-	} {
-		evs, err := p.poll()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := describeAll(evs); got != want {
-			t.Fatalf("poll %d: %q, want %q", i+1, got, want)
-		}
+	if want := "event0:true,event1:false,event2:false"; strings.Join(s, ",") != want {
+		t.Fatalf("D-pad buttons on %s, want %s", strings.Join(s, ","), want)
 	}
 }
 
@@ -297,7 +249,7 @@ func (f *fakePad) close() error { f.closed++; return nil }
 func TestInputSourceAttachesAndSurvivesUnplugging(t *testing.T) {
 	fakeInputs(t, "event0 Rii Gamepad|"+padBits)
 	pad := &fakePad{
-		batches: [][]Event{{{Kind: KeyDown, Code: "Space"}}},
+		batches: [][]Event{{{Kind: Press, Button: sim.ButtonA}}},
 		err:     errors.New("device removed"),
 	}
 	opened := 0
@@ -309,15 +261,15 @@ func TestInputSourceAttachesAndSurvivesUnplugging(t *testing.T) {
 	p := newInputSource("")
 	p.now = func() time.Time { return now }
 
-	if evs, err := p.poll(); err != nil || len(evs) != 1 || evs[0].Code != "Space" {
+	if evs, err := p.poll(); err != nil || describePad(evs) != "down a" {
 		t.Fatalf("first poll: %v %v", evs, err)
 	}
 	if p.Devices() != "event0" {
 		t.Errorf("reading %q", p.Devices())
 	}
-	// Pulled out: the console keeps running and lets the device go, and the key it held
+	// Pulled out: the console keeps running and lets the device go, and the button it held
 	// comes back up even though this fake, unlike a real device, did not say so.
-	if evs, err := p.poll(); err != nil || describePad(evs) != "up Space" {
+	if evs, err := p.poll(); err != nil || describePad(evs) != "up a" {
 		t.Fatalf("unplugged poll: %v %v", evs, err)
 	}
 	if p.Devices() != "" || pad.closed != 1 {
@@ -329,9 +281,9 @@ func TestInputSourceAttachesAndSurvivesUnplugging(t *testing.T) {
 	}
 	// Once the wait is over it is looked for again.
 	now = now.Add(2 * padRescan)
-	pad.batches = [][]Event{{{Kind: KeyDown, Code: "Enter"}}}
+	pad.batches = [][]Event{{{Kind: Press, Button: sim.ButtonSelect}}}
 	pad.err = nil
-	if evs, err := p.poll(); err != nil || len(evs) != 1 || evs[0].Code != "Enter" {
+	if evs, err := p.poll(); err != nil || describePad(evs) != "down select" {
 		t.Fatalf("after replugging: %v %v", evs, err)
 	}
 	if opened != 2 {
@@ -343,8 +295,8 @@ func TestInputSourceAttachesAndSurvivesUnplugging(t *testing.T) {
 // pad exists: both devices are read, and what either sends arrives.
 func TestInputSourceReadsPadAndKeyboard(t *testing.T) {
 	fakeInputs(t, "event0 AT Keyboard|"+keyboardBits, "event1 Rii Gamepad|"+padBits)
-	pad := &fakePad{batches: [][]Event{{{Kind: KeyDown, Code: "Space"}}}}
-	keyboard := &fakePad{batches: [][]Event{{{Kind: KeyDown, Code: "ArrowDown"}}}}
+	pad := &fakePad{batches: [][]Event{{{Kind: Press, Button: sim.ButtonA}}}}
+	keyboard := &fakePad{batches: [][]Event{{{Kind: Press, Button: sim.ButtonDown}}}}
 	byNode := map[string]*fakePad{"event1": pad, "event0": keyboard}
 	old := openPad
 	openPad = func(dev inputDevice) (events, error) { return byNode[dev.Node], nil }
@@ -355,13 +307,9 @@ func TestInputSourceReadsPadAndKeyboard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var codes []string
-	for _, e := range evs {
-		codes = append(codes, e.Code)
-	}
 	// The pad is read first, being the one a console is meant to be played with.
-	if strings.Join(codes, ",") != "Space,ArrowDown" {
-		t.Fatalf("events %v, want the pad's then the keyboard's", codes)
+	if got := describePad(evs); got != "down a,down down" {
+		t.Fatalf("events %q, want the pad's then the keyboard's", got)
 	}
 	if p.Devices() != "event1,event0" {
 		t.Fatalf("reading %q", p.Devices())
@@ -380,8 +328,8 @@ func TestInputSourceReadsPadAndKeyboard(t *testing.T) {
 // and what is already open is neither opened twice nor moved behind the newcomer.
 func TestInputSourcePicksUpALatePad(t *testing.T) {
 	fakeInputs(t, "event0 AT Keyboard|"+keyboardBits)
-	keyboard := &fakePad{batches: [][]Event{{{Kind: KeyDown, Code: "ArrowDown"}}}}
-	pad := &fakePad{batches: [][]Event{{{Kind: KeyDown, Code: "Space"}}}}
+	keyboard := &fakePad{batches: [][]Event{{{Kind: Press, Button: sim.ButtonDown}}}}
+	pad := &fakePad{batches: [][]Event{{{Kind: Press, Button: sim.ButtonA}}}}
 	byNode := map[string]*fakePad{"event0": keyboard, "event1": pad}
 	opened := map[string]int{}
 	old := openPad
@@ -401,14 +349,10 @@ func TestInputSourcePicksUpALatePad(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var s []string
-		for _, e := range evs {
-			s = append(s, e.Code)
-		}
-		return strings.Join(s, ",")
+		return describePad(evs)
 	}
 
-	if got := codes(); got != "ArrowDown" || p.Devices() != "event0" {
+	if got := codes(); got != "down down" || p.Devices() != "event0" {
 		t.Fatalf("keyboard alone: events %q, reading %q", got, p.Devices())
 	}
 	fakeInputs(t, "event1 Rii Gamepad|"+padBits)
@@ -417,7 +361,7 @@ func TestInputSourcePicksUpALatePad(t *testing.T) {
 		t.Fatalf("before the rescan: events %q, reading %q", got, p.Devices())
 	}
 	now = now.Add(2 * padRescan)
-	if got := codes(); got != "Space" {
+	if got := codes(); got != "down a" {
 		t.Fatalf("after the rescan: events %q, want the pad's", got)
 	}
 	if p.Devices() != "event1,event0" {
@@ -477,10 +421,10 @@ func (f *decodingPad) close() error { return nil }
 func (f *decodingPad) pressed() bool { return f.d.pressed() }
 
 // TestInputSourceCountsHolds: a pad's hat, its stick and its D-pad buttons, and the
-// keyboard beside it, all report the same few keys. A key is held while anything holds it:
-// it goes down with the first and up with the last, whichever button, axis or device that
-// is. Before, letting the stick back to the middle released ArrowLeft while the hat still
-// held it, and the hero stopped with the D-pad pressed.
+// keyboard beside it, all press the same few buttons. A button is held while anything holds
+// it: it goes down with the first and up with the last, whichever key, axis or device that
+// is. Before, letting the stick back to the middle released left while the hat still held
+// it, and the hero stopped with the D-pad pressed.
 func TestInputSourceCountsHolds(t *testing.T) {
 	fakeInputs(t, "event0 AT Keyboard|"+keyboardBits, "event1 Rii Gamepad|"+padBits)
 	const size = 24
@@ -500,17 +444,17 @@ func TestInputSourceCountsHolds(t *testing.T) {
 		pad, keyboard []byte
 		want          string
 	}{
-		{name: "hat left", pad: rec(evAbs, absHat0X, -1), want: "down ArrowLeft"},
+		{name: "hat left", pad: rec(evAbs, absHat0X, -1), want: "down left"},
 		{name: "stick left as well", pad: rec(evAbs, absX, -30000), want: ""},
 		{name: "stick back to the middle", pad: rec(evAbs, absX, 0), want: ""},
-		{name: "D-pad button left as well", pad: rec(evKey, 0x222, 1), want: ""},
+		{name: "D-pad button left as well", pad: rec(evKey, btnDPadUp+2, 1), want: ""},
 		{name: "hat back", pad: rec(evAbs, absHat0X, 0), want: ""},
-		{name: "D-pad button back", pad: rec(evKey, 0x222, 0), want: "up ArrowLeft"},
-		{name: "Space on the keyboard", keyboard: rec(evKey, keySpace, 1), want: "down Space"},
+		{name: "D-pad button back", pad: rec(evKey, btnDPadUp+2, 0), want: "up left"},
+		{name: "Space on the keyboard", keyboard: rec(evKey, keySpace, 1), want: "down a"},
 		{name: "A on the pad as well", pad: rec(evKey, btnSouth, 1), want: ""},
 		{name: "the keyboard lets go", keyboard: rec(evKey, keySpace, 0), want: ""},
-		{name: "the pad lets go", pad: rec(evKey, btnSouth, 0), want: "up Space"},
-		{name: "left on both at once", pad: rec(evAbs, absHat0X, -1), keyboard: rec(evKey, keyLeft, 1), want: "down ArrowLeft"},
+		{name: "the pad lets go", pad: rec(evKey, btnSouth, 0), want: "up a"},
+		{name: "left on both at once", pad: rec(evAbs, absHat0X, -1), keyboard: rec(evKey, keyLeft, 1), want: "down left"},
 	} {
 		pad.next, keyboard.next = s.pad, s.keyboard
 		evs, err := p.poll()
@@ -521,23 +465,23 @@ func TestInputSourceCountsHolds(t *testing.T) {
 			t.Fatalf("%s: %q, want %q", s.name, got, s.want)
 		}
 	}
-	// The pad is unplugged while both hold ArrowLeft: the keyboard still does.
+	// The pad is unplugged while both hold left: the keyboard still does.
 	pad.err = errors.New("device removed")
 	if evs, _ := p.poll(); describePad(evs) != "" || p.Devices() != "event0" {
 		t.Fatalf("unplugged while the keyboard holds the key: %q, reading %q", describePad(evs), p.Devices())
 	}
 	keyboard.next = rec(evKey, keyLeft, 0)
-	if evs, _ := p.poll(); describePad(evs) != "up ArrowLeft" {
-		t.Fatalf("the keyboard lets go: %q, want up ArrowLeft", describePad(evs))
+	if evs, _ := p.poll(); describePad(evs) != "up left" {
+		t.Fatalf("the keyboard lets go: %q, want up left", describePad(evs))
 	}
-	// A device that goes without releasing what it held still lets go of it: no key
+	// A device that goes without releasing what it held still lets go of it: no button
 	// outlives the device holding it.
 	keyboard.next = rec(evKey, 17, 1) // KEY_W
-	if evs, _ := p.poll(); describePad(evs) != "down KeyW,down ArrowUp" {
+	if evs, _ := p.poll(); describePad(evs) != "down up" {
 		t.Fatalf("W: %q", describePad(evs))
 	}
 	keyboard.err, keyboard.vanish = errors.New("gone"), true
-	if evs, _ := p.poll(); describePad(evs) != "up ArrowUp,up KeyW" || p.Devices() != "" {
+	if evs, _ := p.poll(); describePad(evs) != "up up" || p.Devices() != "" {
 		t.Fatalf("a device gone without a word: %q, reading %q", describePad(evs), p.Devices())
 	}
 }
@@ -637,7 +581,7 @@ func TestInputSourceGrabsWhilePolled(t *testing.T) {
 	}
 }
 
-// TestInputSourceWithNothingToRead: a console with no pad, keyboard or mouse runs and waits,
+// TestInputSourceWithNothingToRead: a console with no pad or keyboard runs and waits,
 // rather than failing to start, and says once why nothing answers.
 func TestInputSourceWithNothingToRead(t *testing.T) {
 	fakeInputs(t, "event0 Some Mouse|"+mouseBits)
@@ -652,7 +596,7 @@ func TestInputSourceWithNothingToRead(t *testing.T) {
 		}
 		now = now.Add(2 * padRescan)
 	}
-	if got := log.String(); strings.Count(got, "\n") != 1 || !strings.Contains(got, "no gamepad, keyboard or mouse") {
+	if got := log.String(); strings.Count(got, "\n") != 1 || !strings.Contains(got, "no gamepad or keyboard") {
 		t.Fatalf("logged %q, want the reason once", got)
 	}
 	if err := p.close(); err != nil {

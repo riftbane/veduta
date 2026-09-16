@@ -2,13 +2,14 @@ package platform
 
 import (
 	"encoding/binary"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/riftbane/veduta/sim"
 )
 
 // record builds one evdev record of the given size, as the kernel writes them.
@@ -35,27 +36,17 @@ func decodeAll(t *testing.T, size int, recs ...[]byte) []Event {
 	return out
 }
 
-// describePad describes keys and closing, leaving out the stick, whose moves tests of keys
-// do not care about.
-func describePad(evs []Event) string { return describe(evs, false) }
-
-// describeAll describes the stick's moves as well, as "stick x,y".
-func describeAll(evs []Event) string { return describe(evs, true) }
-
-func describe(evs []Event, sticks bool) string {
+// describePad describes buttons and closing as "down a,up left,close".
+func describePad(evs []Event) string {
 	var s []string
 	for _, e := range evs {
 		switch e.Kind {
-		case KeyDown:
-			s = append(s, "down "+e.Code)
-		case KeyUp:
-			s = append(s, "up "+e.Code)
+		case Press:
+			s = append(s, "down "+e.Button.String())
+		case Release:
+			s = append(s, "up "+e.Button.String())
 		case Close:
 			s = append(s, "close")
-		case Stick:
-			if sticks {
-				s = append(s, fmt.Sprintf("stick %g,%g", e.X, e.Y))
-			}
 		default:
 			s = append(s, "other")
 		}
@@ -73,10 +64,13 @@ func TestPadDecoder(t *testing.T) {
 				record(size, evKey, btnSouth, 2),   // auto-repeat: ignored
 				record(size, evKey, btnSouth, 1),   // already down: ignored
 				record(size, evKey, btnSouth, 0),   // A up
-				record(size, evKey, 0x13b, 1),      // Start
+				record(size, evKey, btnSouth+1, 1), // B
+				record(size, evKey, btnSelect, 1),  // Select
+				record(size, evKey, btnSouth+3, 1), // X: not a console button, ignored
 				record(size, evKey, btnTrigger, 1), // a joystick-style pad's first button
+				record(size, evKey, keyBack, 1),    // the handheld's Cancel
 			))
-			want := "down Space,up Space,down Enter,down Space"
+			want := "down a,up a,down b,down select,down a,down cancel"
 			if got != want {
 				t.Fatalf("buttons: %s\n    want: %s", got, want)
 			}
@@ -93,7 +87,7 @@ func TestPadDPad(t *testing.T) {
 		record(size, evAbs, absHat0Y, 1),
 		record(size, evAbs, absHat0Y, 0),
 	))
-	if want := "down ArrowLeft,up ArrowLeft,down ArrowDown,up ArrowDown"; got != want {
+	if want := "down left,up left,down down,up down"; got != want {
 		t.Fatalf("hat: %s\n want: %s", got, want)
 	}
 	// A stick rests in the middle of a wide range: only a real push counts.
@@ -102,7 +96,7 @@ func TestPadDPad(t *testing.T) {
 		record(size, evAbs, absX, 30000), // pushed right
 		record(size, evAbs, absX, 0),     // let go
 	))
-	if want := "down ArrowRight,up ArrowRight"; got != want {
+	if want := "down right,up right"; got != want {
 		t.Fatalf("stick: %s\n  want: %s", got, want)
 	}
 	// Moving from one side to the other releases before it presses.
@@ -110,17 +104,24 @@ func TestPadDPad(t *testing.T) {
 		record(size, evAbs, absHat0X, -1),
 		record(size, evAbs, absHat0X, 1),
 	))
-	if want := "down ArrowLeft,up ArrowLeft,down ArrowRight"; got != want {
+	if want := "down left,up left,down right"; got != want {
 		t.Fatalf("reversal: %s\n  want: %s", got, want)
 	}
-	// Some pads report the D-pad as four buttons instead.
-	got = describePad(decodeAll(t, size, record(size, evKey, 0x222, 1), record(size, evKey, 0x222, 0)))
-	if want := "down ArrowLeft,up ArrowLeft"; got != want {
+	// Some pads, and the handheld, report the D-pad as four buttons instead.
+	got = describePad(decodeAll(t, size, record(size, evKey, btnDPadUp+2, 1), record(size, evKey, btnDPadUp+2, 0)))
+	if want := "down left,up left"; got != want {
 		t.Fatalf("buttons: %s\n   want: %s", got, want)
+	}
+	// On such a pad the sticks are sticks, which the console does not have.
+	d := newPadDecoder()
+	d.size, d.stickDPad = size, false
+	out, err := d.decode(record(size, evAbs, absX, 30000), nil)
+	if err != nil || len(out) != 0 {
+		t.Fatalf("a stick beside D-pad buttons: %v %v", describePad(out), err)
 	}
 }
 
-// TestPadAxisRanges: a stick is read against the range its device reports (EVIOCGABS), not
+// TestPadAxisRanges: an axis is read against the range its device reports (EVIOCGABS), not
 // against one assumed centred on zero. Many pads report the D-pad on ABS_X and ABS_Y from 0
 // to 255 and rest at 127 or 128: read as ±32767, left and right were dead and a push to 1,
 // nearly full left, came out as right.
@@ -133,12 +134,12 @@ func TestPadAxisRanges(t *testing.T) {
 		want     string
 	}{
 		{"0..255 at rest", 0, 255, []int32{127, 128, 110, 150}, ""},
-		{"0..255 left and right", 0, 255, []int32{0, 127, 255, 128}, "down ArrowLeft,up ArrowLeft,down ArrowRight,up ArrowRight"},
-		{"0..255 nearly full left", 0, 255, []int32{1, 127}, "down ArrowLeft,up ArrowLeft"},
-		{"0..255 straight across", 0, 255, []int32{0, 255, 127}, "down ArrowLeft,up ArrowLeft,down ArrowRight,up ArrowRight"},
-		{"-128..127", -128, 127, []int32{-128, 0, 127, 10, -127, -20}, "down ArrowLeft,up ArrowLeft,down ArrowRight,up ArrowRight,down ArrowLeft,up ArrowLeft"},
-		{"-32768..32767", -32768, 32767, []int32{300, 30000, 0, -1, 0, -32768, 0}, "down ArrowRight,up ArrowRight,down ArrowLeft,up ArrowLeft"},
-		{"a hat, -1..1", -1, 1, []int32{-1, 0, 1, 0}, "down ArrowLeft,up ArrowLeft,down ArrowRight,up ArrowRight"},
+		{"0..255 left and right", 0, 255, []int32{0, 127, 255, 128}, "down left,up left,down right,up right"},
+		{"0..255 nearly full left", 0, 255, []int32{1, 127}, "down left,up left"},
+		{"0..255 straight across", 0, 255, []int32{0, 255, 127}, "down left,up left,down right,up right"},
+		{"-128..127", -128, 127, []int32{-128, 0, 127, 10, -127, -20}, "down left,up left,down right,up right,down left,up left"},
+		{"-32768..32767", -32768, 32767, []int32{300, 30000, 0, -1, 0, -32768, 0}, "down right,up right,down left,up left"},
+		{"a hat, -1..1", -1, 1, []int32{-1, 0, 1, 0}, "down left,up left,down right,up right"},
 	} {
 		d := newPadDecoder()
 		d.size = size
@@ -166,7 +167,7 @@ func TestPadAxisRanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := describePad(out), "down ArrowDown,up ArrowDown,down ArrowUp,up ArrowUp"; got != want {
+	if got, want := describePad(out), "down down,up down,down up,up up"; got != want {
 		t.Errorf("no usable range: %q, want %q", got, want)
 	}
 }
@@ -180,7 +181,7 @@ func TestPadDroppedEvents(t *testing.T) {
 		record(size, evAbs, absHat0X, -1),
 		record(size, evSyn, synDropped, 0),
 	))
-	if want := "down Space,down ArrowLeft,up Space,up ArrowLeft"; got != want {
+	if want := "down a,down left,up a,up left"; got != want {
 		t.Fatalf("dropped: %s\n   want: %s", got, want)
 	}
 	// Half of an exit chord is forgotten too: its release may be among the lost events, and
@@ -191,8 +192,8 @@ func TestPadDroppedEvents(t *testing.T) {
 		then  uint16
 		want  string
 	}{
-		{"Select, then Start", padExitChords[0][0], padExitChords[0][1], "down Tab,up Tab,down Enter"},
-		{"Ctrl, then Q", keyLeftCtrl, keyQ, "down ControlLeft,up ControlLeft,down KeyQ"},
+		{"Select, then Start", padExitChords[0][0], padExitChords[0][1], "down select,up select,down cancel"},
+		{"Ctrl, then Q", keyLeftCtrl, keyQ, ""},
 	} {
 		got := describePad(decodeAll(t, size,
 			record(size, evKey, c.first, 1),
@@ -211,13 +212,13 @@ func TestPadDroppedEvents(t *testing.T) {
 		record(size, evKey, keyLeftCtrl, 1),
 		record(size, evKey, keyQ, 1),
 	))
-	if want := "down ControlLeft,up ControlLeft,close,down ControlLeft,up ControlLeft,close"; got != want {
+	if want := "close,close"; got != want {
 		t.Errorf("a chord pressed again after the drop: %s\n  want: %s", got, want)
 	}
 }
 
 // TestPadExitChord: Select and Start together close the window, which is the only way off
-// a console with no keyboard, and it releases what was held first. It has to work on both
+// a pad with no Home button, and it releases what was held first. It has to work on both
 // kinds of pad the table knows: a gamepad, whose buttons start at BTN_SOUTH, and a
 // joystick-style pad, whose buttons start at BTN_TRIGGER.
 func TestPadExitChord(t *testing.T) {
@@ -226,107 +227,84 @@ func TestPadExitChord(t *testing.T) {
 		name          string
 		a, sel, start uint16
 	}{
-		{"gamepad", btnSouth, 0x13a, 0x13b},                                // BTN_SELECT, BTN_START
-		{"joystick-style pad", btnTrigger, btnTrigger + 6, btnTrigger + 7}, // what the table calls Select and Start
+		{"gamepad", btnSouth, btnSelect, btnStart},
+		{"joystick-style pad", btnTrigger, btnTrigger + 6, btnTrigger + 7},
 	} {
 		got := describePad(decodeAll(t, size,
 			record(size, evKey, c.a, 1),
 			record(size, evKey, c.sel, 1),
 			record(size, evKey, c.start, 1),
 		))
-		if want := "down Space,down Tab,up Space,up Tab,close"; got != want {
+		if want := "down a,down select,up a,up select,close"; got != want {
 			t.Errorf("%s chord: %s\n want: %s", c.name, got, want)
 		}
-		// One of the two alone is an ordinary button.
+		// One of the two alone is an ordinary button: Start is Cancel.
 		got = describePad(decodeAll(t, size, record(size, evKey, c.start, 1)))
-		if want := "down Enter"; got != want {
+		if want := "down cancel"; got != want {
 			t.Errorf("%s start alone: %s, want %s", c.name, got, want)
 		}
 	}
 }
 
-// TestPadExitChordsFollowTheTable: the chords are the buttons the table turns into Tab and
-// Enter, so a table corrected against a real pad cannot leave the exit behind. Every
-// button called Select or Start belongs to a chord, and every chord is two real buttons.
+// TestPadExitChordsFollowTheTable: the chords are the buttons the table calls Select and
+// Start (Cancel), and every chord is two real buttons.
 func TestPadExitChordsFollowTheTable(t *testing.T) {
-	inChord := map[uint16]bool{}
 	for _, c := range padExitChords {
 		if c[0] == 0 || c[1] == 0 || c[0] == c[1] {
 			t.Errorf("exit chord %#x is not two buttons", c)
 		}
-		if padButtons[c[0]] != "Tab" || padButtons[c[1]] != "Enter" {
-			t.Errorf("exit chord %#x is %q+%q, want Tab+Enter", c, padButtons[c[0]], padButtons[c[1]])
-		}
-		inChord[c[0]], inChord[c[1]] = true, true
-	}
-	for code, name := range padButtons {
-		if (name == "Tab" || name == "Enter") && !inChord[code] {
-			t.Errorf("button %#x is %s but in no exit chord", code, name)
+		if b0, b1 := padButtons[c[0]], padButtons[c[1]]; b0 != sim.ButtonSelect || b1 != sim.ButtonCancel {
+			t.Errorf("exit chord %#x is %v+%v, want select+cancel", c, b0, b1)
 		}
 	}
 }
 
-// TestKeyboardKeys: a console with no pad is driven from a keyboard, so the kernel's own
-// key codes have to reach the game as W3C codes. Without this the dashboard draws and then
+// TestKeyboardKeys: a console with no pad is driven from a keyboard, so the kernel's key
+// codes have to reach the game as buttons. Without this the dashboard draws and then
 // answers nothing at all.
 func TestKeyboardKeys(t *testing.T) {
 	const size = 24
 	got := describePad(decodeAll(t, size,
 		record(size, evKey, 103, 1), // KEY_UP
 		record(size, evKey, 103, 0),
-		record(size, evKey, 28, 1), // KEY_ENTER
-		record(size, evKey, 57, 1), // KEY_SPACE
+		record(size, evKey, 17, 1), // KEY_W: up as well
+		record(size, evKey, 30, 1), // KEY_A: left
+		record(size, evKey, 57, 1), // KEY_SPACE: A
+		record(size, evKey, 45, 1), // KEY_X: B
+		record(size, evKey, 28, 1), // KEY_ENTER: Select
 		record(size, evKey, keyEsc, 1),
-		record(size, evKey, 17, 1),  // KEY_W
-		record(size, evKey, 190, 1), // a key with no W3C name: ignored, not guessed
+		record(size, evKey, 190, 1), // a key with no meaning on the console: ignored
+		record(size, evSyn, synDropped, 0),
 	))
-	want := "down ArrowUp,up ArrowUp,down Enter,down Space,down Escape,down KeyW,down ArrowUp"
+	// Lost events release in the order of the kernel's codes: Escape, W, Enter, A, X, Space.
+	want := "down up,up up,down up,down left,down a,down b,down select,down cancel," +
+		"up cancel,up up,up select,up left,up b,up a"
 	if got != want {
 		t.Fatalf("keyboard: %s\n     want: %s", got, want)
 	}
 }
 
-// TestKeyboardDPad: until the console has its own controls, a keyboard stands in for them
-// with W, A, S and D as the D-pad. They press the arrows as well as their own codes, so a
-// game reading either sees them, and letting go or losing events releases both.
-func TestKeyboardDPad(t *testing.T) {
-	const size = 24
-	got := describePad(decodeAll(t, size,
-		record(size, evKey, 17, 1),  // KEY_W
-		record(size, evKey, 103, 1), // KEY_UP as well: the game counts the holds
-		record(size, evKey, 17, 0),
-		record(size, evKey, 30, 1), // KEY_A
-		record(size, evKey, 31, 1), // KEY_S
-		record(size, evKey, 32, 1), // KEY_D
-		record(size, evSyn, synDropped, 0),
-	))
-	want := "down KeyW,down ArrowUp,down ArrowUp,up KeyW,up ArrowUp," +
-		"down KeyA,down ArrowLeft,down KeyS,down ArrowDown,down KeyD,down ArrowRight," +
-		"up KeyA,up ArrowLeft,up KeyS,up ArrowDown,up KeyD,up ArrowRight,up ArrowUp"
-	if got != want {
-		t.Fatalf("WASD: %s\n want: %s", got, want)
-	}
-}
-
 // TestPadHome: Home closes the player on its own, as Select and Start do together, and
-// never reaches the game.
+// never reaches the game: BTN_MODE on a gamepad, KEY_HOMEPAGE on the handheld.
 func TestPadHome(t *testing.T) {
 	const size = 24
-	got := describePad(decodeAll(t, size,
-		record(size, evKey, btnSouth, 1),
-		record(size, evKey, btnMode, 1),
-		record(size, evKey, btnMode, 2), // auto-repeat
-		record(size, evKey, btnMode, 0),
-		record(size, evKey, btnMode, 1), // pressed again: closes again
-	))
-	if want := "down Space,up Space,close,close"; got != want {
-		t.Fatalf("Home: %s\n want: %s", got, want)
+	for _, home := range []uint16{btnMode, keyHomePage} {
+		got := describePad(decodeAll(t, size,
+			record(size, evKey, btnSouth, 1),
+			record(size, evKey, home, 1),
+			record(size, evKey, home, 2), // auto-repeat
+			record(size, evKey, home, 0),
+			record(size, evKey, home, 1), // pressed again: closes again
+		))
+		if want := "down a,up a,close,close"; got != want {
+			t.Errorf("Home %#x: %s\n want: %s", home, got, want)
+		}
 	}
 }
 
-// TestKeyboardExit: a keyboard needs its own way out, since the pad's chord does not exist
-// on one — and it must not be Escape, which the dashboard and games already use. Either
-// Ctrl will do, as it does for Ctrl+Q anywhere else, and in either order.
+// TestKeyboardExit: a keyboard needs its own way out, since the pad's Home does not exist
+// on one — and it must not be Escape, which is Cancel. Either Ctrl will do, as it does for
+// Ctrl+Q anywhere else, and in either order.
 func TestKeyboardExit(t *testing.T) {
 	const size = 24
 	for _, c := range []struct {
@@ -338,16 +316,16 @@ func TestKeyboardExit(t *testing.T) {
 			record(size, evKey, 17, 1), // something held, to be released first
 			record(size, evKey, keyLeftCtrl, 1),
 			record(size, evKey, keyQ, 1),
-		}, "down KeyW,down ArrowUp,down ControlLeft,up KeyW,up ArrowUp,up ControlLeft,close"},
+		}, "down up,up up,close"},
 		{"right Ctrl+Q", [][]byte{
 			record(size, evKey, 17, 1),
 			record(size, evKey, keyRightCtrl, 1),
 			record(size, evKey, keyQ, 1),
-		}, "down KeyW,down ArrowUp,down ControlRight,up KeyW,up ArrowUp,up ControlRight,close"},
+		}, "down up,up up,close"},
 		{"Q, then Ctrl", [][]byte{
 			record(size, evKey, keyQ, 1),
 			record(size, evKey, keyRightCtrl, 1),
-		}, "down KeyQ,up KeyQ,close"},
+		}, "close"},
 		// Q belongs to both chords, so holding it through a change of Ctrl has to count
 		// for the second one too, as letting go of Start and pressing it again does on a pad.
 		{"Q held from one Ctrl to the other", [][]byte{
@@ -355,14 +333,14 @@ func TestKeyboardExit(t *testing.T) {
 			record(size, evKey, keyQ, 1),
 			record(size, evKey, keyLeftCtrl, 0),
 			record(size, evKey, keyRightCtrl, 1),
-		}, "down ControlLeft,up ControlLeft,close,close"},
+		}, "close,close"},
 	} {
 		if got := describePad(decodeAll(t, size, c.recs...)); got != c.want {
 			t.Errorf("%s: %s\n  want: %s", c.name, got, c.want)
 		}
 	}
-	// Escape alone is an ordinary key, not a way out of the player.
-	if got := describePad(decodeAll(t, size, record(size, evKey, keyEsc, 1))); got != "down Escape" {
+	// Escape alone is Cancel, not a way out of the player.
+	if got := describePad(decodeAll(t, size, record(size, evKey, keyEsc, 1))); got != "down cancel" {
 		t.Fatalf("Escape: %s", got)
 	}
 }
@@ -433,7 +411,7 @@ func TestEvdevSourceReadsWithoutWaiting(t *testing.T) {
 		t.Fatalf("nothing written, poll = %q", got)
 	}
 	write(record(eventSize, evKey, btnSouth, 1), record(eventSize, evAbs, absHat0X, -1))
-	if got, want := poll(), "down Space,down ArrowLeft"; got != want {
+	if got, want := poll(), "down a,down left"; got != want {
 		t.Fatalf("poll = %q, want %q", got, want)
 	}
 	// More than one read's worth: the source keeps reading until the kernel has no more.
@@ -442,7 +420,7 @@ func TestEvdevSourceReadsWithoutWaiting(t *testing.T) {
 		many = append(many, record(eventSize, evKey, btnSouth+1, int32(1-i%2)))
 	}
 	write(many...)
-	if got := poll(); strings.Count(got, "down Escape") != 35 || strings.Count(got, "up Escape") != 35 {
+	if got := poll(); strings.Count(got, "down b") != 35 || strings.Count(got, "up b") != 35 {
 		t.Fatalf("70 records gave %q", got)
 	}
 	if n := testing.AllocsPerRun(100, func() { src.poll() }); n != 0 {

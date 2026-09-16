@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"syscall"
+
+	"github.com/riftbane/veduta/sim"
 )
 
 // Reading a pad needs no C: the kernel hands out fixed-size records on an ordinary file
@@ -20,17 +22,14 @@ var eventSize = 2*(strconv.IntSize/8) + 8
 // release what is held when the pad goes away or the kernel drops events.
 type padDecoder struct {
 	size   int                      // bytes per record, eventSize unless a test says otherwise
-	held   map[uint16]string        // evdev code → the W3C code reported down for it
-	axis   map[uint16]string        // axis → the direction currently down for it
+	held   map[uint16]sim.Button    // evdev code → the button reported down for it
+	axis   map[uint16]sim.Button    // axis → the direction currently down for it
 	exit   [len(exitChords)][2]bool // the two members of each exit chord, held or not
 	quit   bool                     // a chord was closed: emit Close once
 	down   map[uint16]bool          // keys physically down, whatever was reported for them
 	ranges [absHat0Y + 1]axisRange  // what the device says each axis reports; zero when unknown
 
-	stickArrows bool       // ABS_X and ABS_Y press the arrows as well as moving the stick
-	stick       [2]float32 // the stick as last reported, each axis -1…1, +Y up
-	mouse       [2]int64   // a mouse's movement from rest, in counts, each within ±mouseReach
-	relative    bool       // the stick follows a mouse, so a click brings it back to rest
+	stickDPad bool // ABS_X and ABS_Y are read as the D-pad
 }
 
 // axisRange is the least and the greatest value an axis reports, as EVIOCGABS gives them.
@@ -44,16 +43,16 @@ func (d *padDecoder) setRange(code uint16, lo, hi int32) {
 	}
 }
 
-// exitChords close the player: Select and Start on either kind of pad, Home, and a
-// keyboard's Ctrl (either one) and Q. A console has no other way back, and a game must not
-// be able to swallow it. The array is as long as its contents, and so is the state kept for
-// it.
-var exitChords = [...][2]uint16{padExitChords[0], padExitChords[1], padHome, keyboardExit[0], keyboardExit[1]}
+// exitChords close the player: Select and Start on either kind of pad, Home (BTN_MODE or
+// KEY_HOMEPAGE), and a keyboard's Ctrl (either one) and Q. A console has no other way back,
+// and a game must not be able to swallow it. The array is as long as its contents, and so
+// is the state kept for it.
+var exitChords = [...][2]uint16{padExitChords[0], padExitChords[1], padHome[0], padHome[1], keyboardExit[0], keyboardExit[1]}
 
-// newPadDecoder returns a decoder whose ABS_X and ABS_Y press the arrows as well as moving
-// the stick, as they must on a pad whose D-pad they may be.
+// newPadDecoder returns a decoder whose ABS_X and ABS_Y are the D-pad, as they may be on a
+// pad whose D-pad is not four buttons.
 func newPadDecoder() *padDecoder {
-	return &padDecoder{size: eventSize, held: map[uint16]string{}, axis: map[uint16]string{}, down: map[uint16]bool{}, stickArrows: true}
+	return &padDecoder{size: eventSize, held: map[uint16]sim.Button{}, axis: map[uint16]sim.Button{}, down: map[uint16]bool{}, stickDPad: true}
 }
 
 // pressed reports whether any key or button is physically down: a chord that closed the
@@ -91,7 +90,7 @@ func (d *padDecoder) event(out []Event, typ, code uint16, value int32) []Event {
 		}
 	case evKey:
 		if value == 2 {
-			return out // auto-repeat: the engine reports a key once
+			return out // auto-repeat: the engine reports a button once
 		}
 		down := value != 0
 		if down {
@@ -119,56 +118,45 @@ func (d *padDecoder) event(out []Event, typ, code uint16, value int32) []Event {
 			out = d.releaseAll(out)
 			return append(out, Event{Kind: Close})
 		}
-		if code >= btnLeft && code < btnLeft+8 { // a mouse button
-			if down {
-				out = d.recentre(out)
-			}
-			return out
-		}
-		name, ok := padButtons[code]
+		b, ok := padButtons[code]
 		if !ok {
-			if name, ok = padDPad[code]; !ok {
+			if b, ok = padDPad[code]; !ok {
 				// Not a pad at all: a keyboard, which a console falls back to when no
 				// pad is plugged in.
-				if name, ok = evdevKeys[code]; !ok {
+				if b, ok = evdevKeys[code]; !ok {
 					return out
 				}
 			}
 		}
-		out = d.set(out, code, name, down)
-	case evRel:
-		if code == relX || code == relY {
-			out = d.moveMouse(out, code, value)
-		}
+		out = d.set(out, code, b, down)
 	case evAbs:
 		switch code {
 		case absHat0X:
-			out = d.direction(out, code, value, dirLeft, dirRight)
+			out = d.direction(out, code, value, sim.ButtonLeft, sim.ButtonRight)
 		case absHat0Y:
-			out = d.direction(out, code, value, dirUp, dirDown)
+			out = d.direction(out, code, value, sim.ButtonUp, sim.ButtonDown)
 		case absX:
-			if d.stickArrows {
-				out = d.direction(out, code, value, dirLeft, dirRight)
+			if d.stickDPad {
+				out = d.direction(out, code, value, sim.ButtonLeft, sim.ButtonRight)
 			}
-			out = d.moveStick(out, code, value)
 		case absY:
-			if d.stickArrows {
-				out = d.direction(out, code, value, dirUp, dirDown)
+			if d.stickDPad {
+				out = d.direction(out, code, value, sim.ButtonUp, sim.ButtonDown)
 			}
-			out = d.moveStick(out, code, value)
 		}
 	}
 	return out
 }
 
-// direction turns an axis into the two keys it stands for. A stick rests near the middle
-// of its range, so a value counts as a direction only once it is a quarter of the way from
-// the middle to an end (and at least one step away). The range is the device's own: 0 to
-// 255 resting at 127, -128 to 127, -32768 to 32767, or -1 to 1 for a hat, where any value
-// but the rest is a direction. An axis whose range is not known is read as a hat (-1, 0, 1)
-// or a stick centred on zero with a range of thousands.
-func (d *padDecoder) direction(out []Event, code uint16, value int32, neg, pos string) []Event {
-	want := ""
+// direction turns an axis into the two D-pad buttons it stands for. A stick rests near the
+// middle of its range, so a value counts as a direction only once it is a quarter of the
+// way from the middle to an end (and at least one step away). The range is the device's
+// own: 0 to 255 resting at 127, -128 to 127, -32768 to 32767, or -1 to 1 for a hat, where
+// any value but the rest is a direction. An axis whose range is not known is read as a hat
+// (-1, 0, 1) or a stick centred on zero with a range of thousands.
+func (d *padDecoder) direction(out []Event, code uint16, value int32, neg, pos sim.Button) []Event {
+	const none = sim.Button(sim.NumButtons) // no direction
+	want := none
 	if r := d.ranges[code]; r.max > r.min {
 		lo, hi, v := int64(r.min), int64(r.max), int64(value)
 		mid, half := (lo+hi)/2, (hi-lo)/2
@@ -188,62 +176,55 @@ func (d *padDecoder) direction(out []Event, code uint16, value int32, neg, pos s
 			want = pos
 		}
 	}
-	if now := d.axis[code]; now != want {
-		if now != "" {
-			out = append(out, Event{Kind: KeyUp, Code: now})
+	now, ok := d.axis[code]
+	if !ok {
+		now = none
+	}
+	if now != want {
+		if now != none {
+			out = append(out, Event{Kind: Release, Button: now})
 		}
-		if want != "" {
-			out = append(out, Event{Kind: KeyDown, Code: want})
-		}
-		if want == "" {
-			delete(d.axis, code)
-		} else {
+		if want != none {
+			out = append(out, Event{Kind: Press, Button: want})
 			d.axis[code] = want
+		} else {
+			delete(d.axis, code)
 		}
 	}
 	return out
 }
 
-// set reports a button, ignoring a press of something already down. A keyboard's W, A, S
-// and D press their arrow as well (keyboardDPad).
-func (d *padDecoder) set(out []Event, code uint16, name string, down bool) []Event {
+// set reports a button, ignoring a press of something already down.
+func (d *padDecoder) set(out []Event, code uint16, b sim.Button, down bool) []Event {
 	_, was := d.held[code]
-	kind := KeyDown
+	kind := Press
 	switch {
 	case down && !was:
-		d.held[code] = name
+		d.held[code] = b
 	case !down && was:
 		delete(d.held, code)
-		kind = KeyUp
+		kind = Release
 	default:
 		return out
 	}
-	out = append(out, Event{Kind: kind, Code: name})
-	if arrow, ok := keyboardDPad[code]; ok {
-		out = append(out, Event{Kind: kind, Code: arrow})
+	return append(out, Event{Kind: kind, Button: b})
+}
+
+// releaseAll reports every button it had said was down, in a fixed order so a replay of
+// the same session gives the same events.
+func (d *padDecoder) releaseAll(out []Event) []Event {
+	for _, code := range sortedCodes(d.held) {
+		out = append(out, Event{Kind: Release, Button: d.held[code]})
+		delete(d.held, code)
+	}
+	for _, code := range sortedCodes(d.axis) {
+		out = append(out, Event{Kind: Release, Button: d.axis[code]})
+		delete(d.axis, code)
 	}
 	return out
 }
 
-// releaseAll reports every key it had said was down, in a fixed order so a replay of the
-// same session gives the same events, and then the stick back at rest.
-func (d *padDecoder) releaseAll(out []Event) []Event {
-	for _, code := range sortedCodes(d.held) {
-		out = append(out, Event{Kind: KeyUp, Code: d.held[code]})
-		if arrow, ok := keyboardDPad[code]; ok {
-			out = append(out, Event{Kind: KeyUp, Code: arrow})
-		}
-		delete(d.held, code)
-	}
-	for _, code := range sortedCodes(d.axis) {
-		out = append(out, Event{Kind: KeyUp, Code: d.axis[code]})
-		delete(d.axis, code)
-	}
-	d.mouse = [2]int64{}
-	return d.setStick(out, [2]float32{})
-}
-
-func sortedCodes(m map[uint16]string) []uint16 {
+func sortedCodes(m map[uint16]sim.Button) []uint16 {
 	codes := make([]uint16, 0, len(m))
 	for c := range m {
 		codes = append(codes, c)
@@ -289,7 +270,7 @@ func openEvdev(path string) (*evdevSource, error) {
 		return nil, fmt.Errorf("platform: %s: %w", path, err)
 	}
 	s := &evdevSource{f: f, raw: raw, d: newPadDecoder(), buf: make([]byte, 64*eventSize)}
-	// A stick is read against the range its device reports. Where the device will not say
+	// An axis is read against the range its device reports. Where the device will not say
 	// (not an event device, or one with no axes) the decoder falls back to a hat or a stick
 	// centred on zero.
 	raw.Control(func(fd uintptr) {
