@@ -8,14 +8,17 @@ the `veduta` tool and VS Code, nothing else: no compiler, no build.
 Install [VS Code](https://code.visualstudio.com) first, then in PowerShell:
 
 ```powershell
+$env:VEDUTA_CHANNEL = "beta"
 irm https://raw.githubusercontent.com/riftbane/veduta/main/install.ps1 | iex
 ```
+
+The first line takes release candidates: v2, the version these pages describe, is one
+until v2.0.0 is out; the stable channel still gives v1.
 
 It puts `veduta.exe` in `%LOCALAPPDATA%\Programs\veduta`, adds that folder to your PATH
 (no administrator rights) and installs the Veduta extension into VS Code. Open a new
 terminal afterwards so it sees the PATH. `veduta version` answers when it worked. Running
-the same line again updates both; `$env:VEDUTA_CHANNEL = "beta"` before it takes release
-candidates too.
+the same lines again updates both.
 
 The extension recommends the Lua extension (`sumneko.lua`) when you open a game: accept
 it, and scripts get completion and checks against the API.

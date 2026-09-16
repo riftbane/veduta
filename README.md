@@ -26,9 +26,11 @@ started on Windows, a first game step by step, the Lua API and every format.
 
 ## Install
 
-On Windows, in PowerShell (no administrator rights; a Lua game needs nothing else):
+On Windows, in PowerShell (no administrator rights; a Lua game needs nothing else; the
+beta channel until v2.0.0 is released):
 
 ```powershell
+$env:VEDUTA_CHANNEL = "beta"
 irm https://raw.githubusercontent.com/riftbane/veduta/main/install.ps1 | iex
 ```
 
