@@ -23,6 +23,19 @@ onto its card ([vedutaos](https://github.com/riftbane/vedutaos)).
 
 ## Install
 
+On Windows, in PowerShell (no administrator rights; a Lua game needs nothing else):
+
+```powershell
+irm https://raw.githubusercontent.com/riftbane/veduta/main/install.ps1 | iex
+```
+
+It puts `veduta.exe` (SHA-256 verified) in `%LOCALAPPDATA%\Programs\veduta` and that folder
+on the user's PATH; running it again updates in place. `$env:VEDUTA_VERSION`,
+`$env:VEDUTA_CHANNEL` (`stable` or `beta`) and `$env:VEDUTA_HOME` choose before it runs.
+Then, in a new terminal: `veduta init mygame`, `cd mygame`, `code .`, `veduta sim`.
+
+On Linux:
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/riftbane/veduta/main/install.sh | sh
 ```
@@ -36,8 +49,8 @@ flags, `$VEDUTA_HOME` sets the prefix (`$VEDUTA_HOME/bin`). The beta channel ins
 release candidates as well as releases; to keep following it afterwards, run
 `veduta update --channel beta` once.
 
-Releases carry the tool for linux/amd64, linux/arm64 and windows/amd64 (on Windows, unzip
-`veduta_<tag>_windows_amd64.zip` from GitHub Releases). On macOS, build it from source with
+Releases carry the tool for linux/amd64, linux/arm64 and windows/amd64 (`install.ps1`
+installs the last; unzipping `veduta_<tag>_windows_amd64.zip` from GitHub Releases works too). On macOS, build it from source with
 Go ≥ 1.25, naming the version so `veduta upgrade` and the update checks know it (a macOS
 build cannot update itself, since no macOS archive is published):
 

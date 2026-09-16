@@ -67,6 +67,31 @@ jobs:
           VEDUTA_DISPLAY_TEST: "1"
         run: go test -run TestSimulatorWindow -v ./platform/
 
+      - name: install.ps1 installs, puts veduta on PATH, and a Lua game runs (Windows PowerShell and pwsh)
+        if: runner.os == 'Windows' && matrix.go == 'stable'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # As a person runs it: the script's text through iex, in both PowerShells.
+          $env:VEDUTA_CHANNEL = 'nightly'
+          powershell -NoProfile -Command "Get-Content -Raw install.ps1 | iex"
+          if ($LASTEXITCODE -eq 0) { throw 'an unknown channel was accepted' }
+          $env:VEDUTA_CHANNEL = 'beta'
+          $env:VEDUTA_HOME = Join-Path $env:RUNNER_TEMP 'veduta-inst'
+          powershell -NoProfile -Command "Get-Content -Raw install.ps1 | iex; if (-not `$?) { exit 1 }"
+          if ($LASTEXITCODE -ne 0) { throw 'install.ps1 failed in Windows PowerShell' }
+          Get-Content -Raw install.ps1 | iex # again, in pwsh, over the first
+          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if (@($userPath.Split(';') | Where-Object { $_ -ieq $env:VEDUTA_HOME }).Count -ne 1) { throw "PATH has the folder other than once: $userPath" }
+          veduta version
+          Set-Location $env:RUNNER_TEMP
+          veduta init psgame
+          Set-Location psgame
+          veduta test
+          if ($LASTEXITCODE -ne 0) { throw 'veduta test failed' }
+
       - name: install.sh installs from both channels
         if: runner.os == 'Linux'
         env:

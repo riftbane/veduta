@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `install.ps1`: the Windows installer, `irm …/install.ps1 | iex`. It installs `veduta.exe`
+  (checksum verified) into `%LOCALAPPDATA%\Programs\veduta` and puts it on the user's PATH
+  without administrator rights, from the stable or beta channel; CI runs it in Windows
+  PowerShell and pwsh and plays a new Lua game's scenarios with what it installed.
 - Editor setup: `veduta init` and `veduta upgrade` write `.veduta/schema/` (a JSON Schema per
   source format, generated from `asset/source.go`, with the values each field allows) and,
   for a Lua game, `.veduta/lua/veduta.d.lua` (the API for the Lua Language Server, checked
