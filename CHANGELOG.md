@@ -20,6 +20,17 @@ All notable changes to this project are documented here. The format follows
 - `gmath.Exp64`, `Log64` and `Pow64`: deterministic, unlike `math.Exp` and `math.Log`,
   which use different assembly on amd64 and arm64.
 
+- Script games: a project whose `veduta.json` sets `script` (`"main.lua"`) is written in Lua,
+  and the tool runs it itself, with no Go code and no build: `build` compiles the scripts
+  and reports syntax errors located, and `test`, `simulate`, `render`, `bench`, `fuzz`,
+  `run` and the MCP tools work as for a Go game. The scripts fill `game` (init, update,
+  draw) and `kinds` (init and update per entity kind) and use `input`, `scene`, entities,
+  `camera`, `world`, `hud`, `engine`, `trace`, `invariant` and `require`; an entity's
+  `state` table appears in the trace, so scenarios check it. A Lua error stops the run with
+  its position and traceback. The `lua` docs topic is the reference.
+- Engine hooks for games that are not Go code: `veduta.Starter`, `KindProvider` and
+  `Failer`; `sim.Canonicaler` for state that encodes itself in the trace.
+
 ### Changed
 
 - **The console has eight game buttons** (breaking): the D-pad, A, B, Select (the game's

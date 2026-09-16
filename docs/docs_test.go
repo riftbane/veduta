@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/lua"
 )
 
 // TestDefaultsQuoted checks the manifest defaults the references quote against
@@ -47,5 +48,24 @@ func TestTopicsResolve(t *testing.T) {
 	}
 	if _, err := Get("nightly"); err == nil {
 		t.Error("an unknown topic was accepted")
+	}
+}
+
+// TestLuaExamplesCompile: every Lua block of lua.md is valid Lua.
+func TestLuaExamplesCompile(t *testing.T) {
+	text, err := Get("lua")
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks := strings.Split(text, "```lua\n")[1:]
+	if len(blocks) < 3 {
+		t.Fatalf("%d Lua blocks", len(blocks))
+	}
+	vm := lua.New(lua.Options{})
+	for i, b := range blocks {
+		src := b[:strings.Index(b, "```")]
+		if _, err := vm.Load(fmt.Sprintf("lua.md block %d", i+1), src); err != nil {
+			t.Errorf("%v", err)
+		}
 	}
 }

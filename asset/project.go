@@ -23,6 +23,7 @@ type Project struct {
 	Icon              string     // optional PNG at the project root, shown beside the title
 	Engine            string     // engine version the project targets, "vX.Y.Z[-pre][+build]"
 	Entry             string     // Go package of the game binary, "./cmd/game"
+	Script            string     // the game's main Lua file, "main.lua"; set, the game is a script game and Entry is not used
 	Resolution        [2]int     // the frame the game is designed for: default player and render size (width, height)
 	InspectResolution [2]int     // default inspection image size
 	TickRate          int        // simulation ticks per second
@@ -70,6 +71,7 @@ func CompileProject(src *ProjectSource, loc *Locator) (*Project, error) {
 		Name:         src.Name,
 		Engine:       src.Engine,
 		Entry:        orDefault(src.Entry, d.Entry),
+		Script:       src.Script,
 		TickRate:     c.Int("tick_rate", src.TickRate, 1, 1000, d.TickRate),
 		DefaultScene: orDefault(src.DefaultScene, d.DefaultScene),
 		DefaultWorld: src.DefaultWorld,
@@ -107,6 +109,15 @@ func CompileProject(src *ProjectSource, loc *Locator) (*Project, error) {
 		c.Errorf("entry", "%q must be a Go package path relative to the project root starting with \"./\", for example \"./cmd/game\"", e)
 	} else if e != "." {
 		checkRelPath(c, "entry", strings.TrimPrefix(e, "./"))
+	}
+	if src.Script != "" {
+		checkRelPath(c, "script", src.Script)
+		if !strings.HasSuffix(src.Script, ".lua") {
+			c.Errorf("script", "%q must be a .lua file", src.Script)
+		}
+		if src.Entry != "" {
+			c.Errorf("entry", "a script game (script %q) has no Go entry package; remove entry", src.Script)
+		}
 	}
 	p.Resolution = resolution(c, "resolution", src.Resolution, d.Resolution)
 	p.InspectResolution = resolution(c, "inspect_resolution", src.InspectResolution, d.InspectResolution)

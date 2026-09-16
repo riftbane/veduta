@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/script"
 )
 
 // GameError is a failed headless command of the game binary.
@@ -42,20 +43,25 @@ func (s *Session) runGame(args ...string) (map[string]any, int, error) {
 	return s.runGameBin(bin, args...)
 }
 
-// runGameBin runs an already built game binary (see runGame).
+// runGameBin runs an already built game binary (see runGame). A script game has no binary:
+// the tool runs it itself, in this process.
 func (s *Session) runGameBin(bin string, args ...string) (map[string]any, int, error) {
-	cmd := exec.Command(bin, append([]string{"-project", s.Root, "-headless"}, args...)...)
-	cmd.Dir = s.Root
+	gameArgs := append([]string{"-project", s.Root, "-headless"}, args...)
 	var out, errb bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &errb
-	runErr := cmd.Run()
 	code := 0
-	if runErr != nil {
-		var ee *exec.ExitError
-		if !errors.As(runErr, &ee) {
-			return nil, 0, fmt.Errorf("run game: %w", runErr)
+	if s.IsScript() {
+		code = script.Run(gameArgs, &out, &errb)
+	} else {
+		cmd := exec.Command(bin, gameArgs...)
+		cmd.Dir = s.Root
+		cmd.Stdout, cmd.Stderr = &out, &errb
+		if runErr := cmd.Run(); runErr != nil {
+			var ee *exec.ExitError
+			if !errors.As(runErr, &ee) {
+				return nil, 0, fmt.Errorf("run game: %w", runErr)
+			}
+			code = ee.ExitCode()
 		}
-		code = ee.ExitCode()
 	}
 	rep, perr := lastJSON(out.Bytes())
 	if perr != nil {

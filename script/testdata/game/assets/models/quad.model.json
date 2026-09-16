@@ -1,0 +1,8 @@
+{
+  "veduta": "model/1",
+  "name": "quad",
+  "pivot": "center",
+  "parts": [
+    { "shape": "box", "size": [1, 1, 0.02] }
+  ]
+}

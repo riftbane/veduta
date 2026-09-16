@@ -94,6 +94,11 @@ func (e *engine) prepare(opt runOptions) error {
 	if e.invSpecs == nil {
 		e.invSpecs = e.project.Invariants
 	}
+	if st, ok := e.game.(Starter); ok {
+		if err := st.Start(&e.ctx); err != nil {
+			return fmt.Errorf("game Start: %w", err)
+		}
+	}
 	var err error
 	if opt.World != "" {
 		err = e.loadWorld(opt.World, opt.At)
@@ -106,6 +111,9 @@ func (e *engine) prepare(opt runOptions) error {
 	e.tickSize()
 	if err := e.game.Init(&e.ctx); err != nil {
 		return fmt.Errorf("game Init: %w", err)
+	}
+	if err := e.gameErr(); err != nil {
+		return err
 	}
 	if err := e.buildMonitor(); err != nil {
 		return err
@@ -212,14 +220,30 @@ func (e *engine) install(s *scene.Scene) error {
 	return nil
 }
 
-// attach instantiates the behaviour of a registered kind.
+// gameErr returns the error a Failer game reports, if any.
+func (e *engine) gameErr() error {
+	if f, ok := e.game.(Failer); ok {
+		return f.Err()
+	}
+	return nil
+}
+
+// attach instantiates the behaviour of a kind the game defines or registered.
 func (e *engine) attach(ent *scene.Entity) error {
 	if isBuiltinKind(ent.Kind) {
 		return nil
 	}
-	ctor := lookupKind(ent.Kind)
+	var ctor func(*scene.Entity) Behaviour
+	known := Kinds()
+	if kp, ok := e.game.(KindProvider); ok {
+		ctor = kp.Kind(ent.Kind)
+		known = append(kp.Kinds(), known...)
+	}
 	if ctor == nil {
-		return fmt.Errorf("entity %q: kind %q is not registered (known: %v)", ent.Name, ent.Kind, Kinds())
+		ctor = lookupKind(ent.Kind)
+	}
+	if ctor == nil {
+		return fmt.Errorf("entity %q: kind %q is not registered (known: %v)", ent.Name, ent.Kind, known)
 	}
 	if b := ctor(ent); b != nil {
 		e.behaviours[ent.ID] = b
@@ -282,6 +306,9 @@ func (e *engine) step(in Input) error {
 		if s != e.ctx.Scene { // a behaviour loaded another scene
 			break
 		}
+	}
+	if err := e.gameErr(); err != nil {
+		return err
 	}
 	return e.endTick()
 }
@@ -358,6 +385,9 @@ func (e *engine) render(cam scene.Camera, w, h int, mode gfx.RenderMode, normals
 	if mode == gfx.ModeColor && e.extra == nil {
 		e.ctx.Width, e.ctx.Height = w, h
 		e.game.Draw(&e.ctx, &e.dl)
+		if err := e.gameErr(); err != nil {
+			return nil, err
+		}
 	}
 	if err := e.renderer.Begin(fb); err != nil {
 		return nil, err

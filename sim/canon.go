@@ -12,6 +12,12 @@ import (
 	"github.com/riftbane/veduta/gmath"
 )
 
+// Canonicaler is a value that stands for another in canonical JSON: the state of an entity
+// of a script game is a Lua table, which it hands over as maps, slices and numbers.
+type Canonicaler interface {
+	CanonicalValue() any
+}
+
 // AppendCanonical appends the canonical JSON encoding of v to dst. Canonical JSON is
 // what the trace is written and hashed in:
 //
@@ -29,6 +35,8 @@ import (
 // encoding/json accepts.
 func AppendCanonical(dst []byte, v any) ([]byte, error) {
 	switch x := v.(type) {
+	case Canonicaler:
+		return AppendCanonical(dst, x.CanonicalValue())
 	case nil:
 		return append(dst, "null"...), nil
 	case bool:

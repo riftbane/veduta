@@ -15,13 +15,11 @@ const maxStringSize = 64 << 20
 
 func openString(vm *VM) {
 	lib := NewTable(0, 16)
-	for name, fn := range map[string]GoFunction{
+	setFuncs(lib, "string.", map[string]GoFunction{
 		"byte": strByte, "char": strChar, "find": strFind, "format": strFormat, "gmatch": strGmatch,
 		"gsub": strGsub, "len": strLen, "lower": strLower, "match": strMatch, "rep": strRep,
 		"reverse": strReverse, "sub": strSub, "upper": strUpper,
-	} {
-		lib.SetString(name, FunctionValue(NewFunction("string."+name, fn)))
-	}
+	})
 	vm.globals.SetString("string", TableValue(lib))
 	meta := NewTable(0, 1)
 	meta.SetString("__index", TableValue(lib))

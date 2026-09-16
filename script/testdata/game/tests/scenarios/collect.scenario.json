@@ -1,0 +1,26 @@
+{
+  "veduta": "scenario/1",
+  "scene": "main",
+  "seed": 3,
+  "ticks": 80,
+  "inputs": [
+    { "tick": 1, "press": ["right"] },
+    { "tick": 20, "release": ["right"] },
+    { "tick": 21, "press": ["b", "a"] },
+    { "tick": 22, "release": ["b", "a"] },
+    { "tick": 30, "press": ["left"] },
+    { "tick": 49, "release": ["left"] },
+    { "tick": 50, "press": ["up"] },
+    { "tick": 70, "release": ["up"] }
+  ],
+  "expect": [
+    { "tick": 20, "entity": "hero", "path": "position.x", "op": ">", "value": 3.5 },
+    { "tick": 20, "entity": "hero", "path": "state.score", "op": "==", "value": 1 },
+    { "tick": 20, "entity": "hero", "path": "state.steps", "op": "==", "value": 19 },
+    { "tick": 21, "trace": "spawned", "count_min": 1, "count_max": 1 },
+    { "tick": 80, "trace": "jump", "count_min": 1, "count_max": 1 },
+    { "tick": 80, "trace": "coin_collected", "count_min": 2 },
+    { "tick": 10, "entity": "coin_2", "path": "state.value", "op": "==", "value": 1 }
+  ],
+  "screenshots": [0, 20, 80]
+}

@@ -1,0 +1,13 @@
+{
+  "veduta": "scene/1",
+  "camera": { "type": "orthographic", "size": 12, "position": [0, 0, 100], "look_at": [0, 0, 0] },
+  "background": "#101018",
+  "entities": [
+    { "name": "hero", "kind": "hero", "model": "quad", "material": "hero", "tags": ["hero"],
+      "hitbox": [[-0.4, -0.4, -0.5], [0.4, 0.4, 0.5]] },
+    { "name": "coin_1", "kind": "coin", "model": "quad", "material": "coin", "position": [3, 0, 0],
+      "scale": [0.5, 0.5, 1], "tags": ["coin"] },
+    { "name": "coin_2", "kind": "coin", "model": "quad", "material": "coin", "position": [0, 3, 0],
+      "scale": [0.5, 0.5, 1], "tags": ["coin"] }
+  ]
+}

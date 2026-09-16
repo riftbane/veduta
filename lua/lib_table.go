@@ -9,12 +9,10 @@ import (
 
 func openTable(vm *VM) {
 	lib := NewTable(0, 8)
-	for name, fn := range map[string]GoFunction{
+	setFuncs(lib, "table.", map[string]GoFunction{
 		"concat": tabConcat, "insert": tabInsert, "move": tabMove, "pack": tabPack,
 		"remove": tabRemove, "sort": tabSort, "unpack": tabUnpack,
-	} {
-		lib.SetString(name, FunctionValue(NewFunction("table."+name, fn)))
-	}
+	})
 	vm.globals.SetString("table", TableValue(lib))
 }
 

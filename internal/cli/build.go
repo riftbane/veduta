@@ -15,6 +15,7 @@ import (
 
 	"github.com/riftbane/veduta/asset"
 	"github.com/riftbane/veduta/asset/cook"
+	"github.com/riftbane/veduta/script"
 )
 
 // CompileError is a located compiler or vet message.
@@ -106,6 +107,9 @@ func (s *Session) Build(vet bool) (*BuildReport, error) {
 	}
 	r.Cooked = cr.Compiled
 	r.CookErrors = cr.Errors()
+	if s.IsScript() {
+		return s.checkScripts(r, start)
+	}
 	bin := s.GameBinary()
 	if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
 		return nil, err
@@ -136,6 +140,24 @@ func (s *Session) Build(vet bool) (*BuildReport, error) {
 		}
 	}
 	r.OK = buildErr == nil && len(r.VetErrors) == 0 && len(r.CookErrors) == 0
+	r.Millis = time.Since(start).Milliseconds()
+	return r, nil
+}
+
+// checkScripts is build for a script game: every Lua file of the project must compile.
+func (s *Session) checkScripts(r *BuildReport, start time.Time) (*BuildReport, error) {
+	g, err := script.Load(s.Root, s.Project, io.Discard)
+	if err != nil {
+		r.Output = err.Error()
+	} else {
+		for _, se := range g.SyntaxErrors() {
+			r.Errors = append(r.Errors, CompileError{File: se.Chunk, Line: se.Line, Msg: se.Msg})
+		}
+		if len(r.Errors) == 0 {
+			r.Binary = s.Project.Script
+		}
+	}
+	r.OK = r.Binary != "" && len(r.CookErrors) == 0
 	r.Millis = time.Since(start).Milliseconds()
 	return r, nil
 }
@@ -178,7 +200,7 @@ func init() {
 	register(command{
 		name:    "build",
 		usage:   "build [--vet]",
-		summary: "cook stale assets and go build the game (CGO_ENABLED=0); compile errors as {file,line,col,msg}",
+		summary: "cook stale assets and go build the game (CGO_ENABLED=0), or compile the scripts of a script game; compile errors as {file,line,col,msg}",
 		project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) {
 			fs := newFlags("build", env.Stderr)

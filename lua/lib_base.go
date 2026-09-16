@@ -2,6 +2,7 @@ package lua
 
 import (
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -17,9 +18,22 @@ var (
 	ipairsIterator = NewFunction("ipairs_iterator", ipairsAux)
 )
 
+// setFuncs sets Go functions in a table in name order, so that pairs visits a library the
+// same way on every run.
+func setFuncs(t *Table, prefix string, funcs map[string]GoFunction) {
+	names := make([]string, 0, len(funcs))
+	for name := range funcs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		t.SetString(name, FunctionValue(NewFunction(prefix+name, funcs[name])))
+	}
+}
+
 func openBase(vm *VM) {
 	g := vm.globals
-	for name, fn := range map[string]GoFunction{
+	setFuncs(g, "", map[string]GoFunction{
 		"assert":         baseAssert,
 		"collectgarbage": baseCollectGarbage,
 		"error":          baseError,
@@ -38,9 +52,7 @@ func openBase(vm *VM) {
 		"tostring":       baseTostring,
 		"type":           baseType,
 		"xpcall":         baseXpcall,
-	} {
-		g.SetString(name, FunctionValue(NewFunction(name, fn)))
-	}
+	})
 	g.SetString("next", FunctionValue(nextFunction))
 	g.SetString("_G", TableValue(g))
 	g.SetString("_VERSION", String("Lua 5.4"))

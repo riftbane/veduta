@@ -1,0 +1,10 @@
+{
+  "veduta": "project/1",
+  "name": "scripttest",
+  "engine": "v1.4.1",
+  "script": "main.lua",
+  "resolution": [320, 240],
+  "tick_rate": 20,
+  "default_scene": "main",
+  "invariants": ["finite_positions", "score_non_negative"]
+}

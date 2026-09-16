@@ -52,6 +52,32 @@ type Game interface {
 	Draw(ctx *Context, dl *gfx.DrawList)
 }
 
+// The optional interfaces below let a game that is not Go code — a script game (package
+// script) — plug into the engine.
+
+// Starter is implemented by a game that must set itself up before each run's scene or
+// world is loaded (a script game starts its interpreter there). Start runs after the run's
+// RNG is seeded and before any entity is attached.
+type Starter interface {
+	Start(ctx *Context) error
+}
+
+// KindProvider is implemented by a game that defines entity kinds itself instead of
+// registering them with RegisterKind. Kind returns the constructor of a kind, or nil when
+// the game does not define it (the registered kinds are looked up next); Kinds lists the
+// kinds the game defines, for error messages.
+type KindProvider interface {
+	Kind(name string) func(*scene.Entity) Behaviour
+	Kinds() []string
+}
+
+// Failer is implemented by a game whose Update, Draw or behaviours can fail without
+// returning an error (a script that raised one). The engine checks Err after them and
+// stops the run with the error.
+type Failer interface {
+	Err() error
+}
+
 // Behaviour is the per-entity logic of a kind, updated once per tick in entity id order.
 // Keep behaviour values stateless: store per-entity state in Entity.State, which the
 // trace records and snapshots save.

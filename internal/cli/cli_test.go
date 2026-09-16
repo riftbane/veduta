@@ -444,3 +444,56 @@ func TestMCPEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestScriptProject: the tool runs a script game itself. build checks the scripts and
+// reports syntax errors located, test runs the scenarios, simulate and bench go through
+// the same paths as a Go game's, with no go command involved.
+func TestScriptProject(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join("..", "..", "script", "testdata", "game")
+	err := filepath.Walk(src, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(src, p)
+		if info.IsDir() {
+			return os.MkdirAll(filepath.Join(dir, rel), 0o755)
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(dir, rel), data, 0o644)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", "") // no go command: nothing may need one
+	env := &Env{Version: "dev", Stdout: io.Discard, Stderr: io.Discard}
+	s, err := OpenSession(dir, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, err := s.Build(false); err != nil || !b.OK || b.Binary != "main.lua" {
+		t.Fatalf("build: %+v %v", b, err)
+	}
+	tr, err := s.Test(false)
+	if err != nil || !tr.OK || len(tr.Scenarios) != 1 {
+		t.Fatalf("test: %s %v", tr.Human(), err)
+	}
+	sim, err := s.Simulate(SimulateOptions{Scene: "main", Ticks: 30})
+	if err != nil || sim["verdict"] != "pass" {
+		t.Fatalf("simulate: %+v %v", sim, err)
+	}
+	if bn, err := s.Bench(BenchOptions{Scenario: "collect"}); err != nil || bn["ticks"] != float64(80) {
+		t.Fatalf("bench: %+v %v", bn, err)
+	}
+	os.WriteFile(filepath.Join(dir, "lib", "movement.lua"), []byte("local M = {}\nfunction M.step(e\nreturn M\n"), 0o644)
+	b, err := s.Build(false)
+	if err != nil || b.OK || len(b.Errors) != 1 || b.Errors[0].File != "lib/movement.lua" || b.Errors[0].Line != 3 {
+		t.Fatalf("broken script: %+v %v", b, err)
+	}
+	if _, err := s.Simulate(SimulateOptions{Scene: "main", Ticks: 5}); err == nil || !strings.Contains(err.Error(), "lib/movement.lua:3") {
+		t.Fatalf("simulate a broken script: %v", err)
+	}
+}

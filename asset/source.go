@@ -179,6 +179,7 @@ type ProjectSource struct {
 	Icon              string      `json:"icon"`
 	Engine            string      `json:"engine"`
 	Entry             string      `json:"entry"`
+	Script            string      `json:"script"`
 	Resolution        []int       `json:"resolution"`
 	InspectResolution []int       `json:"inspect_resolution"`
 	TickRate          int         `json:"tick_rate"`

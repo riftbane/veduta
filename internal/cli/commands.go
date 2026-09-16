@@ -12,6 +12,7 @@ import (
 
 	"github.com/riftbane/veduta/asset/cook"
 	"github.com/riftbane/veduta/inspect"
+	"github.com/riftbane/veduta/script"
 )
 
 // CookResult wraps the cook report for printing.
@@ -204,6 +205,12 @@ func init() {
 			bin, err := s.ensureGame()
 			if err != nil {
 				return nil, err
+			}
+			if s.IsScript() {
+				if code := script.Run([]string{"-project", s.Root}, env.Stdout, env.Stderr); code != 0 {
+					return nil, fmt.Errorf("the game stopped with exit code %d", code)
+				}
+				return nil, nil
 			}
 			cmd := exec.Command(bin, "-project", s.Root)
 			cmd.Dir, cmd.Stdout, cmd.Stderr, cmd.Stdin = s.Root, env.Stdout, env.Stderr, env.Stdin

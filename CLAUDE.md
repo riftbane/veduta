@@ -20,7 +20,7 @@ input, Lua games, Windows simulator). Tick its boxes as steps land.
 3. `sim/`, `scene/`, `gfx/`, `asset/`: no clock, env or filesystem at tick time; randomness only `sim.RNG`.
 3b. Float product feeding +/− is wrapped: `float32(a*b) + c` (else arm64 fuses, goldens break). `go test ./internal/fused` checks.
 4. No output-affecting map iteration; sort first.
-5. `veduta` tool has no game logic; game-dependent ops run in the game binary via `-headless`.
+5. `veduta` tool has no game logic; a Go game's ops run in its binary via `-headless`, a script game's (Lua, package `script`) run in-process through the same `-headless` entry point.
 6. Rasterizer inner loops: 0 allocs; `-benchmem` benchmarks are gates.
 7. Source formats strict: unknown JSON fields are errors.
 8. Every spec format, tool, CLI flag exists with its exact name.

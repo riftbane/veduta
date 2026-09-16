@@ -1,0 +1,607 @@
+package script
+
+import (
+	"fmt"
+	"math"
+	"sort"
+
+	"github.com/riftbane/veduta"
+	"github.com/riftbane/veduta/asset"
+	"github.com/riftbane/veduta/gfx"
+	"github.com/riftbane/veduta/gmath"
+	"github.com/riftbane/veduta/lua"
+	"github.com/riftbane/veduta/scene"
+	"github.com/riftbane/veduta/sim"
+	"github.com/riftbane/veduta/sprite"
+)
+
+// The engine's API for scripts: input, scene, entities, camera, world, hud, trace,
+// invariant and require. docs/lua.md describes it; keep the two in step.
+
+type fn = lua.GoFunction
+
+// lib sets a global table of functions, in name order so pairs visits it the same way on
+// every run.
+func (g *Game) lib(name string, funcs map[string]fn) *lua.Table {
+	t := lua.NewTable(0, len(funcs))
+	keys := make([]string, 0, len(funcs))
+	for k := range funcs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		t.SetString(k, lua.FunctionValue(lua.NewFunction(name+"."+k, funcs[k])))
+	}
+	g.vm.SetGlobal(name, lua.TableValue(t))
+	return t
+}
+
+func (g *Game) global(name string, f fn) {
+	g.vm.SetGlobal(name, lua.FunctionValue(lua.NewFunction(name, f)))
+}
+
+func (g *Game) install() {
+	g.installEntity()
+	g.global("require", func(vm *lua.VM, args []lua.Value) []lua.Value {
+		name := vm.CheckString(args, 0, "require")
+		v, err := g.require(g.moduleFile(name))
+		if err != nil {
+			if le, ok := err.(*lua.Error); ok {
+				panic(le)
+			}
+			vm.Errorf("%s", err)
+		}
+		return vm.Ret(v)
+	})
+	g.global("trace", func(vm *lua.VM, args []lua.Value) []lua.Value {
+		name := vm.CheckString(args, 0, "trace")
+		fields := map[string]any{}
+		if t := lua.Arg(args, 1); !t.IsNil() {
+			tb := vm.CheckTable(args, 1, "trace")
+			if m, ok := toGo(lua.TableValue(tb), 0).(map[string]any); ok {
+				fields = m
+			} else {
+				vm.ArgError(1, "trace", "table with string keys expected")
+			}
+		}
+		g.ctx.Trace(name, fields)
+		return nil
+	})
+	g.global("invariant", func(vm *lua.VM, args []lua.Value) []lua.Value {
+		name := vm.CheckString(args, 0, "invariant")
+		pred := vm.CheckFunction(args, 1, "invariant")
+		if err := asset.ValidName(name); err != nil {
+			vm.ArgError(0, "invariant", err.Error())
+		}
+		g.ctx.Invariant(name, func() bool {
+			if g.err != nil {
+				return true
+			}
+			res, err := g.vm.Call(pred)
+			if err != nil {
+				g.err = err
+				return true
+			}
+			return len(res) > 0 && res[0].Truthy()
+		})
+		return nil
+	})
+	g.lib("input", map[string]fn{
+		"down":     g.button(func(b sim.Button) bool { return g.in.Down(b) }),
+		"pressed":  g.button(func(b sim.Button) bool { return g.in.JustPressed(b) }),
+		"released": g.button(func(b sim.Button) bool { return g.in.JustReleased(b) }),
+		"dpad": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			d := g.in.DPad()
+			return vm.Ret(lua.Int(int64(d.X)), lua.Int(int64(d.Y)))
+		},
+	})
+	g.lib("scene", map[string]fn{
+		"name": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			return vm.Ret(lua.String(g.scene(vm, "scene.name").Name))
+		},
+		"find": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			return vm.Ret(g.entity(g.scene(vm, "scene.find").Find(vm.CheckString(args, 0, "find"))))
+		},
+		"tagged": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			return vm.Ret(g.list(g.scene(vm, "scene.tagged").Tagged(vm.CheckString(args, 0, "tagged"))))
+		},
+		"entities": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			var live []*scene.Entity
+			for _, e := range g.scene(vm, "scene.entities").Entities() {
+				if e.Alive() {
+					live = append(live, e)
+				}
+			}
+			return vm.Ret(g.list(live))
+		},
+		"spawn": g.spawn,
+		"load": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			g.scene(vm, "scene.load")
+			if err := g.ctx.LoadScene(vm.CheckString(args, 0, "load")); err != nil {
+				vm.Errorf("%s", err)
+			}
+			return nil
+		},
+	})
+	g.lib("camera", map[string]fn{
+		"get": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			c := g.scene(vm, "camera.get").Camera
+			t := lua.NewTable(0, 7)
+			t.SetString("position", vec3(c.Position))
+			t.SetString("target", vec3(c.Target))
+			t.SetString("ortho", lua.Bool(c.Ortho))
+			t.SetString("fov", lua.Float(float64(c.FovDeg)))
+			t.SetString("size", lua.Float(float64(c.Size)))
+			t.SetString("near", lua.Float(float64(c.Near)))
+			t.SetString("far", lua.Float(float64(c.Far)))
+			return vm.Ret(lua.TableValue(t))
+		},
+		"set": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			s := g.scene(vm, "camera.set")
+			t := vm.CheckTable(args, 0, "set")
+			c := s.Camera
+			if v := t.GetString("position"); !v.IsNil() {
+				c.Position = toVec3(vm, v, "position")
+			}
+			if v := t.GetString("target"); !v.IsNil() {
+				c.Target = toVec3(vm, v, "target")
+			}
+			if v := t.GetString("ortho"); !v.IsNil() {
+				c.Ortho = v.Truthy()
+			}
+			for _, field := range []struct {
+				key string
+				dst *float32
+			}{{"fov", &c.FovDeg}, {"size", &c.Size}, {"near", &c.Near}, {"far", &c.Far}} {
+				if v := t.GetString(field.key); !v.IsNil() {
+					f, ok := v.Float()
+					if !ok {
+						vm.Errorf("camera.set: %s must be a number", field.key)
+					}
+					*field.dst = float32(f)
+				}
+			}
+			s.Camera = c
+			return nil
+		},
+		"follow2d": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			s := g.scene(vm, "camera.follow2d")
+			x, y := vm.CheckFloat(args, 0, "follow2d"), vm.CheckFloat(args, 1, "follow2d")
+			h := vm.CheckFloat(args, 2, "follow2d")
+			s.Camera = scene.Camera2D(gmath.V2(float32(x), float32(y)), float32(h))
+			return nil
+		},
+	})
+	g.lib("world", map[string]fn{
+		"load": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			name := vm.CheckString(args, 0, "load")
+			at := [2]int32{int32(vm.OptInt(args, 1, "load", 0)), int32(vm.OptInt(args, 2, "load", 0))}
+			if err := g.ctx.LoadWorld(name, at); err != nil {
+				vm.Errorf("%s", err)
+			}
+			return nil
+		},
+		"name": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			if w := g.ctx.World(); w != nil {
+				return vm.Ret(lua.String(w.Name))
+			}
+			return vm.Ret(lua.Nil)
+		},
+		"focus": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			g.world(vm, "world.focus").Focus(g.point(vm, args, 0, "focus"))
+			return nil
+		},
+		"height": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			w := g.world(vm, "world.height")
+			x, z := vm.CheckFloat(args, 0, "height"), vm.CheckFloat(args, 1, "height")
+			return vm.Ret(lua.Float(float64(w.HeightAt(gmath.V3(float32(x), 0, float32(z))))))
+		},
+		"water": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			w := g.world(vm, "world.water")
+			x, z := vm.CheckFloat(args, 0, "water"), vm.CheckFloat(args, 1, "water")
+			level, ok := w.WaterAt(gmath.V3(float32(x), 0, float32(z)))
+			if !ok {
+				return vm.Ret(lua.Nil)
+			}
+			return vm.Ret(lua.Float(float64(level)))
+		},
+	})
+	g.lib("hud", map[string]fn{
+		"text": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			b := g.batch(vm, "hud.text")
+			x, y := vm.CheckFloat(args, 0, "text"), vm.CheckFloat(args, 1, "text")
+			s := vm.ToString(vm.CheckAny(args, 2, "text"))
+			color := g.color(vm, args, 3, "text", 0xffffffff)
+			scale := vm.OptInt(args, 4, "text", 1)
+			w := g.ctx.Text(b, float32(x), float32(y), int(scale), s, color)
+			return vm.Ret(lua.Float(float64(w)))
+		},
+		"rect": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			b := g.batch(vm, "hud.rect")
+			x, y := vm.CheckFloat(args, 0, "rect"), vm.CheckFloat(args, 1, "rect")
+			w, h := vm.CheckFloat(args, 2, "rect"), vm.CheckFloat(args, 3, "rect")
+			b.Rect(gmath.R(float32(x), float32(y), float32(w), float32(h)), g.color(vm, args, 4, "rect", 0xffffffff))
+			return nil
+		},
+	})
+}
+
+// scene returns the scene, which a script cannot reach before the first one is loaded.
+func (g *Game) scene(vm *lua.VM, fname string) *scene.Scene {
+	if g.ctx.Scene == nil {
+		vm.Errorf("%s: no scene yet (the main script runs before the scene is loaded; use game.init)", fname)
+	}
+	return g.ctx.Scene
+}
+
+func (g *Game) world(vm *lua.VM, fname string) *veduta.World {
+	w := g.ctx.World()
+	if w == nil {
+		vm.Errorf("%s: no world is loaded", fname)
+	}
+	return w
+}
+
+func (g *Game) batch(vm *lua.VM, fname string) *sprite.Batch {
+	if g.hud == nil {
+		vm.Errorf("%s: the hud can be drawn only in game.draw", fname)
+	}
+	return g.hud
+}
+
+// button returns an input function over a button named by its first argument.
+func (g *Game) button(test func(sim.Button) bool) fn {
+	return func(vm *lua.VM, args []lua.Value) []lua.Value {
+		name := vm.CheckString(args, 0, "button")
+		b, err := sim.ParseButton(name)
+		if err != nil {
+			vm.ArgError(0, "input", err.Error())
+		}
+		return vm.Ret(lua.Bool(test(b)))
+	}
+}
+
+// color reads argument i as "#rrggbb", "#rrggbbaa" or an integer 0xrrggbb.
+func (g *Game) color(vm *lua.VM, args []lua.Value, i int, fname string, def uint32) uint32 {
+	v := lua.Arg(args, i)
+	if v.IsNil() {
+		return def
+	}
+	if s, ok := v.Str(); ok {
+		c, err := gfx.ParseColor(s)
+		if err != nil {
+			vm.ArgError(i, fname, err.Error())
+		}
+		return c
+	}
+	n := vm.CheckInt(args, i, fname)
+	if n < 0 || n > 0xffffff {
+		vm.ArgError(i, fname, "an integer color is 0xrrggbb")
+	}
+	return 0xff000000 | uint32(n)
+}
+
+// point reads x, y, z from arguments i…i+2.
+func (g *Game) point(vm *lua.VM, args []lua.Value, i int, fname string) gmath.Vec3 {
+	return gmath.V3(float32(vm.CheckFloat(args, i, fname)), float32(vm.CheckFloat(args, i+1, fname)), float32(vm.CheckFloat(args, i+2, fname)))
+}
+
+func (g *Game) list(ents []*scene.Entity) lua.Value {
+	t := lua.NewTable(len(ents), 0)
+	for _, e := range ents {
+		t.Append(g.entity(e))
+	}
+	return lua.TableValue(t)
+}
+
+func vec3(v gmath.Vec3) lua.Value {
+	t := lua.NewTable(3, 0)
+	t.Append(lua.Float(float64(v.X)))
+	t.Append(lua.Float(float64(v.Y)))
+	t.Append(lua.Float(float64(v.Z)))
+	return lua.TableValue(t)
+}
+
+func toVec3(vm *lua.VM, v lua.Value, what string) gmath.Vec3 {
+	t := v.Table()
+	var out [3]float32
+	for i := range out {
+		var f float64
+		ok := t != nil
+		if ok {
+			f, ok = t.GetInt(int64(i) + 1).Float()
+		}
+		if !ok {
+			vm.Errorf("%s must be {x, y, z}", what)
+		}
+		out[i] = float32(f)
+	}
+	return gmath.V3(out[0], out[1], out[2])
+}
+
+// spawn is scene.spawn{kind=, name=, model=, material=, position=, rotation=, scale=, tags=,
+// visible=, layer=}.
+func (g *Game) spawn(vm *lua.VM, args []lua.Value) []lua.Value {
+	s := g.scene(vm, "scene.spawn")
+	t := vm.CheckTable(args, 0, "spawn")
+	e := scene.Entity{Visible: true, Transform: scene.Identity()}
+	str := func(key string) string {
+		v := t.GetString(key)
+		if v.IsNil() {
+			return ""
+		}
+		str, ok := v.Str()
+		if !ok {
+			vm.Errorf("scene.spawn: %s must be a string", key)
+		}
+		return str
+	}
+	e.Kind, e.Name, e.Model, e.Material = str("kind"), str("name"), str("model"), str("material")
+	if e.Kind == "" {
+		e.Kind = scene.KindStatic
+	}
+	if v := t.GetString("position"); !v.IsNil() {
+		e.Transform.Position = toVec3(vm, v, "position")
+	}
+	if v := t.GetString("rotation"); !v.IsNil() {
+		e.Transform.Rotation = gmath.QuatEulerDeg(toVec3(vm, v, "rotation"))
+	}
+	if v := t.GetString("scale"); !v.IsNil() {
+		e.Transform.Scale = toVec3(vm, v, "scale")
+	}
+	if v := t.GetString("visible"); !v.IsNil() {
+		e.Visible = v.Truthy()
+	}
+	if v := t.GetString("layer"); !v.IsNil() {
+		n, ok := v.Int()
+		if !ok || n < math.MinInt32 || n > math.MaxInt32 {
+			vm.Errorf("scene.spawn: layer must be an integer")
+		}
+		e.Layer = int(n)
+	}
+	if v := t.GetString("tags"); !v.IsNil() {
+		tags := v.Table()
+		if tags == nil {
+			vm.Errorf("scene.spawn: tags must be a list of strings")
+		}
+		for i := int64(1); i <= int64(tags.Len()); i++ {
+			tag, ok := tags.GetInt(i).Str()
+			if !ok {
+				vm.Errorf("scene.spawn: tags must be a list of strings")
+			}
+			e.Tags = append(e.Tags, tag)
+		}
+	}
+	_ = s
+	ent := g.ctx.Spawn(e)
+	if st := t.GetString("state"); st.Table() != nil {
+		if old, ok := ent.State.(*State); ok {
+			// The kind's init already ran on its own table: it keeps what init stored,
+			// under what the spawn gives.
+			st.Table().ForEach(func(k, v lua.Value) bool {
+				old.Table.Set(k, v)
+				return true
+			})
+		} else {
+			ent.State = &State{Table: st.Table()}
+		}
+	}
+	return vm.Ret(g.entity(ent))
+}
+
+// installEntity builds the metatable of entity values.
+func (g *Game) installEntity() {
+	ent := func(vm *lua.VM, args []lua.Value, fname string) *scene.Entity {
+		if u := lua.Arg(args, 0).Userdata(); u != nil {
+			if e, ok := u.Data.(*scene.Entity); ok {
+				return e
+			}
+		}
+		vm.ArgError(0, fname, "entity expected")
+		return nil
+	}
+	methods := map[string]fn{
+		"position": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			p := ent(vm, args, "position").Transform.Position
+			return vm.Ret(lua.Float(float64(p.X)), lua.Float(float64(p.Y)), lua.Float(float64(p.Z)))
+		},
+		"set_position": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			e := ent(vm, args, "set_position")
+			e.Transform.Position = g.point(vm, args, 1, "set_position")
+			return nil
+		},
+		"move": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			e := ent(vm, args, "move")
+			e.Transform.Position = e.Transform.Position.Add(g.point(vm, args, 1, "move"))
+			return nil
+		},
+		"world_position": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			p := ent(vm, args, "world_position").WorldPosition()
+			return vm.Ret(lua.Float(float64(p.X)), lua.Float(float64(p.Y)), lua.Float(float64(p.Z)))
+		},
+		"rotation": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			r := ent(vm, args, "rotation").Transform.Rotation.EulerDeg()
+			return vm.Ret(lua.Float(float64(r.X)), lua.Float(float64(r.Y)), lua.Float(float64(r.Z)))
+		},
+		"set_rotation": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			e := ent(vm, args, "set_rotation")
+			e.Transform.Rotation = gmath.QuatEulerDeg(g.point(vm, args, 1, "set_rotation"))
+			return nil
+		},
+		"scale": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			s := ent(vm, args, "scale").Transform.Scale
+			return vm.Ret(lua.Float(float64(s.X)), lua.Float(float64(s.Y)), lua.Float(float64(s.Z)))
+		},
+		"set_scale": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			e := ent(vm, args, "set_scale")
+			e.Transform.Scale = g.point(vm, args, 1, "set_scale")
+			return nil
+		},
+		"has_tag": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			return vm.Ret(lua.Bool(ent(vm, args, "has_tag").HasTag(vm.CheckString(args, 1, "has_tag"))))
+		},
+		"add_tag": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			e := ent(vm, args, "add_tag")
+			if tag := vm.CheckString(args, 1, "add_tag"); !e.HasTag(tag) {
+				e.Tags = append(e.Tags, tag)
+			}
+			return nil
+		},
+		"remove_tag": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			e := ent(vm, args, "remove_tag")
+			tag := vm.CheckString(args, 1, "remove_tag")
+			kept := e.Tags[:0]
+			for _, t := range e.Tags {
+				if t != tag {
+					kept = append(kept, t)
+				}
+			}
+			e.Tags = kept
+			return nil
+		},
+		"tags": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			e := ent(vm, args, "tags")
+			t := lua.NewTable(len(e.Tags), 0)
+			for _, tag := range e.Tags {
+				t.Append(lua.String(tag))
+			}
+			return vm.Ret(lua.TableValue(t))
+		},
+		"overlapping": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			e := ent(vm, args, "overlapping")
+			tag := vm.OptString(args, 1, "overlapping", "")
+			var out []*scene.Entity
+			for _, o := range g.ctx.Overlapping(e) {
+				if tag == "" || o.HasTag(tag) {
+					out = append(out, o)
+				}
+			}
+			return vm.Ret(g.list(out))
+		},
+		"bounds": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			b := ent(vm, args, "bounds").AABB
+			if b.IsEmpty() {
+				return vm.Ret(lua.Nil)
+			}
+			f := func(x float32) lua.Value { return lua.Float(float64(x)) }
+			return vm.Ret(f(b.Min.X), f(b.Min.Y), f(b.Min.Z), f(b.Max.X), f(b.Max.Y), f(b.Max.Z))
+		},
+		"despawn": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			g.ctx.Despawn(ent(vm, args, "despawn"))
+			return nil
+		},
+	}
+	methodValues := map[string]lua.Value{}
+	for name, f := range methods {
+		methodValues[name] = lua.FunctionValue(lua.NewFunction("entity:"+name, f))
+	}
+	meta := lua.NewTable(0, 4)
+	meta.SetString("__name", lua.String("entity"))
+	meta.SetString("__index", lua.FunctionValue(lua.NewFunction("entity.__index", func(vm *lua.VM, args []lua.Value) []lua.Value {
+		e := ent(vm, args, "index")
+		key, _ := lua.Arg(args, 1).Str()
+		if m, ok := methodValues[key]; ok {
+			return vm.Ret(m)
+		}
+		p := e.Transform.Position
+		switch key {
+		case "id":
+			return vm.Ret(lua.Int(int64(e.ID)))
+		case "name":
+			return vm.Ret(lua.String(e.Name))
+		case "kind":
+			return vm.Ret(lua.String(e.Kind))
+		case "alive":
+			return vm.Ret(lua.Bool(e.Alive()))
+		case "x":
+			return vm.Ret(lua.Float(float64(p.X)))
+		case "y":
+			return vm.Ret(lua.Float(float64(p.Y)))
+		case "z":
+			return vm.Ret(lua.Float(float64(p.Z)))
+		case "visible":
+			return vm.Ret(lua.Bool(e.Visible))
+		case "model":
+			return vm.Ret(optString(e.Model))
+		case "material":
+			return vm.Ret(optString(e.Material))
+		case "layer":
+			return vm.Ret(lua.Int(int64(e.Layer)))
+		case "state":
+			if st, ok := e.State.(*State); ok {
+				return vm.Ret(lua.TableValue(st.Table))
+			}
+			return vm.Ret(lua.Nil)
+		}
+		vm.Errorf("entity has no field '%s'", key)
+		return nil
+	})))
+	meta.SetString("__newindex", lua.FunctionValue(lua.NewFunction("entity.__newindex", func(vm *lua.VM, args []lua.Value) []lua.Value {
+		e := ent(vm, args, "newindex")
+		key, _ := lua.Arg(args, 1).Str()
+		v := lua.Arg(args, 2)
+		num := func() float32 {
+			f, ok := v.Float()
+			if !ok {
+				vm.Errorf("entity.%s must be a number, got %s", key, v.Type())
+			}
+			return float32(f)
+		}
+		name := func() string {
+			if v.IsNil() {
+				return ""
+			}
+			s, ok := v.Str()
+			if !ok {
+				vm.Errorf("entity.%s must be a string or nil, got %s", key, v.Type())
+			}
+			return s
+		}
+		switch key {
+		case "x":
+			e.Transform.Position.X = num()
+		case "y":
+			e.Transform.Position.Y = num()
+		case "z":
+			e.Transform.Position.Z = num()
+		case "visible":
+			e.Visible = v.Truthy()
+		case "model":
+			e.Model = name()
+		case "material":
+			e.Material = name()
+		case "layer":
+			n, ok := v.Int()
+			if !ok {
+				vm.Errorf("entity.layer must be an integer")
+			}
+			e.Layer = int(n)
+		case "state":
+			switch {
+			case v.IsNil():
+				e.State = nil
+			case v.Table() != nil:
+				e.State = &State{Table: v.Table()}
+			default:
+				vm.Errorf("entity.state must be a table or nil")
+			}
+		case "id", "name", "kind", "alive":
+			vm.Errorf("entity.%s cannot be changed", key)
+		default:
+			vm.Errorf("entity has no field '%s' (entities have x, y, z, visible, model, material, layer and state; keep your own values in state)", key)
+		}
+		return nil
+	})))
+	meta.SetString("__tostring", lua.FunctionValue(lua.NewFunction("entity.__tostring", func(vm *lua.VM, args []lua.Value) []lua.Value {
+		e := ent(vm, args, "tostring")
+		return vm.Ret(lua.String(fmt.Sprintf("entity %d %q (%s)", e.ID, e.Name, e.Kind)))
+	})))
+	g.entityMeta = meta
+}
+
+func optString(s string) lua.Value {
+	if s == "" {
+		return lua.Nil
+	}
+	return lua.String(s)
+}

@@ -9,11 +9,9 @@ import (
 
 func openUTF8(vm *VM) {
 	lib := NewTable(0, 8)
-	for name, fn := range map[string]GoFunction{
+	setFuncs(lib, "utf8.", map[string]GoFunction{
 		"char": utf8Char, "codepoint": utf8Codepoint, "codes": utf8Codes, "len": utf8Len, "offset": utf8Offset,
-	} {
-		lib.SetString(name, FunctionValue(NewFunction("utf8."+name, fn)))
-	}
+	})
 	lib.SetString("charpattern", String("[\x00-\x7F\xC2-\xFD][\x80-\xBF]*"))
 	vm.globals.SetString("utf8", TableValue(lib))
 }

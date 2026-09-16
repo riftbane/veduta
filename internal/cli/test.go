@@ -99,6 +99,9 @@ func (s *Session) Test(update bool) (*TestReport, error) {
 }
 
 func (s *Session) goTest(update bool) GoTestResult {
+	if s.IsScript() && !exists(filepath.Join(s.Root, "go.mod")) {
+		return GoTestResult{OK: true, Failed: []string{}} // a script game has no Go code to test
+	}
 	var out bytes.Buffer
 	cmd := s.goCmd("test", "./...")
 	if update {

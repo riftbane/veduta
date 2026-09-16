@@ -51,16 +51,14 @@ func openMath(vm *VM) {
 	x.Seed(0)
 	vm.random = x
 	lib := NewTable(0, 32)
-	for name, fn := range map[string]GoFunction{
+	setFuncs(lib, "math.", map[string]GoFunction{
 		"abs": mathAbs, "acos": mathUnary(gmath.Acos64), "asin": mathUnary(gmath.Asin64), "atan": mathAtan,
 		"ceil": mathCeil, "cos": mathUnary(gmath.Cos64), "exp": mathUnary(gmath.Exp64), "floor": mathFloor,
 		"fmod": mathFmod, "log": mathLog, "max": mathMax, "min": mathMin, "modf": mathModf,
 		"random": mathRandom, "randomseed": mathRandomseed, "sin": mathUnary(gmath.Sin64),
 		"sqrt": mathUnary(math.Sqrt), "tan": mathUnary(gmath.Tan64), "tointeger": mathToInteger,
 		"type": mathType, "ult": mathUlt,
-	} {
-		lib.SetString(name, FunctionValue(NewFunction("math."+name, fn)))
-	}
+	})
 	lib.SetString("pi", Float(math.Pi))
 	lib.SetString("huge", Float(math.Inf(1)))
 	lib.SetString("maxinteger", Int(math.MaxInt64))
