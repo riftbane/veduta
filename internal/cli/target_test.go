@@ -36,7 +36,14 @@ func fakeGraphics(t *testing.T, fbs map[string][2]string) {
 
 func TestFindPanel(t *testing.T) {
 	const engine = "v1.0.0"
-	if runtime.GOOS != "linux" {
+	switch runtime.GOOS {
+	case "windows": // the simulator
+		if findPanel() != "" || runRefusal(engine) != "" || runRefusal("v0.2.0") != "" {
+			t.Fatalf("on Windows: panel %q, refusal %q, v0.x refusal %q", findPanel(), runRefusal(engine), runRefusal("v0.2.0"))
+		}
+		return
+	case "linux":
+	default:
 		if findPanel() != "" || !strings.Contains(runRefusal(engine), "Linux framebuffer") || runRefusal("v0.2.0") != "" {
 			t.Fatalf("off Linux: panel %q, refusal %q, v0.x refusal %q", findPanel(), runRefusal(engine), runRefusal("v0.2.0"))
 		}
