@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## v1.4.0 — 2026-09-16
+
 ### Added
 
 - `Context.SetModel`, `RemoveModel` and `Model`: a game builds models at runtime (a voxel
