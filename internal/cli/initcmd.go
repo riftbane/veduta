@@ -220,6 +220,11 @@ func Init(env *Env, o InitOptions) (*InitReport, error) {
 	if err != nil {
 		return nil, fmt.Errorf("init: %w", err)
 	}
+	editor, _, err := writeEditorFiles(dir, !o.Go)
+	if err != nil {
+		return nil, fmt.Errorf("init: %w", err)
+	}
+	r.Files += len(editor)
 	if o.Go && !o.NoTidy {
 		cmd := exec.Command("go", "mod", "tidy")
 		cmd.Dir = dir

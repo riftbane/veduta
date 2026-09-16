@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "ExpectSource": {
+      "additionalProperties": false,
+      "description": "ExpectSource is one expectation of a scenario: either an entity path comparison or a trace event count.",
+      "properties": {
+        "count_max": {
+          "type": "integer"
+        },
+        "count_min": {
+          "type": "integer"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "<",
+            "<=",
+            "==",
+            "!=",
+            ">=",
+            ">",
+            "contains"
+          ],
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "tick": {
+          "type": "integer"
+        },
+        "trace": {
+          "type": "string"
+        },
+        "value": {}
+      },
+      "required": [
+        "tick"
+      ],
+      "type": "object"
+    },
+    "InputSource": {
+      "additionalProperties": false,
+      "description": "InputSource is one input event of a scenario or input script: the buttons (ButtonNames) that go down and up at Tick.",
+      "properties": {
+        "press": {
+          "items": {
+            "enum": [
+              "up",
+              "down",
+              "left",
+              "right",
+              "a",
+              "b",
+              "select",
+              "cancel"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "release": {
+          "items": {
+            "enum": [
+              "up",
+              "down",
+              "left",
+              "right",
+              "a",
+              "b",
+              "select",
+              "cancel"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tick": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tick"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "ScenarioSource is tests/scenarios/<name>.scenario.json.",
+  "properties": {
+    "at": {
+      "description": "start cell of a world, default [0, 0]",
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "expect": {
+      "items": {
+        "$ref": "#/definitions/ExpectSource"
+      },
+      "type": "array"
+    },
+    "inputs": {
+      "items": {
+        "$ref": "#/definitions/InputSource"
+      },
+      "type": "array"
+    },
+    "invariants": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "scene": {
+      "type": "string"
+    },
+    "screenshots": {
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "seed": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "ticks": {
+      "type": "integer"
+    },
+    "veduta": {
+      "const": "scenario/1"
+    },
+    "world": {
+      "description": "instead of scene",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seed",
+    "ticks",
+    "veduta"
+  ],
+  "title": "scenario",
+  "type": "object"
+}

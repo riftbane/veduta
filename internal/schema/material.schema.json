@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "MaterialSource is assets/materials/<name>.mat.json.",
+  "properties": {
+    "albedo": {
+      "description": "default #ffffff",
+      "type": "string"
+    },
+    "alpha": {
+      "description": "opaque (default), blend, cutout",
+      "enum": [
+        "opaque",
+        "blend",
+        "cutout"
+      ],
+      "type": "string"
+    },
+    "cull": {
+      "description": "back (default), none",
+      "enum": [
+        "back",
+        "none"
+      ],
+      "type": "string"
+    },
+    "cutoff": {
+      "description": "cutout threshold, default 0.5",
+      "type": "number"
+    },
+    "filter": {
+      "description": "bilinear (default), nearest",
+      "enum": [
+        "bilinear",
+        "nearest"
+      ],
+      "type": "string"
+    },
+    "texture": {
+      "description": "texture name",
+      "type": "string"
+    },
+    "unlit": {
+      "type": "boolean"
+    },
+    "veduta": {
+      "const": "material/1"
+    }
+  },
+  "required": [
+    "veduta"
+  ],
+  "title": "material",
+  "type": "object"
+}

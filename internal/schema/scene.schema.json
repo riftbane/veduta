@@ -1,0 +1,172 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "CameraSource": {
+      "additionalProperties": false,
+      "description": "CameraSource is the scene camera.",
+      "properties": {
+        "far": {
+          "description": "default 200",
+          "type": "number"
+        },
+        "fov_deg": {
+          "description": "perspective, default 60",
+          "type": "number"
+        },
+        "look_at": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "near": {
+          "description": "default 0.1",
+          "type": "number"
+        },
+        "position": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "size": {
+          "description": "orthographic visible height in meters",
+          "type": "number"
+        },
+        "type": {
+          "description": "perspective (default), orthographic",
+          "enum": [
+            "perspective",
+            "orthographic"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "look_at",
+        "position"
+      ],
+      "type": "object"
+    },
+    "EntitySource": {
+      "additionalProperties": false,
+      "description": "EntitySource is one entity of a scene.",
+      "properties": {
+        "hitbox": {
+          "description": "Hitbox is [[minx, miny, minz], [maxx, maxy, maxz]] in the entity's local space.",
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "layer": {
+          "description": "draw order, -1000..1000, default 0",
+          "type": "integer"
+        },
+        "material": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parent": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "rotation_deg": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "scale": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "visible": {
+          "description": "default true",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "type": "object"
+    },
+    "LightSource": {
+      "additionalProperties": false,
+      "description": "LightSource is the scene's directional light.",
+      "properties": {
+        "ambient": {
+          "description": "default #404040",
+          "type": "string"
+        },
+        "color": {
+          "description": "default #ffffff",
+          "type": "string"
+        },
+        "direction": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "direction"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "SceneSource is assets/scenes/<name>.scene.json.",
+  "properties": {
+    "background": {
+      "type": "string"
+    },
+    "camera": {
+      "$ref": "#/definitions/CameraSource"
+    },
+    "entities": {
+      "items": {
+        "$ref": "#/definitions/EntitySource"
+      },
+      "type": "array"
+    },
+    "light": {
+      "$ref": "#/definitions/LightSource"
+    },
+    "veduta": {
+      "const": "scene/1"
+    }
+  },
+  "required": [
+    "camera",
+    "veduta"
+  ],
+  "title": "scene",
+  "type": "object"
+}

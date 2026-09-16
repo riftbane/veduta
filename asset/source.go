@@ -174,23 +174,23 @@ type ExpectSource struct {
 // ProjectSource is the project manifest veduta.json.
 type ProjectSource struct {
 	Veduta            string      `json:"veduta"`
-	Name              string      `json:"name"`
-	Title             string      `json:"title"`
-	Icon              string      `json:"icon"`
-	Engine            string      `json:"engine"`
-	Entry             string      `json:"entry"`
-	Script            string      `json:"script"`
-	API               int         `json:"api"`
-	Resolution        []int       `json:"resolution"`
-	InspectResolution []int       `json:"inspect_resolution"`
-	TickRate          int         `json:"tick_rate"`
-	DefaultScene      string      `json:"default_scene"`
-	DefaultWorld      string      `json:"default_world"`
-	DefaultSeed       uint64      `json:"default_seed"`
-	Assets            string      `json:"assets"`
-	Cooked            string      `json:"cooked"`
-	Invariants        []string    `json:"invariants"`
-	Bounds            [][]float32 `json:"bounds"`
+	Name              string      `json:"name"`               // a-z, 0-9, _ and -, up to 64: archive names
+	Title             string      `json:"title"`              // what a player sees (default: name)
+	Icon              string      `json:"icon"`               // a PNG beside the title on the console
+	Engine            string      `json:"engine"`             // the engine version, as v2.0.0
+	Entry             string      `json:"entry"`              // a Go game's package (default ./cmd/game)
+	Script            string      `json:"script"`             // a Lua game's main script, as main.lua
+	API               int         `json:"api"`                // the Lua API level the game needs (default 1)
+	Resolution        []int       `json:"resolution"`         // [width, height] of the frame (default [320, 240])
+	InspectResolution []int       `json:"inspect_resolution"` // [width, height] of inspection images (default [320, 240])
+	TickRate          int         `json:"tick_rate"`          // ticks per second (default 20)
+	DefaultScene      string      `json:"default_scene"`      // default main
+	DefaultWorld      string      `json:"default_world"`      // a world to start in instead of the scene
+	DefaultSeed       uint64      `json:"default_seed"`       // default 1
+	Assets            string      `json:"assets"`             // default assets
+	Cooked            string      `json:"cooked"`             // default assets/.cooked
+	Invariants        []string    `json:"invariants"`         // checked in every run: finite_positions, within_bounds, entity_count_max:N, no_overlap:a,b or a game's own
+	Bounds            [][]float32 `json:"bounds"`             // [[min x, y, z], [max x, y, z]] in meters (default [[-100, -50, -100], [100, 100, 100]])
 }
 
 // PrefabSource is assets/prefabs/<name>.prefab.json.

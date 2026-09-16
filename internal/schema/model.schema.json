@@ -1,0 +1,183 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "LODSource": {
+      "additionalProperties": false,
+      "description": "LODSource is one level of detail of a model.",
+      "properties": {
+        "distance": {
+          "type": "number"
+        },
+        "model": {
+          "description": "another model drawn instead (default: fewer segments)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PartSource": {
+      "additionalProperties": false,
+      "description": "PartSource is one primitive of a model. Which fields are allowed depends on Shape.",
+      "properties": {
+        "axis": {
+          "enum": [
+            "x",
+            "y",
+            "z"
+          ],
+          "type": "string"
+        },
+        "depth": {
+          "type": "number"
+        },
+        "flip_normals": {
+          "type": "boolean"
+        },
+        "height": {
+          "type": "number"
+        },
+        "material": {
+          "type": "string"
+        },
+        "of": {
+          "type": "integer"
+        },
+        "position": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "profile": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "radius": {
+          "type": "number"
+        },
+        "rings": {
+          "type": "integer"
+        },
+        "rotation_deg": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "scale": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "segments": {
+          "type": "integer"
+        },
+        "shape": {
+          "description": "box, cylinder, sphere, plane, extrude, lathe, mirror",
+          "enum": [
+            "box",
+            "cylinder",
+            "sphere",
+            "plane",
+            "extrude",
+            "lathe",
+            "mirror"
+          ],
+          "type": "string"
+        },
+        "size": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "uv": {
+          "enum": [
+            "box",
+            "planar",
+            "cylindrical",
+            "spherical"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "shape"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "ModelSource is assets/models/<name>.model.json.",
+  "properties": {
+    "draw_distance": {
+      "description": "not drawn beyond (default: always)",
+      "type": "number"
+    },
+    "lod": {
+      "description": "levels of detail, nearest first",
+      "items": {
+        "$ref": "#/definitions/LODSource"
+      },
+      "type": "array"
+    },
+    "name": {
+      "description": "must equal the file name when present",
+      "type": "string"
+    },
+    "parts": {
+      "items": {
+        "$ref": "#/definitions/PartSource"
+      },
+      "type": "array"
+    },
+    "pivot": {
+      "description": "origin (default), center, bottom-center",
+      "enum": [
+        "origin",
+        "center",
+        "bottom-center"
+      ],
+      "type": "string"
+    },
+    "smooth_angle_deg": {
+      "description": "default 30",
+      "type": "number"
+    },
+    "symmetry": {
+      "description": "\"\", x, y, z: check MESH_ASYMMETRIC",
+      "enum": [
+        "x",
+        "y",
+        "z"
+      ],
+      "type": "string"
+    },
+    "triangle_budget": {
+      "description": "0: default budget",
+      "type": "integer"
+    },
+    "units": {
+      "description": "\"m\" (the only unit in v0.1.0)",
+      "enum": [
+        "m"
+      ],
+      "type": "string"
+    },
+    "veduta": {
+      "const": "model/1"
+    }
+  },
+  "required": [
+    "parts",
+    "veduta"
+  ],
+  "title": "model",
+  "type": "object"
+}

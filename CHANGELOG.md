@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Editor setup: `veduta init` and `veduta upgrade` write `.veduta/schema/` (a JSON Schema per
+  source format, generated from `asset/source.go`, with the values each field allows) and,
+  for a Lua game, `.veduta/lua/veduta.d.lua` (the API for the Lua Language Server, checked
+  against the runtime by a test), `.luarc.json`, `.vscode/settings.json` (the schemas mapped
+  to their files) and `.vscode/extensions.json`. Upgrade sets only its keys in the settings
+  files and leaves one with comments alone.
 - `lua`: a Lua 5.4 interpreter in pure Go, the language v2 games are written in. Source is
   compiled to Go closures; integers wrap, floats never fuse, tables iterate in insertion
   order, so a script runs identically on amd64 and arm64. It has the base library, Lua

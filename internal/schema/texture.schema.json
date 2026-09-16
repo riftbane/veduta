@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "LayerSource": {
+      "additionalProperties": false,
+      "description": "LayerSource is one step of a texture's layer program. Which fields are allowed depends on Type.",
+      "properties": {
+        "angle_deg": {
+          "type": "number"
+        },
+        "blend": {
+          "description": "normal (default), multiply, screen, add",
+          "enum": [
+            "normal",
+            "multiply",
+            "screen",
+            "add"
+          ],
+          "type": "string"
+        },
+        "cells": {
+          "type": "integer"
+        },
+        "center": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "color": {
+          "type": "string"
+        },
+        "colors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "corner": {
+          "type": "number"
+        },
+        "fit": {
+          "description": "contain (default), cover, stretch",
+          "enum": [
+            "contain",
+            "cover",
+            "stretch"
+          ],
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "octaves": {
+          "type": "integer"
+        },
+        "opacity": {
+          "description": "default 1",
+          "type": "number"
+        },
+        "outline": {
+          "type": "number"
+        },
+        "path": {
+          "type": "string"
+        },
+        "radius": {
+          "type": "number"
+        },
+        "scale": {
+          "type": "number"
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "size": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "to": {
+          "type": "string"
+        },
+        "type": {
+          "description": "solid, noise, stripes, rect, circle, gradient, checker, image",
+          "enum": [
+            "solid",
+            "noise",
+            "stripes",
+            "rect",
+            "circle",
+            "gradient",
+            "checker",
+            "image"
+          ],
+          "type": "string"
+        },
+        "width": {
+          "type": "number"
+        },
+        "xy": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "TextureSource is assets/textures/<name>.tex.json.",
+  "properties": {
+    "layers": {
+      "items": {
+        "$ref": "#/definitions/LayerSource"
+      },
+      "type": "array"
+    },
+    "mipmaps": {
+      "description": "default true",
+      "type": "boolean"
+    },
+    "size": {
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "tiling": {
+      "type": "boolean"
+    },
+    "veduta": {
+      "const": "texture/1"
+    }
+  },
+  "required": [
+    "layers",
+    "size",
+    "veduta"
+  ],
+  "title": "texture",
+  "type": "object"
+}

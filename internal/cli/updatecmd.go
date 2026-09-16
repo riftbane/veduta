@@ -134,7 +134,7 @@ func autoUpdate(env *Env) (*UpdateReport, error) {
 type UpgradeReport struct {
 	From    string   `json:"from"`
 	To      string   `json:"to"`
-	Changed []string `json:"changed"` // files changed, as applicable: veduta.json, go.mod, CHANGELOG.md
+	Changed []string `json:"changed"` // files changed, as applicable: veduta.json, go.mod, CHANGELOG.md, .veduta (the editor files)
 	// Migrations describes each change made to keep the project's behaviour, one sentence
 	// each, such as `pin "tick_rate": 60 in veduta.json (the default before v1.0.0)`.
 	Migrations []string `json:"migrations"`
@@ -161,7 +161,8 @@ func (r *UpgradeReport) Human() string {
 }
 
 // Upgrade moves the project to the tool's engine version: veduta.json, go.mod (go get +
-// go mod tidy) and an entry in the project's CHANGELOG.md. A project that crosses from a
+// go mod tidy), an entry in the project's CHANGELOG.md, and the editor files
+// (writeEditorFiles). A project that crosses from a
 // v0.x engine to v1.0.0 or later keeps the resolution, inspect_resolution and tick_rate it
 // ran with: every one its manifest left to the default is written out with the v0.x value
 // (v0Defaults), and the report and the changelog entry name them.
@@ -224,19 +225,30 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 			return nil, err
 		}
 	}
-	if len(r.Changed) == 0 {
-		return r, nil
+	if len(r.Changed) > 0 {
+		entry := fmt.Sprintf("- Upgrade the Veduta engine from %s to %s (`veduta upgrade`).\n", from, to)
+		if len(pinned) > 0 {
+			entry = fmt.Sprintf("- Upgrade the Veduta engine from %s to %s (`veduta upgrade`), pinning the defaults `veduta.json` relied on before v1.0.0 so the game keeps its size and tick rate: `%s`.\n", from, to, strings.Join(pinned, "`, `"))
+		}
+		if err := addChangelogEntry(filepath.Join(s.Root, "CHANGELOG.md"), entry); err != nil {
+			return nil, err
+		}
+		r.Changed = append(r.Changed, "CHANGELOG.md")
+		if v0Engine(from) && !v0Engine(to) {
+			r.Next = s.consoleNext()
+		}
 	}
-	entry := fmt.Sprintf("- Upgrade the Veduta engine from %s to %s (`veduta upgrade`).\n", from, to)
-	if len(pinned) > 0 {
-		entry = fmt.Sprintf("- Upgrade the Veduta engine from %s to %s (`veduta upgrade`), pinning the defaults `veduta.json` relied on before v1.0.0 so the game keeps its size and tick rate: `%s`.\n", from, to, strings.Join(pinned, "`, `"))
+	// The editor files follow the tool whether or not the engine version moved: a project
+	// made before they existed gets them from the upgrade of a version it already has.
+	editor, skipped, err := writeEditorFiles(s.Root, s.IsScript())
+	if err != nil {
+		return nil, fmt.Errorf("upgrade: %w", err)
 	}
-	if err := addChangelogEntry(filepath.Join(s.Root, "CHANGELOG.md"), entry); err != nil {
-		return nil, err
+	if len(editor) > 0 {
+		r.Changed = append(r.Changed, editorDir)
 	}
-	r.Changed = append(r.Changed, "CHANGELOG.md")
-	if v0Engine(from) && !v0Engine(to) {
-		r.Next = s.consoleNext()
+	for _, p := range skipped {
+		r.Next = append(r.Next, p+" is not plain JSON, so upgrade left it: set by hand what `veduta init` writes there")
 	}
 	return r, nil
 }

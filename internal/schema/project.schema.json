@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "ProjectSource is the project manifest veduta.json.",
+  "properties": {
+    "api": {
+      "description": "the Lua API level the game needs (default 1)",
+      "type": "integer"
+    },
+    "assets": {
+      "description": "default assets",
+      "type": "string"
+    },
+    "bounds": {
+      "description": "[[min x, y, z], [max x, y, z]] in meters (default [[-100, -50, -100], [100, 100, 100]])",
+      "items": {
+        "items": {
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "cooked": {
+      "description": "default assets/.cooked",
+      "type": "string"
+    },
+    "default_scene": {
+      "description": "default main",
+      "type": "string"
+    },
+    "default_seed": {
+      "description": "default 1",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "default_world": {
+      "description": "a world to start in instead of the scene",
+      "type": "string"
+    },
+    "engine": {
+      "description": "the engine version, as v2.0.0",
+      "type": "string"
+    },
+    "entry": {
+      "description": "a Go game's package (default ./cmd/game)",
+      "type": "string"
+    },
+    "icon": {
+      "description": "a PNG beside the title on the console",
+      "type": "string"
+    },
+    "inspect_resolution": {
+      "description": "[width, height] of inspection images (default [320, 240])",
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "invariants": {
+      "description": "checked in every run: finite_positions, within_bounds, entity_count_max:N, no_overlap:a,b or a game's own",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "name": {
+      "description": "a-z, 0-9, _ and -, up to 64: archive names",
+      "type": "string"
+    },
+    "resolution": {
+      "description": "[width, height] of the frame (default [320, 240])",
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "script": {
+      "description": "a Lua game's main script, as main.lua",
+      "type": "string"
+    },
+    "tick_rate": {
+      "description": "ticks per second (default 20)",
+      "type": "integer"
+    },
+    "title": {
+      "description": "what a player sees (default: name)",
+      "type": "string"
+    },
+    "veduta": {
+      "const": "project/1"
+    }
+  },
+  "required": [
+    "engine",
+    "name",
+    "veduta"
+  ],
+  "title": "project",
+  "type": "object"
+}

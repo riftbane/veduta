@@ -22,6 +22,9 @@ func upgradeProject(t *testing.T, manifest, to string) *Session {
 	if err := os.WriteFile(filepath.Join(dir, asset.ProjectFile), []byte(manifest), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if _, _, err := writeEditorFiles(dir, false); err != nil {
+		t.Fatal(err)
+	}
 	s, err := OpenSession(dir, &Env{Version: to})
 	if err != nil {
 		t.Fatal(err)

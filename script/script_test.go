@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -187,6 +188,54 @@ func TestAPIDocumented(t *testing.T) {
 		}
 		if !strings.Contains(string(doc), "`e:"+m+"(") {
 			t.Errorf("docs/lua.md does not document e:%s", m)
+		}
+	}
+}
+
+// TestTypesMatchAPI: the editor definitions (veduta.d.lua) name every function and entity
+// method the runtime has, and nothing it does not.
+func TestTypesMatchAPI(t *testing.T) {
+	g, err := loadDir(testGame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if code := veduta.RunArgs(g, []string{"-project", testGame, "-headless", "simulate", "--scene", "main", "--ticks", "1", "--out", t.TempDir()}, &out, io.Discard); code != 0 {
+		t.Fatalf("run: %s", out.String())
+	}
+	declared := map[string]bool{}
+	for _, m := range regexp.MustCompile(`(?m)^function ([\w.:]+)\(`).FindAllStringSubmatch(string(Types), -1) {
+		declared[m[1]] = true
+	}
+	have := map[string]bool{"trace": true, "invariant": true, "require": true}
+	for _, lib := range []string{"input", "scene", "camera", "world", "hud"} {
+		g.vm.Global(lib).Table().ForEach(func(k, _ lua.Value) bool {
+			have[lib+"."+k.String()] = true
+			return true
+		})
+	}
+	e := g.entity(g.ctx.Scene.Find("hero"))
+	for name := range declared {
+		if m, ok := strings.CutPrefix(name, "Entity:"); ok {
+			if g.vm.Index(e, lua.String(m)).IsNil() {
+				t.Errorf("veduta.d.lua declares e:%s, which entities do not have", m)
+			}
+			have[name] = true
+		}
+	}
+	for name := range have {
+		if !declared[name] {
+			t.Errorf("veduta.d.lua does not declare %s", name)
+		}
+	}
+	for name := range declared {
+		if !have[name] {
+			t.Errorf("veduta.d.lua declares %s, which the runtime does not have", name)
+		}
+	}
+	for _, field := range []string{"tick", "dt", "width", "height", "headless", "name", "title", "api"} {
+		if g.engine.Get(lua.String(field)).IsNil() || !strings.Contains(string(Types), "---@field "+field+" ") {
+			t.Errorf("engine.%s: in the runtime or in veduta.d.lua but not both", field)
 		}
 	}
 }

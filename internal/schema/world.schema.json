@@ -1,0 +1,467 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "BiomeSource": {
+      "additionalProperties": false,
+      "description": "BiomeSource is one biome of a world.",
+      "properties": {
+        "ground": {
+          "description": "material name",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "weight": {
+          "description": "default 1",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ground",
+        "name"
+      ],
+      "type": "object"
+    },
+    "CameraSource": {
+      "additionalProperties": false,
+      "description": "CameraSource is the scene camera.",
+      "properties": {
+        "far": {
+          "description": "default 200",
+          "type": "number"
+        },
+        "fov_deg": {
+          "description": "perspective, default 60",
+          "type": "number"
+        },
+        "look_at": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "near": {
+          "description": "default 0.1",
+          "type": "number"
+        },
+        "position": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "size": {
+          "description": "orthographic visible height in meters",
+          "type": "number"
+        },
+        "type": {
+          "description": "perspective (default), orthographic",
+          "enum": [
+            "perspective",
+            "orthographic"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "look_at",
+        "position"
+      ],
+      "type": "object"
+    },
+    "EntitySource": {
+      "additionalProperties": false,
+      "description": "EntitySource is one entity of a scene.",
+      "properties": {
+        "hitbox": {
+          "description": "Hitbox is [[minx, miny, minz], [maxx, maxy, maxz]] in the entity's local space.",
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "layer": {
+          "description": "draw order, -1000..1000, default 0",
+          "type": "integer"
+        },
+        "material": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parent": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "rotation_deg": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "scale": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "visible": {
+          "description": "default true",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "type": "object"
+    },
+    "FeatureSource": {
+      "additionalProperties": false,
+      "description": "FeatureSource is one terrain feature of a world: a hill, a plain, a lake or a sea.",
+      "properties": {
+        "cell": {
+          "description": "centre [x, z]",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "depth": {
+          "type": "number"
+        },
+        "falloff": {
+          "type": "integer"
+        },
+        "height": {
+          "type": "number"
+        },
+        "kind": {
+          "enum": [
+            "hill",
+            "plain",
+            "lake",
+            "sea"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "radius": {
+          "description": "cells",
+          "type": "integer"
+        },
+        "roughness": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "cell",
+        "kind",
+        "name",
+        "radius"
+      ],
+      "type": "object"
+    },
+    "LightSource": {
+      "additionalProperties": false,
+      "description": "LightSource is the scene's directional light.",
+      "properties": {
+        "ambient": {
+          "description": "default #404040",
+          "type": "string"
+        },
+        "color": {
+          "description": "default #ffffff",
+          "type": "string"
+        },
+        "direction": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "direction"
+      ],
+      "type": "object"
+    },
+    "PlaceSource": {
+      "additionalProperties": false,
+      "description": "PlaceSource is one explicit landmark of a world.",
+      "properties": {
+        "cell": {
+          "description": "[x, z] in cells",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "prefab": {
+          "type": "string"
+        },
+        "rotation": {
+          "enum": [
+            0,
+            90,
+            180,
+            270
+          ],
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cell",
+        "name",
+        "prefab"
+      ],
+      "type": "object"
+    },
+    "ScatterSource": {
+      "additionalProperties": false,
+      "description": "ScatterSource is one scatter rule of a world.",
+      "properties": {
+        "biomes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "density": {
+          "type": "number"
+        },
+        "prefab": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "prefab"
+      ],
+      "type": "object"
+    },
+    "SiteSource": {
+      "additionalProperties": false,
+      "description": "SiteSource is one site rule of a world.",
+      "properties": {
+        "biomes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "chance": {
+          "description": "default 1",
+          "type": "number"
+        },
+        "prefabs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "spacing": {
+          "type": "integer"
+        },
+        "tag": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "prefabs",
+        "spacing",
+        "tag"
+      ],
+      "type": "object"
+    },
+    "TerrainSource": {
+      "additionalProperties": false,
+      "description": "TerrainSource shapes the ground of a world: generated relief, the sea level, the water material and the ground's levels of detail.",
+      "properties": {
+        "lod_distance": {
+          "description": "meters to the first coarser level, default 2 chunks",
+          "type": "number"
+        },
+        "relief": {
+          "description": "meters above and below 0, default 0 (flat)",
+          "type": "number"
+        },
+        "relief_scale": {
+          "description": "cells per period, default 48",
+          "type": "integer"
+        },
+        "sea_level": {
+          "description": "ground below it is sea (default: no sea)",
+          "type": "number"
+        },
+        "water": {
+          "description": "material of water surfaces (default: built-in)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "VegetationSource": {
+      "additionalProperties": false,
+      "description": "VegetationSource is one vegetation rule of a world: trees (a prefab) or flora (a model), everywhere or in a round area.",
+      "properties": {
+        "biomes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "cell": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "density": {
+          "type": "number"
+        },
+        "model": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "prefab": {
+          "type": "string"
+        },
+        "radius": {
+          "type": "integer"
+        },
+        "scale": {
+          "description": "model: [min, max], default [0.8, 1.2]",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "WorldSource is assets/worlds/<name>.world.json.",
+  "properties": {
+    "background": {
+      "type": "string"
+    },
+    "biome_scale": {
+      "description": "default 64",
+      "type": "integer"
+    },
+    "biomes": {
+      "items": {
+        "$ref": "#/definitions/BiomeSource"
+      },
+      "type": "array"
+    },
+    "camera": {
+      "$ref": "#/definitions/CameraSource"
+    },
+    "cell": {
+      "description": "default 1",
+      "type": "number"
+    },
+    "chunk": {
+      "description": "default 16",
+      "type": "integer"
+    },
+    "entities": {
+      "items": {
+        "$ref": "#/definitions/EntitySource"
+      },
+      "type": "array"
+    },
+    "extent": {
+      "description": "default 512",
+      "type": "integer"
+    },
+    "features": {
+      "items": {
+        "$ref": "#/definitions/FeatureSource"
+      },
+      "type": "array"
+    },
+    "light": {
+      "$ref": "#/definitions/LightSource"
+    },
+    "places": {
+      "items": {
+        "$ref": "#/definitions/PlaceSource"
+      },
+      "type": "array"
+    },
+    "scatter": {
+      "items": {
+        "$ref": "#/definitions/ScatterSource"
+      },
+      "type": "array"
+    },
+    "seed": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "sites": {
+      "items": {
+        "$ref": "#/definitions/SiteSource"
+      },
+      "type": "array"
+    },
+    "terrain": {
+      "$ref": "#/definitions/TerrainSource"
+    },
+    "veduta": {
+      "const": "world/1"
+    },
+    "vegetation": {
+      "items": {
+        "$ref": "#/definitions/VegetationSource"
+      },
+      "type": "array"
+    },
+    "view": {
+      "description": "default 1",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "biomes",
+    "camera",
+    "veduta"
+  ],
+  "title": "world",
+  "type": "object"
+}

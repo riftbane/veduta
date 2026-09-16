@@ -26,6 +26,19 @@ leaves) or any pad. Three keys work the player itself:
 | F5 | restarts the game and records the buttons; F5 again saves them as `tests/scenarios/recorded-<time>.scenario.json`, a scenario to add expectations to |
 | F9 | reads the scripts and assets again and restarts; the simulator also does it by itself when a file changes |
 
+## Editing
+
+`veduta init` sets an editor up, and `veduta upgrade` brings it to the tool's version:
+`.veduta/lua/veduta.d.lua` describes this API for the Lua Language Server (VS Code's
+`sumneko.lua`, which `.vscode/extensions.json` recommends; `.luarc.json` points it there
+and turns off `io`, `os`, `debug`, `coroutine` and `package`), and `.veduta/schema/` holds a
+JSON Schema of every source format, which `.vscode/settings.json` maps to `veduta.json`,
+`*.scene.json`, `*.scenario.json` and the other asset files. The editor then completes the
+API and the fields of every file, shows their descriptions, and marks a misspelt function,
+a button that does not exist or a field the format does not have. `upgrade` sets only its
+own keys in `.vscode/settings.json`, `.vscode/extensions.json` and `.luarc.json`, and leaves
+one with comments in it as it is.
+
 ## The game
 
 ```lua
