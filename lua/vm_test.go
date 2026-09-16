@@ -29,17 +29,17 @@ func TestRuntimeErrorMessages(t *testing.T) {
 		{"local x = {}\nreturn x + 1", "test.lua:2: attempt to perform arithmetic on a table value (local 'x')"},
 		{"return 1 + nil", "test.lua:1: attempt to perform arithmetic on a nil value"},
 		{`return "abc" + 1`, "test.lua:1: attempt to perform arithmetic on a string value (constant 'abc')"},
-		{"return 1 // 0", "test.lua:1: attempt to perform 'n//0'"},
+		{"return 1 // 0", "test.lua:1: attempt to divide by zero"},
 		{"return 1 % 0", "test.lua:1: attempt to perform 'n%0'"},
 		{"return 1.5 | 1", "test.lua:1: number has no integer representation"},
 		{"return {} < {}", "test.lua:1: attempt to compare two table values"},
 		{"return 1 < 'x'", "test.lua:1: attempt to compare number with string"},
 		{"return #nil", "test.lua:1: attempt to get length of a nil value"},
 		{"local s\nreturn 'a' .. s", "test.lua:2: attempt to concatenate a nil value (local 's')"},
-		{"local t = {}\nt[nil] = 1", "test.lua:2: index is nil"},
-		{"local t = {}\nt[0/0] = 1", "test.lua:2: index is NaN"},
+		{"local t = {}\nt[nil] = 1", "test.lua:2: table index is nil"},
+		{"local t = {}\nt[0/0] = 1", "test.lua:2: table index is NaN"},
 		{"for i = 1, 10, 0 do end", "test.lua:1: 'for' step is zero"},
-		{"for i = 'a', 10 do end", "test.lua:1: 'for' initial value must be a number"},
+		{"for i = 'a', 10 do end", "test.lua:1: bad 'for' initial value (number expected, got string)"},
 		{"error('custom')", "test.lua:1: custom"},
 		{"error('no position', 0)", "no position"},
 		{"local function f() error('up', 2) end\nf()", "test.lua:2: up"},
@@ -74,7 +74,7 @@ func TestSyntaxErrors(t *testing.T) {
 		{"::label::", "test.lua:1: labels are not supported"},
 		{"local x <close> = nil", "to-be-closed variables are not supported"},
 		{"local x <const> = 1\nx = 2", "test.lua:2: attempt to assign to const variable 'x'"},
-		{"break", "test.lua:1: break outside a loop at line 1"},
+		{"break", "test.lua:1: break outside loop at line 1"},
 		{"return 1 2", "test.lua:1: <eof> expected near '2'"},
 		{"f() = 1", "test.lua:1: syntax error near '='"},
 		{"return ...", ""},
@@ -177,7 +177,7 @@ func TestGoFunctions(t *testing.T) {
 		assert(p.x == 3 and p.y == 4)
 		assert(twice(function(n) return n * 10 end) == 100)
 		local ok, e = pcall(newpoint, "x")
-		assert(not ok and e == "go.lua:5: bad argument #1 to 'newpoint' (number expected, got string)", e)
+		assert(not ok and e == "bad argument #1 to 'newpoint' (number expected, got string)", e)
 		return p.x + p.y
 	`)
 	if err != nil {

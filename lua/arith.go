@@ -39,8 +39,9 @@ func (op arithOp) bitwise() bool { return op >= opBand }
 // operands for an error message.
 func (vm *VM) arith(op arithOp, a, b Value, ad, bd string) Value {
 	if op.bitwise() {
-		ia, oka := toInteger(a)
-		ib, okb := toInteger(b)
+		// Unlike arithmetic, bitwise operators do not convert strings.
+		ia, oka := numToInteger(a)
+		ib, okb := numToInteger(b)
 		if oka && okb {
 			return Int(intArith(op, ia, ib))
 		}
@@ -55,17 +56,19 @@ func (vm *VM) arith(op arithOp, a, b Value, ad, bd string) Value {
 	if h := vm.metaField(b, arithEvents[op]); !h.IsNil() {
 		return vm.call1(h, a, b)
 	}
+	if op.bitwise() {
+		if a.IsNumber() && b.IsNumber() {
+			vm.Errorf("number has no integer representation")
+		}
+		bad, desc := b, bd
+		if !a.IsNumber() {
+			bad, desc = a, ad
+		}
+		vm.typeError(bad, "perform bitwise operation on", desc)
+	}
 	bad, desc := b, bd
 	if _, ok := toNumber(a); !ok {
 		bad, desc = a, ad
-	}
-	if op.bitwise() {
-		_, na := toNumber(a)
-		_, nb := toNumber(b)
-		if na && nb {
-			vm.Errorf("number has no integer representation")
-		}
-		vm.typeError(bad, "perform bitwise operation on", desc)
 	}
 	if bad.k == kindString {
 		vm.typeError(bad, "perform arithmetic on", desc) // a string that is not a number
@@ -92,7 +95,7 @@ func (vm *VM) numArith(op arithOp, a, b Value) Value {
 			return Int(intMod(x, y))
 		case opIDiv:
 			if y == 0 {
-				vm.Errorf("attempt to perform 'n//0'")
+				vm.Errorf("attempt to divide by zero")
 			}
 			return Int(intIDiv(x, y))
 		case opUnm:
@@ -142,6 +145,17 @@ func intArith(op arithOp, x, y int64) int64 {
 		return ^x
 	}
 	return 0
+}
+
+// numToInteger converts a number (not a string) to an integer.
+func numToInteger(v Value) (int64, bool) {
+	switch v.k {
+	case kindInt:
+		return v.i(), true
+	case kindFloat:
+		return floatToInt(v.f())
+	}
+	return 0, false
 }
 
 // intMod is Lua's integer %: the result has the sign of the divisor.

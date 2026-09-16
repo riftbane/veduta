@@ -1,0 +1,117 @@
+len	5 | 0 | 3
+sub	ell | llo | hello |  | hello
+upper	HELLO WORLD 123 | Àbc
+rep	ababab | ab,ab,ab |  | 
+reverse	olleh | 
+byte	65 | 65
+char	Hi | 
+char bad	error: bad argument #1 to 'string.char' (value out of range)
+find plain	5 | 2 | nil
+find pattern	5 | 3 | 1 | nil
+find init	2 | 3 | nil | 4 | 3
+find captures	1 | 9 | key | value
+match	key | 2024 | 01 | 15
+match whole	123 | hel | hell
+match position	3 | 5
+match anchors	hel | llo | nil
+match classes	a1 | x | 	
+match sets	hello | 123 | - | ]
+match optional	color | ac
+match balance	(a(b)c) | {x{y}}
+match frontier	THE | world
+match backref	" | hi
+match empty	 | 1
+match bad	error: malformed pattern (missing ']')
+match bad2	error: malformed pattern (ends with '%')
+match bad3	error: unfinished capture
+gmatch	one,two,three
+gmatch captures	a1,b2
+gmatch empty	4
+gsub string	hell0 w0rld | 2
+gsub limit	bba | 2
+gsub captures	<hello> <world> | 2
+gsub percent	50% | 1
+gsub table	Ada is 36 | 2
+gsub function	2 4 6 | 3
+gsub keep	AbC | 3
+gsub anchor	baa | 1
+gsub empty	-a-b-c- | 4
+gsub bad repl	error: invalid capture index %2
+gsub bad value	error: invalid replacement value (a table)
+format d	42    42 42   | 00042 +42
+format x	ff FF 0xff 10
+format neg hex	ffffffffffffffff
+format f	3.141590 3.14      3.142 3.1       |
+format e	1.234568e+04 1.234E-04
+format g	100000 1e+06 0.0001 1e-05 3.14
+format g2	1e+20 9.0072e+15 0.333333
+format s	[hi] [        hi] [hi        ] [he]
+format q	"a \"quoted\"\
+line\0end"
+format q num	42 0x8000000000000000 1e9999
+format c	Lua
+format pct	100%
+format float int	3
+format bad int	error: bad argument #2 to 'string.format' (number has no integer representation)
+format bad conv	error: invalid conversion '%y' to 'format'
+format no value	error: bad argument #2 to 'string.format' (no value)
+format a	0x1p+0 | 0x1p-1
+format inf	inf -inf inf
+format tostring	1 1.5 true
+tostring num	1e+100 | -1e-100 | 123456789012 | 9.2233720368548e+18 | 0.3
+tonumber	16.0f | 100.0f | 0.5f | 5.0f | 0.5f
+tonumber bad	nil | nil | nil | nil
+tonumber base	511 | 1295 | -255 | 2
+insert	0,1,2,3,4
+remove	4 | 0 | 1,2,3
+remove empty	nil | 3
+insert bad pos	error: bad argument #2 to 'table.insert' (position out of bounds)
+insert args	error: wrong number of arguments to 'insert'
+concat	1-2.5-x |  | 2,3
+concat bad	error: invalid value (table) at index 2 in table for 'concat'
+unpack	1 | 2 | 2 | 3 | nil | nil
+pack	3 | 1 | nil | 3
+move	2,3,4,4,5
+move other	9,1,2,3
+sort	1,2,3,5,8,9
+sort desc	9,8,5,3,2,1
+sort strings	Apple,banana,fig,pear
+sort records	1 | 2 | 3
+sort mixed	error: attempt to compare string with number
+math floor	3 | -4 | 5 | 1.1805916207174e+21f
+math ceil	4 | -3 | 1e+300f
+math abs	5 | 5.5f | -9223372036854775808
+math max	5 | 5.0f | 1.5f | 3
+math fmod	1 | -1 | 1 | 1.5f | -7.0f
+math fmod zero	error: bad argument #2 to 'math.fmod' (zero)
+math modf	3 | -3 | 5 | inff | 0.0f
+math tointeger	3 | nil | 8 | nil
+math type	integer | float | nil
+math ult	true | false
+math sqrt	4.0f | 1.4142135623731f
+math exp log	1.0f | 0.0f | 3.0f | 2.0f | 3.0f
+math trig	0.0f | 1.0f | true | true
+math pow	true | 100.0f | true
+math consts	3.1415926535898f | inff | 9223372036854775807 | -9223372036854775808
+random range	true | integer
+random float	true
+random empty	error: bad argument #1 to 'math.random' (interval is empty)
+utf8 char	Hä€😀
+utf8 len	4 | 2 | nil | 1
+utf8 codepoint	104 | 8364
+utf8 offset	5 | 5 | 2
+utf8 codes	1:97 2:8364 5:98
+tostring meta	OBJ | OBJ
+concat meta	10,20,30
+unpack meta	10 | 20 | 30
+select	0 | 2 | b | c
+select neg	b | c
+err from lua	error: libs.lua:177: bad argument #1 to 'char' (value out of range)
+err method	error: libs.lua:178: bad argument #1 to 'rep' (number expected, got no value)
+err self	error: libs.lua:179: bad argument #1 to 'rep' (string expected, got no value)
+err global	error: libs.lua:180: bad argument #1 to 'setmetatable' (table expected, got number)
+err direct	error: bad argument #1 to 'setmetatable' (table expected, got number)
+err level2	error: libs.lua:182: lvl
+err concat	error: libs.lua:183: invalid value (table) at index 1 in table for 'concat'
+err index	error: libs.lua:184: attempt to index a nil value (field 'y')
+err call field	error: libs.lua:185: attempt to call a nil value (field 'nope')

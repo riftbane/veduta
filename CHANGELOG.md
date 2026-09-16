@@ -12,8 +12,11 @@ All notable changes to this project are documented here. The format follows
   compiled to Go closures; integers wrap, floats never fuse, tables iterate in insertion
   order, so a script runs identically on amd64 and arm64. It has the base library, Lua
   errors with positions and tracebacks, a step budget that stops endless loops (and that
-  `pcall` cannot swallow), and an API for Go functions and userdata. Not supported: goto,
-  to-be-closed variables, weak tables, finalizers, coroutines (for now).
+  `pcall` cannot swallow), and an API for Go functions and userdata. The string (with Lua
+  patterns and C-style format), table, math (on gmath, with a random source the host can
+  replace) and utf8 libraries print what PUC Lua 5.4.6 prints, checked line by line; errors
+  carry the same positions and names. Not supported: goto, coroutines, to-be-closed
+  variables, weak tables, finalizers, string.pack and string.dump.
 - `gmath.Exp64`, `Log64` and `Pow64`: deterministic, unlike `math.Exp` and `math.Log`,
   which use different assembly on amd64 and arm64.
 

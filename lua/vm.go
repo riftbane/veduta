@@ -121,9 +121,28 @@ type VM struct {
 
 	budget    int64 // steps left in the current call
 	budgetMax int64 // the budget the call started with; 0: unlimited
+
+	random Random // math.random's source
+
+	// The Go function running, if any: how many Go functions are active above the innermost
+	// Lua call (errors of one called by another carry no position), which one, and whether
+	// Lua called it as a method.
+	goActive int
+	goFunc   *Function
+	goMethod bool
 }
 
-// New returns a VM with the base library loaded.
+// goState is the part of the VM an error unwinds to.
+type goState struct {
+	active int
+	fn     *Function
+	method bool
+}
+
+func (vm *VM) saveGo() goState     { return goState{vm.goActive, vm.goFunc, vm.goMethod} }
+func (vm *VM) restoreGo(s goState) { vm.goActive, vm.goFunc, vm.goMethod = s.active, s.fn, s.method }
+
+// New returns a VM with the standard libraries loaded: base, string, table, math and utf8.
 func New(o Options) *VM {
 	if o.MaxDepth <= 0 {
 		o.MaxDepth = 200
@@ -141,6 +160,10 @@ func New(o Options) *VM {
 		vm.stdout = io.Discard
 	}
 	openBase(vm)
+	openString(vm)
+	openTable(vm)
+	openMath(vm)
+	openUTF8(vm)
 	return vm
 }
 
@@ -182,10 +205,11 @@ func (vm *VM) Call(f Value, args ...Value) (results []Value, err error) {
 			vm.budget = vm.budgetMax
 		}
 	}
-	depth, top, btop := vm.depth, vm.top, vm.btop
+	depth, top, btop, gs := vm.depth, vm.top, vm.btop, vm.saveGo()
 	defer func() {
 		if r := recover(); r != nil {
 			vm.unwind(depth, top, btop)
+			vm.restoreGo(gs)
 			switch e := r.(type) {
 			case *Error:
 				err = e
@@ -264,7 +288,12 @@ func (vm *VM) call(f Value, args []Value, desc string) []Value {
 	if fn, ok := f.p.(*Function); ok && f.k == kindFunction {
 		if fn.gofn != nil {
 			vm.step()
-			return fn.gofn(vm, args)
+			gs := vm.saveGo()
+			vm.goActive++
+			vm.goFunc, vm.goMethod = fn, strings.HasPrefix(desc, "method '")
+			res := fn.gofn(vm, args)
+			vm.restoreGo(gs)
+			return res
 		}
 		return vm.callLua(fn, args)
 	}
@@ -304,6 +333,8 @@ func (vm *VM) callLua(f *Function, args []Value) []Value {
 		vm.btop = bbase + p.nbox
 	}
 	vm.depth++
+	goActive := vm.goActive
+	vm.goActive = 0
 	fr := &vm.frames[vm.depth]
 	*fr = frame{vm: vm, reg: reg, boxes: boxes, fn: f, line: p.line}
 	for i, ps := range p.params {
@@ -326,6 +357,7 @@ func (vm *VM) callLua(f *Function, args []Value) []Value {
 	}
 	*fr = frame{}
 	vm.depth--
+	vm.goActive = goActive
 	clear(reg)
 	if boxes != nil {
 		clear(boxes)
@@ -346,8 +378,12 @@ func (vm *VM) newError(v Value) *Error {
 }
 
 // where returns "chunk:line: " for the Lua function level levels up the stack (1: the one
-// running), or "" when there is none.
+// running), or "" when there is none: a Go function called by another Go function (as
+// pcall calls its argument) has no Lua position.
 func (vm *VM) where(level int) string {
+	if vm.goActive > 1 {
+		return ""
+	}
 	d := vm.depth - (level - 1)
 	if d < 1 || d > vm.depth {
 		return ""

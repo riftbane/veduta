@@ -590,9 +590,9 @@ func (c *compiler) numFor(s *numForStmt) stmtFn {
 		for _, x := range [...]struct {
 			v    Value
 			what string
-		}{{a, "initial"}, {b, "limit"}, {st, "step"}} {
+		}{{a, "initial value"}, {b, "limit"}, {st, "step"}} {
 			if !x.v.IsNumber() {
-				vm.Errorf("'for' %s value must be a number", x.what)
+				vm.Errorf("bad 'for' %s (number expected, got %s)", x.what, vm.typeName(x.v))
 			}
 		}
 		if a.k == kindInt && st.k == kindInt {
@@ -1156,25 +1156,49 @@ func (c *compiler) table(e *tableExpr) exprFn {
 	if len(fields) == 0 {
 		return func(*frame) Value { return TableValue(&Table{}) }
 	}
+	// Positional values are stored in batches of 50, after the keyed fields evaluated before
+	// them, as Lua's own compiler does: in {[1] = "a", "b"}, t[1] is "b".
+	const batch = 50
 	return func(fr *frame) Value {
+		vm := fr.vm
 		t := NewTable(npos, nkey)
+		base := vm.top
 		pos := int64(1)
+		pending := 0
+		flush := func() {
+			for i := 0; i < pending; i++ {
+				t.SetInt(pos, vm.stack[base+i])
+				pos++
+			}
+			clear(vm.stack[base : base+pending])
+			pending = 0
+			vm.top = base
+		}
 		for _, f := range fields {
 			switch {
 			case f.multi != nil:
-				for _, v := range f.multi(fr) {
+				res := f.multi(fr)
+				flush()
+				for _, v := range res {
 					t.SetInt(pos, v)
 					pos++
 				}
 			case f.key != nil:
 				k := f.key(fr)
 				v := f.val(fr)
-				fr.vm.rawSet(t, k, v)
+				vm.rawSet(t, k, v)
 			default:
-				t.SetInt(pos, f.val(fr))
-				pos++
+				v := f.val(fr)
+				vm.ensure(base + pending + 1)
+				vm.stack[base+pending] = v
+				pending++
+				vm.top = base + pending
+				if pending == batch {
+					flush()
+				}
 			}
 		}
+		flush()
 		return TableValue(t)
 	}
 }

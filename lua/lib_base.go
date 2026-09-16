@@ -143,7 +143,7 @@ func ipairsAux(vm *VM, args []Value) []Value {
 
 // protectedCall calls f and reports a Lua error instead of raising it.
 func (vm *VM) protectedCall(f Value, args []Value) (res []Value, errv Value, ok bool) {
-	depth, top, btop := vm.depth, vm.top, vm.btop
+	depth, top, btop, gs := vm.depth, vm.top, vm.btop, vm.saveGo()
 	defer func() {
 		if r := recover(); r != nil {
 			e, isErr := r.(*Error)
@@ -151,6 +151,7 @@ func (vm *VM) protectedCall(f Value, args []Value) (res []Value, errv Value, ok 
 				panic(r) // a budget exhausted, or a bug: not for Lua to catch
 			}
 			vm.unwind(depth, top, btop)
+			vm.restoreGo(gs)
 			res, errv, ok = nil, e.Value, false
 		}
 	}()

@@ -85,9 +85,9 @@ func (t *Table) GetString(s string) Value {
 func keyError(k Value) string {
 	switch {
 	case k.k == kindNil:
-		return "index is nil"
+		return "table index is nil"
 	case k.k == kindFloat && math.IsNaN(k.f()):
-		return "index is NaN"
+		return "table index is NaN"
 	}
 	return ""
 }

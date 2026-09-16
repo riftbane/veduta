@@ -1,6 +1,10 @@
 -- Language core: values, operators, control flow, functions, closures, tables, metatables.
 -- Every check is an assert; the Go test runs the file and fails on the first error.
 
+-- VEDUTA is set by the engine's test harness: checks of what the engine deliberately does
+-- differently from PUC Lua (the order pairs visits a table in) run only there.
+local ENGINE = rawget(_G, "VEDUTA") ~= nil
+
 local function eq(a, b, what)
   if a ~= b then
     error((what or "value") .. ": got " .. tostring(a) .. ", want " .. tostring(b), 2)
@@ -40,7 +44,7 @@ eq(tostring(3.0), "3.0")
 eq(tostring(-0.0), "-0.0")
 eq(tostring(1/0), "inf")
 eq(tostring(-1/0), "-inf")
-eq(tostring(0/0), "nan")
+eq(tostring(0/0) == "nan" or tostring(0/0) == "-nan", true) -- the engine never shows the sign
 eq(tostring(0.1), "0.1")
 eq(tostring(100), "100")
 eq(tonumber("0x10"), 16)
@@ -66,7 +70,7 @@ eq(1 << 63, -9223372036854775808)
 eq(1 << 64, 0)
 eq(-1 >> 1, 9223372036854775807)
 eq(2.0 | 1, 3)
-eq("3" & 1, 1)
+eq(pcall(function() return "3" & 1 end), false)
 eq(1 << -1, 0)
 eq(4 >> -1, 8)
 
@@ -176,7 +180,7 @@ eq(outer()(), 11)
 
 -- tables
 t = {10, 20, 30, x = 1, ["y z"] = 2, [1.0 + 1] = "two"}
-eq(t[2], "two")
+eq(t[2], 20) -- positional fields are stored after the keyed ones
 eq(t.x, 1)
 eq(t["y z"], 2)
 eq(#t, 3)
@@ -186,12 +190,12 @@ t[#t] = nil
 eq(#t, 3)
 local keys = {}
 for k in pairs({a = 1, b = 2, c = 3}) do keys[#keys + 1] = k end
-eq(keys[1] .. keys[2] .. keys[3], "abc")
+if ENGINE then eq(keys[1] .. keys[2] .. keys[3], "abc") end
 local ordered = {}
 local src = {}
 src.zeta, src.alpha, src[5], src.mid = 1, 2, 3, 4
 for k, v in pairs(src) do ordered[#ordered + 1] = tostring(k) .. "=" .. v end
-eq(ordered[1] .. " " .. ordered[2] .. " " .. ordered[3] .. " " .. ordered[4], "zeta=1 alpha=2 5=3 mid=4")
+if ENGINE then eq(ordered[1] .. " " .. ordered[2] .. " " .. ordered[3] .. " " .. ordered[4], "zeta=1 alpha=2 5=3 mid=4") end
 local arr = {}
 for i = 1, 5 do arr[i] = i end
 local cnt = 0
@@ -207,7 +211,7 @@ local nested = {a = {b = {c = "deep"}}}
 eq(nested.a.b.c, "deep")
 local ok, err = pcall(function() local q = {}; q[nil] = 1 end)
 eq(ok, false)
-eq(err, "core.lua:208: index is nil")
+eq(err, "core.lua:212: table index is nil")
 
 -- metatables
 local V = {}
@@ -255,11 +259,11 @@ eq(e2.code, 7)
 local ok3, e3 = pcall(error, "plain", 0)
 eq(e3, "plain")
 local ok4, e4 = pcall(function() error("where") end)
-eq(e4, "core.lua:257: where")
+eq(e4, "core.lua:261: where")
 local ok5, e5 = pcall(function() local x = nil; return x.field end)
 eq(ok5, false)
 local ok6, e6 = xpcall(function() error("boom") end, function(m) return "handled: " .. m end)
-eq(e6, "handled: core.lua:261: boom")
+eq(e6, "handled: core.lua:265: boom")
 eq(select("#", pcall(function() return 1, 2 end)), 3)
 
 -- integer and float keys agree

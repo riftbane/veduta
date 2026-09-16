@@ -233,7 +233,7 @@ func (p *parser) statement() stmt {
 	case tBreak:
 		p.advance()
 		if p.fn.loops == 0 {
-			panic(&SyntaxError{Chunk: p.lx.chunk, Line: line, Msg: fmt.Sprintf("break outside a loop at line %d", line)})
+			panic(&SyntaxError{Chunk: p.lx.chunk, Line: line, Msg: fmt.Sprintf("break outside loop at line %d", line)})
 		}
 		return &breakStmt{line: line}
 	case tGoto:

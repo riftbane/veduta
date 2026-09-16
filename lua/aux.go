@@ -12,8 +12,19 @@ func Arg(args []Value, i int) Value {
 	return Nil
 }
 
-// ArgError raises "bad argument #i to 'fname' (msg)"; i is 0-based.
+// ArgError raises "bad argument #i to 'fname' (msg)"; i is 0-based. As in Lua, the name is
+// the one the caller used, qualified ("string.rep") when a Go function such as pcall made
+// the call, and a method's self is not counted.
 func (vm *VM) ArgError(i int, fname, msg string) {
+	if vm.goActive > 1 && vm.goFunc != nil {
+		fname = vm.goFunc.name
+	}
+	if vm.goMethod && vm.goActive == 1 {
+		if i == 0 {
+			vm.Errorf("calling '%s' on bad self (%s)", fname, msg)
+		}
+		i--
+	}
 	vm.Errorf("bad argument #%d to '%s' (%s)", i+1, fname, msg)
 }
 

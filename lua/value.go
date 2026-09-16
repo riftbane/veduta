@@ -7,8 +7,11 @@
 // traversal follows insertion order, and the math library is built on gmath rather than
 // on the math package, whose functions differ between amd64 and arm64.
 //
-// Differences from Lua 5.4: no goto, no to-be-closed variables, no weak tables and no
-// finalizers (the Go collector owns memory); no io, os, debug or package libraries.
+// The standard libraries are base, string, table, math and utf8; their output is checked
+// line by line against PUC Lua 5.4.6 (testdata/libs.lua). Differences from Lua 5.4: pairs
+// visits keys in insertion order, NaN prints without a sign, no goto, no coroutines, no
+// to-be-closed variables, no weak tables and no finalizers (the Go collector owns memory),
+// no io, os, debug or package libraries, and no string.pack or string.dump.
 package lua
 
 import (
