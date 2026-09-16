@@ -1,8 +1,8 @@
 {
   "name": "veduta",
   "displayName": "Veduta",
-  "description": "Make Veduta console games: new game, play in the simulator (F5), test, build with errors in Problems, deploy to the console's card.",
-  "version": "0.1.0",
+  "description": "Make Veduta console games: new game, play and debug (F5), test, build with errors in Problems, deploy to the console's card.",
+  "version": "0.2.0",
   "publisher": "riftbane",
   "license": "MIT",
   "repository": {
@@ -14,6 +14,7 @@
   },
   "categories": [
     "Programming Languages",
+    "Debuggers",
     "Other"
   ],
   "keywords": [
@@ -24,7 +25,9 @@
   ],
   "main": "./extension.js",
   "activationEvents": [
-    "workspaceContains:veduta.json"
+    "workspaceContains:veduta.json",
+    "onDebugResolve:veduta",
+    "onDebugDynamicConfigurations:veduta"
   ],
   "contributes": {
     "commands": [
@@ -53,13 +56,6 @@
         "command": "veduta.deploy",
         "title": "Deploy to the Console's Card",
         "category": "Veduta"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "veduta.play",
-        "key": "f5",
-        "when": "veduta.project && !inDebugMode"
       }
     ],
     "configuration": {
@@ -115,6 +111,86 @@
           "column": 3,
           "message": 4
         }
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "lua"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "veduta",
+        "label": "Veduta",
+        "languages": [
+          "lua"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "properties": {
+              "project": {
+                "type": "string",
+                "description": "The game's folder.",
+                "default": "${workspaceFolder}"
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "play",
+                  "scenario"
+                ],
+                "enumDescriptions": [
+                  "Play the game: the simulator on Windows, the framebuffer on Linux.",
+                  "Run a scenario headless."
+                ],
+                "default": "play"
+              },
+              "scenario": {
+                "type": "string",
+                "description": "With mode scenario: its name (tests/scenarios/<name>.scenario.json) or file."
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Stop before the first statement.",
+                "default": false
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "veduta",
+            "request": "launch",
+            "name": "Play",
+            "project": "${workspaceFolder}",
+            "mode": "play"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Veduta: Play",
+            "description": "Play the game with the debugger",
+            "body": {
+              "type": "veduta",
+              "request": "launch",
+              "name": "Play",
+              "project": "^\"\\${workspaceFolder}\"",
+              "mode": "play"
+            }
+          },
+          {
+            "label": "Veduta: Scenario",
+            "description": "Run a scenario with the debugger",
+            "body": {
+              "type": "veduta",
+              "request": "launch",
+              "name": "Scenario",
+              "project": "^\"\\${workspaceFolder}\"",
+              "mode": "scenario",
+              "scenario": "start"
+            }
+          }
+        ]
       }
     ]
   },

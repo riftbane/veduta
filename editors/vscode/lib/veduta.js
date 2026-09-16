@@ -64,4 +64,17 @@ function validName(name) {
   return /^[a-z0-9][a-z0-9_-]{0,63}$/.test(name);
 }
 
-module.exports = { program, playCommand, diagnostics, isGameFile, validName };
+// launchConfig completes a debug configuration: the game's folder when it names none, and
+// play when it names no mode.
+function launchConfig(config, root) {
+  const c = Object.assign({ type: 'veduta', request: 'launch', name: 'Play' }, config);
+  if (!c.project) {
+    c.project = root;
+  }
+  if (!c.mode) {
+    c.mode = 'play';
+  }
+  return c;
+}
+
+module.exports = { program, playCommand, diagnostics, isGameFile, validName, launchConfig };

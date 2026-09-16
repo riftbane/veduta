@@ -65,6 +65,37 @@ async function run() {
   await until('veduta test to end', () => exit !== undefined, 120000);
   done.dispose();
   assert.strictEqual(exit, 0, 'veduta test passes');
+
+  // The debugger: a breakpoint in game.draw stops a scenario there, the stack says so, and
+  // the session runs to its end once continued.
+  const drawLine = good.split('\n').findIndex((l) => l.includes('hud.text'));
+  assert.ok(drawLine > 0, 'main.lua draws its title');
+  vscode.debug.addBreakpoints([new vscode.SourceBreakpoint(new vscode.Location(vscode.Uri.file(main), new vscode.Position(drawLine, 0)))]);
+  let stopped = false;
+  let ended = false;
+  const tracker = vscode.debug.registerDebugAdapterTrackerFactory('veduta', {
+    createDebugAdapterTracker: () => ({
+      onDidSendMessage: (m) => {
+        if (m.type === 'event' && m.event === 'stopped') {
+          stopped = true;
+        }
+      },
+    }),
+  });
+  const ends = vscode.debug.onDidTerminateDebugSession(() => { ended = true; });
+  const started = await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0],
+    { type: 'veduta', request: 'launch', name: 'Scenario', mode: 'scenario', scenario: 'start' });
+  assert.ok(started, 'the debug session starts');
+  await until('the breakpoint to stop the game', () => stopped);
+  const session = vscode.debug.activeDebugSession;
+  const trace = await session.customRequest('stackTrace', { threadId: 1 });
+  assert.strictEqual(trace.stackFrames[0].line, drawLine + 1);
+  assert.ok(trace.stackFrames[0].source.path.endsWith('main.lua'));
+  vscode.debug.removeBreakpoints(vscode.debug.breakpoints);
+  await session.customRequest('continue', { threadId: 1 });
+  await until('the session to end', () => ended, 120000);
+  tracker.dispose();
+  ends.dispose();
 }
 
 module.exports = { run };

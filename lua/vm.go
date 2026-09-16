@@ -43,6 +43,8 @@ type proto struct {
 	upvals  []upvalSource
 	body    stmtFn
 	nparams int
+
+	upvalNames []string // for a debugger
 }
 
 // slotRef is a local's place: a register, or a cell slot when captured.
@@ -67,6 +69,7 @@ type frame struct {
 	fn      *Function
 	ret     []Value
 	line    int
+	vis     []*localVar // the locals visible at the statement a debugger stopped before
 }
 
 // Error is a Lua error: the value raised, with the Lua stack when it was raised.
@@ -99,6 +102,9 @@ type Options struct {
 	Stdout io.Writer
 	// MaxDepth bounds nested Lua calls (default 200).
 	MaxDepth int
+	// Debugger, when set, is called before every statement of the code the VM loads. Code
+	// loaded without it has no hooks and runs at full speed.
+	Debugger Debugger
 }
 
 // maxStack bounds the value stack.
@@ -130,6 +136,8 @@ type VM struct {
 	goActive int
 	goFunc   *Function
 	goMethod bool
+
+	debugger Debugger
 }
 
 // goState is the part of the VM an error unwinds to.
@@ -148,13 +156,14 @@ func New(o Options) *VM {
 		o.MaxDepth = 200
 	}
 	vm := &VM{
-		globals: NewTable(0, 64),
-		stdout:  o.Stdout,
-		stack:   make([]Value, 1024),
-		boxes:   make([]*cell, 256),
-		frames:  make([]frame, o.MaxDepth+1),
-		ret:     make([]Value, 8),
-		budget:  1<<63 - 1,
+		globals:  NewTable(0, 64),
+		stdout:   o.Stdout,
+		stack:    make([]Value, 1024),
+		boxes:    make([]*cell, 256),
+		frames:   make([]frame, o.MaxDepth+1),
+		ret:      make([]Value, 8),
+		budget:   1<<63 - 1,
+		debugger: o.Debugger,
 	}
 	if vm.stdout == nil {
 		vm.stdout = io.Discard
@@ -186,7 +195,7 @@ func (vm *VM) Load(chunk, src string) (*Function, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := compileFunc(chunk, pf, nil)
+	p := compileFunc(chunk, pf, nil, vm.debugger != nil)
 	return &Function{proto: p}, nil
 }
 

@@ -26,6 +26,18 @@ leaves) or any pad. Three keys work the player itself:
 | F5 | restarts the game and records the buttons; F5 again saves them as `tests/scenarios/recorded-<time>.scenario.json`, a scenario to add expectations to |
 | F9 | reads the scripts and assets again and restarts; the simulator also does it by itself when a file changes |
 
+## Debugging
+
+`veduta dap` is a debug adapter (the Debug Adapter Protocol, on stdin and stdout), which VS
+Code's Veduta extension starts on F5. It plays the game (`"mode": "play"`, the simulator on
+Windows) or runs a scenario headless (`"mode": "scenario"`, `"scenario": "collect"`) with a
+debugger on the scripts: breakpoints, pause, stepping over, into and out of calls (into a
+module `require` runs too), the call stack, each call's locals and upvalues and the
+globals, tables and entities opened field by field, and a name with its fields
+(`e.state.score`) evaluated on hover or as a watch. `"stopOnEntry": true` stops before the
+first statement. Ctrl+F5 runs without it. While the game is stopped the simulator's window
+does not redraw. A run under the debugger gives the same trace as one without.
+
 ## Editing
 
 `veduta init` sets an editor up, and `veduta upgrade` brings it to the tool's version:

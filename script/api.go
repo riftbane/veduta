@@ -390,6 +390,9 @@ func (g *Game) spawn(vm *lua.VM, args []lua.Value) []lua.Value {
 }
 
 // installEntity builds the metatable of entity values.
+// EntityFields are the fields of an entity, in the order a debugger shows them.
+var EntityFields = []string{"id", "name", "kind", "alive", "x", "y", "z", "visible", "model", "material", "layer", "state"}
+
 func (g *Game) installEntity() {
 	ent := func(vm *lua.VM, args []lua.Value, fname string) *scene.Entity {
 		if u := lua.Arg(args, 0).Userdata(); u != nil {

@@ -32,10 +32,21 @@ type compiler struct {
 	maxbox  int
 	upvals  []*localVar
 	sources []upvalSource
+	debug   bool        // compile the debugger's statement hooks
+	scope   []*localVar // the locals visible here, in declaration order
 }
 
-func compileFunc(chunk string, pf *parseFunc, parent *compiler) *proto {
-	c := &compiler{chunk: chunk, pf: pf, parent: parent}
+// scopeMark is what a block restores when it ends.
+type scopeMark struct{ reg, box, scope int }
+
+func (c *compiler) mark() scopeMark { return scopeMark{c.nreg, c.nbox, len(c.scope)} }
+
+func (c *compiler) release(m scopeMark) {
+	c.nreg, c.nbox, c.scope = m.reg, m.box, c.scope[:m.scope]
+}
+
+func compileFunc(chunk string, pf *parseFunc, parent *compiler, debug bool) *proto {
+	c := &compiler{chunk: chunk, pf: pf, parent: parent, debug: debug}
 	p := &proto{name: pf.name, chunk: chunk, line: pf.line, vararg: pf.vararg, nparams: len(pf.params)}
 	for _, v := range pf.params {
 		p.params = append(p.params, c.declare(v))
@@ -43,11 +54,15 @@ func compileFunc(chunk string, pf *parseFunc, parent *compiler) *proto {
 	p.body = c.block(pf.body)
 	p.nreg, p.nbox = c.maxreg, c.maxbox
 	p.upvals = c.sources
+	for _, u := range c.upvals {
+		p.upvalNames = append(p.upvalNames, u.name)
+	}
 	return p
 }
 
 // declare gives a local its slot.
 func (c *compiler) declare(v *localVar) slotRef {
+	c.scope = append(c.scope, v)
 	if v.captured {
 		v.slot = c.nbox
 		c.nbox++
@@ -103,12 +118,12 @@ func (c *compiler) describe(e expr) string {
 
 // block compiles statements in a scope of their own.
 func (c *compiler) block(stmts []stmt) stmtFn {
-	reg, box := c.nreg, c.nbox
+	m := c.mark()
 	fns := make([]stmtFn, 0, len(stmts))
 	for _, s := range stmts {
 		fns = append(fns, c.stmt(s))
 	}
-	c.nreg, c.nbox = reg, box
+	c.release(m)
 	return seq(fns)
 }
 
@@ -148,7 +163,25 @@ func seq(fns []stmtFn) stmtFn {
 	}
 }
 
+// stmt compiles a statement; for a debugger, behind a hook that stops before it runs with
+// the locals visible there.
 func (c *compiler) stmt(s stmt) stmtFn {
+	if !c.debug {
+		return c.stmt1(s)
+	}
+	vis := append([]*localVar(nil), c.scope...)
+	line := s.stmtLine()
+	fn := c.stmt1(s)
+	return func(fr *frame) ctl {
+		if d := fr.vm.debugger; d != nil {
+			fr.line, fr.vis = line, vis
+			d.Statement(fr.vm, fr.fn.proto.chunk, line, fr.vm.depth)
+		}
+		return fn(fr)
+	}
+}
+
+func (c *compiler) stmt1(s stmt) stmtFn {
 	switch s := s.(type) {
 	case *localStmt:
 		return c.localStmt(s)
@@ -184,13 +217,13 @@ func (c *compiler) stmt(s stmt) stmtFn {
 			}
 		}
 	case *repeatStmt:
-		reg, box := c.nreg, c.nbox
+		m := c.mark()
 		fns := make([]stmtFn, 0, len(s.body))
 		for _, b := range s.body {
 			fns = append(fns, c.stmt(b))
 		}
 		cond := c.cond(s.cond)
-		c.nreg, c.nbox = reg, box
+		c.release(m)
 		body := seq(fns)
 		return func(fr *frame) ctl {
 			vm := fr.vm
@@ -217,7 +250,7 @@ func (c *compiler) stmt(s stmt) stmtFn {
 		return c.genFor(s)
 	case *localFuncStmt:
 		ref := c.declare(s.v)
-		p := compileFunc(c.chunk, s.f, c)
+		p := compileFunc(c.chunk, s.f, c, c.debug)
 		line := s.line
 		if ref.boxed {
 			slot := ref.slot
@@ -575,10 +608,10 @@ func (c *compiler) numFor(s *numForStmt) stmtFn {
 	if s.step != nil {
 		step = c.expr(s.step)
 	}
-	reg, box := c.nreg, c.nbox
+	m := c.mark()
 	store := c.storeLocal(c.declare(s.v), true)
 	body := c.block(s.body)
-	c.nreg, c.nbox = reg, box
+	c.release(m)
 	line := s.line
 	return func(fr *frame) ctl {
 		fr.line = line
@@ -688,13 +721,13 @@ func forLimit(init int64, lim Value, step int64) (int64, bool) {
 
 func (c *compiler) genFor(s *genForStmt) stmtFn {
 	vals := c.exprList(s.exprs, 3)
-	reg, box := c.nreg, c.nbox
+	m := c.mark()
 	stores := make([]func(*frame, Value), len(s.vars))
 	for i, v := range s.vars {
 		stores[i] = c.storeLocal(c.declare(v), true)
 	}
 	body := c.block(s.body)
-	c.nreg, c.nbox = reg, box
+	c.release(m)
 	line := s.line
 	nvars := len(s.vars)
 	return func(fr *frame) ctl {
@@ -1060,7 +1093,7 @@ func (c *compiler) expr(e expr) exprFn {
 			return Nil
 		}
 	case *funcExpr:
-		p := compileFunc(c.chunk, e.f, c)
+		p := compileFunc(c.chunk, e.f, c, c.debug)
 		return func(fr *frame) Value { return makeClosure(fr, p) }
 	case *nameExpr:
 		return c.name(e)

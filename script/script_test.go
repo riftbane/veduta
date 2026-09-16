@@ -233,6 +233,16 @@ func TestTypesMatchAPI(t *testing.T) {
 			t.Errorf("veduta.d.lua declares %s, which the runtime does not have", name)
 		}
 	}
+	for _, field := range EntityFields {
+		if !strings.Contains(string(Types), "---@field "+field+" ") {
+			t.Errorf("veduta.d.lua does not declare the entity field %s", field)
+		}
+		if _, err := g.vm.Call(lua.FunctionValue(lua.NewFunction("get", func(vm *lua.VM, args []lua.Value) []lua.Value {
+			return vm.Ret(vm.Index(e, lua.String(field)))
+		}))); err != nil {
+			t.Errorf("entities have no field %s: %v", field, err)
+		}
+	}
 	for _, field := range []string{"tick", "dt", "width", "height", "headless", "name", "title", "api"} {
 		if g.engine.Get(lua.String(field)).IsNil() || !strings.Contains(string(Types), "---@field "+field+" ") {
 			t.Errorf("engine.%s: in the runtime or in veduta.d.lua but not both", field)

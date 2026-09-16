@@ -41,6 +41,10 @@ var skipDirs = map[string]bool{".git": true, "out": true, "bin": true, "node_mod
 
 // Game is a game written in Lua.
 type Game struct {
+	// Debugger, set before a run starts, follows the scripts statement by statement: a
+	// debug adapter's. Runs without one have no hooks.
+	Debugger lua.Debugger
+
 	root    string            // the project directory
 	main    string            // slash path of the main script
 	sources map[string]string // slash path → source, every .lua file of the project
@@ -169,7 +173,7 @@ func (g *Game) Start(ctx *veduta.Context) error {
 	g.ctx, g.err, g.in = ctx, nil, veduta.Input{}
 	g.entities = map[*scene.Entity]*lua.Userdata{}
 	g.modules = map[string]lua.Value{}
-	g.vm = lua.New(lua.Options{Stdout: g.stderr})
+	g.vm = lua.New(lua.Options{Stdout: g.stderr, Debugger: g.Debugger})
 	g.vm.SetBudget(Budget)
 	g.vm.SetRandom(ctx.RNG)
 	g.game, g.kinds, g.engine = lua.NewTable(0, 4), lua.NewTable(0, 8), lua.NewTable(0, 8)

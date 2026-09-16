@@ -12,6 +12,11 @@ All notable changes to this project are documented here. The format follows
   (checksum verified) into `%LOCALAPPDATA%\Programs\veduta` and puts it on the user's PATH
   without administrator rights, from the stable or beta channel; CI runs it in Windows
   PowerShell and pwsh and plays a new Lua game's scenarios with what it installed.
+- Lua debugging: `veduta dap`, a Debug Adapter Protocol server (`internal/dap`) that plays
+  the game or runs a scenario with a debugger on its VM (breakpoints, pause, step over, in
+  and out, stack, locals, upvalues, globals, tables and entities, `e.state.score` evaluated),
+  and the VS Code extension's debugger type `veduta` on F5. The VM compiles statement hooks
+  only when given a `lua.Debugger`, so runs without one are unchanged.
 - The documentation website, https://riftbane.github.io/veduta/: `docs/*.md` rendered by
   `internal/site` (a Markdown subset in Go, links between pages and headings checked by a
   test) and published by the `site` workflow with GitHub Pages. Two new pages, also docs

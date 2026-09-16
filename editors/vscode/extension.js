@@ -157,7 +157,7 @@ async function activate(context) {
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   status.text = '$(play) Veduta';
-  status.tooltip = `Play the game (F5): veduta ${v.playCommand(process.platform)}`;
+  status.tooltip = `Play the game without the debugger: veduta ${v.playCommand(process.platform)} (F5 plays it with the debugger)`;
   status.command = 'veduta.play';
   if (isProject) {
     status.show();
@@ -182,6 +182,23 @@ async function activate(context) {
         const folder = t.scope && t.scope.uri ? t.scope : await projectRoot();
         return folder && t.definition.command ? task(folder, t.definition.command) : undefined;
       },
+    }),
+    // F5 with no launch.json plays the game under the debugger; veduta dap is the adapter.
+    vscode.debug.registerDebugConfigurationProvider('veduta', {
+      resolveDebugConfiguration: async (folder, config) => {
+        const root = folder || await projectRoot();
+        if (!config.type && !config.request && !config.name) {
+          if (!root) {
+            vscode.window.showWarningMessage('Veduta: open a game project (a folder with veduta.json) first.');
+            return undefined;
+          }
+          return v.launchConfig({}, root.uri.fsPath);
+        }
+        return v.launchConfig(config, root ? root.uri.fsPath : '');
+      },
+    }),
+    vscode.debug.registerDebugAdapterDescriptorFactory('veduta', {
+      createDebugAdapterDescriptor: () => new vscode.DebugAdapterExecutable(veduta(), ['dap']),
     }),
     vscode.workspace.onDidSaveTextDocument((doc) => {
       if (vscode.workspace.getConfiguration('veduta').get('buildOnSave') && v.isGameFile(doc.fileName)) {

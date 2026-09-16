@@ -46,3 +46,9 @@ test('validName', () => {
   assert.ok(!v.validName('-x'));
   assert.ok(!v.validName(''));
 });
+
+test('launchConfig', () => {
+  assert.deepStrictEqual(v.launchConfig({}, '/g'), { type: 'veduta', request: 'launch', name: 'Play', project: '/g', mode: 'play' });
+  assert.deepStrictEqual(v.launchConfig({ type: 'veduta', request: 'launch', name: 'S', mode: 'scenario', scenario: 'start', project: '/other' }, '/g'),
+    { type: 'veduta', request: 'launch', name: 'S', mode: 'scenario', scenario: 'start', project: '/other' });
+});

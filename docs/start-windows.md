@@ -37,7 +37,7 @@ opens in a new window. From a terminal it is `veduta init mygame` and `code myga
 
 ## 3. Play it
 
-**F5** (or ▶ Veduta in the status bar) opens the simulator: the console's 320 × 240 panel
+**F5** opens the simulator: the console's 320 × 240 panel
 at a whole scale, in its 16-bit colours, 20 frames a second. The console's buttons are on
 the keyboard, and any gamepad works too:
 
@@ -53,6 +53,12 @@ the keyboard, and any gamepad works too:
 Three keys work the simulator itself: **F1** shows the time each tick takes against the
 console's budget, **F5** records what you play as a scenario (F5 again saves it), **F9**
 reloads scripts and assets. It also reloads by itself when you save a file.
+
+Breakpoints work in the same run: click left of a line number in `main.lua`, and the game
+stops there when it reaches it. The Run and Debug panel shows where it stopped, the local
+variables, the entities opened field by field; F10 steps over, F11 into a call, Shift+F11
+out, F5 continues. Ctrl+F5 plays without the debugger. To debug a scenario instead, add a
+configuration in `.vscode/launch.json` (**Veduta: Scenario**).
 
 ## 4. Build and test
 
