@@ -178,6 +178,35 @@ drawn), `engine.headless`, the project's `engine.name` and `engine.title`, and `
 the API level of the runtime (1 in v2.0.0). A game that needs a later level says so with
 `"api"` in `veduta.json`, and an older console refuses it with a message.
 
+## mesh and volume
+
+Models built while the game runs: the terrain of a block world, a shape that changes. The
+loops run in the engine, not in Lua, so a whole chunk of blocks is one call.
+
+| Function | Meaning |
+|----------|---------|
+| `mesh.new()` | an empty mesh |
+| `m:part([material])` | what follows is drawn with `material` (a material's name); without one, with the entity's |
+| `m:quad(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4)` | a quad, its corners counter-clockwise seen from the side that shows; UVs (0, 0), (1, 0), (1, 1), (0, 1) |
+| `m:triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3)` | a triangle, likewise |
+| `m:box(x, y, z, w, h, d [, faces])` | the box from (x, y, z), w × h × d; `faces` names the faces to add, run together (`"+y-y"`), default all six |
+| `m:triangles()` | how many triangles the mesh has |
+| `mesh.set(name, m)` | makes `m` the model `name`, which entities name as `model` like an asset: the name contains `:` (`"game:chunk_0_0"`) and does not start with `world:`. It copies the mesh: change `m` and set it again to change the model. Models set here outlive `scene.load` |
+| `mesh.remove(name)` | forgets the model; entities naming it draw nothing |
+| `volume.new(x, y, z)` | a grid of blocks, each a block id from 0 (empty) to 255; at most 4 194 304 blocks |
+| `v:get(x, y, z)`, `v:set(x, y, z, id)` | one block; cells count from 0 |
+| `v:fill(x1, y1, z1, x2, y2, z2, id)` | every block of the box between two cells |
+| `v:size()` | x, y, z |
+| `mesh.voxels(v, materials [, size])` | a mesh of the faces between a block and an empty cell or the edge: one part per block id, drawn with `materials[id]` (a table of id → material name), each block `size` units (default 1), cell (0, 0, 0) at the origin |
+
+```lua
+local world = volume.new(16, 8, 16)
+world:fill(0, 0, 0, 15, 2, 15, 1)       -- three layers of stone
+world:fill(0, 3, 0, 15, 3, 15, 2)       -- grass on top
+mesh.set("game:chunk", mesh.voxels(world, {[1] = "stone", [2] = "grass"}))
+scene.spawn{name = "chunk", model = "game:chunk"}
+```
+
 ## trace, invariant, require
 
 | Function | Meaning |

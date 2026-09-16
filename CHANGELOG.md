@@ -12,6 +12,11 @@ All notable changes to this project are documented here. The format follows
   (checksum verified) into `%LOCALAPPDATA%\Programs\veduta` and puts it on the user's PATH
   without administrator rights, from the stable or beta channel; CI runs it in Windows
   PowerShell and pwsh and plays a new Lua game's scenarios with what it installed.
+- Lua `mesh` and `volume`: models built while a script game runs (`Context.SetModel`), with
+  the loops in Go. A mesh adds parts, quads, triangles and boxes (a face mask for the hidden
+  ones); a volume is a grid of block ids whose visible faces `mesh.voxels` turns into a mesh,
+  one part per id. The geometry is pinned bit for bit by a golden that CI checks on amd64,
+  arm64 and Windows.
 - Lua debugging: `veduta dap`, a Debug Adapter Protocol server (`internal/dap`) that plays
   the game or runs a scenario with a debugger on its VM (breakpoints, pause, step over, in
   and out, stack, locals, upvalues, globals, tables and entities, `e.state.score` evaluated),

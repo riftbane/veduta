@@ -167,7 +167,7 @@ func TestAPIDocumented(t *testing.T) {
 	if code := veduta.RunArgs(g, []string{"-project", testGame, "-headless", "simulate", "--scene", "main", "--ticks", "1", "--out", t.TempDir()}, &out, io.Discard); code != 0 {
 		t.Fatalf("run: %s", out.String())
 	}
-	for _, lib := range []string{"input", "scene", "camera", "world", "hud"} {
+	for _, lib := range []string{"input", "scene", "camera", "world", "hud", "mesh", "volume"} {
 		g.vm.Global(lib).Table().ForEach(func(k, _ lua.Value) bool {
 			if name := lib + "." + k.String(); !strings.Contains(string(doc), "`"+name) {
 				t.Errorf("docs/lua.md does not document %s", name)
@@ -208,20 +208,34 @@ func TestTypesMatchAPI(t *testing.T) {
 		declared[m[1]] = true
 	}
 	have := map[string]bool{"trace": true, "invariant": true, "require": true}
-	for _, lib := range []string{"input", "scene", "camera", "world", "hud"} {
+	for _, lib := range []string{"input", "scene", "camera", "world", "hud", "mesh", "volume"} {
 		g.vm.Global(lib).Table().ForEach(func(k, _ lua.Value) bool {
 			have[lib+"."+k.String()] = true
 			return true
 		})
 	}
 	e := g.entity(g.ctx.Scene.Find("hero"))
+	newMesh, _ := g.vm.Call(g.vm.Global("mesh").Table().GetString("new"))
+	newVolume, _ := g.vm.Call(g.vm.Global("volume").Table().GetString("new"), lua.Int(1), lua.Int(1), lua.Int(1))
+	objects := map[string]lua.Value{"Entity:": e, "Mesh:": newMesh[0], "Volume:": newVolume[0]}
 	for name := range declared {
-		if m, ok := strings.CutPrefix(name, "Entity:"); ok {
-			if g.vm.Index(e, lua.String(m)).IsNil() {
-				t.Errorf("veduta.d.lua declares e:%s, which entities do not have", m)
+		for prefix, obj := range objects {
+			if m, ok := strings.CutPrefix(name, prefix); ok {
+				if g.vm.Index(obj, lua.String(m)).IsNil() {
+					t.Errorf("veduta.d.lua declares %s, which the runtime does not have", name)
+				}
+				have[name] = true
 			}
-			have[name] = true
 		}
+	}
+	for prefix, obj := range objects {
+		if prefix == "Entity:" {
+			continue // an entity's __index is a function: its methods are checked above
+		}
+		obj.Userdata().Meta.GetString("__index").Table().ForEach(func(k, _ lua.Value) bool {
+			have[prefix+k.String()] = true
+			return true
+		})
 	}
 	for name := range have {
 		if !declared[name] {

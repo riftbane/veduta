@@ -250,6 +250,72 @@ function hud.text(x, y, text, color, scale) end
 ---@param color? veduta.Color default white
 function hud.rect(x, y, w, h, color) end
 
+---A mesh being built; mesh.set makes it a model.
+---@class veduta.Mesh
+local Mesh = {}
+
+---What follows is drawn with this material; without one, with the entity's.
+---@param material? string
+function Mesh:part(material) end
+
+---A quad, its corners counter-clockwise seen from the side that shows.
+function Mesh:quad(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4) end
+
+---A triangle, its corners counter-clockwise seen from the side that shows.
+function Mesh:triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3) end
+
+---The box from (x, y, z), w × h × d.
+---@param faces? string the faces to add, run together: "+x-x+y-y+z-z" (default all)
+function Mesh:box(x, y, z, w, h, d, faces) end
+
+---@return integer
+function Mesh:triangles() end
+
+---A grid of blocks: ids from 0 (empty) to 255.
+---@class veduta.Volume
+local Volume = {}
+
+---@return integer id
+function Volume:get(x, y, z) end
+
+---@param id integer 0 (empty) to 255
+function Volume:set(x, y, z, id) end
+
+---Every block of the box between two cells.
+function Volume:fill(x1, y1, z1, x2, y2, z2, id) end
+
+---@return integer x, integer y, integer z
+function Volume:size() end
+
+---Models built while the game runs.
+mesh = {}
+
+---@return veduta.Mesh
+function mesh.new() end
+
+---Makes the mesh the model name (it contains ':', as "game:chunk"), a copy.
+---@param name string
+---@param m veduta.Mesh
+function mesh.set(name, m) end
+
+---@param name string
+function mesh.remove(name) end
+
+---The faces between a block and an empty cell or the edge, one part per block id.
+---@param v veduta.Volume
+---@param materials table<integer, string> block id → material name
+---@param size? number a block's size (default 1)
+---@return veduta.Mesh
+function mesh.voxels(v, materials, size) end
+
+volume = {}
+
+---@param x integer
+---@param y integer
+---@param z integer
+---@return veduta.Volume
+function volume.new(x, y, z) end
+
 ---Adds an event to the tick's trace; scenarios count them.
 ---@param name string
 ---@param fields? table<string, any>
