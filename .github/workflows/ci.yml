@@ -60,12 +60,6 @@ jobs:
           cd tmp
           ../veduta test
 
-      - name: the veduta tool never links the platform layer
-        run: |
-          if go list -deps ./cmd/veduta | grep -q 'github.com/riftbane/veduta/platform'; then
-            echo "cmd/veduta imports platform"; exit 1
-          fi
-
       - name: install.sh installs from both channels
         if: runner.os == 'Linux'
         env:

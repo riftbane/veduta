@@ -56,6 +56,15 @@ All notable changes to this project are documented here. The format follows
   village, world) is no longer shipped; it moved to `internal/testgame`, the fixture the
   engine's own scenarios, goldens and benchmarks run on.
 
+### Decisions
+
+- **The tool runs script games, player included.** v1 kept the platform layer out of the
+  `veduta` tool, since the tool only built and delegated to a game binary. A script game
+  has no binary: the tool is its runtime, headless and on a framebuffer, and v2's Windows
+  simulator lives in it too. The CI check that forbade the import is gone.
+- **`lua/aux.go` is `lua/args.go`.** Windows reserves AUX as a device name, and a checkout of
+  a file called so fails there.
+
 ## v1.4.1 — 2026-09-16
 
 ### Fixed
