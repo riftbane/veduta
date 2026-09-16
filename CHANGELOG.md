@@ -59,6 +59,47 @@ All notable changes to this project are documented here. The format follows
 - `asset.CompilerVersion` is `veduta-asset/0.4.0`: `MESH` chunks end with the draw
   distance and the levels (`docs/vda.md`), so every asset is recompiled once.
 
+### Decisions
+
+- **Terrain, vegetation and the rendering savings extend `SPEC-v1.0.0.md` at the user's
+  request (2026-09-16).** The spec is not edited; this entry, `docs/world.md`,
+  `docs/model.md`, `docs/inspect.md` and `docs/vda.md` are the record. The MCP tools
+  `world_terrain` and `world_vegetation` mirror `veduta world terrain|vegetation`.
+- **Two savings, both automatic: the view limit and levels of detail.** Culling is by
+  drawn bounds against the view volume with a 1 mm margin, so it never changes a pixel;
+  the camera's `far` is the view limit. Levels of detail are per model (`lod`,
+  `draw_distance`) and per chunk (ground grids, flora thinning), chosen per entity per
+  frame from the camera, so rendering stays a pure function of the state.
+- **Distances are measured as through a 60° lens.** Orthographic cameras have no
+  distance, and a narrow lens magnifies: scaling by tan(fov/2)/tan(30°), and using
+  0.866 × `size` for orthographic cameras, keeps "farther means fewer triangles" true to
+  what reaches the screen.
+- **Automatic levels halve segments.** Models are primitives with `segments` and
+  `rings`, so a level needs no second source; a level may name another model when that
+  is not enough. Boxes keep their triangles (`MESH_LOD_NO_GAIN` says so).
+- **Heights are integer millimeters per vertex, features apply in file order.** As with
+  biomes, integer arithmetic keeps every machine and any chunk order in agreement; file
+  order makes "flatten this hill" (a plain after a hill) expressible. Lakes and seas are
+  bowls with a dry rim 5 cm above the water so the water plane never z-fights with the
+  ground and never floats over a downhill shore.
+- **Skirts close the cracks between chunk levels.** Stitching edges would make a chunk's
+  mesh depend on its neighbours' levels; a skirt as deep as the edge's height range
+  closes any crack from the higher side, costs nothing on straight edges, and keeps every
+  chunk's meshes a function of the chunk alone.
+- **A chunk's finest grid is the coarsest within 6 cm.** Gentle relief then costs a
+  quarter of the triangles near the camera; flat biome edges keep 1-cell precision,
+  uneven ground accepts 2-cell biome steps. `HeightAt` follows the same triangles, so
+  heroes stand exactly on what is drawn.
+- **Flora is baked, not spawned.** The trace summarizes every entity every tick; a meadow
+  as entities would bury it. Flora is one model per chunk and flora model, without
+  collision, thinned by rank (a seeded half per level) and cut at the model's draw
+  distance. Trees stay prefabs: they collide.
+- **Structures stand on pads.** Sites and places level their footprint to the ground at
+  its centre and blend over 2 cells, so houses never float on slopes; sites are dropped
+  from water (checked on the ground before pads, so there is no cycle).
+- **One namespace for places, features and vegetation rules.** `world_remove` takes a
+  name; duplicates across the three lists are compile errors.
+
 ## v1.2.0 — 2026-09-15
 
 ### Added

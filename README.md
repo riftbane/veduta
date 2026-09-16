@@ -72,7 +72,7 @@ topic ([docs/2d.md](docs/2d.md)).
 | `veduta render --scene S [--tick T] [--seed N] [--camera P] [--mode M] [--out f.png] [--bundle]` | render one frame headless |
 | `veduta simulate --scenario F` / `--scene S --ticks N --seed N [--input F]` | trace, verdict, expectations, invariants, one contact sheet |
 | `veduta inspect model\|texture\|scene\|prefab\|world NAME [--focus ISSUE] [--sheets list]` | report + sheets |
-| `veduta world map\|query\|place\|remove NAME [flags]` | describe a generated world ([docs/world.md](docs/world.md)) and put landmarks where its rules allow |
+| `veduta world map\|query\|place\|terrain\|vegetation\|remove NAME [flags]` | describe a generated world ([docs/world.md](docs/world.md)), shape its ground (hills, plains, lakes, seas), plant it (trees, grass, flowers) and put landmarks where its rules allow |
 | `veduta query --frame F --at x,y` / `--coverage` | ID-buffer questions on a frame bundle |
 | `veduta diff A B [--out f.png]` | image diff with an a\|b\|heat sheet |
 | `veduta test [--update-golden]` | `go test ./...` + every scenario + golden hashes and sheets |
@@ -90,9 +90,9 @@ its report as JSON with `--json`.
 
 `veduta mcp` speaks JSON-RPC 2.0 over stdio (protocol 2025-06-18, also 2025-03-26 and
 2024-11-05). Tools: `status`, `build`, `cook`, `render`, `simulate`, `trace`, `inspect`,
-`world_map`, `world_query`, `world_place`, `world_remove`,
+`world_map`, `world_query`, `world_place`, `world_terrain`, `world_vegetation`, `world_remove`,
 `query`, `diff`, `test`, `fuzz`, `release`, `docs`. Reports come back as JSON text;
-`render`, `simulate`, `inspect`, `query` and `diff` also return PNG images inline
+`render`, `simulate`, `inspect`, `query`, `diff` and the `world_*` map tools also return PNG images inline
 sized after the 320×240 console panel: renders are 320×240 by default and at most
 640×480 (a single side gets the other at 4:3); sheets are at most 640×720, and
 `simulate` returns exactly one contact sheet.

@@ -353,3 +353,43 @@ Win32 windows are gone.
 - **Resolved:** spec extended, not edited; silent streamed spawns; bounds follow the
   world; start-cell-relative camera and entities; footprints in meters (CHANGELOG →
   Decisions).
+
+
+## Unreleased — terrain, vegetation, view limit and levels of detail (2026-09-16)
+
+- **Built:** model `lod` (automatic levels halving `segments`/`rings`, or another model)
+  and `draw_distance`; `scene.Draw` culls by drawn bounds against the view volume and
+  picks levels by distance through a 60° lens (`scene/cull.go`, `DrawStats`, `render`'s
+  `draw`); world `terrain` (relief, sea level, water material, `lod_distance`) and
+  `features` (hill, plain, lake, sea) in integer millimeters, pads under structures,
+  water that drops sites and scatter, `HeightAt`/`WaterAt` (`world/terrain.go`); chunk
+  ground with up to five grids, the finest within 6 cm, skirts, water quads
+  (`world/ground.go`); `vegetation` rules planting prefabs or baked flora thinned by the
+  model's levels (`world/flora.go`); `world_terrain`, `world_vegetation`, name-based
+  `world_remove`, terrain in `world_map`/`world_query` and the shaded map sheet
+  (`internal/cli/worldedit.go`, `inspect/world.go`); the template's hills, pond, sea,
+  grass, flowers and grove, a hero that walks on the ground and stops at the shore, and a
+  `shore` scenario.
+- **Verified:**
+  - `go test ./...`, `go vet ./...`, `gofmt -l .`, `go test ./internal/fused` (found and
+    fixed two fused jitter products in `world/flora.go`), and
+    `GOARCH=arm64 go test -exec qemu-aarch64-static ./ ./world/ ./scene/ ./asset/... ./inspect/`.
+  - Culling changes no pixel: every existing golden image and trace hash is unchanged
+    except the world scenario (looked at: its distant overview first drew coarser ground,
+    then only texture rounding differed; with the terrain template the hero climbs the
+    hill). New golden looked at: `testdata/golden/scenario_shore_sheet.png`.
+  - Cracks: `TestGroundLevelsAndSkirts` samples every pair of levels along a chunk edge;
+    960×720 renders of a hilly world in color and wireframe showed no gap.
+  - `BenchmarkWorldFrame` (template world, 7×7 chunks, camera far 100 m, 1 core): with
+    levels 8773 triangles submitted, 4670 drawn, 7.5 ms; with every level stripped 11496,
+    5860, 8.2 ms. The v1.2.0 flat world with the same camera: v1.2.0 13364 submitted,
+    2449 drawn, 6.8 ms; now 2994, 1671, 4.5 ms.
+  - Tools on the template: `inspect world overworld` clean (visible estimate 998
+    triangles), `world terrain … --dry-run`, `world vegetation … --dry-run`, `world query
+    --cell -8,1` (height −1.967, water −0.728); MCP end to end calls `world_terrain` and
+    `world_vegetation`.
+- **Not verified:** frame times on the console; the look of flora on the SPI panel.
+- **Deferred:** fog to soften the draw distance; per-quad adaptive ground (T-junction
+  free) instead of whole-chunk grids; roads and rivers; slope-based ground materials.
+- **Resolved:** CHANGELOG → Decisions (spec extended; 60° lens; skirts; 6 cm grids;
+  baked flora; pads; one namespace).
