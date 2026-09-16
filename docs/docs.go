@@ -17,7 +17,7 @@ var files embed.FS
 var Topics = []string{"model", "texture", "material", "scene", "prefab", "world", "scenario", "api", "lua"}
 
 // Extra topics that are also available.
-var Extra = []string{"project", "vda", "inspect", "config", "2d"}
+var Extra = []string{"project", "vda", "inspect", "config", "2d", "start-windows", "first-game"}
 
 // Get returns the reference text of a topic.
 func Get(topic string) (string, error) {

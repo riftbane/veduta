@@ -488,7 +488,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 		},
 		{
 			Name:        "docs",
-			Description: "Format reference for writing sources: model, texture, material, scene, prefab, world, scenario, api, lua (also project, vda, inspect, config, 2d).",
+			Description: "Format reference for writing sources: model, texture, material, scene, prefab, world, scenario, api, lua (also project, vda, inspect, config, 2d, and the guides for people start-windows and first-game).",
 			InputSchema: schema(map[string]any{"topic": enum("topic", docs.All()...)}, "topic"),
 			Handler: func(ctx context.Context, args json.RawMessage) (*mcp.Result, error) {
 				var a struct {
