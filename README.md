@@ -81,6 +81,7 @@ topic ([docs/2d.md](docs/2d.md)).
 | `veduta init [dir] --name N [--go [--module M]]` | create a game project from the embedded template: Lua, or Go with `--go` |
 | `veduta doctor` | check Go, git, the manifest, engine/tool versions, assets, updates, and the game against the console (arm64 build, fused multiply-adds in the game's code, release target, `card.json`) |
 | `veduta build [--vet]` | cook stale assets, `go build` the game; errors as `{file,line,col,msg}` |
+| `veduta deploy [card]` | put the game on the console's card (found by its label, or the folder named) as its release would |
 | `veduta sim` | play the game in the simulator window (Windows): the panel at a whole scale, in its 16-bit colors, with the console's buttons on the keyboard |
 | `veduta run` | run the player on this machine's framebuffer; refuses where there is none (no 16 or 32 bpp `/sys/class/graphics/fbN`, no `VEDUTA_FB`). A desktop session's DRM framebuffer counts as one: play from a text console (a VT) |
 | `veduta cook [--force]` | compile changed asset sources to `.vda` |

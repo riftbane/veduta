@@ -37,7 +37,9 @@
 			# ahead of its own candidates, and the candidates' numbers compared as numbers.
 			$best = $null
 			$bestKey = $null
-			foreach ($r in Invoke-RestMethod -Headers $headers "https://api.github.com/repos/$repo/releases?per_page=30") {
+			# Assigned first: Windows PowerShell passes the whole list on as one object.
+			$releases = Invoke-RestMethod -Headers $headers "https://api.github.com/repos/$repo/releases?per_page=30"
+			foreach ($r in $releases) {
 				if ($r.tag_name -notmatch '^v(\d+)\.(\d+)\.(\d+)(?:-(.+))?$') { continue }
 				$pre = '~'
 				if ($Matches[4]) {

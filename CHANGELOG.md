@@ -12,6 +12,10 @@ All notable changes to this project are documented here. The format follows
   (checksum verified) into `%LOCALAPPDATA%\Programs\veduta` and puts it on the user's PATH
   without administrator rights, from the stable or beta channel; CI runs it in Windows
   PowerShell and pwsh and plays a new Lua game's scenarios with what it installed.
+- `veduta deploy [card]`: puts the game on a console's card as its release unpacks
+  (`games/<name>`, a Go game built for linux/arm64, `card.json` versioned by `git describe`),
+  replacing the old folder only once the new one is complete. Without a folder it finds the
+  card itself: the one mounted volume labelled VEDUTA or VEDUTAOS (a drive letter on Windows).
 - Editor setup: `veduta init` and `veduta upgrade` write `.veduta/schema/` (a JSON Schema per
   source format, generated from `asset/source.go`, with the values each field allows) and,
   for a Lua game, `.veduta/lua/veduta.d.lua` (the API for the Lua Language Server, checked
