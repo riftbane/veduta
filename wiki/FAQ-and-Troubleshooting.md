@@ -34,14 +34,15 @@ project to refresh them.
 ### Missing standard functions
 
 Veduta's Lua is Lua 5.4 without the parts that would break determinism or reach outside the
-game (`io`, `os`, `debug`, `load`, coroutines, `goto`). A few ordinary functions are also
-missing for now:
+game (`io`, `os`, `debug`, `load`, coroutines, `goto`), and without `string.pack`,
+`string.unpack` and `string.dump`, which have no use without file access. An engine before
+v2.0.0-rc.4 also lacked `math.deg` and `math.rad`: update it (`veduta update`).
 
-| Missing | Instead |
-|---------|---------|
-| `math.deg(x)` | `x * 180 / math.pi` |
-| `math.rad(x)` | `x * math.pi / 180` |
-| `string.pack`, `string.unpack` | not needed without file access |
+### An asset in a folder is not found
+
+Folders under an asset kind's directory work from v2.0.0-rc.4. The asset's name is its file
+name, whatever the folder: two files of the same name in different folders are an error
+that names both.
 
 ### "entity has no field …"
 
@@ -93,10 +94,11 @@ These are known and planned, not bugs in your game:
 
 - **No sound** yet.
 - **No saving** between sessions: a game cannot store progress or high scores.
-- **HUD without images**: `hud.text` and `hud.rect` only. Use sprite entities for icons.
-- **Spawned entities have no hitbox or parent**: give those to entities in scene files.
-- **Snapshots** (`-headless snapshot`) do not yet save Lua state; scenarios, tests and
-  fuzzing are unaffected.
+- **No coroutines**: sequences (cutscenes, dialogue waiting for A) are written as state
+  machines for now.
+- **Text is ASCII**: no accented letters in `hud.text`, and no automatic line breaks.
+- **Sprite sheets**: an animation frame is a material each; `hud.image` already picks parts
+  of a sheet.
 - While the debugger is stopped at a breakpoint, the simulator window is not redrawn.
 - The simulator window exists on Windows only; Linux and macOS have every headless command.
 

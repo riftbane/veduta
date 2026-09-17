@@ -137,6 +137,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Decisions
 
+- **The Lua API stays at level 1 until v2.0.0.** Release candidates add to it (parents,
+  prefabs, hud images); a level counts what a released runtime has, and no v2 runtime is
+  released yet. A console runs games of the candidate it was built with.
+
 - **The tool runs script games, player included.** v1 kept the platform layer out of the
   `veduta` tool, since the tool only built and delegated to a game binary. A script game
   has no binary: the tool is its runtime, headless and on a framebuffer, and v2's Windows

@@ -102,6 +102,7 @@ differences:
 | `pairs` order | order of insertion |
 | `math.random` | the run's seeded generator |
 | `io`, `os`, `debug`, `load`, `dofile` | not available |
+| `string.pack`, `string.unpack`, `string.dump` | not available |
 | coroutines, `goto` | not available |
 
 ## Errors and endless loops

@@ -38,7 +38,10 @@ by git and never need editing.
 
 An asset's name is its file name without the extension: `assets/materials/hero.mat.json`
 is the material `hero`. Names are 1 to 64 characters of `a-z`, `0-9`, `_` and `-`,
-starting with a letter or a digit.
+starting with a letter or a digit. Sources can be sorted into folders under their kind's
+directory (`assets/materials/enemies/bat.mat.json` is still the material `bat`), so a name
+must be unique across the folders; `tests/scenarios/` stays flat. See
+[Structuring a Large Game](Structuring-a-Large-Game).
 
 Every JSON file starts with a `"veduta"` header naming its format (`"scene/1"`,
 `"material/1"`, …). Decoding is strict: an unknown field, a duplicate key or a wrong type is
@@ -51,7 +54,7 @@ an error with its file, line and column, and VS Code underlines it as you type.
   "veduta": "project/1",
   "name": "gemcave",
   "title": "Gem Cave",
-  "engine": "v2.0.0-rc.3",
+  "engine": "v2.0.0-rc.4",
   "script": "main.lua",
   "icon": "icon.png"
 }

@@ -20,6 +20,8 @@ whether two variables hold the same entity.
 | `visible` | read/write | drawn or not; an invisible entity still updates and collides |
 | `model`, `material` | read/write | asset names, or `nil` |
 | `layer` | read/write | the first key of the draw order (see [2D Games](2D-Games#depth-and-layers)) |
+| `parent` | read/write | the parent entity or `nil`; set it to an entity, an entity's name or `nil` |
+| `hitbox` | read/write | `{{min x, y, z}, {max x, y, z}}` in the entity's own space, or `nil` |
 | `state` | read/write | a table of your own values |
 
 Setting any other field is an error. Switching `material` every few ticks is how a sprite
@@ -48,7 +50,8 @@ kinds.torch = {
 | `e:has_tag(t)`, `e:add_tag(t)`, `e:remove_tag(t)`, `e:tags()` | tags |
 | `e:overlapping([tag])` | the live entities whose bounds overlap this one's, in id order; only those with `tag` when given |
 | `e:bounds()` | min x, y, z, max x, y, z in the world, or `nil` for an entity with no model and no hitbox |
-| `e:despawn()` | removes the entity at the end of the tick |
+| `e:children()` | the live entities whose parent is this one, in id order |
+| `e:despawn()` | removes the entity, and its children, at the end of the tick |
 
 Rotations are Euler angles in degrees, applied roll about Z first, then pitch about X, then
 yaw about Y (R = Ry · Rx · Rz), as in scene files.
@@ -96,6 +99,8 @@ local coin = scene.spawn{
   tags = {"coin", "pickup"},
   visible = true,
   layer = 0,
+  parent = nil,                             -- an entity or an entity's name
+  hitbox = {{-0.3, -0.3, -0.5}, {0.3, 0.3, 0.5}},
   state = {value = 5},
 }
 ```
@@ -109,8 +114,45 @@ Spawning is allowed from `game.init`, `game.update` and any kind's `init` or `up
 including while a scene loads, which is how [Your First Game](Your-First-Game) builds its
 level from a text map.
 
-Entities spawned from Lua cannot yet have a parent or a hitbox: put entities that need them
-in the scene file (see [Scenes](Scenes#entities)).
+## Parents
+
+An entity with a parent moves, turns and scales with it: its position, rotation and scale
+are relative to the parent. A sword in the hero's hand, a party member's shadow, a
+turret on a tank:
+
+```lua
+local hero = scene.find("hero")
+local sword = scene.spawn{name = "sword", model = "sword", material = "steel",
+  parent = hero, position = {0.4, 0.2, 0.1}}
+
+-- later: drop it where it is
+local x, y, z = sword:world_position()
+sword.parent = nil
+sword:set_position(x, y, z)
+```
+
+Setting `parent` keeps the entity's local position, so re-parenting moves it unless you
+set the position again, as above. A parent that would make a cycle (an entity under its
+own child) is an error. Despawning a parent despawns its children.
+
+## Prefabs
+
+A prefab (`assets/prefabs/<name>.prefab.json`) is a group of entities placed as one: a
+house with its door, a camp, a room. Worlds place them; scripts can too:
+
+```lua
+local camp = scene.spawn_prefab("camp", 12, 0, -4, 90, "camp_north")
+camp.fire.state.lit = true           -- each entity under its name in the prefab
+for _, e in ipairs(camp) do          -- and all of them in prefab order
+  e:add_tag("camp")
+end
+```
+
+`scene.spawn_prefab(name, x, y, z [, rotation [, prefix]])` puts the corner of the
+prefab's footprint at (x, y, z), turns it by 0, 90, 180 or 270 degrees about +Y, names its
+entities `<prefix>_<entity>` (the prefix defaults to the prefab's name) and keeps the
+parents the prefab gives. The prefab format is in the
+[prefab reference](https://riftbane.github.io/veduta/prefab.html).
 
 ## Finding entities
 
@@ -127,7 +169,7 @@ in the scene.
 ## Collisions
 
 `e:overlapping(tag)` compares axis-aligned bounding boxes: the model's bounds, or the
-entity's hitbox when the scene file gives one. It uses the bounds computed at the end of
+entity's hitbox when it has one. It uses the bounds computed at the end of
 the **previous** tick, so an entity moved this tick is seen where it was.
 
 - Boxes that only touch do not overlap.

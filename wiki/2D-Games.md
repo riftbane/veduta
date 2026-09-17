@@ -29,7 +29,7 @@ camera. Everything else (entities, kinds, collisions, tests) works as in any gam
 3. **Planes**: give every plane of the game its own z. For example the background at 0,
    tiles and actors at 1, a foreground at 2.
 
-4. **Hitboxes** for everything that collides, in the scene file (see
+4. **Hitboxes** for everything that collides, in the scene file or in `scene.spawn` (see
    [Collisions](#collisions)).
 
 ## Units and pixels
@@ -89,7 +89,8 @@ A negative scale mirrors the sprite, so one set of frames serves both directions
 - An entity with a hitbox and no model is an invisible trigger.
 - Boxes that only touch do not overlap.
 
-Hitboxes are set in the scene file:
+Hitboxes are set in the scene file, in `scene.spawn{hitbox = ...}`, or later with
+`e.hitbox = {{-0.4, -0.5, -0.5}, {0.4, 0.5, 0.5}}`. A scene with them:
 
 ```json
 {
@@ -109,8 +110,12 @@ Hitboxes are set in the scene file:
 }
 ```
 
-Entities spawned from Lua have no hitbox yet: a spawned sprite collides by its quad, so
-spawn it at the same z as what it must touch.
+A spawned coin with a fair box:
+
+```lua
+scene.spawn{kind = "coin", model = "quad", material = "coin", tags = {"coin"},
+  position = {x, y, 1}, scale = {0.5, 0.5, 1}, hitbox = {{-0.3, -0.3, -0.5}, {0.3, 0.3, 0.5}}}
+```
 
 ### Platforms and gravity
 

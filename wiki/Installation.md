@@ -20,7 +20,7 @@ terminal afterwards so it sees the PATH, then check:
 veduta version
 ```
 
-It must print a `v2` version (`v2.0.0-rc.3` or later). Running the same two lines again
+It must print a `v2` version (`v2.0.0-rc.4` or later). Running the same two lines again
 updates both the tool and the extension.
 
 > **Why the first line matters.** Until v2.0.0 is out, the *stable* channel still installs
@@ -32,7 +32,7 @@ Settings of the installer, all optional:
 | Variable | Meaning |
 |----------|---------|
 | `$env:VEDUTA_CHANNEL` | `stable` (default) or `beta` |
-| `$env:VEDUTA_VERSION` | an exact version, such as `v2.0.0-rc.3` |
+| `$env:VEDUTA_VERSION` | an exact version, such as `v2.0.0-rc.4` |
 | `$env:VEDUTA_HOME` | where to install instead of `%LOCALAPPDATA%\Programs\veduta` |
 | `$env:VEDUTA_VSCODE` | `"0"` leaves VS Code alone |
 
@@ -49,7 +49,7 @@ windows/amd64. On macOS, build it with Go 1.25 or newer, naming the version (suc
 cannot update itself):
 
 ```sh
-go install -ldflags "-X main.version=v2.0.0-rc.3" github.com/riftbane/veduta/v2/cmd/veduta@v2.0.0-rc.3
+go install -ldflags "-X main.version=v2.0.0-rc.4" github.com/riftbane/veduta/v2/cmd/veduta@v2.0.0-rc.4
 ```
 
 The simulator window exists only on Windows. On Linux, `veduta run` plays the game on a

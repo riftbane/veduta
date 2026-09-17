@@ -50,6 +50,8 @@ Fields:
 | `visible` | read/write | boolean |
 | `model`, `material` | read/write | asset name or `nil` |
 | `layer` | read/write | integer, draw order |
+| `parent` | read/write | entity or `nil`; accepts an entity's name |
+| `hitbox` | read/write | `{{min x, y, z}, {max x, y, z}}` or `nil` |
 | `state` | read/write | table of the entity's own values |
 
 Methods:
@@ -69,7 +71,8 @@ Methods:
 | `e:tags()` | list of strings |
 | `e:overlapping([tag])` | list of live entities whose bounds overlap (last tick's bounds), id order |
 | `e:bounds()` | min x, y, z, max x, y, z; or `nil` |
-| `e:despawn()` | removed at the end of the tick |
+| `e:children()` | list of live child entities, id order |
+| `e:despawn()` | removed at the end of the tick, with its children |
 
 ## scene
 
@@ -81,7 +84,8 @@ Available from `game.init` on.
 | `scene.find(name)` | entity or `nil` |
 | `scene.tagged(tag)` | list of entities, id order |
 | `scene.entities()` | every live entity, id order |
-| `scene.spawn{...}` | the new entity; fields `kind` (default `static`), `name`, `model`, `material`, `position`, `rotation`, `scale` (each `{x, y, z}`), `tags` (list), `visible`, `layer`, `state` (table) |
+| `scene.spawn{...}` | the new entity; fields `kind` (default `static`), `name`, `model`, `material`, `position`, `rotation`, `scale` (each `{x, y, z}`), `tags` (list), `visible`, `layer`, `parent` (entity or name), `hitbox` (`{{min}, {max}}`), `state` (table) |
+| `scene.spawn_prefab(name, x, y, z [, rotation [, prefix]])` | a prefab's entities, footprint corner at (x, y, z), turned 0/90/180/270; the table lists them and holds each under its prefab name |
 | `scene.load(name)` | replaces the scene, as a reset |
 
 ## input
@@ -111,6 +115,9 @@ Only inside `game.draw`. Pixels from the top left.
 |----------|----------------|
 | `hud.text(x, y, text [, color [, scale]])` | draws with the 8 × 8 font; returns the width drawn |
 | `hud.rect(x, y, w, h [, color])` | a filled rectangle |
+| `hud.image(texture, x, y [, options])` | a texture or part of it; options `src = {x, y, w, h}`, `w`, `h`, `color`, `flip_x`, `flip_y` |
+| `hud.panel(texture, x, y, w, h, border [, options])` | nine-slice panel; `border` a number or `{left, top, right, bottom}`; options `src`, `color` |
+| `hud.image_size(texture)` | width, height in texels |
 
 ## world
 
@@ -161,7 +168,6 @@ Only inside `game.draw`. Pixels from the top left.
 
 - `pairs` visits keys in insertion order.
 - `math.random` and `math.randomseed` use the run's deterministic generator.
-- Missing: `math.deg`, `math.rad` (use `x * 180 / math.pi`, `x * math.pi / 180`),
-  `string.pack`, `string.unpack`, `string.packsize`, `string.dump`.
+- Missing: `string.pack`, `string.unpack`, `string.packsize`, `string.dump`.
 - Not available by design: `io`, `os`, `debug`, `load`, `loadfile`, `dofile`, coroutines,
   `goto`.

@@ -27,9 +27,10 @@ game, on every machine, so a play session can be saved as a test and replayed fo
 | [Graphics Assets](Graphics-Assets) | models, materials and textures as JSON |
 | [Input](Input) | the console's buttons, keyboard and gamepad |
 | [Camera](Camera) | 2D and 3D cameras, following the player |
-| [HUD](HUD) | text and rectangles over the frame |
+| [HUD](HUD) | text, icons and dialogue boxes over the frame |
 | [2D Games](2D-Games) | sprites, depth, layers, hitboxes, the traps |
 | [3D, Worlds and Blocks](3D-Worlds-and-Blocks) | perspective scenes, streamed worlds, block worlds built at runtime |
+| [Structuring a Large Game](Structuring-a-Large-Game) | folders, modules, shared state, data tables, sequences |
 
 ## Making it solid
 

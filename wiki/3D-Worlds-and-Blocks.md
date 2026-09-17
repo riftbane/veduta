@@ -50,7 +50,7 @@ kinds.walker = {
     e.z = e.z - dy * SPEED * engine.dt
     if dx ~= 0 or dy ~= 0 then
       -- face the direction of travel: yaw 0 looks toward -z, -90 toward +x
-      e:set_rotation(0, math.atan(-dx, dy) * 180 / math.pi, 0)
+      e:set_rotation(0, math.deg(math.atan(-dx, dy)), 0)
     end
     camera.set{position = {e.x, e.y + 6, e.z + 8}, target = {e.x, e.y + 1, e.z}}
   end,
