@@ -30,6 +30,7 @@ func specFromScenario(sc *asset.Scenario) *scenarioSpec {
 		Inputs:      inputEvents(sc.Inputs),
 		Invariants:  sc.Invariants,
 		Screenshots: sc.Screenshots,
+		Saves:       sc.Saves,
 	}
 	for _, x := range sc.Expect {
 		spec.Expect = append(spec.Expect, sim.Expectation{

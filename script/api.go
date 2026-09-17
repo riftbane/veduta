@@ -45,6 +45,7 @@ func (g *Game) global(name string, f fn) {
 func (g *Game) install() {
 	g.installEntity()
 	g.installMesh()
+	g.installSave()
 	g.global("require", func(vm *lua.VM, args []lua.Value) []lua.Value {
 		name := vm.CheckString(args, 0, "require")
 		v, err := g.require(g.moduleFile(name))

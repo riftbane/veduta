@@ -190,14 +190,23 @@ func (pl *player) restart() error {
 	pl.input = sim.InputState{}
 	// The player has no trace reader: it prepares without recording, so no tick spends
 	// time summarizing every entity (a streamed world has hundreds).
-	opt := runOptions{Scene: pl.proj.DefaultScene, Seed: pl.proj.DefaultSeed}
+	opt := runOptions{Scene: pl.proj.DefaultScene, Seed: pl.proj.DefaultSeed, SaveDir: pl.saveDir()}
 	if pl.proj.DefaultWorld != "" {
-		opt = runOptions{World: pl.proj.DefaultWorld, Seed: pl.proj.DefaultSeed}
+		opt = runOptions{World: pl.proj.DefaultWorld, Seed: pl.proj.DefaultSeed, SaveDir: pl.saveDir()}
 	}
 	if err := pl.e.prepare(opt); err != nil {
 		return err
 	}
 	return pl.e.endTick()
+}
+
+// saveDir is where the player keeps the game's saves: VEDUTA_SAVE_DIR, else out/saves in
+// the project.
+func (pl *player) saveDir() string {
+	if d := os.Getenv(SaveDirEnv); d != "" {
+		return d
+	}
+	return filepath.Join(pl.dir, "out", "saves")
 }
 
 // say shows a message over the frame for a few seconds and writes it to stderr.

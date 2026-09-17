@@ -43,6 +43,7 @@ type engine struct {
 	seed       uint64
 	recording  bool
 	replay     *snapReplay // the run so far, for a Replayer's snapshots (headless runs only)
+	saves      saveStore
 
 	renderer *soft.Renderer
 	res      *scene.Resources
@@ -68,8 +69,10 @@ type runOptions struct {
 	World      string   // load this world instead of Scene
 	At         [2]int32 // the world's start cell
 	Seed       uint64
-	Invariants []string  // invariant specs; nil means the project's list
-	Trace      io.Writer // receives trace.jsonl (nil: hash only)
+	Saves      map[string][]byte // a headless run's saves when it starts
+	SaveDir    string            // the player's: where saves are files (empty: in memory)
+	Invariants []string          // invariant specs; nil means the project's list
+	Trace      io.Writer         // receives trace.jsonl (nil: hash only)
 	Headless   bool
 }
 
@@ -95,9 +98,18 @@ func (e *engine) prepare(opt runOptions) error {
 	if e.invSpecs == nil {
 		e.invSpecs = e.project.Invariants
 	}
+	if opt.SaveDir != "" {
+		e.saves = dirSaves(opt.SaveDir)
+	} else {
+		m := memorySaves{}
+		for name, b := range opt.Saves {
+			m[name] = bytes.Clone(b)
+		}
+		e.saves = m
+	}
 	e.replay = nil
 	if _, ok := e.game.(Replayer); ok && opt.Headless {
-		e.replay = &snapReplay{Scene: opt.Scene, World: opt.World, At: opt.At, Seed: opt.Seed}
+		e.replay = &snapReplay{Scene: opt.Scene, World: opt.World, At: opt.At, Seed: opt.Seed, Saves: opt.Saves}
 	}
 	if st, ok := e.game.(Starter); ok {
 		if err := st.Start(&e.ctx); err != nil {
@@ -521,6 +533,7 @@ type snapReplay struct {
 	World  string
 	At     [2]int32
 	Seed   uint64
+	Saves  map[string][]byte
 	Inputs []Input
 	Hash   string
 }
@@ -669,7 +682,7 @@ func (e *engine) restoreReplay(r *snapReplay, tick uint64, trace io.Writer) erro
 	if uint64(len(r.Inputs)) != tick {
 		return fmt.Errorf("restore: snapshot at tick %d holds %d ticks of input", tick, len(r.Inputs))
 	}
-	opt := runOptions{Scene: r.Scene, World: r.World, At: r.At, Seed: r.Seed, Invariants: e.invSpecs, Headless: true}
+	opt := runOptions{Scene: r.Scene, World: r.World, At: r.At, Seed: r.Seed, Saves: r.Saves, Invariants: e.invSpecs, Headless: true}
 	if err := e.start(opt); err != nil {
 		return fmt.Errorf("restore: replaying the run: %w", err)
 	}

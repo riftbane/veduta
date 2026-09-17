@@ -65,6 +65,7 @@ func RegisterKind(name string, ctor func(*scene.Entity) veduta.Behaviour)
 | `RemoveModel(name)`, `Model(name)` | forget a runtime model; look one up |
 | `Overlapping(e)` | live entities whose AABB overlaps `e`'s (last tick's bounds) |
 | `Texture(name)` | a texture asset's handle and size in texels, for `Batch.Image` and `Batch.NineSlice` in `Draw` (`ok` false for an unknown texture) |
+| `ReadSave(name)`, `WriteSave(name, data)`, `RemoveSave(name)`, `SaveNames()` | the game's saves: JSON objects or arrays of at most 1 MiB under valid names. The player keeps them as files in `VEDUTA_SAVE_DIR` (default `out/saves` of the project; the console sets it to the card); headless runs keep them in memory, starting from the scenario's `saves`. Writes and removals are trace events `save_write` and `save_remove` |
 | `HUD(dl) *sprite.Batch` | start a HUD batch covering the frame; call `End()` |
 | `Text(b, x, y, scale, s, color)` | draw text with the built-in font |
 

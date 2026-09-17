@@ -1,7 +1,10 @@
 package asset
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -28,6 +31,10 @@ type Scenario struct {
 	Screenshots []int         // ticks to capture, strictly increasing
 	World       string        // world asset name, instead of Scene
 	At          [2]int32      // start cell of the world (x, z)
+	// Saves are the game's saves when the run starts, by name: each a JSON object or array,
+	// compact, written as the file writes it (ParseScenario) or with object keys sorted
+	// (CompileScenario alone).
+	Saves map[string][]byte
 }
 
 // Input is one scripted input event: buttons (ButtonNames) that go down or up. Events of
@@ -172,7 +179,24 @@ func ParseScenario(file string, data []byte) (*Scenario, error) {
 	if err != nil {
 		return nil, err
 	}
-	return CompileScenario(name, &src, loc)
+	sc, err := CompileScenario(name, &src, loc)
+	if err != nil {
+		return nil, err
+	}
+	// The saves as the file writes them: decoded into src, 2.0 would become 2, which a Lua
+	// game reads back as an integer.
+	var raw struct {
+		Saves map[string]json.RawMessage `json:"saves"`
+	}
+	if json.Unmarshal(data, &raw) == nil {
+		for name := range sc.Saves {
+			var buf bytes.Buffer
+			if json.Compact(&buf, raw.Saves[name]) == nil {
+				sc.Saves[name] = buf.Bytes()
+			}
+		}
+	}
+	return sc, nil
 }
 
 // CompileScenario validates src and returns the compiled scenario called name. Every
@@ -229,10 +253,53 @@ func CompileScenario(name string, src *ScenarioSource, loc *Locator) (*Scenario,
 			}
 		}
 	}
+	sc.Saves = compileSaves(c, src.Saves)
 	if err := c.Err(); err != nil {
 		return nil, err
 	}
 	return sc, nil
+}
+
+// MaxSaveBytes is the largest save a game may write, in bytes of JSON.
+const MaxSaveBytes = 1 << 20
+
+// compileSaves checks a scenario's saves: valid names, each an object or an array, within
+// MaxSaveBytes.
+func compileSaves(c *Checker, src map[string]any) map[string][]byte {
+	if len(src) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(src))
+	for name := range src {
+		names = append(names, name)
+	}
+	sort.Strings(names) // errors in a stable order
+	out := map[string][]byte{}
+	for _, name := range names {
+		v := src[name]
+		p := Path("saves", name)
+		if err := ValidName(name); err != nil {
+			c.Errorf(p, "save %v", err)
+			continue
+		}
+		switch v.(type) {
+		case map[string]any, []any:
+		default:
+			c.Errorf(p, "a save is a JSON object or array")
+			continue
+		}
+		b, err := json.Marshal(v)
+		if err != nil {
+			c.Errorf(p, "%v", err)
+			continue
+		}
+		if len(b) > MaxSaveBytes {
+			c.Errorf(p, "%d bytes, more than a save may hold (%d)", len(b), MaxSaveBytes)
+			continue
+		}
+		out[name] = b
+	}
+	return out
 }
 
 func compileInputs(c *Checker, src []InputSource, tick func(string, int)) []Input {

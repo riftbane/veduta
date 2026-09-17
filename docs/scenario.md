@@ -39,6 +39,7 @@ update of tick t; at tick 0 it is the initial state. Every tick field in a scena
 | `expect` | array of objects | `[]` | Checks; see Expectations. A scenario passes when every expectation holds and no invariant is violated. |
 | `invariants` | array of strings | `[]` | Invariants checked after every tick, in addition to the project's `invariants` (`veduta.json`); see Invariants. No duplicates. |
 | `screenshots` | array of integers | `[]` | Ticks at which a frame is rendered (at the state of that tick) into the run's contact sheet. Strictly increasing, each in 0 to `ticks`. |
+| `saves` | object | `{}` | The game's saves when the run starts, by save name: each a JSON object or array of at most 1 MiB, as the game wrote it (`{"slot1": {"gold": 120, "level": 3}}`). The run keeps what the game writes in memory and never touches the saves of the simulator or the console. |
 
 ## Inputs
 
@@ -92,7 +93,8 @@ required field out, is an error.
 named `trace` emitted from tick 0 through `tick` inclusive; the count must be at least
 `count_min` and at most `count_max`. At least one bound is required; both are integers
 ≥ 0 and `count_min` ≤ `count_max`. Event names are the game's `ctx.Trace` names and the
-built-in events `spawn`, `despawn`, `collision`, `scene_load`, `invariant_violation`.
+built-in events `spawn`, `despawn`, `collision`, `scene_load`, `invariant_violation`,
+`save_write` (`{name, bytes}`) and `save_remove` (`{name}`).
 `{"trace": "gem_collected", "count_min": 1}` means "at least once";
 `{"trace": "invariant_violation", "count_max": 0}` means "never".
 

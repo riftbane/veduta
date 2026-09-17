@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Saves: `save.write`, `save.read`, `save.remove` and `save.list` in Lua (tables of plain
+  data as JSON, integers and floats kept apart), `Context.ReadSave`, `WriteSave`,
+  `RemoveSave` and `SaveNames` in Go. The player keeps them as files in `VEDUTA_SAVE_DIR`
+  (default `out/saves`), written to a synced temporary file with the previous save kept
+  until the new one is in place. Headless runs keep them in memory, starting from a
+  scenario's new `saves` field; writes and removals are trace events `save_write` and
+  `save_remove`.
 - Asset sources in folders: `assets/materials/enemies/bat.mat.json` is the material `bat`,
   and likewise for every kind (hidden folders are skipped). A name used by two files is an
   error naming both. Worlds follow their prefabs into folders, and `inspect` and `world`

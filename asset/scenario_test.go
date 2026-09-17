@@ -278,3 +278,19 @@ func TestScenarioDocExamples(t *testing.T) {
 		}
 	}
 }
+
+func TestScenarioSaves(t *testing.T) {
+	sc, err := ParseScenario("s.scenario.json", []byte(`{"veduta": "scenario/1", "scene": "main", "ticks": 1,
+		"saves": {"slot1": {"z": 2.0, "a": [1, 2]}, "settings": []}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(sc.Saves["slot1"]) != `{"z":2.0,"a":[1,2]}` || string(sc.Saves["settings"]) != `[]` {
+		t.Fatalf("saves %q", sc.Saves)
+	}
+	_, err = ParseScenario("s.scenario.json", []byte(`{"veduta": "scenario/1", "scene": "main", "ticks": 1,
+		"saves": {"Bad Name": {}, "number": 3}}`))
+	if err == nil || !strings.Contains(err.Error(), "saves.Bad Name") || !strings.Contains(err.Error(), "saves.number: a save is a JSON object or array") {
+		t.Fatalf("errors: %v", err)
+	}
+}

@@ -403,6 +403,7 @@ type scenarioSpec struct {
 	Expect      []sim.Expectation
 	Invariants  []string
 	Screenshots []int
+	Saves       map[string][]byte
 }
 
 // simResult is the report of simulate.
@@ -645,7 +646,7 @@ func (h *headless) runScenario(spec *scenarioSpec, dir string, tileW int, withSh
 
 // target returns the scene or world the scenario starts in.
 func (spec *scenarioSpec) target() runOptions {
-	return runOptions{Scene: spec.Scene, World: spec.World, At: spec.At}
+	return runOptions{Scene: spec.Scene, World: spec.World, At: spec.At, Saves: spec.Saves}
 }
 
 func describeFailure(r sim.ExpectResult) string {

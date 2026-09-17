@@ -371,6 +371,33 @@ volume = {}
 ---@return veduta.Volume
 function volume.new(x, y, z) end
 
+---Saves outlive a run: tables of numbers, strings, booleans and tables of them, by name.
+---Tests keep them in memory, starting from the scenario's "saves".
+save = {}
+
+---Stores the table as the save called name, replacing any.
+---@param name string a valid name: slot1, settings
+---@param data table
+---@return true? ok
+---@return string? error when the storage fails
+function save.write(name, data) end
+
+---The save as a new table, or nil when there is none.
+---@param name string
+---@return table? data
+---@return string? error when it cannot be read
+function save.read(name) end
+
+---Deletes the save.
+---@param name string
+---@return true? ok
+---@return string? error
+function save.remove(name) end
+
+---The names of the saves, sorted.
+---@return string[]
+function save.list() end
+
 ---Adds an event to the tick's trace; scenarios count them.
 ---@param name string
 ---@param fields? table<string, any>

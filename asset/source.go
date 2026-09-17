@@ -148,6 +148,7 @@ type ScenarioSource struct {
 	Screenshots []int          `json:"screenshots,omitempty"`
 	World       string         `json:"world,omitempty"` // instead of scene
 	At          []int          `json:"at,omitempty"`    // start cell of a world, default [0, 0]
+	Saves       map[string]any `json:"saves,omitempty"` // the game's saves when the run starts, by name
 }
 
 // InputSource is one input event of a scenario or input script: the buttons (ButtonNames)

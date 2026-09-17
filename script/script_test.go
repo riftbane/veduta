@@ -169,7 +169,7 @@ func TestAPIDocumented(t *testing.T) {
 	if code := veduta.RunArgs(g, []string{"-project", testGame, "-headless", "simulate", "--scene", "main", "--ticks", "1", "--out", t.TempDir()}, &out, io.Discard); code != 0 {
 		t.Fatalf("run: %s", out.String())
 	}
-	for _, lib := range []string{"input", "scene", "camera", "world", "hud", "mesh", "volume"} {
+	for _, lib := range []string{"input", "scene", "camera", "world", "hud", "mesh", "volume", "save"} {
 		g.vm.Global(lib).Table().ForEach(func(k, _ lua.Value) bool {
 			if name := lib + "." + k.String(); !strings.Contains(string(doc), "`"+name) {
 				t.Errorf("docs/lua.md does not document %s", name)
@@ -210,7 +210,7 @@ func TestTypesMatchAPI(t *testing.T) {
 		declared[m[1]] = true
 	}
 	have := map[string]bool{"trace": true, "invariant": true, "require": true}
-	for _, lib := range []string{"input", "scene", "camera", "world", "hud", "mesh", "volume"} {
+	for _, lib := range []string{"input", "scene", "camera", "world", "hud", "mesh", "volume", "save"} {
 		g.vm.Global(lib).Table().ForEach(func(k, _ lua.Value) bool {
 			have[lib+"."+k.String()] = true
 			return true
@@ -481,5 +481,73 @@ end
 		if code == 0 || r.Error == "" {
 			t.Errorf("%s: exit %d %+v", name, code, r)
 		}
+	}
+}
+
+// TestSaves: a script's save comes back with its types and nesting; a scenario's saves
+// are there when the run starts; writes are trace events; what a save cannot hold is an
+// error.
+func TestSaves(t *testing.T) {
+	dir := copyGame(t, map[string]string{
+		"main.lua": `+
+local problems = {}
+local function check(ok, what) if not ok then problems[#problems + 1] = what end end
+
+local init = game.init
+function game.init()
+  init()
+  local old = save.read("slot1")
+  check(old and old.gold == 120 and math.type(old.gold) == "integer", "scenario save")
+  check(old and math.type(old.ratio) == "float" and old.ratio == 2.0, "float stays float")
+  check(save.read("nothing") == nil, "a missing save")
+
+  local data = {gold = 7, ratio = 0.5, name = "Mira", flags = {bridge = true}, party = {"mira", "tobi"}, big = 2^53}
+  check(save.write("slot2", data) == true, "write")
+  local back = save.read("slot2")
+  check(back ~= data and back.party[2] == "tobi" and back.flags.bridge == true, "read back")
+  check(math.type(back.gold) == "integer" and math.type(back.big) == "float", "number types")
+  local keys = {}
+  for k in pairs(back) do keys[#keys + 1] = k end
+  check(table.concat(keys, ",") == "big,flags,gold,name,party,ratio", "sorted keys: " .. table.concat(keys, ","))
+  check(table.concat(save.list(), ",") == "slot1,slot2", "list")
+  check(save.remove("slot1") == true and save.read("slot1") == nil, "remove")
+
+  local cyclic = {}
+  cyclic.self = cyclic
+  for what, bad in pairs({
+    ["a function"] = function() save.write("x", {f = print}) end,
+    ["an entity"] = function() save.write("x", {e = scene.find("hero")}) end,
+    ["a float key"] = function() save.write("x", {[1.5] = 1}) end,
+    ["a cycle"] = function() save.write("x", cyclic) end,
+    ["nan"] = function() save.write("x", {n = 0/0}) end,
+    ["a bad name"] = function() save.write("Slot 1", {}) end,
+    ["not a table"] = function() save.write("x", 3) end,
+  }) do
+    check(not pcall(bad), what .. " was saved")
+  end
+  trace("saves", {problems = table.concat(problems, "; ")})
+end
+`,
+		"tests/scenarios/saves.scenario.json": `{
+			"veduta": "scenario/1", "scene": "main", "seed": 1, "ticks": 3,
+			"saves": {"slot1": {"gold": 120, "ratio": 2.0}},
+			"expect": [
+				{"tick": 3, "trace": "save_write", "count_min": 1, "count_max": 1},
+				{"tick": 3, "trace": "save_remove", "count_min": 1, "count_max": 1}
+			]
+		}`,
+	})
+	out := t.TempDir()
+	r, stderr, code := run(t, dir, "simulate", "--scenario", filepath.Join(dir, "tests", "scenarios", "saves.scenario.json"), "--out", out)
+	if code != 0 || r.Verdict != "pass" {
+		t.Fatalf("exit %d %+v %s", code, r, stderr)
+	}
+	trace, _ := os.ReadFile(filepath.Join(out, "trace.jsonl"))
+	if !strings.Contains(string(trace), `"problems":""`) {
+		i := strings.Index(string(trace), `"event":"saves"`)
+		t.Fatalf("checks failed: %s", string(trace)[max(0, i-400):min(len(trace), i+50)])
+	}
+	if _, err := os.Stat(filepath.Join(dir, "out", "saves")); err == nil {
+		t.Error("a headless run wrote saves to disk")
 	}
 }

@@ -216,6 +216,43 @@ mesh.set("game:chunk", mesh.voxels(world, {[1] = "stone", [2] = "grass"}))
 scene.spawn{name = "chunk", model = "game:chunk"}
 ```
 
+## save
+
+Saves outlive a run: progress, settings, high scores. A save is a table of numbers,
+strings, booleans and tables of them, stored under a name (a valid asset name: `slot1`,
+`settings`). Integers and floats come back as they went in, and tables in the order of their
+keys, sorted.
+
+| Function | Meaning |
+|----------|---------|
+| `save.write(name, table)` | stores the table as the save `name`, replacing any; `true`, or `nil` and a message when the storage fails. A value a save cannot hold (a function, an entity, a key that is neither a string nor part of a list, a table that holds itself) or a save over 1 MiB of JSON is an error |
+| `save.read(name)` | the save as a new table, or `nil` when there is none (and a message when it cannot be read) |
+| `save.remove(name)` | deletes the save; `true`, or `nil` and a message |
+| `save.list()` | the names of the saves, sorted |
+
+Where saves live depends on the run. The simulator and the console keep them in files, one
+per save: the console on its card (`saves/<game>/`), the simulator in `out/saves` of the
+project, or wherever `VEDUTA_SAVE_DIR` says. Tests never touch those: a run starts with the
+saves its scenario lists (`"saves"` in the scenario topic) and keeps its writes in memory,
+recording `save_write` and `save_remove` events a scenario can count.
+
+```lua
+function game.init()
+  local data = save.read("slot1")
+  if data then
+    gold, level = data.gold, data.level
+  end
+end
+
+local function on_checkpoint()
+  local ok, err = save.write("slot1", {gold = gold, level = level, party = {"mira", "tobi"}})
+  if not ok then
+    message = "COULD NOT SAVE"   -- the card is full or missing; the game goes on
+    print(err)
+  end
+end
+```
+
 ## trace, invariant, require
 
 | Function | Meaning |
