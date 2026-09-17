@@ -537,16 +537,23 @@ func (g *Gen) GroundEntity(c *Chunk) asset.Entity {
 // named "<key>_<entity>"; parents refer to those names. Root entities stand on the
 // structure's ground.
 func (g *Gen) Instantiate(s *Struct) []asset.Entity {
-	p := s.Prefab
-	out := make([]asset.Entity, len(p.Entities))
-	fw, fd := float64(p.Footprint.X), float64(p.Footprint.Y)
 	ox, oz := float64(meters(s.Rect.X, g.W.Cell)), float64(meters(s.Rect.Z, g.W.Cell))
 	oy := float64(s.Ground) / 1000
+	return Place(s.Prefab, s.Key, ox, oy, oz, s.Rotation)
+}
+
+// Place returns the entities of prefab p placed with the min corner of its footprint at
+// (ox, oy, oz), turned by rotation (0, 90, 180 or 270 degrees about +Y) about the
+// footprint's centre, in prefab order and named "<key>_<entity>"; parents refer to those
+// names, and children keep their positions relative to them.
+func Place(p *asset.Prefab, key string, ox, oy, oz float64, rotation int) []asset.Entity {
+	out := make([]asset.Entity, len(p.Entities))
+	fw, fd := float64(p.Footprint.X), float64(p.Footprint.Y)
 	for i := range p.Entities {
 		e := p.Entities[i]
-		e.Name = s.Key + "_" + e.Name
+		e.Name = key + "_" + e.Name
 		if e.Parent != "" {
-			e.Parent = s.Key + "_" + e.Parent
+			e.Parent = key + "_" + e.Parent
 			out[i] = e
 			continue
 		}
@@ -557,7 +564,7 @@ func (g *Gen) Instantiate(s *Struct) []asset.Entity {
 		hw, hd := float64(fw/2), float64(fd/2)
 		x, z := float64(e.Position.X)-hw, float64(e.Position.Z)-hd
 		cx, cz := hw, hd
-		switch s.Rotation {
+		switch rotation {
 		case 90:
 			x, z = z, -x
 			cx, cz = hd, hw
@@ -568,7 +575,7 @@ func (g *Gen) Instantiate(s *Struct) []asset.Entity {
 			cx, cz = hd, hw
 		}
 		e.Position = gmath.V3(float32(ox+cx+x), float32(oy+float64(e.Position.Y)), float32(oz+cz+z))
-		e.RotationDeg.Y += float32(s.Rotation)
+		e.RotationDeg.Y += float32(rotation)
 		out[i] = e
 	}
 	return out

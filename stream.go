@@ -248,24 +248,10 @@ func (w *World) addModels(c *world.Chunk) []string {
 
 // spawn adds entities in order, resolving parents by name, and returns their ids.
 func (w *World) spawn(ents []asset.Entity) []uint32 {
-	e := w.eng
-	ids := make([]uint32, len(ents))
-	byName := make(map[string]uint32, len(ents)) // lookup only
-	for i, a := range ents {
-		ent := e.spawn(scene.Entity{
-			Name: a.Name, Kind: a.Kind,
-			Transform: scene.Transform{Position: a.Position, Rotation: gmath.QuatEulerDeg(a.RotationDeg), Scale: a.Scale},
-			Model:     a.Model, Material: a.Material, Tags: a.Tags, Visible: a.Visible, Hitbox: a.Hitbox, Layer: a.Layer,
-		})
+	spawned := w.eng.spawnAll(ents)
+	ids := make([]uint32, len(spawned))
+	for i, ent := range spawned {
 		ids[i] = ent.ID
-		byName[a.Name] = ent.ID
-	}
-	for i, a := range ents {
-		if a.Parent != "" {
-			if id, ok := byName[a.Parent]; ok {
-				e.ctx.Scene.Get(ids[i]).Parent = id
-			}
-		}
 	}
 	return ids
 }

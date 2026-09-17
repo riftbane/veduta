@@ -9,9 +9,11 @@ import (
 
 	"github.com/riftbane/veduta/v2/asset"
 	"github.com/riftbane/veduta/v2/gfx"
+	"github.com/riftbane/veduta/v2/gmath"
 	"github.com/riftbane/veduta/v2/scene"
 	"github.com/riftbane/veduta/v2/sim"
 	"github.com/riftbane/veduta/v2/sprite"
+	"github.com/riftbane/veduta/v2/world"
 )
 
 // Version is the engine version.
@@ -192,6 +194,28 @@ func (c *Context) RegisterState(codec StateCodec) { c.eng.codec = codec }
 // behaviour when its kind is registered. Entities spawned during a tick are first
 // updated on the next tick.
 func (c *Context) Spawn(tmpl scene.Entity) *scene.Entity { return c.eng.spawn(tmpl) }
+
+// SpawnPrefab adds the entities of a prefab (assets/prefabs/<name>.prefab.json) with the
+// min corner of its footprint at origin, turned by rotation (0, 90, 180 or 270 degrees about
+// +Y) about the footprint's centre, as a world places it. They are named
+// "<prefix>_<entity>" (prefix defaults to the prefab's name), returned in prefab order, and
+// parented among themselves as the prefab says.
+func (c *Context) SpawnPrefab(name string, origin gmath.Vec3, rotation int, prefix string) ([]*scene.Entity, error) {
+	p := c.eng.assets.Prefab(name)
+	if p == nil {
+		return nil, fmt.Errorf("spawn prefab: no prefab %q (assets/prefabs/%s.prefab.json)", name, name)
+	}
+	if rotation%90 != 0 {
+		return nil, fmt.Errorf("spawn prefab %s: rotation %d is not 0, 90, 180 or 270", name, rotation)
+	}
+	if rotation = rotation % 360; rotation < 0 {
+		rotation += 360
+	}
+	if prefix == "" {
+		prefix = name
+	}
+	return c.eng.spawnAll(world.Place(p, prefix, float64(origin.X), float64(origin.Y), float64(origin.Z), rotation)), nil
+}
 
 // Despawn removes e (and its children) at the end of the tick.
 func (c *Context) Despawn(e *scene.Entity) { c.Scene.Despawn(e) }

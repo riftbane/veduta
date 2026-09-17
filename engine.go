@@ -264,6 +264,27 @@ func (e *engine) spawn(tmpl scene.Entity) *scene.Entity {
 	return ent
 }
 
+// spawnAll adds entities of a world or a prefab in order and then gives them the parents
+// they name among themselves.
+func (e *engine) spawnAll(ents []asset.Entity) []*scene.Entity {
+	out := make([]*scene.Entity, len(ents))
+	byName := make(map[string]*scene.Entity, len(ents)) // lookup only
+	for i, a := range ents {
+		out[i] = e.spawn(scene.Entity{
+			Name: a.Name, Kind: a.Kind,
+			Transform: scene.Transform{Position: a.Position, Rotation: gmath.QuatEulerDeg(a.RotationDeg), Scale: a.Scale},
+			Model:     a.Model, Material: a.Material, Tags: a.Tags, Visible: a.Visible, Hitbox: a.Hitbox, Layer: a.Layer,
+		})
+		byName[a.Name] = out[i]
+	}
+	for i, a := range ents {
+		if p := byName[a.Parent]; a.Parent != "" && p != nil {
+			out[i].Parent = p.ID
+		}
+	}
+	return out
+}
+
 func (e *engine) emit(name string, fields map[string]any) {
 	if e.rec != nil {
 		e.rec.Emit(name, fields)

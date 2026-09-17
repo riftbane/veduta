@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/riftbane/veduta/v2"
 	"github.com/riftbane/veduta/v2/asset"
@@ -115,7 +116,8 @@ func (g *Game) install() {
 			}
 			return vm.Ret(g.list(live))
 		},
-		"spawn": g.spawn,
+		"spawn":        g.spawn,
+		"spawn_prefab": g.spawnPrefab,
 		"load": func(vm *lua.VM, args []lua.Value) []lua.Value {
 			g.scene(vm, "scene.load")
 			if err := g.ctx.LoadScene(vm.CheckString(args, 0, "load")); err != nil {
@@ -320,8 +322,79 @@ func toVec3(vm *lua.VM, v lua.Value, what string) gmath.Vec3 {
 	return gmath.V3(out[0], out[1], out[2])
 }
 
+// toEntity reads an entity value, or the name of an entity of the scene.
+func (g *Game) toEntity(vm *lua.VM, v lua.Value, what string) *scene.Entity {
+	if u := v.Userdata(); u != nil {
+		if e, ok := u.Data.(*scene.Entity); ok {
+			return e
+		}
+	}
+	if name, ok := v.Str(); ok {
+		if e := g.scene(vm, what).Find(name); e != nil {
+			return e
+		}
+		vm.Errorf("%s: no entity named %q", what, name)
+	}
+	vm.Errorf("%s must be an entity or an entity's name", what)
+	return nil
+}
+
+// toBox reads {{min x, y, z}, {max x, y, z}}.
+func toBox(vm *lua.VM, v lua.Value, what string) *gmath.AABB {
+	t := v.Table()
+	if t == nil || t.Len() != 2 {
+		vm.Errorf("%s must be {{min x, y, z}, {max x, y, z}}", what)
+	}
+	b := gmath.AABB{Min: toVec3(vm, t.GetInt(1), what+" min"), Max: toVec3(vm, t.GetInt(2), what+" max")}
+	if b.Min.X > b.Max.X || b.Min.Y > b.Max.Y || b.Min.Z > b.Max.Z {
+		vm.Errorf("%s: min must not exceed max on any axis", what)
+	}
+	return &b
+}
+
+func boxValue(b *gmath.AABB) lua.Value {
+	if b == nil {
+		return lua.Nil
+	}
+	t := lua.NewTable(2, 0)
+	t.Append(vec3(b.Min))
+	t.Append(vec3(b.Max))
+	return lua.TableValue(t)
+}
+
+// spawnPrefab is scene.spawn_prefab(name, x, y, z [, rotation [, prefix]]): the prefab's
+// entities in a table that lists them in prefab order and also holds each under its name in
+// the prefab.
+func (g *Game) spawnPrefab(vm *lua.VM, args []lua.Value) []lua.Value {
+	g.scene(vm, "scene.spawn_prefab")
+	name := vm.CheckString(args, 0, "spawn_prefab")
+	origin := g.point(vm, args, 1, "spawn_prefab")
+	rotation := vm.OptInt(args, 4, "spawn_prefab", 0)
+	prefix := vm.OptString(args, 5, "spawn_prefab", "")
+	ents, err := g.ctx.SpawnPrefab(name, origin, int(rotation), prefix)
+	if err != nil {
+		vm.Errorf("%s", err)
+	}
+	if prefix == "" {
+		prefix = name
+	}
+	t := lua.NewTable(len(ents), len(ents))
+	for _, e := range ents {
+		v := g.entity(e)
+		t.Append(v)
+		// The entity's name in the prefab: its scene name without the prefix, and without
+		// the "#<id>" a name already taken gets.
+		key := strings.TrimPrefix(e.Name, prefix+"_")
+		if i := strings.LastIndexByte(key, '#'); i >= 0 {
+			key = key[:i]
+		}
+		t.SetString(key, v)
+	}
+	return vm.Ret(lua.TableValue(t))
+}
+
 // spawn is scene.spawn{kind=, name=, model=, material=, position=, rotation=, scale=, tags=,
-// visible=, layer=}.
+// visible=, layer=, parent=, hitbox=, state=}.
 func (g *Game) spawn(vm *lua.VM, args []lua.Value) []lua.Value {
 	s := g.scene(vm, "scene.spawn")
 	t := vm.CheckTable(args, 0, "spawn")
@@ -373,6 +446,12 @@ func (g *Game) spawn(vm *lua.VM, args []lua.Value) []lua.Value {
 			e.Tags = append(e.Tags, tag)
 		}
 	}
+	if v := t.GetString("parent"); !v.IsNil() {
+		e.Parent = g.toEntity(vm, v, "scene.spawn: parent").ID
+	}
+	if v := t.GetString("hitbox"); !v.IsNil() {
+		e.Hitbox = toBox(vm, v, "scene.spawn: hitbox")
+	}
 	_ = s
 	ent := g.ctx.Spawn(e)
 	if st := t.GetString("state"); st.Table() != nil {
@@ -392,7 +471,7 @@ func (g *Game) spawn(vm *lua.VM, args []lua.Value) []lua.Value {
 
 // installEntity builds the metatable of entity values.
 // EntityFields are the fields of an entity, in the order a debugger shows them.
-var EntityFields = []string{"id", "name", "kind", "alive", "x", "y", "z", "visible", "model", "material", "layer", "state"}
+var EntityFields = []string{"id", "name", "kind", "alive", "x", "y", "z", "visible", "model", "material", "layer", "parent", "hitbox", "state"}
 
 func (g *Game) installEntity() {
 	ent := func(vm *lua.VM, args []lua.Value, fname string) *scene.Entity {
@@ -490,6 +569,10 @@ func (g *Game) installEntity() {
 			f := func(x float32) lua.Value { return lua.Float(float64(x)) }
 			return vm.Ret(f(b.Min.X), f(b.Min.Y), f(b.Min.Z), f(b.Max.X), f(b.Max.Y), f(b.Max.Z))
 		},
+		"children": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			e := ent(vm, args, "children")
+			return vm.Ret(g.list(g.scene(vm, "entity:children").Children(e)))
+		},
 		"despawn": func(vm *lua.VM, args []lua.Value) []lua.Value {
 			g.ctx.Despawn(ent(vm, args, "despawn"))
 			return nil
@@ -531,6 +614,13 @@ func (g *Game) installEntity() {
 			return vm.Ret(optString(e.Material))
 		case "layer":
 			return vm.Ret(lua.Int(int64(e.Layer)))
+		case "parent":
+			if e.Parent == 0 {
+				return vm.Ret(lua.Nil)
+			}
+			return vm.Ret(g.entity(g.scene(vm, "entity.parent").Get(e.Parent)))
+		case "hitbox":
+			return vm.Ret(boxValue(e.Hitbox))
 		case "state":
 			if st, ok := e.State.(*State); ok {
 				return vm.Ret(lua.TableValue(st.Table))
@@ -580,6 +670,20 @@ func (g *Game) installEntity() {
 				vm.Errorf("entity.layer must be an integer")
 			}
 			e.Layer = int(n)
+		case "parent":
+			var p *scene.Entity
+			if !v.IsNil() {
+				p = g.toEntity(vm, v, "entity.parent")
+			}
+			if err := g.scene(vm, "entity.parent").SetParent(e, p); err != nil {
+				vm.Errorf("%s", err)
+			}
+		case "hitbox":
+			if v.IsNil() {
+				e.Hitbox = nil
+			} else {
+				e.Hitbox = toBox(vm, v, "entity.hitbox")
+			}
 		case "state":
 			switch {
 			case v.IsNil():
@@ -592,7 +696,7 @@ func (g *Game) installEntity() {
 		case "id", "name", "kind", "alive":
 			vm.Errorf("entity.%s cannot be changed", key)
 		default:
-			vm.Errorf("entity has no field '%s' (entities have x, y, z, visible, model, material, layer and state; keep your own values in state)", key)
+			vm.Errorf("entity has no field '%s' (entities have x, y, z, visible, model, material, layer, parent, hitbox and state; keep your own values in state)", key)
 		}
 		return nil
 	})))

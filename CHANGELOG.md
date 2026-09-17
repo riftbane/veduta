@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Lua entities get parents and hitboxes like scene files' entities: `parent` and `hitbox` in
+  `scene.spawn` and as entity fields (set, changed or cleared at any time; a parent that
+  would make a cycle is refused), and `e:children()`. `scene.SetParent` and
+  `scene.Children` in Go.
+- Prefabs outside worlds: `scene.spawn_prefab(name, x, y, z [, rotation [, prefix]])` in Lua
+  and `Context.SpawnPrefab` in Go place a prefab's entities as a world does (footprint
+  corner, right-angle turns, parents), for a house, a camp or a room built by a script.
 - The GitHub wiki, https://github.com/riftbane/veduta/wiki: making games in Lua, from
   installation and a first game (Gem Cave) to entities, scenes, assets, input, camera, HUD,
   2D, 3D and block worlds, testing, debugging, publishing, the Lua API and a FAQ. Its source

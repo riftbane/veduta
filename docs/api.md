@@ -58,6 +58,7 @@ func RegisterKind(name string, ctor func(*scene.Entity) veduta.Behaviour)
 | `Invariant(name, pred)` | register a predicate checked after every tick when listed |
 | `RegisterState(codec)` | save/restore the game's own state in snapshots |
 | `Spawn(tmpl) *scene.Entity` | add an entity (next id); its behaviour starts next tick |
+| `SpawnPrefab(name, origin, rotation, prefix)` | add a prefab's entities with the min corner of its footprint at `origin`, turned by 0, 90, 180 or 270 degrees about +Y as a world places it, named `<prefix>_<entity>` (the prefab's name when `prefix` is empty) and parented as the prefab says; returns them in prefab order |
 | `Despawn(e)` | remove `e` and its children at the end of the tick |
 | `LoadScene(name)` | replace the scene (ids restart at 1), e.g. to reset a level |
 | `SetModel(name, m) error` | add or replace a model the game builds at runtime (a voxel chunk's mesh): entities name it like an asset model, with culling, `LODs` and `DrawDistance`; uploaded at the next frame. The name contains `:` and does not start with `world:`; pass a new `*asset.Model` to change it (the engine re-uploads when the pointer changes). Not saved in snapshots and kept across `LoadScene` |

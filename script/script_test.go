@@ -103,6 +103,7 @@ func copyGame(t *testing.T, replace map[string]string) string {
 			}
 			src = string(old) + "\n" + rest
 		}
+		os.MkdirAll(filepath.Dir(file), 0o755)
 		if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -345,5 +346,71 @@ func TestSnapshotReplay(t *testing.T) {
 	os.WriteFile(main, bytes.Replace(src, []byte("score = score + 1"), []byte("score = score + 2"), 1), 0o644)
 	if r, _, code := run(t, other, "snapshot", "--restore", snap, "--ticks", "1"); code == 0 || !strings.Contains(r.Error, "replayed run") {
 		t.Fatalf("a changed game restored: exit %d %+v", code, r)
+	}
+}
+
+// TestEntityHierarchy: scripts give entities parents and hitboxes, when spawning them and
+// later, and spawn prefabs placed and turned as a world places them.
+func TestEntityHierarchy(t *testing.T) {
+	dir := copyGame(t, map[string]string{
+		"assets/prefabs/hut.prefab.json": `{
+			"veduta": "prefab/1", "footprint": [4, 2],
+			"entities": [
+				{ "name": "roof", "kind": "static", "model": "quad", "parent": "walls", "position": [0, 2, 0] },
+				{ "name": "walls", "kind": "static", "model": "quad", "position": [1, 0, 0.5], "tags": ["hut"] }
+			]
+		}`,
+		"main.lua": `+
+local problems = {}
+local function check(ok, what) if not ok then problems[#problems + 1] = what end end
+
+local init = game.init
+function game.init()
+  init()
+  local hero = scene.find("hero")
+  local cart = scene.spawn{name = "cart", model = "quad", position = {2, 0, 0}, parent = hero,
+    hitbox = {{-1, -1, -1}, {1, 1, 1}}}
+  local wheel = scene.spawn{name = "wheel", model = "quad", parent = "cart", position = {0, -1, 0}}
+  check(cart.parent == hero and wheel.parent == cart, "spawn parents")
+  check(cart.hitbox[2][1] == 1 and wheel.hitbox == nil, "spawn hitbox")
+  check(#hero:children() == 1 and hero:children()[1] == cart, "children")
+  check(not pcall(function() hero.parent = wheel end), "a cycle was accepted")
+  check(not pcall(function() cart.hitbox = {{1, 0, 0}, {0, 1, 1}} end), "an inverted hitbox was accepted")
+  wheel.parent = nil
+  wheel.hitbox = {{-0.5, -0.5, -0.5}, {0.5, 0.5, 0.5}}
+  check(wheel.parent == nil and #cart:children() == 0, "parent cleared")
+
+  local hut = scene.spawn_prefab("hut", 10, 0, 20, 90, "hut_a")
+  check(#hut == 2 and hut[1] == hut.roof and hut.walls.name == "hut_a_walls", "prefab table")
+  check(hut.roof.parent == hut.walls and hut.walls:has_tag("hut"), "prefab parents and tags")
+  local x, _, z = hut.walls:position()
+  -- footprint 4 x 2 turned by 90: walls at (1, 0.5) from the corner end up at (0.5, 3)
+  check(x == 10.5 and z == 23, "prefab placement " .. x .. " " .. z)
+  check(not pcall(scene.spawn_prefab, "nope", 0, 0, 0), "an unknown prefab was accepted")
+  check(not pcall(scene.spawn_prefab, "hut", 0, 0, 0, 45), "a 45 degree rotation was accepted")
+  trace("hierarchy", {problems = table.concat(problems, "; ")})
+end
+`,
+	})
+	out := t.TempDir()
+	r, stderr, code := run(t, dir, "simulate", "--scene", "main", "--ticks", "2", "--out", out)
+	if code != 0 {
+		t.Fatalf("exit %d %+v %s", code, r, stderr)
+	}
+	trace, _ := os.ReadFile(filepath.Join(out, "trace.jsonl"))
+	if !strings.Contains(string(trace), `"problems":""`) {
+		i := strings.Index(string(trace), `"hierarchy"`)
+		t.Fatalf("checks failed: %s", string(trace)[i:min(len(trace), i+300)])
+	}
+	last := string(trace)[strings.LastIndex(strings.TrimSpace(string(trace)), "\n"):]
+	for _, want := range []string{`"name":"cart"`, `"parent":"hero"`, `"name":"hut_a_roof"`, `"parent":"hut_a_walls"`} {
+		if !strings.Contains(last, want) {
+			t.Errorf("the trace lacks %s", want)
+		}
+	}
+	// The cart's hitbox follows the hero: its world box is centred 2 units right of him.
+	if !regexp.MustCompile(`\{"aabb":\{"max":\[3,1,1\],"min":\[1,-1,-1\]\},"id":\d+,"kind":"static","material":"","model":"quad","name":"cart"`).MatchString(last) {
+		i := strings.Index(last, `"name":"cart"`)
+		t.Errorf("cart's box: %s", last[i:min(len(last), i+300)])
 	}
 }

@@ -22,6 +22,8 @@
 ---@field model string? a model asset's name
 ---@field material string? a material asset's name
 ---@field layer integer the first key of the draw order
+---@field parent veduta.Entity? the parent; set it to an entity, an entity's name or nil
+---@field hitbox number[][]? {{min x, y, z}, {max x, y, z}} in the entity's own space, or nil
 ---@field state table your own values; the trace records them as state.<key>
 local Entity = {}
 
@@ -85,6 +87,10 @@ function Entity:bounds() end
 
 ---Removed at the end of the tick.
 function Entity:despawn() end
+
+---The live entities whose parent is this one, in id order.
+---@return veduta.Entity[]
+function Entity:children() end
 
 ---A kind: the behaviour of the entities whose `kind` names it.
 ---@class veduta.Kind
@@ -165,12 +171,26 @@ function scene.entities() end
 ---@field tags? string[]
 ---@field visible? boolean
 ---@field layer? integer
+---@field parent? veduta.Entity|string an entity or an entity's name
+---@field hitbox? number[][] {{min x, y, z}, {max x, y, z}}
 ---@field state? table merged into the kind's
 
 ---Adds an entity.
 ---@param spec veduta.Spawn
 ---@return veduta.Entity
 function scene.spawn(spec) end
+
+---Adds the entities of a prefab, the min corner of its footprint at (x, y, z), turned by
+---rotation (0, 90, 180 or 270) about +Y, named "<prefix>_<entity>". The table lists them in
+---prefab order and holds each under its name in the prefab.
+---@param name string
+---@param x number
+---@param y number
+---@param z number
+---@param rotation? integer degrees: 0, 90, 180 or 270
+---@param prefix? string default: the prefab's name
+---@return table<integer|string, veduta.Entity>
+function scene.spawn_prefab(name, x, y, z, rotation, prefix) end
 
 ---Replaces the scene, as a reset.
 ---@param name string

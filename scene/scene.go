@@ -260,6 +260,40 @@ func (s *Scene) Restore(ents []Entity, nextID uint32) error {
 	return nil
 }
 
+// SetParent makes p the parent of e, or leaves e without one when p is nil. e's transform is
+// then relative to p, so its place in the world changes unless the caller adjusts it. It
+// refuses e itself, a descendant of e, and an entity that is not alive in the scene.
+func (s *Scene) SetParent(e, p *Entity) error {
+	if p == nil {
+		e.Parent = 0
+		return nil
+	}
+	if p.dead || s.byID[p.ID] != p {
+		return fmt.Errorf("entity %q: parent %q is not in the scene", e.Name, p.Name)
+	}
+	for a := p; a != nil; a = s.byID[a.Parent] {
+		if a == e {
+			return fmt.Errorf("entity %q: parent %q would make a cycle", e.Name, p.Name)
+		}
+		if a.Parent == 0 {
+			break
+		}
+	}
+	e.Parent = p.ID
+	return nil
+}
+
+// Children returns the live entities whose parent is e, in id order.
+func (s *Scene) Children(e *Entity) []*Entity {
+	var out []*Entity
+	for _, c := range s.entities {
+		if c.Parent == e.ID && !c.dead {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 // Despawn marks e (and its descendants) as dead. They stay reachable until Flush, which
 // the engine calls at the end of the tick, so iteration order is never disturbed.
 func (s *Scene) Despawn(e *Entity) {

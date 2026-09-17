@@ -190,3 +190,32 @@ func TestFrameOrthoFitsBox(t *testing.T) {
 		}
 	}
 }
+
+func TestSetParent(t *testing.T) {
+	s := testScene(t)
+	player, hat := s.Find("player"), s.Find("hat")
+	box := s.Spawn(Entity{Name: "box", Kind: "static"})
+	if err := s.SetParent(player, hat); err == nil {
+		t.Fatal("a child became its parent's parent")
+	}
+	if err := s.SetParent(box, box); err == nil {
+		t.Fatal("an entity became its own parent")
+	}
+	if err := s.SetParent(box, hat); err != nil || box.Parent != hat.ID {
+		t.Fatalf("set parent: %v, parent %d", err, box.Parent)
+	}
+	if kids := s.Children(hat); len(kids) != 1 || kids[0] != box {
+		t.Fatalf("children of hat: %v", kids)
+	}
+	s.Despawn(player) // hat, and box under it, go too
+	if !box.dead {
+		t.Fatal("a grandchild outlived its despawned grandparent")
+	}
+	other := s.Spawn(Entity{Name: "other", Kind: "static"})
+	if err := s.SetParent(other, hat); err == nil {
+		t.Fatal("a despawned entity became a parent")
+	}
+	if err := s.SetParent(other, nil); err != nil || other.Parent != 0 {
+		t.Fatalf("clearing the parent: %v", err)
+	}
+}
