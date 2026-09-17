@@ -30,7 +30,8 @@ game, on every machine, so a play session can be saved as a test and replayed fo
 | [HUD](HUD) | text, icons and dialogue boxes over the frame |
 | [2D Games](2D-Games) | sprites, depth, layers, hitboxes, the traps |
 | [3D, Worlds and Blocks](3D-Worlds-and-Blocks) | perspective scenes, streamed worlds, block worlds built at runtime |
-| [Structuring a Large Game](Structuring-a-Large-Game) | folders, modules, shared state, data tables, sequences |
+| [Saves](Saves) | progress and settings that outlive a play, on the card and in tests |
+| [Structuring a Large Game](Structuring-a-Large-Game) | folders, modules, shared state, data tables, cutscenes |
 
 ## Making it solid
 

@@ -38,6 +38,11 @@ game (`io`, `os`, `debug`, `load`, coroutines, `goto`), and without `string.pack
 `string.unpack` and `string.dump`, which have no use without file access. An engine before
 v2.0.0-rc.4 also lacked `math.deg` and `math.rad`: update it (`veduta update`).
 
+### Accented letters show as `?`
+
+The font covers ASCII, Latin-1 and Windows-1252's extra characters from v2.0.0-rc.5. Other
+scripts (Greek, Cyrillic, Japanese, emoji) are not in it. Save scripts as UTF-8.
+
 ### An asset in a folder is not found
 
 Folders under an asset kind's directory work from v2.0.0-rc.4. The asset's name is its file
@@ -93,12 +98,6 @@ Positions are float32. Compare with a margin: `>` 4.99 and `<` 5.01.
 These are known and planned, not bugs in your game:
 
 - **No sound** yet.
-- **No saving** between sessions: a game cannot store progress or high scores.
-- **No coroutines**: sequences (cutscenes, dialogue waiting for A) are written as state
-  machines for now.
-- **Text is ASCII**: no accented letters in `hud.text`, and no automatic line breaks.
-- **Sprite sheets**: an animation frame is a material each; `hud.image` already picks parts
-  of a sheet.
 - While the debugger is stopped at a breakpoint, the simulator window is not redrawn.
 - The simulator window exists on Windows only; Linux and macOS have every headless command.
 

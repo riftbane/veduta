@@ -97,13 +97,13 @@ differences:
 
 | Lua 5.4 | Veduta |
 |---------|--------|
-| `string`, `table`, `math`, `utf8` | the same |
+| `string`, `table`, `math`, `utf8`, `coroutine` | the same (a coroutine may even yield inside a `table.sort` comparison) |
 | `print` | writes to the tool's error output (the Debug Console in VS Code) |
 | `pairs` order | order of insertion |
 | `math.random` | the run's seeded generator |
 | `io`, `os`, `debug`, `load`, `dofile` | not available |
 | `string.pack`, `string.unpack`, `string.dump` | not available |
-| coroutines, `goto` | not available |
+| `goto` | not available |
 
 ## Errors and endless loops
 

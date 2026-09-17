@@ -20,6 +20,9 @@ every console.
 4. Eject the card, put it back and switch the console on. The dashboard lists the game by
    its title: A plays it, Home comes back.
 
+The console keeps each game's [saves](Saves) on the card in `saves/<name>/`, apart from the
+game: deploying again never touches them.
+
 `deploy` writes `games/<name>/` with the `.lua` files, `assets/` (without the compiled
 cache), `veduta.json`, `README.md`, the icon and a `card.json` carrying the version
 (from `git describe`). Deploying again replaces the folder, so it is also how to update a

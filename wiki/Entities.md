@@ -20,19 +20,18 @@ whether two variables hold the same entity.
 | `visible` | read/write | drawn or not; an invisible entity still updates and collides |
 | `model`, `material` | read/write | asset names, or `nil` |
 | `layer` | read/write | the first key of the draw order (see [2D Games](2D-Games#depth-and-layers)) |
+| `frame` | read/write | the frame of a sprite sheet its material cuts into a grid (see [2D Games](2D-Games#animation)) |
 | `parent` | read/write | the parent entity or `nil`; set it to an entity, an entity's name or `nil` |
 | `hitbox` | read/write | `{{min x, y, z}, {max x, y, z}}` in the entity's own space, or `nil` |
 | `state` | read/write | a table of your own values |
 
-Setting any other field is an error. Switching `material` every few ticks is how a sprite
-is animated:
+Setting any other field is an error. Changing `frame` every few ticks is how a sprite is
+animated, when its material is a sprite sheet:
 
 ```lua
 kinds.torch = {
   update = function(e)
-    if engine.tick % 4 == 0 then
-      e.material = (e.material == "torch_1") and "torch_2" or "torch_1"
-    end
+    e.frame = engine.tick // 4 % 3   -- frames 0, 1, 2, a new one every 4 ticks
   end,
 }
 ```
@@ -99,6 +98,7 @@ local coin = scene.spawn{
   tags = {"coin", "pickup"},
   visible = true,
   layer = 0,
+  frame = 0,
   parent = nil,                             -- an entity or an entity's name
   hitbox = {{-0.3, -0.3, -0.5}, {0.3, 0.3, 0.5}},
   state = {value = 5},

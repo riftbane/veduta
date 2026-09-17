@@ -67,6 +67,7 @@ should. Leave `light` out for the defaults shown above.
 | `visible` | `true` | |
 | `hitbox` | none | `[[minx, miny, minz], [maxx, maxy, maxz]]` in the entity's own space: replaces the model's bounds for collisions |
 | `layer` | `0` | draw order, −1000 to 1000 |
+| `frame` | `0` | the frame of a sprite sheet material |
 
 Ids are given in file order when the scene loads: the first entity is 1. Entities spawned
 later take the following ids.

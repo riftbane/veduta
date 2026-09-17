@@ -50,6 +50,7 @@ Fields:
 | `visible` | read/write | boolean |
 | `model`, `material` | read/write | asset name or `nil` |
 | `layer` | read/write | integer, draw order |
+| `frame` | read/write | integer, the frame of a sprite sheet material |
 | `parent` | read/write | entity or `nil`; accepts an entity's name |
 | `hitbox` | read/write | `{{min x, y, z}, {max x, y, z}}` or `nil` |
 | `state` | read/write | table of the entity's own values |
@@ -84,7 +85,7 @@ Available from `game.init` on.
 | `scene.find(name)` | entity or `nil` |
 | `scene.tagged(tag)` | list of entities, id order |
 | `scene.entities()` | every live entity, id order |
-| `scene.spawn{...}` | the new entity; fields `kind` (default `static`), `name`, `model`, `material`, `position`, `rotation`, `scale` (each `{x, y, z}`), `tags` (list), `visible`, `layer`, `parent` (entity or name), `hitbox` (`{{min}, {max}}`), `state` (table) |
+| `scene.spawn{...}` | the new entity; fields `kind` (default `static`), `name`, `model`, `material`, `position`, `rotation`, `scale` (each `{x, y, z}`), `tags` (list), `visible`, `layer`, `frame`, `parent` (entity or name), `hitbox` (`{{min}, {max}}`), `state` (table) |
 | `scene.spawn_prefab(name, x, y, z [, rotation [, prefix]])` | a prefab's entities, footprint corner at (x, y, z), turned 0/90/180/270; the table lists them and holds each under its prefab name |
 | `scene.load(name)` | replaces the scene, as a reset |
 
@@ -113,7 +114,9 @@ Only inside `game.draw`. Pixels from the top left.
 
 | Function | Returns / does |
 |----------|----------------|
-| `hud.text(x, y, text [, color [, scale]])` | draws with the 8 × 8 font; returns the width drawn |
+| `hud.text(x, y, text [, color [, scale]])` | draws with the 8 × 8 font (ASCII, Latin-1, Windows-1252's €‘’“”–—…); returns the width drawn |
+| `hud.text_width(text [, scale])` | width in pixels; usable outside `draw` |
+| `hud.wrap(text, width [, scale])` | text with line breaks, and the number of lines; usable outside `draw` |
 | `hud.rect(x, y, w, h [, color])` | a filled rectangle |
 | `hud.image(texture, x, y [, options])` | a texture or part of it; options `src = {x, y, w, h}`, `w`, `h`, `color`, `flip_x`, `flip_y` |
 | `hud.panel(texture, x, y, w, h, border [, options])` | nine-slice panel; `border` a number or `{left, top, right, bottom}`; options `src`, `color` |
@@ -153,6 +156,15 @@ Only inside `game.draw`. Pixels from the top left.
 | `v:fill(x1, y1, z1, x2, y2, z2, id)` | every cell of the box |
 | `v:size()` | x, y, z |
 
+## save
+
+| Function | Returns / does |
+|----------|----------------|
+| `save.write(name, table)` | `true`, or `nil` and a message when the storage fails; errors on what a save cannot hold |
+| `save.read(name)` | a new table, or `nil` (and a message when it cannot be read) |
+| `save.remove(name)` | `true`, or `nil` and a message |
+| `save.list()` | the save names, sorted |
+
 ## Globals
 
 | Function | Does |
@@ -168,6 +180,6 @@ Only inside `game.draw`. Pixels from the top left.
 
 - `pairs` visits keys in insertion order.
 - `math.random` and `math.randomseed` use the run's deterministic generator.
+- `coroutine` as in Lua 5.4; a coroutine may also yield inside a Go callback (`table.sort`).
 - Missing: `string.pack`, `string.unpack`, `string.packsize`, `string.dump`.
-- Not available by design: `io`, `os`, `debug`, `load`, `loadfile`, `dofile`, coroutines,
-  `goto`.
+- Not available by design: `io`, `os`, `debug`, `load`, `loadfile`, `dofile`, `goto`.

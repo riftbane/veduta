@@ -10,6 +10,8 @@ console. `engine.width` and `engine.height` give the frame's size inside `game.d
 |----------|-------|
 | `hud.text(x, y, text [, color [, scale]])` | text in the built-in 8 × 8 font; returns the width drawn in pixels |
 | `hud.rect(x, y, w, h [, color])` | a filled rectangle |
+| `hud.text_width(text [, scale])` | the width `hud.text` would draw; works outside `draw` too |
+| `hud.wrap(text, width [, scale])` | the text broken into lines of at most `width` pixels, and the line count |
 | `hud.image(texture, x, y [, options])` | a texture, or a part of it, with sharp texels |
 | `hud.panel(texture, x, y, w, h, border [, options])` | a frame that stretches to any size |
 | `hud.image_size(texture)` | a texture's width and height in texels |
@@ -32,20 +34,24 @@ function game.draw()
 end
 ```
 
-## Centering text
-
-Every character is 8 pixels wide times the scale:
+## Centering and wrapping text
 
 ```lua
 local function centered(y, text, color, scale)
-  scale = scale or 1
-  local w = 8 * scale * #text
-  hud.text((engine.width - w) // 2, y, text, color, scale)
+  hud.text((engine.width - hud.text_width(text, scale)) // 2, y, text, color, scale)
+end
+
+function game.draw()
+  centered(100, "È già notte", "#f4f0e0", 2)
+  local body, lines = hud.wrap("Il ponte è crollato. Prendi il sentiero della grotta.", 200)
+  hud.text(60, 130, body, "#a0a0b0")   -- lines * 8 pixels tall
 end
 ```
 
-`#text` counts bytes: keep HUD text to ASCII. The font has every printable ASCII character
-(space to `~`): upper and lower case letters, digits and punctuation.
+The font has ASCII, the accented letters of Latin-1 (à è é ì ò ù ç ñ ä ö ü ß …) and the
+typographic characters of Windows-1252 (€ ‘ ’ “ ” – — …); anything else draws as `?`. Write
+scripts in UTF-8, as VS Code does. Measure with `hud.text_width`, not `#text`: `#` counts
+bytes, and `è` is two.
 
 ## Bars
 

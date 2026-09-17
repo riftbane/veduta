@@ -19,7 +19,7 @@ mygame/
 ```
 
 A `.git` repository is created too. The tool writes what it produces (test runs, renders,
-fuzz results) under `out/`, and compiled assets under `assets/.cooked/`: both are ignored
+fuzz results, and the simulator's [saves](Saves)) under `out/`, and compiled assets under `assets/.cooked/`: both are ignored
 by git and never need editing.
 
 ## Where things go
@@ -54,7 +54,7 @@ an error with its file, line and column, and VS Code underlines it as you type.
   "veduta": "project/1",
   "name": "gemcave",
   "title": "Gem Cave",
-  "engine": "v2.0.0-rc.4",
+  "engine": "v2.0.0-rc.5",
   "script": "main.lua",
   "icon": "icon.png"
 }

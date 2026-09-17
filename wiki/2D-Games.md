@@ -55,26 +55,47 @@ What covers what is decided by z, then by `layer`:
 
 ## Animation
 
-One material per frame, switched on a timer:
+Draw the frames of an animation side by side in one texture, a **sprite sheet**, and give
+its material a `grid` of `[columns, rows]`. An entity's `frame` then picks the frame drawn,
+counted left to right and top to bottom from 0, wrapping around:
+
+```json
+{ "veduta": "material/1", "texture": "hero_sheet", "grid": [4, 2], "unlit": true, "alpha": "cutout", "filter": "nearest" }
+```
+
+```json
+{
+  "veduta": "texture/1",
+  "size": [64, 32],
+  "mipmaps": false,
+  "layers": [
+    { "type": "image", "path": "sprites/hero_sheet.png" }
+  ]
+}
+```
+
+Here the sheet is 4 × 2 frames of 16 × 16 pixels: the top row walks, the bottom row stands.
 
 ```lua
-local WALK = {"hero_walk_1", "hero_walk_2", "hero_walk_3", "hero_walk_2"}
+local WALK = {0, 1, 2, 3}   -- frames of the top row
+local IDLE = 4              -- the first frame of the bottom row
 
 kinds.hero = {
   update = function(e)
     local dx = input.dpad()
     if dx ~= 0 then
       e.x = e.x + dx * 4 * engine.dt
-      e.material = WALK[(engine.tick // 3) % #WALK + 1]   -- a frame every 3 ticks
-      e:set_scale(dx * 0.8, 0.8, 1)                        -- a negative x mirrors: face left
+      e.frame = WALK[(engine.tick // 3) % #WALK + 1]   -- a frame every 3 ticks
+      e:set_scale(dx * 0.8, 0.8, 1)                     -- a negative x mirrors: face left
     else
-      e.material = "hero_idle"
+      e.frame = IDLE
     end
   end,
 }
 ```
 
-A negative scale mirrors the sprite, so one set of frames serves both directions.
+A negative scale mirrors the sprite, so one set of frames serves both directions. Give a
+sheet's texture `"mipmaps": false`, so frames never bleed into each other.
 
 ## Collisions
 

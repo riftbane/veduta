@@ -141,34 +141,57 @@ easy to balance without touching code.
 - **Invariants for the rules of the game**: gold never negative, hp between 0 and max, no
   item count below zero. Fuzzing then hunts for the inputs that break them.
 
-## Sequences without coroutines
+## Sequences with coroutines
 
-Cutscenes and dialogue that wait for the player are state machines for now: a list of
-steps and an index, advanced in `update`.
+Cutscenes and dialogue that wait read best as a sequence. A coroutine runs until it
+yields, and the next resume carries on where it stopped: resume it once per tick and
+`wait(n)` is n ticks.
 
-```lua
-local steps = {
-  {say = "Mira", text = "The bridge is out."},
-  {wait = 20},
-  {say = "Old man", text = "Take the cave path."},
-}
-local step, timer = 1, 0
+```lua cutscenes/bridge.lua
+local say = require("ui.say")
 
-local function run_cutscene()
-  local s = steps[step]
-  if not s then
-    return true -- finished
+local function wait(ticks)
+  for _ = 1, ticks do coroutine.yield() end
+end
+
+local function wait_for(button)
+  repeat coroutine.yield() until input.pressed(button)
+end
+
+return function()
+  say("Mira", "The bridge is out.")
+  wait_for("a")
+  say("Old man", "Take the cave path. And mind the bats.")
+  wait_for("a")
+  say(nil)
+  local hero = scene.find("hero")
+  for _ = 1, 20 do          -- walk right for a second
+    hero:move(0.1, 0, 0)
+    coroutine.yield()
   end
-  if s.say and input.pressed("a") then
-    step = step + 1
-  elseif s.wait then
-    timer = timer + 1
-    if timer >= s.wait then
-      step, timer = step + 1, 0
-    end
-  end
-  return false
+  wait(10)
 end
 ```
 
-`game.draw` shows `steps[step]` while it lasts, in a [panel](HUD#panels-and-dialogue-boxes).
+```lua
+local cutscene   -- the running cutscene, or nil
+
+local function play(fn)
+  cutscene = coroutine.create(fn)
+end
+
+function game.update()
+  if cutscene then
+    local ok, err = coroutine.resume(cutscene)
+    if not ok then error(err) end
+    if coroutine.status(cutscene) == "dead" then cutscene = nil end
+    return   -- the game waits while a cutscene plays
+  end
+  if input.pressed("b") then
+    play(require("cutscenes.bridge"))
+  end
+end
+```
+
+Coroutines are deterministic like the rest of the game: scenarios replay a cutscene tick for
+tick, and snapshots restore one where it was.

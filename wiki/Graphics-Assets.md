@@ -60,6 +60,7 @@ from Lua instead: see [3D, Worlds and Blocks](3D-Worlds-and-Blocks#block-worlds-
 | `cutoff` | `0.5` | the threshold of `cutout` |
 | `cull` | `"back"` | `none` draws both sides (leaves, flags) |
 | `filter` | `"bilinear"` | `nearest` keeps pixel art sharp |
+| `grid` | none | `[columns, rows]`: the texture is a sprite sheet, and an entity's `frame` picks the frame drawn |
 
 A sprite's material is always:
 

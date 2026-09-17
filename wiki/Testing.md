@@ -40,6 +40,7 @@ without a window in a fraction of a second, and checked. That is a **scenario**.
 | `expect` | checks, see below |
 | `invariants` | rules checked after every tick, in addition to the project's |
 | `screenshots` | ticks at which a frame is drawn into the run's contact sheet |
+| `saves` | the game's saves when the run starts, by name (see [Saves](Saves#saves-in-tests)) |
 
 Tick 0 is the scene just loaded; inputs at tick t are seen by the update of tick t.
 
@@ -55,6 +56,7 @@ Tick 0 is the scene just loaded; inputs at tick t are seen by the update of tick
 | `visible` | boolean |
 | `tags` | list: `contains` a tag, or `==` a list |
 | `kind`, `model`, `material`, `parent` | strings |
+| `frame` | number: the sprite sheet frame |
 | `state.<key>` (and deeper, `state.inventory.keys`) | whatever the script stored in `e.state` |
 
 Operators: `<`, `<=`, `==`, `!=`, `>=`, `>` for numbers; `==`, `!=` and `contains` for
@@ -63,7 +65,7 @@ strings and lists. Positions are float32: prefer `<` and `>` with a margin over 
 **How many times something happened, up to a tick**: `trace`, `count_min`, `count_max`.
 The names are the ones your script passes to `trace(name, fields)`, plus the engine's own
 events: `spawn`, `despawn`, `collision`, `scene_load`, `invariant_violation`,
-`chunk_load` and `chunk_unload` in worlds.
+`chunk_load` and `chunk_unload` in worlds, `save_write` and `save_remove`.
 
 ```lua
 trace("coin_collected", {coin = coin.name, score = score})
