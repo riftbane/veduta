@@ -165,11 +165,14 @@ game's menu) and `cancel` (back). Home leaves the game and never reaches it.
 
 ## hud
 
-Only inside `game.draw`. Coordinates are pixels from the top left of the frame.
+Only inside `game.draw`, except `hud.text_width` and `hud.wrap`, which measure. Coordinates
+are pixels from the top left of the frame.
 
 | Function | Meaning |
 |----------|---------|
-| `hud.text(x, y, text [, color [, scale]])` | the built-in 8×8 font; returns the width drawn |
+| `hud.text(x, y, text [, color [, scale]])` | the built-in 8×8 font; returns the width drawn. The font has ASCII, Latin-1 (à è é ì ò ù ç ñ ä ö ü ß …) and Windows-1252's extra characters (€ ‘ ’ “ ” – — …); others draw as `?`. `\n` starts a new line |
+| `hud.text_width(text [, scale])` | the width in pixels `hud.text` would draw (count characters, not bytes: `#text` counts the two bytes of `è`); usable anywhere |
+| `hud.wrap(text, width [, scale])` | the text broken into lines at most `width` pixels wide, at spaces (a longer word is cut), and the number of lines; usable anywhere |
 | `hud.rect(x, y, w, h [, color])` | a filled rectangle |
 | `hud.image(texture, x, y [, options])` | a texture asset, or a part of it, with its texels sharp. `options`: `src = {x, y, w, h}` the part in texels (an icon of a sheet; default all of it), `w`, `h` the size drawn in pixels (default the part's), `color` multiplying the texels, `flip_x`, `flip_y` |
 | `hud.panel(texture, x, y, w, h, border [, options])` | a nine-slice panel of any size: the corners, `border` texels wide (one number, or `{left, top, right, bottom}`), keep their size; edges and middle stretch. `options`: `src`, `color` |

@@ -551,3 +551,38 @@ end
 		t.Error("a headless run wrote saves to disk")
 	}
 }
+
+// TestHUDText: text is measured in characters, not bytes, and wrapped to a width.
+func TestHUDText(t *testing.T) {
+	dir := copyGame(t, map[string]string{
+		"main.lua": `+
+local init = game.init
+function game.init()
+  init()
+  local problems = {}
+  local function check(ok, what) if not ok then problems[#problems + 1] = what end end
+  check(hud.text_width("città") == 40 and #"città" == 6, "width of città: " .. hud.text_width("città"))
+  check(hud.text_width("ab\nabcd", 2) == 64, "widest line at scale 2")
+  local text, lines = hud.wrap("la città è più bella di notte", 80)
+  check(text == "la città è\npiù bella\ndi notte" and lines == 3, "wrap: " .. text)
+  trace("text", {problems = table.concat(problems, "; ")})
+end
+function game.draw()
+  hud.text(4, 4, hud.wrap("Perché è così? – 12€", 100), "#ffffff")
+end
+`,
+	})
+	out := t.TempDir()
+	if r, stderr, code := run(t, dir, "simulate", "--scene", "main", "--ticks", "1", "--out", out); code != 0 {
+		t.Fatalf("exit %d %+v %s", code, r, stderr)
+	}
+	trace, _ := os.ReadFile(filepath.Join(out, "trace.jsonl"))
+	if !strings.Contains(string(trace), `"problems":""`) {
+		i := strings.Index(string(trace), `"event":"text"`)
+		t.Fatalf("checks failed: %s", string(trace)[max(0, i-200):min(len(trace), i+40)])
+	}
+	frame := filepath.Join(t.TempDir(), "frame.png")
+	if r, stderr, code := run(t, dir, "render", "--out", frame); code != 0 {
+		t.Fatalf("render: exit %d %+v %s", code, r, stderr)
+	}
+}

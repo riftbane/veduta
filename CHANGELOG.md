@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The built-in font draws Latin-1 (à è é ì ò ù ç ñ ä ö ü ß, « », £, ©, …) and Windows-1252's
+  extra characters (€, ‘ ’ “ ”, – —, …, ™): 224 glyphs in a 128×112 atlas. Accented capitals
+  stay on the baseline under a one-row accent; `Font.Cells` maps the Unicode code points of
+  the Windows-1252 characters to their cells, and control characters draw as `?`.
+  `sprite.Wrap` breaks text into lines of a pixel width; Lua gets `hud.text_width` and
+  `hud.wrap`, which count characters rather than bytes.
 - Saves: `save.write`, `save.read`, `save.remove` and `save.list` in Lua (tables of plain
   data as JSON, integers and floats kept apart), `Context.ReadSave`, `WriteSave`,
   `RemoveSave` and `SaveNames` in Go. The player keeps them as files in `VEDUTA_SAVE_DIR`

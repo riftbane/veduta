@@ -262,6 +262,22 @@ hud = {}
 ---@return integer width drawn
 function hud.text(x, y, text, color, scale) end
 
+---The width in pixels of text drawn with the built-in font; the widest line when it has
+---several. Works outside game.draw too.
+---@param text any
+---@param scale? integer
+---@return integer width
+function hud.text_width(text, scale) end
+
+---Text broken into lines no wider than width pixels: at spaces, and inside a word too long
+---for a line. hud.text draws the lines it returns. Works outside game.draw too.
+---@param text any
+---@param width integer pixels
+---@param scale? integer
+---@return string text with line breaks
+---@return integer lines
+function hud.wrap(text, width, scale) end
+
 ---A filled rectangle.
 ---@param x number
 ---@param y number

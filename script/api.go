@@ -221,6 +221,18 @@ func (g *Game) install() {
 			w := g.ctx.Text(b, float32(x), float32(y), int(scale), s, color)
 			return vm.Ret(lua.Float(float64(w)))
 		},
+		"text_width": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			s := vm.ToString(vm.CheckAny(args, 0, "hud.text_width"))
+			w, _ := sprite.MeasureText(g.ctx.Font, s, int(vm.OptInt(args, 1, "hud.text_width", 1)))
+			return vm.Ret(lua.Int(int64(w)))
+		},
+		"wrap": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			s := vm.ToString(vm.CheckAny(args, 0, "hud.wrap"))
+			width := vm.CheckInt(args, 1, "hud.wrap")
+			scale := vm.OptInt(args, 2, "hud.wrap", 1)
+			wrapped := sprite.Wrap(g.ctx.Font, s, int(width), int(scale))
+			return vm.Ret(lua.String(wrapped), lua.Int(int64(strings.Count(wrapped, "\n")+1)))
+		},
 		"image":      g.hudImage,
 		"panel":      g.hudPanel,
 		"image_size": g.hudImageSize,

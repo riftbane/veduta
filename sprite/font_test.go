@@ -17,8 +17,8 @@ func TestDefaultFont(t *testing.T) {
 	if f != DefaultFont() {
 		t.Fatal("DefaultFont returned different fonts")
 	}
-	if f.Atlas.W != 128 || f.Atlas.H != 48 || f.CellW != 8 || f.CellH != 8 || f.Cols != 16 ||
-		f.First != 32 || f.Last != 126 {
+	if f.Atlas.W != 128 || f.Atlas.H != 112 || f.CellW != 8 || f.CellH != 8 || f.Cols != 16 ||
+		f.First != 32 || f.Last != 255 {
 		t.Fatalf("font = %+v (atlas %dx%d)", *f, f.Atlas.W, f.Atlas.H)
 	}
 	for i, c := range f.Atlas.Pix {
@@ -27,7 +27,7 @@ func TestDefaultFont(t *testing.T) {
 		}
 	}
 	td := f.TextureData()
-	if td.Levels[0].W != 128 || td.Levels[0].H != 48 || len(td.Levels) != 8 || td.Wrap != gfx.WrapClamp {
+	if td.Levels[0].W != 128 || td.Levels[0].H != 112 || len(td.Levels) != 8 || td.Wrap != gfx.WrapClamp {
 		t.Fatalf("texture data: %d levels, wrap %v", len(td.Levels), td.Wrap)
 	}
 	if &td.Levels[0].Pix[0] == &f.Atlas.Pix[0] {
@@ -49,7 +49,7 @@ func TestEmbeddedAtlasMatchesSource(t *testing.T) {
 	}
 	f := DefaultFont()
 	for r := rune(fontsrc.First); r <= fontsrc.Last; r++ {
-		g := f.Glyph(r)
+		g := f.Cell(r)
 		bm := fs.Glyph(r)
 		for y := 0; y < fontsrc.CellH; y++ {
 			for x := 0; x < fontsrc.CellW; x++ {
@@ -109,7 +109,11 @@ func TestGlyph(t *testing.T) {
 		{'~', image.Rect(112, 40, 120, 48)},
 		{'?', image.Rect(120, 8, 128, 16)},
 		{'\n', image.Rect(120, 8, 128, 16)},
-		{'é', image.Rect(120, 8, 128, 16)},
+		{'é', image.Rect(72, 96, 80, 104)},      // 0xe9-32 = 201: column 9, row 12
+		{'€', image.Rect(0, 48, 8, 56)},         // Windows-1252's 0x80 cell: column 0, row 6
+		{'’', image.Rect(16, 56, 24, 64)},       // 0x92: column 2, row 7
+		{'\u0085', image.Rect(120, 8, 128, 16)}, // a control character
+		{'☃', image.Rect(120, 8, 128, 16)},
 		{-1, image.Rect(120, 8, 128, 16)},
 	}
 	for _, c := range cases {
@@ -143,7 +147,8 @@ func TestTextGlyphUV(t *testing.T) {
 	if tl.Pos != gmath.V3(5, 6, 0) || br.Pos != gmath.V3(21, 22, 0) {
 		t.Errorf("glyph quad %v..%v, want (5,6)..(21,22)", tl.Pos, br.Pos)
 	}
-	if tl.UV != gmath.V2(8.0/128, 16.0/48) || br.UV != gmath.V2(16.0/128, 24.0/48) {
+	iw, ih := 1/float32(128), 1/float32(112) // as Image computes them
+	if tl.UV != gmath.V2(8*iw, 16*ih) || br.UV != gmath.V2(16*iw, 24*ih) {
 		t.Errorf("glyph UVs %v..%v", tl.UV, br.UV)
 	}
 }
@@ -172,7 +177,7 @@ func TestTextLayout(t *testing.T) {
 	for k, g := range want {
 		v := dl.Verts[4*k]
 		r := f.Glyph(g.r)
-		if v.Pos != gmath.V3(g.x, g.y, 0) || v.UV != gmath.V2(float32(r.Min.X)/128, float32(r.Min.Y)/48) {
+		if v.Pos != gmath.V3(g.x, g.y, 0) || v.UV != gmath.V2(float32(r.Min.X)/128, float32(r.Min.Y)/112) {
 			t.Errorf("glyph %q at %v uv %v, want (%v,%v) uv of %v", g.r, v.Pos, v.UV, g.x, g.y, r)
 		}
 	}
@@ -182,13 +187,13 @@ func TestTextUnknownRuneAndScale(t *testing.T) {
 	f := DefaultFont()
 	var dl gfx.DrawList
 	b := Begin(&dl, 640, 360)
-	w := b.Text(f, 1, 0, 0, 0, "é", 0xFFFFFFFF) // scale 0 counts as 1
+	w := b.Text(f, 1, 0, 0, 0, "☃", 0xFFFFFFFF) // scale 0 counts as 1
 	b.End()
 	if w != 8 || len(dl.Verts) != 4 {
 		t.Fatalf("width %v, %d verts", w, len(dl.Verts))
 	}
 	q := f.Glyph('?')
-	if dl.Verts[0].UV != gmath.V2(float32(q.Min.X)/128, float32(q.Min.Y)/48) || dl.Verts[2].Pos != gmath.V3(8, 8, 0) {
+	if dl.Verts[0].UV != gmath.V2(float32(q.Min.X)/128, float32(q.Min.Y)/112) || dl.Verts[2].Pos != gmath.V3(8, 8, 0) {
 		t.Fatalf("unknown rune drew %+v .. %+v", dl.Verts[0], dl.Verts[2])
 	}
 }
@@ -210,6 +215,34 @@ func TestMeasureText(t *testing.T) {
 	for _, c := range cases {
 		if w, h := MeasureText(f, c.s, c.scale); w != c.w || h != c.h {
 			t.Errorf("MeasureText(%q, %d) = %d×%d, want %d×%d", c.s, c.scale, w, h, c.w, c.h)
+		}
+	}
+}
+
+func TestWrap(t *testing.T) {
+	f := DefaultFont()
+	cases := []struct {
+		s            string
+		width, scale int
+		want         string
+	}{
+		{"the bridge is out", 80, 1, "the bridge\nis out"},       // 10 glyphs a line
+		{"the bridge is out", 160, 2, "the bridge\nis out"},      // the same at scale 2
+		{"la città è più bella", 80, 1, "la città è\npiù bella"}, // runes, not bytes
+		{"a\n\nb c", 16, 1, "a\n\nb\nc"},
+		{"abcdefghij", 32, 1, "abcd\nefgh\nij"}, // a word wider than the line
+		{"ab abcdefgh", 32, 1, "ab\nabcd\nefgh"},
+		{"xyz", 3, 1, "x\ny\nz"},
+		{"", 80, 1, ""},
+	}
+	for _, c := range cases {
+		if got := Wrap(f, c.s, c.width, c.scale); got != c.want {
+			t.Errorf("Wrap(%q, %d, %d) = %q, want %q", c.s, c.width, c.scale, got, c.want)
+		}
+		for _, line := range strings.Split(Wrap(f, c.s, c.width, c.scale), "\n") {
+			if w, _ := MeasureText(f, line, c.scale); w > max(c.width, f.CellW*c.scale) {
+				t.Errorf("Wrap(%q): line %q is %d pixels, over %d", c.s, line, w, c.width)
+			}
 		}
 	}
 }

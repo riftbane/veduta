@@ -48,12 +48,12 @@ func TestParseErrors(t *testing.T) {
 		name, src, want string
 	}{
 		{"bad header", edit(3, "space"), "line 3: glyph header"},
-		{"out of range", edit(3, "0x7F"), "line 3: character code 0x7f outside"},
+		{"out of range", edit(3, "0x100"), "line 3: character code 0x100 outside"},
 		{"duplicate", edit(13, "0x20"), "line 13: duplicate glyph 0x20"},
 		{"short row", edit(4, "......."), "line 4: glyph 0x20 row 0 has 7 cells, want 8"},
 		{"bad cell", edit(15, "...x...."), "line 15: glyph 0x21 row 1: invalid cell 'x'"},
-		{"missing", strings.Join(lines[:len(lines)-11], "\n"), "missing glyph 0x7e"},
-		{"truncated", strings.Join(lines[:len(lines)-4], "\n"), "glyph 0x7e has 5 rows, want 8"},
+		{"missing", strings.Join(lines[:len(lines)-11], "\n"), "missing glyph 0xff"},
+		{"truncated", strings.Join(lines[:len(lines)-4], "\n"), "glyph 0xff has 5 rows, want 8"},
 	}
 	for _, c := range cases {
 		_, err := Parse([]byte(c.src))
@@ -74,8 +74,8 @@ func TestAtlasPlacement(t *testing.T) {
 		t.Fatal("pixel (2,3) of 'A' not parsed as ink")
 	}
 	img := f.Atlas()
-	if img.Rect.Dx() != AtlasW || img.Rect.Dy() != AtlasH || AtlasW != 128 || AtlasH != 48 {
-		t.Fatalf("atlas %v, want 128x48", img.Rect)
+	if img.Rect.Dx() != AtlasW || img.Rect.Dy() != AtlasH || AtlasW != 128 || AtlasH != 112 {
+		t.Fatalf("atlas %v, want 128x112", img.Rect)
 	}
 	// 'A' is glyph 33: column 1, row 2.
 	for y := 0; y < AtlasH; y++ {
@@ -107,7 +107,8 @@ func TestAtlasPlacement(t *testing.T) {
 
 // TestBuiltinDesignRules checks the committed font source against the design rules
 // documented in its header: blank spacing column, descenders only in the last row,
-// a blank space glyph, ink in every other glyph and no two identical glyphs.
+// blank glyphs only where no character is drawn, and no two identical glyphs but the
+// soft hyphen, which is a hyphen.
 func TestBuiltinDesignRules(t *testing.T) {
 	src, err := os.ReadFile("../../font8x8.txt")
 	if err != nil {
@@ -117,7 +118,11 @@ func TestBuiltinDesignRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const descenders = "gjpqy,;"
+	// Row 7 holds descenders, cedillas and the low quotation marks (0x82, 0x84).
+	const descenders = "gjpqy,;µ¸çÇýÿþø\u0082\u0084"
+	// Blank: space, delete, the cells Windows-1252 leaves unused, no-break space.
+	blank := map[rune]bool{' ': true, 0x7f: true, 0x81: true, 0x8d: true, 0x8f: true, 0x90: true, 0x9d: true, 0xa0: true}
+	same := map[rune]rune{0xad: '-'} // the soft hyphen draws as a hyphen
 	seen := map[Bitmap]rune{}
 	for r := rune(First); r <= Last; r++ {
 		g := f.Glyph(r)
@@ -129,12 +134,14 @@ func TestBuiltinDesignRules(t *testing.T) {
 		if g[CellH-1] != 0 && !strings.ContainsRune(descenders, r) {
 			t.Errorf("glyph %q: ink in row %d, reserved for descenders %q", r, CellH-1, descenders)
 		}
-		if (*g == Bitmap{}) != (r == ' ') {
+		if (*g == Bitmap{}) != blank[r] {
 			t.Errorf("glyph %q: blank = %v", r, *g == Bitmap{})
 		}
-		if prev, ok := seen[*g]; ok {
+		if prev, ok := seen[*g]; ok && !blank[r] && same[r] != prev {
 			t.Errorf("glyphs %q and %q are identical", prev, r)
 		}
-		seen[*g] = r
+		if _, ok := seen[*g]; !ok {
+			seen[*g] = r
+		}
 	}
 }

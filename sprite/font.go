@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"image"
+	"strings"
 	"sync"
 
 	"github.com/riftbane/veduta/v2/gfx"
@@ -18,20 +19,40 @@ type Font struct {
 	CellW, CellH int        // cell size in pixels
 	Cols         int        // cells per atlas row
 	First, Last  rune       // inclusive range of runes present in the atlas
+	// Cells draws runes beyond the atlas's range with the cell of another code: the
+	// default font keeps the characters of Windows-1252's 0x80..0x9F (€, ’, …) there.
+	Cells map[rune]rune
 }
 
-// Glyph returns the atlas rectangle, in texels, of the glyph for r. Runes outside
-// [First, Last] map to '?' (or to First if '?' is not in the font either).
+// Glyph returns the atlas rectangle, in texels, of the glyph for r. A rune of Cells
+// takes its cell; control characters (0x7F..0x9F) and runes outside [First, Last] map to
+// '?' (or to First if '?' is not in the font either).
 func (f *Font) Glyph(r rune) image.Rectangle {
-	if r < f.First || r > f.Last {
+	if c, ok := f.Cells[r]; ok {
+		r = c
+	} else if r >= 0x7f && r <= 0x9f || r < f.First || r > f.Last {
 		r = '?'
 		if r < f.First || r > f.Last {
 			r = f.First
 		}
 	}
-	i := int(r - f.First)
+	return f.Cell(r)
+}
+
+// Cell returns the atlas rectangle of the cell of code c, which must be in [First, Last].
+func (f *Font) Cell(c rune) image.Rectangle {
+	i := int(c - f.First)
 	x, y := i%f.Cols*f.CellW, i/f.Cols*f.CellH
 	return image.Rect(x, y, x+f.CellW, y+f.CellH)
+}
+
+// cp1252 maps the characters Windows-1252 puts at 0x80..0x9F to those cells of the
+// default font.
+var cp1252 = map[rune]rune{
+	'€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85, '†': 0x86, '‡': 0x87, 'ˆ': 0x88,
+	'‰': 0x89, 'Š': 0x8a, '‹': 0x8b, 'Œ': 0x8c, 'Ž': 0x8e, '‘': 0x91, '’': 0x92, '“': 0x93,
+	'”': 0x94, '•': 0x95, '–': 0x96, '—': 0x97, '˜': 0x98, '™': 0x99, 'š': 0x9a, '›': 0x9b,
+	'œ': 0x9c, 'ž': 0x9e, 'Ÿ': 0x9f,
 }
 
 // TextureData returns the atlas as texture data for gfx.Backend.CreateTexture: a full
@@ -61,6 +82,41 @@ func MeasureText(f *Font, s string, scale int) (w, h int) {
 	}
 	widest = max(widest, n)
 	return widest * f.CellW * scale, lines * f.CellH * scale
+}
+
+// Wrap breaks s into lines no wider than width pixels when drawn with f at an integer
+// scale, and returns them joined by '\n'. Lines break between words (at spaces, which the
+// break swallows) and at the '\n' already in s; a word wider than the line is cut between
+// runes. A width narrower than one glyph still fits one glyph per line.
+func Wrap(f *Font, s string, width, scale int) string {
+	scale = max(scale, 1)
+	perLine := max(width/(f.CellW*scale), 1) // glyphs in a line
+	var out strings.Builder
+	for i, para := range strings.Split(s, "\n") {
+		if i > 0 {
+			out.WriteByte('\n')
+		}
+		n := 0 // glyphs on the current line
+		for _, word := range strings.Split(para, " ") {
+			runes := []rune(word)
+			switch {
+			case n > 0 && n+1+len(runes) <= perLine:
+				out.WriteByte(' ')
+				n++
+			case n > 0:
+				out.WriteByte('\n')
+				n = 0
+			}
+			for len(runes) > perLine-n {
+				out.WriteString(string(runes[:perLine-n]))
+				out.WriteByte('\n')
+				runes, n = runes[perLine-n:], 0
+			}
+			out.WriteString(string(runes))
+			n += len(runes)
+		}
+	}
+	return out.String()
 }
 
 // Text draws s with font f, whose atlas has been uploaded as texture tex, with the
@@ -112,11 +168,13 @@ var (
 	defaultFont *Font
 )
 
-// DefaultFont returns the built-in 8×8 font covering ASCII 32..126 (space to '~'),
-// decoded once from the embedded atlas font8x8.png: 16 columns × 6 rows of 8×8 cells
-// (128×48 pixels) with white glyph pixels (0xFFFFFFFF) on transparent (0x00000000).
-// Capitals and digits are 5×7; column 7 of every cell and row 7 (except descenders) are
-// blank, so text stays legible at scale 1 and 2.
+// DefaultFont returns the built-in 8×8 font covering ASCII and Latin-1 (space to 'ÿ':
+// the accented letters of Western European languages) and the characters of
+// Windows-1252 (€, typographic quotes and dashes, …), decoded once from the embedded atlas
+// font8x8.png: 16 columns × 14 rows of 8×8 cells (128×112 pixels) with white glyph pixels
+// (0xFFFFFFFF) on transparent (0x00000000). Capitals and digits are 5×7; column 7 of
+// almost every cell and row 7 (except descenders) are blank, so text stays legible at
+// scale 1 and 2.
 //
 // Every call returns the same *Font; treat it as read-only. The font is an original
 // design dedicated to the public domain (CC0 1.0, see FONT-LICENSE.md); its source is
@@ -127,7 +185,7 @@ func DefaultFont() *Font {
 		if err != nil {
 			panic("sprite: embedded font atlas: " + err.Error())
 		}
-		defaultFont = &Font{Atlas: atlas, CellW: 8, CellH: 8, Cols: 16, First: 32, Last: 126}
+		defaultFont = &Font{Atlas: atlas, CellW: 8, CellH: 8, Cols: 16, First: 32, Last: 255, Cells: cp1252}
 	})
 	return defaultFont
 }

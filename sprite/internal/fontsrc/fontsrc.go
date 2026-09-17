@@ -28,7 +28,7 @@ const (
 	CellH = 8   // glyph cell height in pixels
 	Cols  = 16  // cells per atlas row
 	First = 32  // first rune in the atlas (space)
-	Last  = 126 // last rune in the atlas ('~')
+	Last  = 255 // last code in the atlas (ÿ, the end of Latin-1)
 
 	// Count is the number of glyphs.
 	Count = Last - First + 1
