@@ -101,6 +101,17 @@ Every layer takes `opacity` and `blend` (`normal`, `multiply`, `screen`, `add`).
 are pixels from the top left. Pixels no layer paints stay transparent, which is how a
 sprite gets its shape.
 
+### Seeing it while you write it
+
+In VS Code, the eye in the title bar of a `.tex.json` file (or **Veduta: Preview the
+Texture**) opens a panel beside it that draws the texture as you type, with nothing to save
+and no game to start. A grid and a ruler measure the picture, the pointer reads the texel it
+is on and that texel's colour — which is how you find the `src` rectangle of one sprite in a
+sheet — and dragging across the picture measures a rectangle. Every layer has a switch, so
+you can look under the one on top, and a texture with `tiling` can be shown repeated to
+check its seams. A source the engine would refuse is not drawn: the panel names the field
+that is wrong, the way `veduta build` does.
+
 ### Pixel art from PNG files
 
 Draw sprites in any editor, save them as PNG under `assets/` and wrap each in a texture of

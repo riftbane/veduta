@@ -1,13 +1,20 @@
 'use strict';
-// The Veduta extension: the veduta tool's commands inside VS Code. It holds no game logic
-// and no engine: every action runs veduta in the project, as a person would in a terminal.
+// The Veduta extension: the veduta tool's commands inside VS Code. It holds no game logic:
+// every action runs veduta in the project, as a person would in a terminal. The one thing it
+// draws itself is the texture preview, from the engine's layer program transliterated in
+// lib/texture.js and compared with the engine's own images by the tests.
 
 const vscode = require('vscode');
 const cp = require('child_process');
+const crypto = require('crypto');
+const fs = require('fs');
 const path = require('path');
 const v = require('./lib/veduta');
+const texture = require('./lib/texture');
 
 let problems;
+let context; // the extension's own folder, for the files the preview panel loads
+let preview = null; // the one texture preview: its panel, the file it shows, its timer
 let building = null; // the running build, so saves in a row do not start builds in parallel
 let again = false;
 
@@ -148,7 +155,108 @@ async function newGame() {
   }));
 }
 
-async function activate(context) {
+// --------------------------------------------------------------- the texture preview
+// A panel beside the editor that draws the texture its JSON describes, redrawn while the
+// file is typed in. It runs no engine: lib/texture.js is the engine's layer program in
+// JavaScript, checked against the engine's golden images.
+
+// previewHtml builds the page of the panel, with the nonce its scripts need.
+function previewHtml(webview) {
+  const nonce = crypto.randomBytes(16).toString('base64');
+  const uri = (...p) => webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, ...p));
+  const values = {
+    cspSource: webview.cspSource,
+    nonce,
+    css: uri('media', 'preview.css'),
+    preview: uri('media', 'preview.js'),
+    png: uri('lib', 'png.js'),
+    texture: uri('lib', 'texture.js'),
+  };
+  const page = fs.readFileSync(path.join(context.extensionPath, 'media', 'preview.html'), 'utf8');
+  return page.replace(/{{(\w+)}}/g, (_, k) => String(values[k]));
+}
+
+// sendSource gives the panel the text of the document and the images its layers name,
+// read from the project's assets directory. A path the engine would refuse is left out:
+// the panel reports it, and nothing outside the assets directory is ever read.
+function sendSource(doc) {
+  if (!preview || !doc) {
+    return;
+  }
+  const text = doc.getText();
+  const dir = v.assetsDir(doc.fileName);
+  const images = {};
+  for (const p of texture.deps(texture.parse(text).src)) {
+    if (texture.badImagePath(p) !== '') {
+      continue;
+    }
+    try {
+      images[p] = fs.readFileSync(path.join(dir, p)).toString('base64');
+    } catch (e) {
+      images[p] = { error: e.code === 'ENOENT' ? 'file not found in the assets directory' : String(e.message) };
+    }
+  }
+  preview.uri = doc.uri;
+  preview.panel.title = path.basename(doc.fileName);
+  preview.panel.webview.postMessage({ type: 'source', file: path.basename(doc.fileName), text, images });
+}
+
+// previewDoc is the texture source a preview would show: the active editor's, else the
+// one the panel already shows.
+function previewDoc() {
+  const editor = vscode.window.activeTextEditor;
+  if (editor && v.isTextureFile(editor.document.fileName)) {
+    return editor.document;
+  }
+  if (preview && preview.uri) {
+    return vscode.workspace.textDocuments.find((d) => d.uri.toString() === preview.uri.toString());
+  }
+  return undefined;
+}
+
+function openPreview() {
+  const doc = previewDoc();
+  if (!doc) {
+    vscode.window.showWarningMessage('Veduta: open a texture source (a .tex.json file) to preview it.');
+    return;
+  }
+  if (preview) {
+    preview.panel.reveal(vscode.ViewColumn.Beside, true);
+    sendSource(doc);
+    return;
+  }
+  const panel = vscode.window.createWebviewPanel('veduta.texture', path.basename(doc.fileName),
+    { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+    { enableScripts: true, localResourceRoots: [context.extensionUri] });
+  preview = { panel, uri: doc.uri, timer: null };
+  panel.webview.html = previewHtml(panel.webview);
+  // The page asks for the source once it can receive it, and again whenever VS Code
+  // rebuilds it (a hidden panel is thrown away and reloaded when it comes back).
+  panel.webview.onDidReceiveMessage((m) => {
+    if (m && m.type === 'ready') {
+      sendSource(previewDoc());
+    }
+  });
+  panel.onDidDispose(() => {
+    if (preview) {
+      clearTimeout(preview.timer);
+    }
+    preview = null;
+  });
+}
+
+// previewChanged redraws the panel a moment after a keystroke, so it follows the file
+// being written instead of waiting for a save.
+function previewChanged(doc) {
+  if (!preview || !preview.uri || doc.uri.toString() !== preview.uri.toString()) {
+    return;
+  }
+  clearTimeout(preview.timer);
+  preview.timer = setTimeout(() => sendSource(doc), 120);
+}
+
+async function activate(ctx) {
+  context = ctx;
   problems = vscode.languages.createDiagnosticCollection('veduta');
   context.subscriptions.push(problems);
 
@@ -170,6 +278,7 @@ async function activate(context) {
     vscode.commands.registerCommand('veduta.test', () => runTask('test')),
     vscode.commands.registerCommand('veduta.deploy', () => runTask('deploy')),
     vscode.commands.registerCommand('veduta.build', () => build(false)),
+    vscode.commands.registerCommand('veduta.previewTexture', openPreview),
     vscode.tasks.registerTaskProvider('veduta', {
       provideTasks: async () => {
         const folder = await projectRoot();
@@ -199,6 +308,12 @@ async function activate(context) {
     }),
     vscode.debug.registerDebugAdapterDescriptorFactory('veduta', {
       createDebugAdapterDescriptor: () => new vscode.DebugAdapterExecutable(veduta(), ['dap']),
+    }),
+    vscode.workspace.onDidChangeTextDocument((e) => previewChanged(e.document)),
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (preview && editor && v.isTextureFile(editor.document.fileName)) {
+        sendSource(editor.document);
+      }
     }),
     vscode.workspace.onDidSaveTextDocument((doc) => {
       if (vscode.workspace.getConfiguration('veduta').get('buildOnSave') && v.isGameFile(doc.fileName)) {

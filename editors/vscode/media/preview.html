@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src 'nonce-{{nonce}}';">
+<link rel="stylesheet" href="{{css}}">
+<title>Texture</title>
+</head>
+<body>
+<div id="bar">
+  <span id="name" title="The texture being previewed"></span>
+  <span id="size" class="badge"></span>
+  <span class="spacer"></span>
+  <button id="zoomout" title="Smaller">&#8722;</button>
+  <span id="zoom" class="badge">1x</span>
+  <button id="zoomin" title="Bigger">+</button>
+  <button id="fit" title="Fit the panel">Fit</button>
+  <label><input type="checkbox" id="grid" checked> Grid</label>
+  <label id="repeatbox" hidden><input type="checkbox" id="repeat"> Repeat</label>
+</div>
+<div id="layers"></div>
+<div id="error" hidden></div>
+<div id="note" hidden></div>
+<div id="view"><canvas id="canvas"></canvas></div>
+<div id="status"><span id="pos">&nbsp;</span><span id="swatch"></span><span id="color"></span><span id="measure"></span></div>
+<script nonce="{{nonce}}" src="{{png}}"></script>
+<script nonce="{{nonce}}" src="{{texture}}"></script>
+<script nonce="{{nonce}}" src="{{preview}}"></script>
+</body>
+</html>

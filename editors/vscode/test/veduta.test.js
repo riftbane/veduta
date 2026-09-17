@@ -61,3 +61,21 @@ test('toolProblem', () => {
   assert.match(v.toolProblem({ code: 'ENOENT' }, ''), /not installed/);
   assert.match(v.toolProblem({ message: 'exit 2' }, 'usage'), /failed: exit 2/);
 });
+
+test('isTextureFile', () => {
+  for (const f of ['assets/textures/crate.tex.json', 'C:\\g\\assets\\textures\\ui\\panel.tex.json']) {
+    assert.ok(v.isTextureFile(f), f);
+  }
+  for (const f of ['assets/models/crate.model.json', 'veduta.json', 'crate.tex.json.bak']) {
+    assert.ok(!v.isTextureFile(f), f);
+  }
+});
+
+test('assetsDir', () => {
+  const project = (p) => p === '/g/veduta.json';
+  assert.strictEqual(v.assetsDir('/g/assets/textures/ui/panel.tex.json', project), '/g/assets');
+  assert.strictEqual(v.assetsDir('/g/elsewhere/panel.tex.json', project), '/g/assets');
+  // No project above it: the assets folder its own path goes through.
+  assert.strictEqual(v.assetsDir('/x/game/assets/textures/panel.tex.json', () => false), '/x/game/assets');
+  assert.strictEqual(v.assetsDir('/x/loose/panel.tex.json', () => false), '/x/loose');
+});

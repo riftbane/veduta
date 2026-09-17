@@ -31,7 +31,7 @@ async function run() {
   assert.ok(ext, 'the extension is installed');
   await ext.activate();
   const commands = await vscode.commands.getCommands(true);
-  for (const c of ['veduta.newGame', 'veduta.play', 'veduta.test', 'veduta.build', 'veduta.deploy']) {
+  for (const c of ['veduta.newGame', 'veduta.play', 'veduta.test', 'veduta.build', 'veduta.deploy', 'veduta.previewTexture']) {
     assert.ok(commands.includes(c), c + ' is registered');
   }
 
@@ -96,6 +96,28 @@ async function run() {
   await until('the session to end', () => ended, 120000);
   tracker.dispose();
   ends.dispose();
+
+  // The texture preview: the command opens a panel beside the source it draws, and the
+  // panel survives the file being typed in.
+  const texFile = path.join(root, 'assets', 'textures', 'probe.tex.json');
+  fs.mkdirSync(path.dirname(texFile), { recursive: true });
+  fs.writeFileSync(texFile, JSON.stringify({
+    veduta: 'texture/1',
+    size: [16, 16],
+    layers: [{ type: 'rect', xy: [2, 2], size: [12, 12], color: '#ff8800', corner: 3 }],
+  }, null, 2) + '\n');
+  const texDoc = await vscode.workspace.openTextDocument(texFile);
+  await vscode.window.showTextDocument(texDoc);
+  await vscode.commands.executeCommand('veduta.previewTexture');
+  const previewTab = () => vscode.window.tabGroups.all
+    .flatMap((g) => g.tabs)
+    .find((t) => t.input instanceof vscode.TabInputWebview && t.label.includes('probe.tex.json'));
+  await until('the preview panel', () => previewTab() !== undefined);
+  const texEditor = await vscode.window.showTextDocument(texDoc);
+  await texEditor.edit((e) => e.insert(new vscode.Position(2, 0), '  "tiling": true,\n'));
+  await sleep(500);
+  assert.ok(previewTab(), 'the preview stays open while the source is written');
+  await vscode.window.tabGroups.close(previewTab());
 }
 
 module.exports = { run };

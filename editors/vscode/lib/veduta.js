@@ -64,6 +64,37 @@ function validName(name) {
   return /^[a-z0-9][a-z0-9_-]{0,63}$/.test(name);
 }
 
+// isTextureFile reports whether a file is a texture source, the one format the preview
+// panel draws.
+function isTextureFile(name) {
+  return /\.tex\.json$/.test(name);
+}
+
+// assetsDir returns the directory an image layer's path is relative to: the assets folder
+// of the project the file belongs to (the one beside veduta.json), else the assets folder
+// the file's own path goes through, else its folder.
+function assetsDir(file, exists = fs.existsSync) {
+  let dir = path.dirname(file);
+  for (;;) {
+    if (exists(path.join(dir, 'veduta.json'))) {
+      return path.join(dir, 'assets');
+    }
+    const up = path.dirname(dir);
+    if (up === dir) {
+      break;
+    }
+    dir = up;
+  }
+  const parts = file.split(/[\\/]/);
+  const i = parts.lastIndexOf('assets');
+  if (i < 0) {
+    return path.dirname(file);
+  }
+  const head = parts.slice(0, i + 1);
+  // A path that started at the root keeps its leading separator.
+  return head[0] === '' ? path.sep + path.join(...head.slice(1)) : path.join(...head);
+}
+
 // launchConfig completes a debug configuration: the game's folder when it names none, and
 // play when it names no mode.
 function launchConfig(config, root) {
@@ -101,4 +132,4 @@ function toolProblem(err, stdout) {
   return null;
 }
 
-module.exports = { program, playCommand, diagnostics, isGameFile, validName, launchConfig, toolProblem, INSTALL_URL };
+module.exports = { program, playCommand, diagnostics, isGameFile, isTextureFile, assetsDir, launchConfig, validName, toolProblem, INSTALL_URL };

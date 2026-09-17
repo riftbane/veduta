@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0
+
+- **Veduta: Preview the Texture** (the eye in the title bar of a `*.tex.json`): a panel
+  beside the source that draws the texture while you write it, without saving and without
+  running the engine. A grid and a ruler to measure it by, the texel and the colour under
+  the pointer, a drag to measure a rectangle, a switch per layer, and the 2x2 repeat of a
+  tiling texture. What it draws is the engine's own layer program, compared pixel by pixel
+  with the engine's golden images; a source the engine would refuse is not drawn, the panel
+  names the field instead.
+
 ## 0.4.0
 
 - Debug configurations of mode `play` take `scene` (or `world` and `at`) and `seed`: the

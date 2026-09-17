@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A texture preview in the VS Code extension: **Veduta: Preview the Texture** (the eye in
+  the title bar of a `*.tex.json`) opens a panel beside the source and draws it while it is
+  written, with nothing saved and no engine running. Over the picture a grid and a ruler
+  measure it, the pointer reads the texel and its colour, a drag measures a rectangle,
+  every layer can be switched off on its own, and a tiling texture can be shown as a 2x2
+  repeat. The layer program is transliterated to JavaScript
+  (`editors/vscode/lib/texture.js`, with a PNG reader of its own for `image` layers) and is
+  compared pixel by pixel with the engine's: `asset/texture`'s TestGoldenBase writes
+  `testdata/golden/texture_base_*.png` and the extension's tests draw the same sources and
+  must match them, so the panel cannot drift from what the game shows. A source the engine
+  would refuse is not drawn: the panel names the field, as `veduta build` does.
 - Live editing in the simulator: saving a script or an asset source reloads the game in
   place, in the scene it was in (a world, around the focus cell), with the same seed, so a
   level or a hud is edited while it shows; F9 restarts from the start. A script game's

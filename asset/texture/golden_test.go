@@ -135,3 +135,41 @@ func TestGoldenSamples(t *testing.T) {
 		})
 	}
 }
+
+// baseSamples are the sample textures the preview of the VS Code extension is compared
+// with, and the fit modes of the image sample, whose source names only one.
+var baseSamples = []struct {
+	golden string
+	sample string
+	fit    string
+}{
+	{"solid", "solid", ""},
+	{"noise", "noise", ""},
+	{"stripes", "stripes", ""},
+	{"rect", "rect", ""},
+	{"circle", "circle", ""},
+	{"gradient", "gradient", ""},
+	{"checker", "checker", ""},
+	{"image", "image", ""},
+	{"image_cover", "image", "cover"},
+	{"image_stretch", "image", "stretch"},
+	{"example", "example", ""},
+	{"crate_wood", "crate_wood", ""},
+}
+
+// TestGoldenBase writes the base level of every sample texture as it is, with no backdrop
+// and no zoom, to testdata/golden/texture_base_<name>.png. Nothing else in Go reads them:
+// they are what the preview of the VS Code extension is compared with
+// (editors/vscode/test/texture.test.js), which draws the same sources in JavaScript. A
+// change to the renderer here therefore fails that test too, until both are updated.
+func TestGoldenBase(t *testing.T) {
+	for _, s := range baseSamples {
+		t.Run(s.golden, func(t *testing.T) {
+			var edit func(*asset.TextureSource)
+			if s.fit != "" {
+				edit = func(src *asset.TextureSource) { src.Layers[0].Fit = s.fit }
+			}
+			golden.Image(t, "texture_base_"+s.golden, parseSample(t, s.sample, edit).Data.Levels[0])
+		})
+	}
+}
