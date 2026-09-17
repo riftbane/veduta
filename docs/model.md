@@ -7,7 +7,8 @@ joined by concatenation only (no boolean operations): overlapping parts simply o
 
 File: `assets/models/<name>.model.json`. The model name is the file name without
 `.model.json`; it must be 1–64 characters of `a-z`, `0-9`, `_`, `-`, starting with a
-letter or digit.
+letter or digit. A folder under `assets/models/` works too (`assets/models/enemies/bat.model.json`):
+the name is still the file name, so it must be unique across the folders.
 
 Units and axes: lengths are meters, angles are degrees. Coordinates are right-handed,
 +Y up, +X right, +Z towards the viewer of a camera looking down −Z.

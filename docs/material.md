@@ -8,10 +8,12 @@ model that name none. A part that ends up with no material uses the default mate
 
 ## File and name
 
-- Location: `assets/materials/<name>.mat.json`.
+- Location: `assets/materials/<name>.mat.json`, or a folder under it
+  (`assets/materials/enemies/bat.mat.json`). Hidden folders (`.name`) are skipped.
 - The material's name is the file name without `.mat.json` (`crate_wood.mat.json` →
   `crate_wood`). Names are 1–64 characters of `a-z`, `0-9`, `_` and `-`, and must start
-  with a letter or a digit. Any other file name is an error.
+  with a letter or a digit. Any other file name is an error. The name ignores the folder,
+  so two materials of the same name in different folders are an error.
 - The file is one JSON object. Decoding is strict: unknown fields, duplicate keys, wrong
   types and trailing data are errors. Every error carries `file:line:col` and the JSON path
   of the offending value, and all problems in a file are reported together.

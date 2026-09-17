@@ -8,7 +8,9 @@ material, tags, an optional parent, and a `kind` that selects its Go behaviour.
 
 - Location: `assets/scenes/<name>.scene.json`. The scene's name is the file name without
   `.scene.json` (`main.scene.json` → `main`); it is what `render --scene`, scenarios
-  (`"scene": "main"`) and `default_scene` in `veduta.json` refer to.
+  (`"scene": "main"`) and `default_scene` in `veduta.json` refer to. A folder under
+  `assets/scenes/` works too (`assets/scenes/caves/cave_1.scene.json` is the scene
+  `cave_1`), so names must be unique across the folders.
 - Names (scene, entity, kind, model, material, tag) are 1–64 characters of `a-z`, `0-9`,
   `_` and `-`, starting with a letter or a digit.
 - The file is one JSON object. Decoding is strict: unknown fields, duplicate keys, wrong

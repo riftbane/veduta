@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Asset sources in folders: `assets/materials/enemies/bat.mat.json` is the material `bat`,
+  and likewise for every kind (hidden folders are skipped). A name used by two files is an
+  error naming both. Worlds follow their prefabs into folders, and `inspect` and `world`
+  find sources wherever they are (`cook.SourcePath`). Before, a source in a folder was
+  silently ignored.
 - Images in the Lua hud: `hud.image(texture, x, y [, options])` draws a texture or a part
   of it (`src`, an icon of a sheet) at any size, tinted or mirrored; `hud.panel` draws a
   nine-slice panel (dialogue boxes, menus); `hud.image_size`. `Context.Texture` gives Go

@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/cook"
 	"github.com/riftbane/veduta/v2/gfx"
 	"github.com/riftbane/veduta/v2/inspect"
 	"github.com/riftbane/veduta/v2/mcp"
@@ -32,7 +33,7 @@ func (s *Session) worldGen(name string) (*world.Gen, *asset.Library, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	src := filepath.ToSlash(filepath.Join(s.Project.Assets, asset.KindWorld.Dir(), name+asset.KindWorld.Ext()))
+	src := cook.SourcePath(s.Root, s.Project, asset.KindWorld, name)
 	var own asset.Errors
 	for _, e := range errs {
 		if strings.HasSuffix(e.File, src) {
@@ -349,7 +350,7 @@ func (s *Session) WorldPlace(o WorldPlaceOptions) (*WorldPlaceReport, error) {
 	}
 	fw, fd := g.W.Footprint(p, rot)
 	rep := &WorldPlaceReport{World: o.World, Name: o.Name, Prefab: o.Prefab, Rotation: rot, Footprint: [2]int32{int32(fw), int32(fd)}, Issues: []world.Issue{}, Displaces: []string{}}
-	rep.File = s.Rel(filepath.Join(s.Root, filepath.FromSlash(s.Project.Assets), asset.KindWorld.Dir(), o.World+asset.KindWorld.Ext()))
+	rep.File = cook.SourcePath(s.Root, s.Project, asset.KindWorld, o.World)
 	if o.Cell != nil {
 		rep.Cell = *o.Cell
 		rep.Issues = g.Validate(p, rep.Cell, rot, "")
@@ -448,7 +449,7 @@ func (s *Session) WorldRemove(name, what string) (*WorldRemoveReport, error) {
 // byte, and checks that the result compiles. The compiled world is returned; nothing is
 // written when dryRun is set.
 func (s *Session) editWorld(name, field, add, remove string, lib *asset.Library, dryRun bool) (*asset.World, error) {
-	file := filepath.Join(s.Root, filepath.FromSlash(s.Project.Assets), asset.KindWorld.Dir(), name+asset.KindWorld.Ext())
+	file := filepath.Join(s.Root, filepath.FromSlash(cook.SourcePath(s.Root, s.Project, asset.KindWorld, name)))
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err

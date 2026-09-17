@@ -18,7 +18,8 @@ on the authoring machine and on the console.
 
 - Location: `assets/worlds/<name>.world.json`. The name is the file name without
   `.world.json`; `render --world`, `simulate --world`, scenarios (`"world": …`) and
-  `ctx.LoadWorld` refer to it.
+  `ctx.LoadWorld` refer to it. A folder under `assets/worlds/` works too; names must be
+  unique across the folders.
 - Decoding is strict (unknown fields, duplicate keys, wrong types and trailing data are
   errors located by `file:line:col` and JSON path; all problems are reported together).
   Prefab references are checked when the prefab exists: a prefab too large for its cell,

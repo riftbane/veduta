@@ -7,7 +7,9 @@ renders the program into a BGRA8 image with a mip chain. Materials use textures 
 
 File: `assets/textures/<name>.tex.json`. The texture name is the file name without
 `.tex.json` (`crate_wood.tex.json` → `crate_wood`); it must be 1–64 characters of
-`a-z`, `0-9`, `_`, `-`, starting with a letter or digit.
+`a-z`, `0-9`, `_`, `-`, starting with a letter or digit. A folder under
+`assets/textures/` works too (`assets/textures/ui/icons.tex.json`): the name is still the
+file name, so it must be unique across the folders.
 
 ## Minimal example
 

@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/cook"
 	"github.com/riftbane/veduta/v2/inspect"
 	"github.com/riftbane/veduta/v2/mcp"
 	"github.com/riftbane/veduta/v2/world"
@@ -222,7 +222,7 @@ func (s *Session) WorldTerrain(o WorldTerrainOptions) (*WorldTerrainReport, erro
 
 // worldFile returns the world's source path relative to the project.
 func (s *Session) worldFile(name string) string {
-	return s.Rel(filepath.Join(s.Root, filepath.FromSlash(s.Project.Assets), asset.KindWorld.Dir(), name+asset.KindWorld.Ext()))
+	return cook.SourcePath(s.Root, s.Project, asset.KindWorld, name)
 }
 
 // worldSheet draws the map around centre into out/<world>.map.png.

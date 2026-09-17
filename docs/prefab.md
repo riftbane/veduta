@@ -7,7 +7,8 @@ is one placement with one footprint and the generator keeps footprints apart. Si
 ## File and name
 
 - Location: `assets/prefabs/<name>.prefab.json`. The prefab's name is the file name
-  without `.prefab.json`; worlds refer to it by that name.
+  without `.prefab.json`; worlds refer to it by that name. A folder under
+  `assets/prefabs/` works too; names must be unique across the folders.
 - Names are 1–64 characters of `a-z`, `0-9`, `_` and `-`, starting with a letter or a
   digit. Decoding is strict: unknown fields, duplicate keys, wrong types and trailing data
   are errors located by `file:line:col` and JSON path; all problems are reported together.

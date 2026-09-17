@@ -143,6 +143,11 @@ type cooker struct {
 	dry    bool
 	report *Report
 	lib    *asset.Library
+	// files are the sources of each kind by asset name, as slash paths under the kind's
+	// directory ("enemies/bat.mat.json"); dups are the later sources of a name already
+	// taken, each with the path that took it.
+	files map[asset.Kind]map[string]string
+	dups  map[asset.Kind]map[string]string
 }
 
 func newCooker(root string, p *asset.Project) (*cooker, error) {
@@ -164,15 +169,19 @@ func newCooker(root string, p *asset.Project) (*cooker, error) {
 }
 
 func (c *cooker) run() error {
+	sources := map[asset.Kind][]string{}
 	for _, k := range asset.CookedKinds {
-		names, err := c.sources(k)
+		files, err := c.sources(k)
 		if err != nil {
 			return err
 		}
-		for _, file := range names {
+		sources[k] = files
+	}
+	for _, k := range asset.CookedKinds {
+		for _, file := range sources[k] {
 			c.cookOne(k, file)
 		}
-		if err := c.prune(k, names); err != nil {
+		if err := c.prune(k, sources[k]); err != nil {
 			return err
 		}
 	}
@@ -180,23 +189,77 @@ func (c *cooker) run() error {
 	return nil
 }
 
-// sources lists the source files of kind k (base names, sorted).
+// sources lists the source files of kind k as slash paths under the kind's directory,
+// sorted: sources may sit in folders of their own (materials/enemies/bat.mat.json), and a
+// source's asset name is still its file name. It also indexes them by name, and notes a
+// name used twice.
 func (c *cooker) sources(k asset.Kind) ([]string, error) {
-	entries, err := os.ReadDir(filepath.Join(c.assets, filepath.FromSlash(k.Dir())))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
+	files, err := SourceFiles(c.assets, k)
+	if err != nil {
+		return nil, err
 	}
+	if c.files == nil {
+		c.files, c.dups = map[asset.Kind]map[string]string{}, map[asset.Kind]map[string]string{}
+	}
+	c.files[k], c.dups[k] = map[string]string{}, map[string]string{}
+	for _, f := range files {
+		name, _ := k.NameFromFile(path.Base(f))
+		if first, ok := c.files[k][name]; ok {
+			c.dups[k][f] = first
+			continue
+		}
+		c.files[k][name] = f
+	}
+	return files, nil
+}
+
+// SourceFiles lists the source files of kind k under the assets directory, as slash paths
+// under the kind's directory, sorted, searching its folders too (hidden ones excepted).
+func SourceFiles(assets string, k asset.Kind) ([]string, error) {
+	dir := filepath.Join(assets, filepath.FromSlash(k.Dir()))
+	var out []string
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) && p == dir {
+				return filepath.SkipAll
+			}
+			return err
+		}
+		if d.IsDir() {
+			if p != dir && strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if _, ok := k.NameFromFile(d.Name()); !ok {
+			return nil
+		}
+		rel, err := filepath.Rel(dir, p)
+		if err != nil {
+			return err
+		}
+		out = append(out, filepath.ToSlash(rel))
+		return nil
+	})
 	if err != nil {
 		return nil, fmt.Errorf("cook: %w", err)
 	}
-	var out []string
-	for _, e := range entries {
-		if _, ok := k.NameFromFile(e.Name()); ok && !e.IsDir() {
-			out = append(out, e.Name())
-		}
-	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// SourcePath returns the source file of asset name of kind k, relative to the project root
+// with forward slashes: where it is, in a folder or not, or where a new one would go.
+func SourcePath(root string, p *asset.Project, k asset.Kind, name string) string {
+	base := name + k.Ext()
+	if files, err := SourceFiles(filepath.Join(root, filepath.FromSlash(p.Assets)), k); err == nil {
+		for _, f := range files {
+			if path.Base(f) == base {
+				return path.Join(p.Assets, k.Dir(), f)
+			}
+		}
+	}
+	return path.Join(p.Assets, k.Dir(), base)
 }
 
 // rel returns p relative to the project root with forward slashes.
@@ -208,10 +271,10 @@ func (c *cooker) rel(p string) string {
 	return filepath.ToSlash(r)
 }
 
-func (c *cooker) cookOne(k asset.Kind, base string) {
-	name, _ := k.NameFromFile(base)
-	srcAbs := filepath.Join(c.assets, filepath.FromSlash(k.Dir()), base)
-	srcAssetRel := path.Join(k.Dir(), base) // relative to the assets directory
+func (c *cooker) cookOne(k asset.Kind, file string) {
+	name, _ := k.NameFromFile(path.Base(file))
+	srcAbs := filepath.Join(c.assets, filepath.FromSlash(k.Dir()), filepath.FromSlash(file))
+	srcAssetRel := path.Join(k.Dir(), file) // relative to the assets directory
 	outAbs := filepath.Join(c.cooked, filepath.FromSlash(k.Dir()), name+".vda")
 	it := Item{Kind: k, Name: name, Source: c.rel(srcAbs), Output: c.rel(outAbs)}
 	fail := func(err error) {
@@ -219,6 +282,11 @@ func (c *cooker) cookOne(k asset.Kind, base string) {
 		it.Errors = toSourceErrors(it.Source, err)
 		c.report.Failed++
 		c.report.Items = append(c.report.Items, it)
+	}
+	if first, dup := c.dups[k][file]; dup {
+		fail(fmt.Errorf("the %s name %q is taken by %s: an asset's name is its file name, whatever its folder, so it must be unique",
+			k, name, path.Join(k.Dir(), first)))
+		return
 	}
 	data, err := os.ReadFile(srcAbs)
 	if err != nil {
@@ -246,6 +314,13 @@ func (c *cooker) cookOne(k asset.Kind, base string) {
 			return
 		}
 		deps = asset.WorldDeps(&worldSrc)
+		for i, d := range deps { // a prefab in a folder of its own
+			if rest, ok := strings.CutPrefix(d, asset.KindPrefab.Dir()+"/"); ok {
+				if n, ok := asset.KindPrefab.NameFromFile(rest); ok && c.files[asset.KindPrefab][n] != "" {
+					deps[i] = path.Join(asset.KindPrefab.Dir(), c.files[asset.KindPrefab][n])
+				}
+			}
+		}
 	}
 	hash, err := c.hash(srcAssetRel, data, deps)
 	if err != nil {
@@ -438,7 +513,7 @@ func (c *cooker) prune(k asset.Kind, sources []string) error {
 	}
 	have := map[string]bool{}
 	for _, s := range sources {
-		n, _ := k.NameFromFile(s)
+		n, _ := k.NameFromFile(path.Base(s))
 		have[n] = true
 	}
 	for _, e := range entries {

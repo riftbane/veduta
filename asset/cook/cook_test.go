@@ -238,3 +238,73 @@ func TestCookPrefabAndWorld(t *testing.T) {
 		t.Fatalf("missing prefab: %v %+v", err, r)
 	}
 }
+
+// TestCookFolders: sources may sit in folders under their kind's directory. The name is
+// still the file name, so the same name in two folders is an error; a world depends on
+// its prefabs wherever they are; moving a source between folders keeps its asset.
+func TestCookFolders(t *testing.T) {
+	root := copyTemplate(t)
+	move := func(from, to string) {
+		t.Helper()
+		to = filepath.Join(root, "assets", filepath.FromSlash(to))
+		os.MkdirAll(filepath.Dir(to), 0o755)
+		if err := os.Rename(filepath.Join(root, "assets", filepath.FromSlash(from)), to); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write := func(rel, data string) {
+		p := filepath.Join(root, "assets", filepath.FromSlash(rel))
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, []byte(data), 0o644)
+	}
+	move("materials/gem.mat.json", "materials/items/gem.mat.json")
+	move("textures/crate.tex.json", "textures/props/wood/crate.tex.json")
+	move("prefabs/tree.prefab.json", "prefabs/nature/tree.prefab.json")
+	write("materials/.drafts/ghost.mat.json", `{"veduta": "material/1"}`) // hidden folders are not assets
+
+	r, err := Run(Options{Root: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := statuses(r)
+	if r.Failed != 0 || st["material/gem"] != StatusCompiled || st["texture/crate"] != StatusCompiled || st["material/ghost"] != "" {
+		t.Fatalf("cook: failed %d, %v %v", r.Failed, st, r.Errors())
+	}
+	for _, it := range r.Items {
+		if it.Name == "gem" && it.Kind == asset.KindMaterial && it.Source != "assets/materials/items/gem.mat.json" {
+			t.Errorf("gem's source %s", it.Source)
+		}
+	}
+	lib, err := Load(root)
+	if err != nil || lib.Materials["gem"] == nil || lib.Textures["crate"] == nil || lib.Prefabs["tree"] == nil {
+		t.Fatalf("load: %v", err)
+	}
+	data, _ := os.ReadFile(filepath.Join(root, "assets", ".cooked", "worlds", "overworld.vda"))
+	if meta, _, err := asset.UnpackVDA(data); err != nil || !strings.Contains(strings.Join(meta.Deps, " "), "prefabs/nature/tree.prefab.json") {
+		t.Fatalf("world deps %v %v", meta.Deps, err)
+	}
+	if got := SourcePath(root, lib.Project, asset.KindPrefab, "tree"); got != "assets/prefabs/nature/tree.prefab.json" {
+		t.Errorf("SourcePath %s", got)
+	}
+	if got := SourcePath(root, lib.Project, asset.KindWorld, "new"); got != "assets/worlds/new.world.json" {
+		t.Errorf("SourcePath of a new world %s", got)
+	}
+
+	// The world follows its prefab into the folder: editing it there recooks the world.
+	tree, _ := os.ReadFile(filepath.Join(root, "assets", "prefabs", "nature", "tree.prefab.json"))
+	write("prefabs/nature/tree.prefab.json", string(tree)+"\n")
+	if r, err = Run(Options{Root: root}); err != nil || statuses(r)["world/overworld"] != StatusCompiled {
+		t.Fatalf("after editing the prefab: %v %v", err, statuses(r))
+	}
+
+	// The same name twice.
+	write("materials/props/gem.mat.json", `{"veduta": "material/1"}`)
+	r, err = Run(Options{Root: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	es := r.Errors()
+	if r.Failed != 1 || len(es) != 1 || es[0].File != "assets/materials/props/gem.mat.json" || !strings.Contains(es[0].Msg, "taken by materials/items/gem.mat.json") {
+		t.Fatalf("duplicate: failed %d, %v", r.Failed, es)
+	}
+}

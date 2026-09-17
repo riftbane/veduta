@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/cook"
 	"github.com/riftbane/veduta/v2/inspect"
 	"github.com/riftbane/veduta/v2/mcp"
 )
@@ -70,7 +71,7 @@ func (s *Session) Inspect(kind, name, focus string, sheets []string) (*inspect.R
 		return nil, usagef("inspect: %v", err)
 	}
 	// When the subject itself does not compile, the located errors are the report.
-	src := filepath.ToSlash(filepath.Join(s.Project.Assets, k.Dir(), name+k.Ext()))
+	src := cook.SourcePath(s.Root, s.Project, k, name)
 	var own asset.Errors
 	for _, e := range errs {
 		if strings.HasSuffix(e.File, src) {
