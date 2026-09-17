@@ -7,9 +7,10 @@
 // traversal follows insertion order, and the math library is built on gmath rather than
 // on the math package, whose functions differ between amd64 and arm64.
 //
-// The standard libraries are base, string, table, math and utf8; their output is checked
+// The standard libraries are base, string, table, math, utf8 and coroutine (a coroutine
+// may also yield across a Go function, which PUC Lua refuses); their output is checked
 // line by line against PUC Lua 5.4.6 (testdata/libs.lua). Differences from Lua 5.4: pairs
-// visits keys in insertion order, NaN prints without a sign, no goto, no coroutines, no
+// visits keys in insertion order, NaN prints without a sign, no goto, no
 // to-be-closed variables, no weak tables and no finalizers (the Go collector owns memory),
 // no io, os, debug or package libraries, and no string.pack or string.dump.
 package lua
@@ -33,9 +34,10 @@ const (
 	TypeTable
 	TypeFunction
 	TypeUserdata
+	TypeThread
 )
 
-var typeNames = [...]string{"nil", "boolean", "number", "string", "table", "function", "userdata"}
+var typeNames = [...]string{"nil", "boolean", "number", "string", "table", "function", "userdata", "thread"}
 
 // String returns the type's name.
 func (t Type) String() string { return typeNames[t] }
@@ -52,6 +54,7 @@ const (
 	kindTable
 	kindFunction
 	kindUserdata
+	kindThread
 )
 
 // Value is a Lua value. The zero Value is nil. Values are comparable with ==, which is Lua's
@@ -128,6 +131,8 @@ func (v Value) Type() Type {
 		return TypeTable
 	case kindFunction:
 		return TypeFunction
+	case kindThread:
+		return TypeThread
 	}
 	return TypeUserdata
 }
@@ -217,6 +222,8 @@ func (v Value) String() string {
 			return fmt.Sprintf("builtin: %p", f)
 		}
 		return fmt.Sprintf("function: %p", f)
+	case kindThread:
+		return fmt.Sprintf("thread: %p", v.p.(*Coroutine).c)
 	}
 	return fmt.Sprintf("userdata: %p", v.p)
 }

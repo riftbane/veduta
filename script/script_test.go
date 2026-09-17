@@ -641,3 +641,55 @@ end
 		t.Fatalf("scenario: exit %d %+v %s", code, r, stderr)
 	}
 }
+
+// TestCoroutineCutscene: a cutscene written in sequence, one step a tick, plays the same in
+// every run and survives a snapshot, which replays it.
+func TestCoroutineCutscene(t *testing.T) {
+	dir := copyGame(t, map[string]string{
+		"main.lua": `+
+local function wait(ticks)
+  for _ = 1, ticks do coroutine.yield() end
+end
+
+local scene_script = coroutine.wrap(function()
+  trace("line", {who = "mira", text = "The bridge is out."})
+  wait(3)
+  trace("line", {who = "tobi", text = "Take the cave path."})
+  wait(2)
+  trace("cutscene_done", {})
+  while true do coroutine.yield() end
+end)
+
+local update = game.update
+function game.update()
+  update()
+  scene_script()
+end
+`,
+		"tests/scenarios/cutscene.scenario.json": `{"veduta": "scenario/1", "scene": "main", "ticks": 10,
+			"expect": [{"tick": 3, "trace": "line", "count_min": 1, "count_max": 1},
+			           {"tick": 4, "trace": "line", "count_min": 2, "count_max": 2},
+			           {"tick": 6, "trace": "cutscene_done", "count_min": 1, "count_max": 1}]}`,
+	})
+	scenario := filepath.Join(dir, "tests", "scenarios", "cutscene.scenario.json")
+	a, stderr, code := run(t, dir, "simulate", "--scenario", scenario, "--out", t.TempDir())
+	if code != 0 || a.Verdict != "pass" {
+		t.Fatalf("exit %d %+v %s", code, a, stderr)
+	}
+	b, _, _ := run(t, dir, "simulate", "--scenario", scenario, "--out", t.TempDir())
+	if a.TraceHash != b.TraceHash {
+		t.Fatal("two runs of the cutscene differ")
+	}
+	snap := filepath.Join(t.TempDir(), "s.snap")
+	if r, stderr, code := run(t, dir, "snapshot", "--tick", "4", "--out", snap); code != 0 || !r.OK {
+		t.Fatalf("snapshot: %d %+v %s", code, r, stderr)
+	}
+	trace := filepath.Join(t.TempDir(), "after.jsonl")
+	if r, stderr, code := run(t, dir, "snapshot", "--restore", snap, "--ticks", "3", "--out", trace); code != 0 || !r.OK {
+		t.Fatalf("restore: %d %+v %s", code, r, stderr)
+	}
+	after, _ := os.ReadFile(trace)
+	if strings.Count(string(after), `"event":"cutscene_done"`) != 1 {
+		t.Fatalf("the restored run did not finish the cutscene where it was:\n%s", after)
+	}
+}

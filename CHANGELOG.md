@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Coroutines in Lua: `coroutine.create`, `resume`, `yield`, `status`, `wrap`, `running`,
+  `isyieldable` and `close`, matching PUC Lua 5.4.6 line by line in `testdata/libs.lua`, so
+  cutscenes and dialogue are written in sequence (`wait(20)` between lines). Each coroutine
+  runs on a goroutine with stacks of its own and control passes by channels, one side at a
+  time, so runs stay deterministic; unlike PUC Lua a coroutine may yield from inside a Go
+  function (a `table.sort` comparison). The budget counts the steps of resumed coroutines;
+  `VM.Close` ends suspended ones, as a script game's next run does, and a coroutine nothing
+  refers to is ended when collected. Editors no longer disable the `coroutine` library.
 - Sprite sheets: a material's `grid` ([columns, rows]) cuts its texture into frames, and an
   entity's `frame` (scene files, `Entity.Frame`, `e.frame` and `scene.spawn{frame=}` in Lua)
   picks the one drawn, wrapping around. The renderer maps the model's texture coordinates

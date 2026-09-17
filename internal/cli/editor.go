@@ -46,7 +46,7 @@ func editorFiles(lua bool) (owned map[string][]byte, settings map[string]map[str
 		settings[".luarc.json"] = map[string]any{
 			"runtime.version": "Lua 5.4",
 			// What the engine's Lua leaves out (lua docs topic).
-			"runtime.builtin":   map[string]string{"io": "disable", "os": "disable", "debug": "disable", "coroutine": "disable", "package": "disable"},
+			"runtime.builtin":   map[string]string{"io": "disable", "os": "disable", "debug": "disable", "package": "disable"},
 			"workspace.library": []string{editorDir + "/lua"},
 		}
 		settings[".vscode/extensions.json"] = map[string]any{"recommendations": []string{"sumneko.lua"}}

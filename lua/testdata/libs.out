@@ -117,3 +117,22 @@ err level2	error: libs.lua:184: lvl
 err concat	error: libs.lua:185: invalid value (table) at index 1 in table for 'concat'
 err index	error: libs.lua:186: attempt to index a nil value (field 'y')
 err call field	error: libs.lua:187: attempt to call a nil value (field 'nope')
+co type	thread | suspended | false
+co start	1 | 2 | true | false
+co resume 1	true | 3
+co status	suspended
+co resume 2	true | 20
+co resume 3	true | 7 | done
+co dead	dead | false | cannot resume dead coroutine
+co error	false | libs.lua:202: attempt to index a nil value (local 'x')
+co error status	dead
+co wrap	inner 1 | inner 2 | outer done
+co wrap dead	error: cannot resume dead coroutine
+co wrap error	error: libs.lua:213: boom
+co yield in pcall	from pcall | true back!
+co yield outside	error: attempt to yield from outside a coroutine
+co running	true | running
+co resume running	false | cannot resume non-suspended coroutine
+co close	true | dead
+co resume bad	error: bad argument #1 to 'coroutine.resume' (thread expected, got number)
+co producer	6

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 )
 
 // GoFunction is a function written in Go. It receives the arguments of the call and returns
@@ -138,6 +139,11 @@ type VM struct {
 	goMethod bool
 
 	debugger Debugger
+
+	co         *coState              // the coroutine these stacks run, nil for the main thread
+	root       *VM                   // the main thread's VM, for a coroutine's
+	coMu       sync.Mutex            // guards coroutines: finalizers end coroutines from other goroutines
+	coroutines map[*coState]struct{} // the coroutines not yet dead, in the main thread's VM
 }
 
 // goState is the part of the VM an error unwinds to.
@@ -173,6 +179,7 @@ func New(o Options) *VM {
 	openTable(vm)
 	openMath(vm)
 	openUTF8(vm)
+	openCoroutine(vm)
 	return vm
 }
 
@@ -207,7 +214,7 @@ func (vm *VM) SetBudget(steps int64) { vm.budgetMax = steps }
 // *Error, an exhausted budget as a *BudgetError, and a syntax error in a chunk loaded by the
 // script as an *Error too. Call may be used from inside a Go function.
 func (vm *VM) Call(f Value, args ...Value) (results []Value, err error) {
-	outer := vm.depth == 0
+	outer := vm.depth == 0 && vm.co == nil
 	if outer {
 		vm.budget = 1<<63 - 1
 		if vm.budgetMax > 0 {

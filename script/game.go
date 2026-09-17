@@ -173,6 +173,9 @@ func (g *Game) Start(ctx *veduta.Context) error {
 	g.ctx, g.err, g.in = ctx, nil, veduta.Input{}
 	g.entities = map[*scene.Entity]*lua.Userdata{}
 	g.modules = map[string]lua.Value{}
+	if g.vm != nil {
+		g.vm.Close() // the last run's suspended coroutines
+	}
 	g.vm = lua.New(lua.Options{Stdout: g.stderr, Debugger: g.Debugger})
 	g.vm.SetBudget(Budget)
 	g.vm.SetRandom(ctx.RNG)

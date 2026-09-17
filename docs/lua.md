@@ -269,9 +269,10 @@ end
 
 `string`, `table`, `math` and `utf8` behave as in Lua 5.4. `math.random` draws from the run's
 seeded generator, so it is deterministic. `print` writes to the tool's error output.
-Differences from Lua 5.4: `pairs` visits keys in the order they were first set; there is no
-`goto`, no coroutines, no `io`, `os`, `debug` or `load`, and no `string.pack`,
-`string.unpack`, `string.packsize` or `string.dump`. A callback that runs for 20
+`coroutine` works as in Lua 5.4, and a coroutine may even yield from inside a function the
+engine calls back (a `table.sort` comparison). Differences from Lua 5.4: `pairs` visits keys
+in the order they were first set; there is no `goto`, no `io`, `os`, `debug` or `load`, and
+no `string.pack`, `string.unpack`, `string.packsize` or `string.dump`. A callback that runs for 20
 million steps without returning is stopped as an endless loop.
 
 ## Full example
