@@ -84,13 +84,18 @@
 
 		New-Item -ItemType Directory -Force -Path $dir | Out-Null
 		$exe = Join-Path $dir 'veduta.exe'
-		# A running veduta.exe cannot be overwritten, but it can be renamed out of the way.
+		# A running veduta.exe cannot be overwritten or deleted, but it can be renamed out of
+		# the way. The one an earlier update left behind may be running too (VS Code's debug
+		# adapter, a simulator window), and then it cannot be replaced either: move the one in
+		# the way to a name of its own instead of failing the install.
 		if (Test-Path $exe) {
-			Remove-Item -Force -ErrorAction SilentlyContinue "$exe.old"
-			Move-Item -Force $exe "$exe.old"
+			Remove-Item -Force -ErrorAction SilentlyContinue "$exe.old*"
+			$old = "$exe.old"
+			if (Test-Path $old) { $old = "$exe.old-" + [guid]::NewGuid().ToString('N').Substring(0, 8) }
+			Move-Item -Force $exe $old
 		}
 		Copy-Item (Join-Path $tmp 'x\veduta.exe') $exe
-		Remove-Item -Force -ErrorAction SilentlyContinue "$exe.old"
+		Remove-Item -Force -ErrorAction SilentlyContinue "$exe.old*"
 		Write-Host "Installed $exe"
 
 		# The extension, from the same release and checked the same way; a release made before
