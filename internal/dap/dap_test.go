@@ -279,3 +279,34 @@ func TestLaunchRefuses(t *testing.T) {
 		t.Error("a stack trace of a game that is not stopped")
 	}
 }
+
+// TestLaunchGameArgs: a play launch passes where the game starts to the player, and a
+// scenario launch refuses those fields.
+func TestLaunchGameArgs(t *testing.T) {
+	a := &LaunchArgs{Project: "p", Mode: "play", Scene: "level3", Seed: 5}
+	if got := strings.Join(a.gameArgs(), " "); got != "-project p -scene level3 -seed 5" {
+		t.Fatalf("play: %q", got)
+	}
+	a = &LaunchArgs{Project: "p", Mode: "play", World: "land", At: "1,2"}
+	if got := strings.Join(a.gameArgs(), " "); got != "-project p -world land -at 1,2" {
+		t.Fatalf("world: %q", got)
+	}
+	a = &LaunchArgs{Project: "p", Mode: "scenario", Scenario: "s.json", Out: "o"}
+	if got := strings.Join(a.gameArgs(), " "); got != "-project p -headless simulate --scenario s.json --out o" {
+		t.Fatalf("scenario: %q", got)
+	}
+	game := testGame(t)
+	s := &Session{}
+	for _, bad := range []*LaunchArgs{
+		{Project: game, Mode: "scenario", Scenario: "collect", Scene: "x"},
+		{Project: game, Mode: "play", Scene: "x", World: "y"},
+		{Project: game, Mode: "play", At: "1,2"},
+	} {
+		if err := s.checkLaunch(bad); err == nil {
+			t.Errorf("%+v: accepted", bad)
+		}
+	}
+	if err := s.checkLaunch(&LaunchArgs{Project: game, Scene: "x"}); err != nil {
+		t.Fatal(err)
+	}
+}

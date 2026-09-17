@@ -37,7 +37,7 @@ type ToolKey uint8
 const (
 	ToolOverlay ToolKey = iota + 1 // F1: show the timings and triangles against the console's budget
 	ToolRecord                     // F5: restart and record the buttons, F5 again to save them as a scenario
-	ToolReload                     // F9: read the scripts and assets again and restart
+	ToolReload                     // F9: read the scripts and assets again and restart from the start
 )
 
 // Event is one input event.

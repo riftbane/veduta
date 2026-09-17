@@ -104,5 +104,26 @@ end
 Remember that `scene.load` resets entities but not Lua variables: reset the score and the
 lives yourself when a new game starts.
 
+## Editing a scene while it shows
+
+Lay a level out with its scene file open beside the simulator. Every save reloads the game
+**in place**: it restarts in the scene it was in (not the project's default), so a moved
+platform or a new enemy shows a second later, without playing back to the level. The same
+goes for a texture, a material or a hud written in `game.draw`. A file that does not
+compile, or a script that fails, leaves the last frame on the screen with the error over
+it until a save fixes it; F9 restarts from the start.
+
+To open the simulator directly in a scene, in VS Code add a debug configuration with the
+snippet **Veduta: Play a scene** (`"scene": "level3"` in `.vscode/launch.json`) and press
+F5, or in a terminal:
+
+```sh
+veduta sim --scene level3
+```
+
+The run starts at tick 0 in that scene and `game.init` runs again, so a game whose `init`
+loads its title scene comes back to the title: load the first scene from a scene file's
+entities or from `game.update` instead, or make `init` respect `scene.name()`.
+
 The complete format, with every error message, is in the
 [scene reference](https://riftbane.github.io/veduta/scene.html).

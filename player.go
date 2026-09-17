@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/riftbane/veduta/v2/internal/sheet"
 	"github.com/riftbane/veduta/v2/platform"
 	"github.com/riftbane/veduta/v2/sim"
+	"github.com/riftbane/veduta/v2/sprite"
 	"github.com/riftbane/veduta/v2/world"
 )
 
@@ -28,16 +30,24 @@ type Reloader interface {
 // per tick (no interpolation), input from the pad and the keyboard. A keyboard's tool keys
 // work the player itself: F1 shows timings and triangles against the console's budget, F5
 // restarts and records the buttons into a scenario (F5 again saves it), F9 reads scripts
-// and assets again and restarts.
+// and assets again and restarts from the start. The simulator also watches the scripts and
+// the asset sources: when one changes it reads everything again and restarts in place, in
+// the scene (or the world cell) the game was in, so a level or a hud is edited while it
+// shows. A script game's error does not close the window: the frame stays with the error
+// over it until the next reload.
 type player struct {
 	game   Game
 	proj   *asset.Project
 	assets *Assets
 	dir    string
 	stderr io.Writer
+	start  runOptions // where a run starts: the flags, or the project's defaults
 
 	e     *engine
 	input sim.InputState
+
+	failed error      // the error the run stopped on, shown until a reload succeeds
+	last   *gfx.Image // the last frame presented, shown while failed
 
 	overlay     bool
 	updateMs    float64
@@ -63,8 +73,7 @@ func sourceStamp(dir string, p *asset.Project) (string, error) {
 			return err
 		}
 		if d.IsDir() {
-			switch name := d.Name(); {
-			case path != dir && (strings.HasPrefix(name, ".") || name == "out" || name == "bin"), filepath.Clean(path) == cooked:
+			if name := d.Name(); path != dir && (strings.HasPrefix(name, ".") || name == "out" || name == "bin" || filepath.Clean(path) == cooked) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -92,15 +101,41 @@ var openWindow = platform.Open
 // watchPeriod is how often the simulator looks for changed scripts and assets.
 var watchPeriod = time.Second
 
+// playOptions say where the player starts: a scene, or a world and its start cell, and
+// the seed; empty means the project's defaults.
+type playOptions struct {
+	Scene string
+	World string
+	At    string // "x,z"
+	Seed  uint64 // 0: the project's
+}
+
+// resolve turns the options into the run's start.
+func (o playOptions) resolve(p *asset.Project) (runOptions, error) {
+	opt, err := resolveTarget(p, o.Scene, o.World, o.At)
+	if err != nil {
+		return opt, err
+	}
+	opt.Seed = o.Seed
+	if opt.Seed == 0 {
+		opt.Seed = p.DefaultSeed
+	}
+	return opt, nil
+}
+
 // runPlayer puts the game on the screen and runs it until the player leaves (Home,
 // Select+Start, Ctrl+Q, or closing the simulator window).
-func runPlayer(g Game, p *asset.Project, a *Assets, dir string, stderr io.Writer) error {
+func runPlayer(g Game, p *asset.Project, a *Assets, dir string, stderr io.Writer, o playOptions) error {
+	start, err := o.resolve(p)
+	if err != nil {
+		return err
+	}
 	win, err := openWindow(platform.Options{Title: p.Title, Width: p.Resolution[0], Height: p.Resolution[1]})
 	if err != nil {
 		return fmt.Errorf("%w (the player draws on a framebuffer, or on Windows in the simulator: it runs on a console, at a Linux text console or on Windows; use -headless to render and simulate)", err)
 	}
 	defer win.Close()
-	pl := &player{game: g, proj: p, assets: a, dir: dir, stderr: stderr}
+	pl := &player{game: g, proj: p, assets: a, dir: dir, stderr: stderr, start: start}
 	if err := pl.restart(); err != nil {
 		return err
 	}
@@ -141,14 +176,31 @@ func runPlayer(g Game, p *asset.Project, a *Assets, dir string, stderr io.Writer
 			nextWatch = time.Now().Add(watchPeriod)
 			if stamp, err := sourceStamp(pl.dir, pl.proj); err == nil && stamp != pl.stamp {
 				pl.stamp = stamp
-				if err := pl.tool(platform.ToolReload); err != nil {
+				if err := pl.reload(true); err != nil {
 					return err
 				}
 			}
 		}
+		if pl.failed != nil {
+			// The run stopped: hold the last frame with the error over it, and keep
+			// watching for the reload that fixes it.
+			if w, h := win.Size(); w > 0 && h > 0 {
+				img := pl.lastFrame(w, h)
+				pl.drawOverlay(img)
+				if err := win.Present(img); err != nil {
+					return err
+				}
+			}
+			next = pl.wait(next, period)
+			continue
+		}
 		start := time.Now()
 		if err := pl.e.step(pl.input.Next()); err != nil {
-			return err
+			if _, ok := pl.game.(Reloader); !ok {
+				return err
+			}
+			pl.fail(err)
+			continue
 		}
 		updated := time.Now()
 		if w, h := win.Size(); w > 0 && h > 0 {
@@ -163,26 +215,58 @@ func runPlayer(g Game, p *asset.Project, a *Assets, dir string, stderr io.Writer
 			pl.updateMs = ms(updated.Sub(start))
 			pl.renderMs = ms(time.Since(updated))
 			pl.triangles = f.Stats.Triangles
-			pl.drawOverlay(f.FB.Image())
-			if err := win.Present(f.FB.Image()); err != nil {
+			img := f.FB.Image()
+			pl.last = &gfx.Image{W: img.W, H: img.H, Pix: slices.Clone(img.Pix)}
+			pl.drawOverlay(img)
+			if err := win.Present(img); err != nil {
 				return err
 			}
 		}
-		// Hold the tick rate; when far behind (a stall), skip ahead instead of racing.
-		next = next.Add(period)
-		now := time.Now()
-		if d := next.Sub(now); d > 0 {
-			time.Sleep(d)
-		} else if -d > 5*period {
-			next = now
-		}
+		next = pl.wait(next, period)
 	}
+}
+
+// wait holds the tick rate: it sleeps until next and returns the tick after it; when far
+// behind (a stall), it skips ahead instead of racing.
+func (pl *player) wait(next time.Time, period time.Duration) time.Time {
+	next = next.Add(period)
+	now := time.Now()
+	if d := next.Sub(now); d > 0 {
+		time.Sleep(d)
+	} else if -d > 5*period {
+		next = now
+	}
+	return next
+}
+
+// lastFrame is the frame to show while the run is stopped: the last one presented, or a
+// dark one when none was.
+func (pl *player) lastFrame(w, h int) *gfx.Image {
+	if pl.last != nil {
+		return &gfx.Image{W: pl.last.W, H: pl.last.H, Pix: slices.Clone(pl.last.Pix)}
+	}
+	img := gfx.NewImage(w, h)
+	for i := range img.Pix {
+		img.Pix[i] = sheet.Background
+	}
+	return img
+}
+
+// fail stops the run on err: the window stays, showing the error, until a reload succeeds.
+func (pl *player) fail(err error) {
+	pl.failed = err
+	pl.rec = nil
+	fmt.Fprintln(pl.stderr, "veduta: error:", err)
 }
 
 func ms(d time.Duration) float64 { return float64(d.Microseconds()) / 1000 }
 
-// restart starts the game from its first tick in a fresh engine.
-func (pl *player) restart() error {
+// restart starts the game from its first tick in a fresh engine, where the run started.
+func (pl *player) restart() error { return pl.restartAt(pl.start) }
+
+// restartAt starts the game from its first tick in a fresh engine, in opt's scene or
+// world.
+func (pl *player) restartAt(opt runOptions) error {
 	if pl.e != nil {
 		pl.e.close()
 	}
@@ -190,14 +274,28 @@ func (pl *player) restart() error {
 	pl.input = sim.InputState{}
 	// The player has no trace reader: it prepares without recording, so no tick spends
 	// time summarizing every entity (a streamed world has hundreds).
-	opt := runOptions{Scene: pl.proj.DefaultScene, Seed: pl.proj.DefaultSeed, SaveDir: pl.saveDir()}
-	if pl.proj.DefaultWorld != "" {
-		opt = runOptions{World: pl.proj.DefaultWorld, Seed: pl.proj.DefaultSeed, SaveDir: pl.saveDir()}
-	}
+	opt.SaveDir = pl.saveDir()
 	if err := pl.e.prepare(opt); err != nil {
 		return err
 	}
 	return pl.e.endTick()
+}
+
+// here is where the game is now, for a reload in place: the scene it is in, or its world
+// around the cell the focus is at (so an edit shows where the player stands), with the
+// run's seed. Before a run got anywhere, it is the start.
+func (pl *player) here() runOptions {
+	opt := pl.start
+	if pl.e == nil || pl.e.ctx.Scene == nil {
+		return opt
+	}
+	opt.Scene, opt.World, opt.At = "", "", [2]int32{}
+	if w := pl.e.world; w != nil {
+		opt.World, opt.At = w.Name, w.FocusedCell()
+	} else {
+		opt.Scene = pl.e.ctx.Scene.Name
+	}
+	return opt
 }
 
 // saveDir is where the player keeps the game's saves: VEDUTA_SAVE_DIR, else out/saves in
@@ -225,27 +323,54 @@ func (pl *player) tool(t platform.ToolKey) error {
 			return pl.stopRecording()
 		}
 		if err := pl.restart(); err != nil {
-			return err
+			if _, ok := pl.game.(Reloader); !ok {
+				return err
+			}
+			pl.fail(fmt.Errorf("restart: %w", err))
+			return nil
 		}
+		pl.failed = nil
 		pl.rec = &recording{}
 		pl.say("recording from tick 0: F5 saves the scenario")
 	case platform.ToolReload:
-		pl.rec = nil
-		if r, ok := pl.game.(Reloader); ok {
-			if err := r.Reload(); err != nil {
-				pl.say("reload: %v", err)
-				return nil
-			}
-		}
-		p, a, err := loadProjectFunc(pl.dir)
-		if err != nil {
-			pl.say("reload: %v", err)
+		return pl.reload(false)
+	}
+	return nil
+}
+
+// reload reads the scripts and the assets again (stale sources are compiled in memory)
+// and restarts: from the start, or in place, where the game is now. What fails to load
+// or to start is shown over the frame, and the run stays stopped until a reload succeeds;
+// the scripts and assets that loaded last keep being the ones that run.
+func (pl *player) reload(inPlace bool) error {
+	pl.rec = nil
+	at := pl.start
+	if inPlace {
+		at = pl.here()
+	}
+	if r, ok := pl.game.(Reloader); ok {
+		if err := r.Reload(); err != nil {
+			pl.fail(fmt.Errorf("reload: %w", err))
 			return nil
 		}
-		pl.proj, pl.assets = p, a
-		if err := pl.restart(); err != nil {
+	}
+	p, a, err := loadProjectFunc(pl.dir)
+	if err != nil {
+		pl.fail(fmt.Errorf("reload: %w", err))
+		return nil
+	}
+	pl.proj, pl.assets = p, a
+	if err := pl.restartAt(at); err != nil {
+		if _, ok := pl.game.(Reloader); !ok {
 			return err
 		}
+		pl.fail(fmt.Errorf("restart: %w", err))
+		return nil
+	}
+	pl.failed = nil
+	if inPlace {
+		pl.say("reloaded in %s", at.name())
+	} else {
 		pl.say("reloaded")
 	}
 	return nil
@@ -304,12 +429,12 @@ func (pl *player) stopRecording() error {
 	path := filepath.Join(pl.dir, "tests", "scenarios", name+".scenario.json")
 	var b strings.Builder
 	fmt.Fprintf(&b, "{\n  \"veduta\": %q,\n", asset.TypeScenario)
-	if pl.proj.DefaultWorld != "" {
-		fmt.Fprintf(&b, "  \"world\": %q,\n", pl.proj.DefaultWorld)
+	if pl.start.World != "" {
+		fmt.Fprintf(&b, "  \"world\": %q,\n  \"at\": [%d, %d],\n", pl.start.World, pl.start.At[0], pl.start.At[1])
 	} else {
-		fmt.Fprintf(&b, "  \"scene\": %q,\n", pl.proj.DefaultScene)
+		fmt.Fprintf(&b, "  \"scene\": %q,\n", pl.start.Scene)
 	}
-	fmt.Fprintf(&b, "  \"seed\": %d,\n  \"ticks\": %d,\n  \"inputs\": [", pl.proj.DefaultSeed, ticks)
+	fmt.Fprintf(&b, "  \"seed\": %d,\n  \"ticks\": %d,\n  \"inputs\": [", pl.start.Seed, ticks)
 	n := 0
 	for _, in := range rec.inputs {
 		if in.Tick > ticks {
@@ -374,4 +499,27 @@ func (pl *player) drawOverlay(img *gfx.Image) {
 	for i, l := range lines {
 		sheet.Label(img, 2, 2+i*10, 1, l)
 	}
+	if pl.failed != nil {
+		drawError(img, pl.failed.Error())
+	}
+}
+
+// Colors of the error panel.
+const (
+	errorBG = 0xd0501010
+	errorFG = 0xfffff0e0
+)
+
+// drawError writes the error over the bottom of the frame: its lines wrapped to the
+// width, as many as fit under a heading that says how to go on.
+func drawError(img *gfx.Image, msg string) {
+	f := sprite.DefaultFont()
+	text := "ERROR (SAVE A FILE OR F9 RELOADS, HOME LEAVES)\n" + sprite.Wrap(f, strings.ReplaceAll(msg, "\t", "  "), img.W-8, 1)
+	lines := strings.Split(text, "\n")
+	if maxLines := max((img.H/2-8)/f.CellH, 2); len(lines) > maxLines {
+		lines = append(lines[:maxLines-1], "...")
+	}
+	h := len(lines)*f.CellH + 8
+	sheet.FillRect(img, 0, img.H-h, img.W, h, errorBG)
+	sheet.Text(img, 4, img.H-h+4, 1, strings.Join(lines, "\n"), errorFG)
 }

@@ -497,3 +497,32 @@ func TestScriptProject(t *testing.T) {
 		t.Fatalf("simulate a broken script: %v", err)
 	}
 }
+
+// TestPlayArgs: run and sim turn their flags into the player's, and refuse what makes no
+// sense.
+func TestPlayArgs(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+		err  string
+	}{
+		{nil, "", ""},
+		{[]string{"--scene", "level3"}, "-scene level3", ""},
+		{[]string{"--world", "land", "--at", "4,-2", "--seed", "9"}, "-world land -at 4,-2 -seed 9", ""},
+		{[]string{"--scene", "a", "--world", "b"}, "", "exclusive"},
+		{[]string{"--at", "1,2"}, "", "needs --world"},
+		{[]string{"extra"}, "", "unexpected argument"},
+		{[]string{"--bogus"}, "", "bogus"},
+	} {
+		got, err := playArgs("sim", io.Discard, tc.args)
+		if tc.err != "" {
+			if err == nil || !strings.Contains(err.Error(), tc.err) {
+				t.Errorf("%v: err %v, want %q", tc.args, err, tc.err)
+			}
+			continue
+		}
+		if err != nil || strings.Join(got, " ") != tc.want {
+			t.Errorf("%v: %q, %v; want %q", tc.args, strings.Join(got, " "), err, tc.want)
+		}
+	}
+}

@@ -55,7 +55,10 @@ the keyboard, and any gamepad works too:
 
 Three keys work the simulator itself: **F1** shows the time each tick takes against the
 console's budget, **F5** records what you play as a scenario (F5 again saves it), **F9**
-reloads scripts and assets. It also reloads by itself when you save a file.
+reloads scripts and assets and restarts from the start. Saving a file reloads by itself,
+in place: the game starts again in the scene it was in, so a level or a hud is edited
+while it shows. An error stays on the screen until a save fixes it. `veduta sim --scene
+NAME` (or a debug configuration with `"scene"`) opens the simulator in one scene.
 
 Breakpoints work in the same run: click left of a line number in `main.lua`, and the game
 stops there when it reaches it. The Run and Debug panel shows where it stopped, the local

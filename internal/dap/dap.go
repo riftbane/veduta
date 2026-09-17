@@ -37,8 +37,38 @@ type LaunchArgs struct {
 	Mode        string `json:"mode"`        // "play" (the simulator, or the framebuffer on Linux) or "scenario"
 	Scenario    string `json:"scenario"`    // with mode scenario: its name or file
 	Out         string `json:"out"`         // with mode scenario: where the run's files go (default the project's out)
+	Scene       string `json:"scene"`       // with mode play: start in this scene (default: the project's)
+	World       string `json:"world"`       // with mode play: start in this world instead of a scene
+	At          string `json:"at"`          // with world: the start cell "x,z"
+	Seed        uint64 `json:"seed"`        // with mode play: the RNG seed (default: the project's)
 	StopOnEntry bool   `json:"stopOnEntry"` // stop before the first statement
 	NoDebug     bool   `json:"noDebug"`     // run without the debugger (Run Without Debugging)
+}
+
+// gameArgs are the engine's arguments for the launch: the project, and in mode play where
+// the player starts; in mode scenario the headless simulate of the scenario.
+func (a *LaunchArgs) gameArgs() []string {
+	args := []string{"-project", a.Project}
+	if a.Mode == "scenario" {
+		args = append(args, "-headless", "simulate", "--scenario", a.Scenario)
+		if a.Out != "" {
+			args = append(args, "--out", a.Out)
+		}
+		return args
+	}
+	if a.Scene != "" {
+		args = append(args, "-scene", a.Scene)
+	}
+	if a.World != "" {
+		args = append(args, "-world", a.World)
+	}
+	if a.At != "" {
+		args = append(args, "-at", a.At)
+	}
+	if a.Seed != 0 {
+		args = append(args, "-seed", strconv.FormatUint(a.Seed, 10))
+	}
+	return args
 }
 
 type message struct {
@@ -265,9 +295,18 @@ func (s *Session) checkLaunch(a *LaunchArgs) error {
 	switch a.Mode {
 	case "", "play":
 		a.Mode = "play"
+		if a.Scene != "" && a.World != "" {
+			return fmt.Errorf("launch: scene and world are exclusive")
+		}
+		if a.At != "" && a.World == "" {
+			return fmt.Errorf("launch: at needs a world (its start cell)")
+		}
 	case "scenario":
 		if a.Scenario == "" {
 			return fmt.Errorf("launch: mode scenario needs a scenario")
+		}
+		if a.Scene != "" || a.World != "" || a.At != "" || a.Seed != 0 {
+			return fmt.Errorf("launch: scene, world, at and seed are for mode play; a scenario says where it runs")
 		}
 		// A name, as veduta simulate --scenario takes it, is a file of tests/scenarios.
 		if !strings.HasSuffix(a.Scenario, ".json") {
@@ -314,14 +353,7 @@ func (s *Session) run(a *LaunchArgs, stdout, stderr io.Writer) int {
 	if !a.NoDebug {
 		g.Debugger = s
 	}
-	args := []string{"-project", a.Project}
-	if a.Mode == "scenario" {
-		args = append(args, "-headless", "simulate", "--scenario", a.Scenario)
-		if a.Out != "" {
-			args = append(args, "--out", a.Out)
-		}
-	}
-	return veduta.RunArgs(g, args, stdout, stderr)
+	return veduta.RunArgs(g, a.gameArgs(), stdout, stderr)
 }
 
 func (s *Session) setBreakpoints(req *message) {

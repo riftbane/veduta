@@ -170,3 +170,14 @@ func TestHeadlessWorld(t *testing.T) {
 		t.Fatalf("describe: %s", b)
 	}
 }
+
+// TestPlayerFlagsAreNotHeadless: -scene, -world, -at and -seed are the player's; a
+// headless subcommand has its own.
+func TestPlayerFlagsAreNotHeadless(t *testing.T) {
+	useTestProject(t, walkSpec(t))
+	for _, args := range [][]string{{"-scene", "main"}, {"-world", "land", "-at", "1,2"}, {"-seed", "3"}} {
+		if code, _ := runCmd(t, append(args, "-headless", "describe")...); code != exitUsage {
+			t.Fatalf("%v with -headless: exit %d, want %d", args, code, exitUsage)
+		}
+	}
+}

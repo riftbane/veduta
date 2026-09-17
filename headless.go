@@ -65,6 +65,11 @@ func runMain(g Game, args []string, stdout, stderr io.Writer) int {
 	headlessMode := fs.Bool("headless", false, "run a headless subcommand: render, simulate, query, snapshot, describe or bench")
 	dir := fs.String("project", ".", "project directory containing veduta.json")
 	showVersion := fs.Bool("version", false, "print the engine version and exit")
+	var play playOptions
+	fs.StringVar(&play.Scene, "scene", "", "the player starts in this scene (default: the project's default world or scene)")
+	fs.StringVar(&play.World, "world", "", "the player starts in this world instead of a scene")
+	fs.StringVar(&play.At, "at", "", "with -world: the start cell x,z")
+	fs.Uint64Var(&play.Seed, "seed", 0, "the player's RNG seed (default: the project's)")
 	if err := fs.Parse(args); err != nil {
 		return exitUsage
 	}
@@ -76,12 +81,16 @@ func runMain(g Game, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: game -headless render|simulate|query|snapshot|describe|bench [flags]")
 		return exitUsage
 	}
+	if *headlessMode && play != (playOptions{}) {
+		fmt.Fprintln(stderr, "-scene, -world, -at and -seed are the player's: a headless subcommand takes its own after its name")
+		return exitUsage
+	}
 	p, a, err := loadProjectFunc(*dir)
 	if err != nil {
 		return fail(stdout, stderr, err)
 	}
 	if !*headlessMode {
-		if err := runPlayer(g, p, a, projectDir(*dir), stderr); err != nil {
+		if err := runPlayer(g, p, a, projectDir(*dir), stderr, play); err != nil {
 			fmt.Fprintln(stderr, err)
 			return exitError
 		}
@@ -231,6 +240,12 @@ func writePNG(path string, img *gfx.Image) error {
 // target resolves the --scene, --world and --at flags of a command: a world when one is
 // named (or the project's default world when neither is), else a scene.
 func (h *headless) target(sceneName, worldName, at string) (runOptions, error) {
+	return resolveTarget(h.project, sceneName, worldName, at)
+}
+
+// resolveTarget reads the scene, world and start cell flags of a run: a scene or a world,
+// else the project's default world or scene.
+func resolveTarget(p *asset.Project, sceneName, worldName, at string) (runOptions, error) {
 	var opt runOptions
 	switch {
 	case sceneName != "" && worldName != "":
@@ -239,10 +254,10 @@ func (h *headless) target(sceneName, worldName, at string) (runOptions, error) {
 		opt.World = worldName
 	case sceneName != "":
 		opt.Scene = sceneName
-	case h.project.DefaultWorld != "":
-		opt.World = h.project.DefaultWorld
+	case p.DefaultWorld != "":
+		opt.World = p.DefaultWorld
 	default:
-		opt.Scene = h.project.DefaultScene
+		opt.Scene = p.DefaultScene
 	}
 	if at != "" {
 		if opt.World == "" {

@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Live editing in the simulator: saving a script or an asset source reloads the game in
+  place, in the scene it was in (a world, around the focus cell), with the same seed, so a
+  level or a hud is edited while it shows; F9 restarts from the start. A script game's
+  error, a source that does not compile or a scene that does not load no longer closes the
+  window: the last frame stays with the error over it until a reload succeeds. `veduta sim`
+  and `veduta run` take `--scene` (or `--world` and `--at`) and `--seed`, as does the
+  player (`-scene`, `-world`, `-at`, `-seed`) and a debug configuration of mode `play`
+  (`scene`, `world`, `at`, `seed`; the extension's snippet "Veduta: Play a scene"). A
+  recording names the scene or world the run started in.
 - Coroutines in Lua: `coroutine.create`, `resume`, `yield`, `status`, `wrap`, `running`,
   `isyieldable` and `close`, matching PUC Lua 5.4.6 line by line in `testdata/libs.lua`, so
   cutscenes and dialogue are written in sequence (`wait(20)` between lines). Each coroutine

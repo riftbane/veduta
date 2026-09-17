@@ -42,6 +42,10 @@ stack traceback:
 	main.lua:42: in function 'game.update'
 ```
 
+In the simulator the window stays open with the error written over the last frame (in
+the terminal and the Debug Console too); fix the script and save it, and the game
+reloads. The same happens to a scene file or a texture that does not compile.
+
 The most common ones:
 
 | Message | Usually means |
@@ -62,10 +66,12 @@ checks every script and asset).
 |-----|------|
 | F1 | shows the time each tick takes against the console's budget, and the triangles drawn |
 | F5 | starts and stops recording the session as a scenario |
-| F9 | reloads scripts and assets and restarts the game |
+| F9 | reloads scripts and assets and restarts the game from the start |
 | Ctrl+Q | the console's Home: leaves the game |
 
-Saving any script or asset also reloads and restarts the game.
+Saving any script or asset also reloads, **in place**: the game restarts in the scene it
+was in (a world, around the cell the player stands in), with the same seed. See
+[Editing a scene while it shows](Scenes#editing-a-scene-while-it-shows).
 
 ## Looking at frames without playing
 

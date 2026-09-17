@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -194,11 +195,11 @@ func init() {
 		},
 	})
 	register(command{
-		name: "run", usage: "run", summary: "build and run the player: on Windows the simulator window, on Linux the framebuffer; refuses where there is none (no 16 or 32 bpp /sys/class/graphics/fbN, no VEDUTA_FB)", project: true,
+		name: "run", usage: "run [--scene S | --world W --at x,z] [--seed N]", summary: "build and run the player: on Windows the simulator window, on Linux the framebuffer; refuses where there is none (no 16 or 32 bpp /sys/class/graphics/fbN, no VEDUTA_FB). Starts in the scene or world given, else the project's default", project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) { return runGameCommand(env, s, "run", args) },
 	})
 	register(command{
-		name: "sim", usage: "sim", summary: "play the game in the simulator (Windows): the console's panel at a whole scale (VEDUTA_SCALE, 3), its 16-bit colors (VEDUTA_PANEL=0 turns them off) and its buttons on the keyboard", project: true,
+		name: "sim", usage: "sim [--scene S | --world W --at x,z] [--seed N]", summary: "play the game in the simulator (Windows): the console's panel at a whole scale (VEDUTA_SCALE, 3), its 16-bit colors (VEDUTA_PANEL=0 turns them off) and its buttons on the keyboard. Starts in the scene or world given, else the project's default; saving a script or an asset reloads it in place", project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) {
 			if runtime.GOOS != "windows" {
 				return nil, fmt.Errorf("sim: the simulator is a Windows window, and this is %s/%s; on Linux, veduta run plays on a framebuffer", runtime.GOOS, runtime.GOARCH)
@@ -208,11 +209,45 @@ func init() {
 	})
 }
 
+// playArgs reads the flags of run and sim and returns the player's arguments for them:
+// where it starts (-scene, or -world and -at) and its -seed.
+func playArgs(name string, w io.Writer, args []string) ([]string, error) {
+	fs := newFlags(name, w)
+	sceneName := fs.String("scene", "", "start in this scene (default: the project's default world or scene)")
+	worldName := fs.String("world", "", "start in this world instead of a scene")
+	at := fs.String("at", "", "with --world: the start cell x,z")
+	seed := fs.Uint64("seed", 0, "RNG seed (default: the project's)")
+	if err := parseFlags(fs, args); err != nil {
+		return nil, err
+	}
+	if *sceneName != "" && *worldName != "" {
+		return nil, usagef("%s: --scene and --world are exclusive", name)
+	}
+	if *at != "" && *worldName == "" {
+		return nil, usagef("%s: --at needs --world (the start cell)", name)
+	}
+	var out []string
+	if *sceneName != "" {
+		out = append(out, "-scene", *sceneName)
+	}
+	if *worldName != "" {
+		out = append(out, "-world", *worldName)
+	}
+	if *at != "" {
+		out = append(out, "-at", *at)
+	}
+	if *seed != 0 {
+		out = append(out, "-seed", strconv.FormatUint(*seed, 10))
+	}
+	return out, nil
+}
+
 // runGameCommand builds the game and plays it: a Go game's binary, or a script game in this
 // process.
 func runGameCommand(env *Env, s *Session, name string, args []string) (any, error) {
-	if len(args) > 0 {
-		return nil, usagef("%s takes no arguments", name)
+	play, err := playArgs(name, env.Stderr, args)
+	if err != nil {
+		return nil, err
 	}
 	if why := runRefusal(s.Project.Engine); why != "" {
 		return nil, errors.New(why)
@@ -221,13 +256,14 @@ func runGameCommand(env *Env, s *Session, name string, args []string) (any, erro
 	if err != nil {
 		return nil, err
 	}
+	gameArgs := append([]string{"-project", s.Root}, play...)
 	if s.IsScript() {
-		if code := script.Run([]string{"-project", s.Root}, env.Stdout, env.Stderr); code != 0 {
+		if code := script.Run(gameArgs, env.Stdout, env.Stderr); code != 0 {
 			return nil, fmt.Errorf("the game stopped with exit code %d", code)
 		}
 		return nil, nil
 	}
-	cmd := exec.Command(bin, "-project", s.Root)
+	cmd := exec.Command(bin, gameArgs...)
 	cmd.Dir, cmd.Stdout, cmd.Stderr, cmd.Stdin = s.Root, env.Stdout, env.Stderr, env.Stdin
 	return nil, cmd.Run()
 }

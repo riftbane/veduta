@@ -24,7 +24,27 @@ leaves) or any pad. Three keys work the player itself:
 |-----|------|
 | F1 | shows update, render and frame milliseconds against the tick's budget, and triangles against the console's 1200 |
 | F5 | restarts the game and records the buttons; F5 again saves them as `tests/scenarios/recorded-<time>.scenario.json`, a scenario to add expectations to |
-| F9 | reads the scripts and assets again and restarts; the simulator also does it by itself when a file changes |
+| F9 | reads the scripts and assets again and restarts the game from the start |
+
+### Editing while it plays
+
+The simulator watches the scripts and the asset sources. When one is saved it reads
+everything again (a changed scene, texture or material is compiled on the spot) and
+restarts **in place**: in the scene the game was in, or in its world around the cell the
+player stands in, with the same seed. So a level is laid out with the scene file open next
+to the simulator, and a hud is written in `game.draw` while it shows: every save shows the
+result a second later, without playing back to it. The run starts again at tick 0 there;
+`game.init` runs again, so a game whose `init` loads its title scene comes back to the
+title.
+
+`veduta sim --scene level3` (or `--world land --at 4,-2`, and `--seed N`) opens the
+simulator in that scene rather than the project's default; the debugger's `"scene"` does
+the same in VS Code (the snippet "Veduta: Play a scene"). F5 records from there, and the
+scenario it writes names that scene.
+
+An error stops the run but not the simulator: the last frame stays, the error (a script's
+file, line and traceback; an asset that does not compile; a scene that does not load) is
+written over it, and the next save that fixes it reloads. F9 does the same from the start.
 
 ## Debugging
 
@@ -43,7 +63,7 @@ does not redraw. A run under the debugger gives the same trace as one without.
 `veduta init` sets an editor up, and `veduta upgrade` brings it to the tool's version:
 `.veduta/lua/veduta.d.lua` describes this API for the Lua Language Server (VS Code's
 `sumneko.lua`, which `.vscode/extensions.json` recommends; `.luarc.json` points it there
-and turns off `io`, `os`, `debug`, `coroutine` and `package`), and `.veduta/schema/` holds a
+and turns off `io`, `os`, `debug` and `package`), and `.veduta/schema/` holds a
 JSON Schema of every source format, which `.vscode/settings.json` maps to `veduta.json`,
 `*.scene.json`, `*.scenario.json` and the other asset files. The editor then completes the
 API and the fields of every file, shows their descriptions, and marks a misspelt function,

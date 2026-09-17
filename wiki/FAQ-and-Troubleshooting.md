@@ -34,9 +34,11 @@ project to refresh them.
 ### Missing standard functions
 
 Veduta's Lua is Lua 5.4 without the parts that would break determinism or reach outside the
-game (`io`, `os`, `debug`, `load`, coroutines, `goto`), and without `string.pack`,
-`string.unpack` and `string.dump`, which have no use without file access. An engine before
-v2.0.0-rc.4 also lacked `math.deg` and `math.rad`: update it (`veduta update`).
+game (`io`, `os`, `debug`, `load`, `goto`), and without `string.pack`, `string.unpack` and
+`string.dump`, which have no use without file access. An engine before v2.0.0-rc.4 also
+lacked `math.deg` and `math.rad`, and one before rc.5 the `coroutine` library: update it
+(`veduta update`), then `veduta upgrade` in the project so the editor stops marking
+`coroutine` as missing.
 
 ### Accented letters show as `?`
 
@@ -52,7 +54,8 @@ that names both.
 ### "entity has no field …"
 
 Entities accept only their own fields (`x`, `y`, `z`, `visible`, `model`, `material`,
-`layer`, `state`). Keep your values in `e.state`: `e.state.speed = 3`.
+`layer`, `frame`, `parent`, `hitbox`, `state`). Keep your values in `e.state`:
+`e.state.speed = 3`.
 
 ### My variables survive `scene.load`
 

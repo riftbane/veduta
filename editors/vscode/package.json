@@ -2,7 +2,7 @@
   "name": "veduta",
   "displayName": "Veduta",
   "description": "Make Veduta console games: new game, play and debug (F5), test, build with errors in Problems, deploy to the console's card.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "riftbane",
   "license": "MIT",
   "repository": {
@@ -149,6 +149,22 @@
                 "type": "string",
                 "description": "With mode scenario: its name (tests/scenarios/<name>.scenario.json) or file."
               },
+              "scene": {
+                "type": "string",
+                "description": "With mode play: start in this scene instead of the project's default. Saving a file reloads the game in place, in the scene it is in."
+              },
+              "world": {
+                "type": "string",
+                "description": "With mode play: start in this world instead of a scene."
+              },
+              "at": {
+                "type": "string",
+                "description": "With world: the start cell, \"x,z\"."
+              },
+              "seed": {
+                "type": "integer",
+                "description": "With mode play: the seed of math.random (default: the project's)."
+              },
               "stopOnEntry": {
                 "type": "boolean",
                 "description": "Stop before the first statement.",
@@ -176,6 +192,18 @@
               "name": "Play",
               "project": "^\"\\${workspaceFolder}\"",
               "mode": "play"
+            }
+          },
+          {
+            "label": "Veduta: Play a scene",
+            "description": "Play the game from one scene, to edit that scene or its hud while it shows",
+            "body": {
+              "type": "veduta",
+              "request": "launch",
+              "name": "Play ${1:level}",
+              "project": "^\"\\${workspaceFolder}\"",
+              "mode": "play",
+              "scene": "${1:level}"
             }
           },
           {
