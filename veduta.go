@@ -305,6 +305,18 @@ func (c *Context) Overlapping(e *scene.Entity) []*scene.Entity {
 // HUD starts a sprite batch covering the frame; call End when done.
 func (c *Context) HUD(dl *gfx.DrawList) *sprite.Batch { return sprite.Begin(dl, c.Width, c.Height) }
 
+// Texture returns the handle and size in texels of a texture asset, for drawing it in the
+// HUD with sprite.Batch.Image or NineSlice. It is valid only in Draw; ok is false for a
+// texture the project does not have.
+func (c *Context) Texture(name string) (tex gfx.TextureID, w, h int, ok bool) {
+	t := c.eng.assets.Textures[name]
+	if t == nil || c.eng.res == nil || len(t.Data.Levels) == 0 {
+		return 0, 0, 0, false
+	}
+	tex, ok = c.eng.res.Textures[name]
+	return tex, t.Data.Levels[0].W, t.Data.Levels[0].H, ok
+}
+
 // Text draws s with the built-in font at pixel (x, y) with an integer scale.
 func (c *Context) Text(b *sprite.Batch, x, y float32, scale int, s string, color uint32) float32 {
 	return b.Text(c.Font, c.FontTexture, x, y, scale, s, color)

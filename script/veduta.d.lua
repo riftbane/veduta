@@ -270,6 +270,41 @@ function hud.text(x, y, text, color, scale) end
 ---@param color? veduta.Color default white
 function hud.rect(x, y, w, h, color) end
 
+---@class veduta.ImageOptions
+---@field src? integer[] {x, y, w, h}: the part of the texture, in texels (default: all of it)
+---@field w? number width drawn, in pixels (default: the part's width)
+---@field h? number height drawn, in pixels (default: the part's height)
+---@field color? veduta.Color multiplies the texels (default white: unchanged)
+---@field flip_x? boolean mirrored left to right
+---@field flip_y? boolean mirrored top to bottom
+
+---A texture, or a part of it (an icon of a sheet), at (x, y); texels stay sharp.
+---@param texture string a texture asset's name
+---@param x number
+---@param y number
+---@param options? veduta.ImageOptions
+function hud.image(texture, x, y, options) end
+
+---@class veduta.PanelOptions
+---@field src? integer[] {x, y, w, h}: the part of the texture, in texels
+---@field color? veduta.Color
+
+---A panel that stretches to any size (nine-slice): the corners keep their size, the edges
+---and the middle stretch.
+---@param texture string
+---@param x number
+---@param y number
+---@param w number
+---@param h number
+---@param border integer|integer[] the corners' width in texels, or {left, top, right, bottom}
+---@param options? veduta.PanelOptions
+function hud.panel(texture, x, y, w, h, border, options) end
+
+---A texture's width and height in texels.
+---@param texture string
+---@return integer w, integer h
+function hud.image_size(texture) end
+
 ---A mesh being built; mesh.set makes it a model.
 ---@class veduta.Mesh
 local Mesh = {}

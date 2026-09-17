@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Images in the Lua hud: `hud.image(texture, x, y [, options])` draws a texture or a part
+  of it (`src`, an icon of a sheet) at any size, tinted or mirrored; `hud.panel` draws a
+  nine-slice panel (dialogue boxes, menus); `hud.image_size`. `Context.Texture` gives Go
+  games the handle and size a texture asset needs for `Batch.Image`.
 - Lua entities get parents and hitboxes like scene files' entities: `parent` and `hitbox` in
   `scene.spawn` and as entity fields (set, changed or cleared at any time; a parent that
   would make a cycle is refused), and `e:children()`. `scene.SetParent` and

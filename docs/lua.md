@@ -171,8 +171,13 @@ Only inside `game.draw`. Coordinates are pixels from the top left of the frame.
 |----------|---------|
 | `hud.text(x, y, text [, color [, scale]])` | the built-in 8×8 font; returns the width drawn |
 | `hud.rect(x, y, w, h [, color])` | a filled rectangle |
+| `hud.image(texture, x, y [, options])` | a texture asset, or a part of it, with its texels sharp. `options`: `src = {x, y, w, h}` the part in texels (an icon of a sheet; default all of it), `w`, `h` the size drawn in pixels (default the part's), `color` multiplying the texels, `flip_x`, `flip_y` |
+| `hud.panel(texture, x, y, w, h, border [, options])` | a nine-slice panel of any size: the corners, `border` texels wide (one number, or `{left, top, right, bottom}`), keep their size; edges and middle stretch. `options`: `src`, `color` |
+| `hud.image_size(texture)` | the texture's width and height in texels |
 
-A color is `"#rrggbb"`, `"#rrggbbaa"` or an integer `0xrrggbb`; the default is white.
+A color is `"#rrggbb"`, `"#rrggbbaa"` or an integer `0xrrggbb`; the default is white. A texture
+drawn in the hud is a texture asset like any other (`assets/textures/<name>.tex.json`,
+often a PNG image layer): an icon sheet is one texture and `src` picks each icon.
 
 ## engine
 

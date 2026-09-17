@@ -64,6 +64,7 @@ func RegisterKind(name string, ctor func(*scene.Entity) veduta.Behaviour)
 | `SetModel(name, m) error` | add or replace a model the game builds at runtime (a voxel chunk's mesh): entities name it like an asset model, with culling, `LODs` and `DrawDistance`; uploaded at the next frame. The name contains `:` and does not start with `world:`; pass a new `*asset.Model` to change it (the engine re-uploads when the pointer changes). Not saved in snapshots and kept across `LoadScene` |
 | `RemoveModel(name)`, `Model(name)` | forget a runtime model; look one up |
 | `Overlapping(e)` | live entities whose AABB overlaps `e`'s (last tick's bounds) |
+| `Texture(name)` | a texture asset's handle and size in texels, for `Batch.Image` and `Batch.NineSlice` in `Draw` (`ok` false for an unknown texture) |
 | `HUD(dl) *sprite.Batch` | start a HUD batch covering the frame; call `End()` |
 | `Text(b, x, y, scale, s, color)` | draw text with the built-in font |
 

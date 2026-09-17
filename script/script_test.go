@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -412,5 +413,73 @@ end
 	if !regexp.MustCompile(`\{"aabb":\{"max":\[3,1,1\],"min":\[1,-1,-1\]\},"id":\d+,"kind":"static","material":"","model":"quad","name":"cart"`).MatchString(last) {
 		i := strings.Index(last, `"name":"cart"`)
 		t.Errorf("cart's box: %s", last[i:min(len(last), i+300)])
+	}
+}
+
+// TestHUDImages: hud.image draws a part of a texture where and as large as asked, and
+// hud.panel keeps its corners while it stretches.
+func TestHUDImages(t *testing.T) {
+	dir := copyGame(t, map[string]string{
+		"assets/textures/icons.tex.json": `{"veduta": "texture/1", "size": [8, 4], "mipmaps": false, "layers": [
+			{"type": "rect", "xy": [0, 0], "size": [4, 4], "color": "#ff0000"},
+			{"type": "rect", "xy": [4, 0], "size": [4, 4], "color": "#0000ff"}]}`,
+		"assets/textures/frame.tex.json": `{"veduta": "texture/1", "size": [6, 6], "mipmaps": false, "layers": [
+			{"type": "solid", "color": "#00ff00"},
+			{"type": "rect", "xy": [0, 0], "size": [6, 6], "color": "#ffffff", "outline": 2}]}`,
+		"main.lua": `+
+function game.draw()
+  hud.image("icons", 10, 10, {src = {4, 0, 4, 4}, w = 16, h = 16})
+  hud.image("icons", 40, 10)
+  hud.panel("frame", 100, 100, 60, 40, 2)
+  local w, h = hud.image_size("icons")
+  if w ~= 8 or h ~= 4 then error("image_size " .. w .. "x" .. h) end
+end
+`,
+	})
+	out := filepath.Join(t.TempDir(), "frame.png")
+	if r, stderr, code := run(t, dir, "render", "--out", out); code != 0 {
+		t.Fatalf("exit %d %+v %s", code, r, stderr)
+	}
+	f, err := os.Open(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	img, err := png.Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := func(x, y int) string {
+		r, g, b, _ := img.At(x, y).RGBA()
+		return fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)
+	}
+	for _, c := range []struct {
+		x, y int
+		want string
+	}{
+		{10, 10, "#0000ff"}, {25, 25, "#0000ff"}, // the blue icon, 16 pixels wide
+		{41, 11, "#ff0000"}, {46, 11, "#0000ff"}, // the whole sheet, at its size
+		{100, 100, "#ffffff"}, {101, 139, "#ffffff"}, {158, 120, "#ffffff"}, // the frame's border, 2 pixels
+		{103, 103, "#00ff00"}, {130, 120, "#00ff00"}, // its middle, stretched
+	} {
+		if got := at(c.x, c.y); got != c.want {
+			t.Errorf("pixel (%d, %d) is %s, want %s", c.x, c.y, got, c.want)
+		}
+	}
+
+	for name, src := range map[string]string{
+		"no texture": `hud.image("nope", 0, 0)`,
+		"bad src":    `hud.image("icons", 0, 0, {src = {6, 0, 4, 4}})`,
+		"bad border": `hud.panel("frame", 0, 0, 10, 10, {1, 2})`,
+	} {
+		bad := copyGame(t, map[string]string{
+			"assets/textures/icons.tex.json": `{"veduta": "texture/1", "size": [8, 4], "layers": [{"type": "solid", "color": "#ff0000"}]}`,
+			"assets/textures/frame.tex.json": `{"veduta": "texture/1", "size": [6, 6], "layers": [{"type": "solid", "color": "#ff0000"}]}`,
+			"main.lua":                       "+function game.draw() " + src + " end",
+		})
+		r, _, code := run(t, bad, "render", "--out", filepath.Join(t.TempDir(), "x.png"))
+		if code == 0 || r.Error == "" {
+			t.Errorf("%s: exit %d %+v", name, code, r)
+		}
 	}
 }

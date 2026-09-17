@@ -2,6 +2,7 @@ package script
 
 import (
 	"fmt"
+	"image"
 	"math"
 	"sort"
 	"strings"
@@ -219,6 +220,9 @@ func (g *Game) install() {
 			w := g.ctx.Text(b, float32(x), float32(y), int(scale), s, color)
 			return vm.Ret(lua.Float(float64(w)))
 		},
+		"image":      g.hudImage,
+		"panel":      g.hudPanel,
+		"image_size": g.hudImageSize,
 		"rect": func(vm *lua.VM, args []lua.Value) []lua.Value {
 			b := g.batch(vm, "hud.rect")
 			x, y := vm.CheckFloat(args, 0, "rect"), vm.CheckFloat(args, 1, "rect")
@@ -227,6 +231,127 @@ func (g *Game) install() {
 			return nil
 		},
 	})
+}
+
+// texture looks up a texture for the hud by its asset name.
+func (g *Game) texture(vm *lua.VM, args []lua.Value, i int, fname string) (gfx.TextureID, int, int) {
+	name := vm.CheckString(args, i, fname)
+	tex, w, h, ok := g.ctx.Texture(name)
+	if !ok {
+		vm.Errorf("%s: no texture %q (assets/textures/%s.tex.json)", fname, name, name)
+	}
+	return tex, w, h
+}
+
+// srcRect reads options.src, {x, y, w, h} in texels, defaulting to the whole texture.
+func srcRect(vm *lua.VM, opts *lua.Table, w, h int, fname string) image.Rectangle {
+	if opts == nil || opts.GetString("src").IsNil() {
+		return image.Rect(0, 0, w, h)
+	}
+	t := opts.GetString("src").Table()
+	var r [4]int
+	for i := range r {
+		n := lua.Nil
+		if t != nil {
+			n = t.GetInt(int64(i) + 1)
+		}
+		v, ok := n.Int()
+		if !ok {
+			vm.Errorf("%s: src must be {x, y, w, h} in whole texels", fname)
+		}
+		r[i] = int(v)
+	}
+	src := image.Rect(r[0], r[1], r[0]+r[2], r[1]+r[3])
+	if r[2] <= 0 || r[3] <= 0 || !src.In(image.Rect(0, 0, w, h)) {
+		vm.Errorf("%s: src {%d, %d, %d, %d} is not inside the %d×%d texture", fname, r[0], r[1], r[2], r[3], w, h)
+	}
+	return src
+}
+
+// options reads an optional table argument.
+func options(vm *lua.VM, args []lua.Value, i int, fname string) *lua.Table {
+	if lua.Arg(args, i).IsNil() {
+		return nil
+	}
+	return vm.CheckTable(args, i, fname)
+}
+
+// optNumber reads a number field of an options table.
+func optNumber(vm *lua.VM, opts *lua.Table, key, fname string, def float64) float64 {
+	if opts == nil {
+		return def
+	}
+	v := opts.GetString(key)
+	if v.IsNil() {
+		return def
+	}
+	f, ok := v.Float()
+	if !ok {
+		vm.Errorf("%s: %s must be a number", fname, key)
+	}
+	return f
+}
+
+// optColor reads the color field of an options table.
+func (g *Game) optColor(vm *lua.VM, opts *lua.Table, fname string) uint32 {
+	if opts == nil {
+		return 0xffffffff
+	}
+	return g.color(vm, []lua.Value{opts.GetString("color")}, 0, fname, 0xffffffff)
+}
+
+// hudImage is hud.image(texture, x, y [, {src = {x, y, w, h}, w =, h =, color =, flip_x =,
+// flip_y =}]).
+func (g *Game) hudImage(vm *lua.VM, args []lua.Value) []lua.Value {
+	b := g.batch(vm, "hud.image")
+	tex, tw, th := g.texture(vm, args, 0, "hud.image")
+	x, y := vm.CheckFloat(args, 1, "hud.image"), vm.CheckFloat(args, 2, "hud.image")
+	opts := options(vm, args, 3, "hud.image")
+	src := srcRect(vm, opts, tw, th, "hud.image")
+	w := optNumber(vm, opts, "w", "hud.image", float64(src.Dx()))
+	h := optNumber(vm, opts, "h", "hud.image", float64(src.Dy()))
+	dst := gmath.R(float32(x), float32(y), float32(w), float32(h))
+	if opts != nil && opts.GetString("flip_x").Truthy() {
+		dst.Min.X, dst.Max.X = dst.Max.X, dst.Min.X
+	}
+	if opts != nil && opts.GetString("flip_y").Truthy() {
+		dst.Min.Y, dst.Max.Y = dst.Max.Y, dst.Min.Y
+	}
+	b.Image(tex, tw, th, src, dst, g.optColor(vm, opts, "hud.image"), gfx.FilterNearest)
+	return nil
+}
+
+// hudPanel is hud.panel(texture, x, y, w, h, border [, {src =, color =}]): a nine-slice
+// panel whose border is one width for every side or {left, top, right, bottom}.
+func (g *Game) hudPanel(vm *lua.VM, args []lua.Value) []lua.Value {
+	b := g.batch(vm, "hud.panel")
+	tex, tw, th := g.texture(vm, args, 0, "hud.panel")
+	x, y := vm.CheckFloat(args, 1, "hud.panel"), vm.CheckFloat(args, 2, "hud.panel")
+	w, h := vm.CheckFloat(args, 3, "hud.panel"), vm.CheckFloat(args, 4, "hud.panel")
+	var inset [4]int
+	if t := lua.Arg(args, 5).Table(); t != nil {
+		for i := range inset {
+			n, ok := t.GetInt(int64(i) + 1).Int()
+			if !ok {
+				vm.ArgError(5, "hud.panel", "border must be a whole number or {left, top, right, bottom}")
+			}
+			inset[i] = int(n)
+		}
+	} else {
+		n := vm.CheckInt(args, 5, "hud.panel")
+		inset = [4]int{int(n), int(n), int(n), int(n)}
+	}
+	opts := options(vm, args, 6, "hud.panel")
+	src := srcRect(vm, opts, tw, th, "hud.panel")
+	b.NineSlice(tex, tw, th, src, inset, gmath.R(float32(x), float32(y), float32(w), float32(h)), g.optColor(vm, opts, "hud.panel"), gfx.FilterNearest)
+	return nil
+}
+
+// hudImageSize is hud.image_size(texture): its width and height in texels.
+func (g *Game) hudImageSize(vm *lua.VM, args []lua.Value) []lua.Value {
+	g.batch(vm, "hud.image_size")
+	_, w, h := g.texture(vm, args, 0, "hud.image_size")
+	return vm.Ret(lua.Int(int64(w)), lua.Int(int64(h)))
 }
 
 // scene returns the scene, which a script cannot reach before the first one is loaded.
