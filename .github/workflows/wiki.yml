@@ -1,0 +1,45 @@
+name: wiki
+
+# The GitHub wiki, https://github.com/riftbane/veduta/wiki: wiki/ copied into the wiki's own
+# repository whenever it changes on main. Its examples are tested in internal/cli
+# (TestWikiExamples, TestWikiFirstGame). The wiki must exist first: GitHub creates its
+# repository when its first page is saved in the browser.
+on:
+  push:
+    branches: [main]
+    paths: ["wiki/**", ".github/workflows/wiki.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: source
+
+      - name: publish
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          git clone "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki
+          # The wiki holds exactly what wiki/ holds.
+          find wiki -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r source/wiki/. wiki/
+          cd wiki
+          git add -A
+          if git diff --cached --quiet; then
+            echo "the wiki is up to date"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Update from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+          git push -q origin HEAD

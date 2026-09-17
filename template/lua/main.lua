@@ -1,5 +1,5 @@
 -- The game: an empty scene and its name on the screen, the starting point of a new
--- project. `veduta docs lua` (the MCP docs tool, topic lua) describes the API.
+-- project. The Lua API: https://riftbane.github.io/veduta/lua.html (the MCP docs tool, topic lua).
 
 function game.init()
 end

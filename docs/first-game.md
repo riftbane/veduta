@@ -233,8 +233,9 @@ scenario start                pass  golden new
 PASS
 ```
 
-The first run records each scenario's result as its golden; from then on a change that
-alters what happens fails the test until you accept it. Instead of writing inputs by hand,
+`golden new` means no outcome is recorded yet: `veduta test --update-golden` records each
+scenario's run as its golden, and from then on a change that alters what happens fails the
+test until you record again. Instead of writing inputs by hand,
 press F5 in the simulator, play, and F5 again: the run is saved as a scenario to add
 expectations to.
 

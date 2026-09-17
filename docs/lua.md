@@ -220,7 +220,8 @@ scene.spawn{name = "chunk", model = "game:chunk"}
 `string`, `table`, `math` and `utf8` behave as in Lua 5.4. `math.random` draws from the run's
 seeded generator, so it is deterministic. `print` writes to the tool's error output.
 Differences from Lua 5.4: `pairs` visits keys in the order they were first set; there is no
-`goto`, no coroutines, no `io`, `os`, `debug` or `load`. A callback that runs for 20
+`goto`, no coroutines, no `io`, `os`, `debug` or `load`, and no `math.deg`, `math.rad`,
+`string.pack`, `string.unpack`, `string.packsize` or `string.dump`. A callback that runs for 20
 million steps without returning is stopped as an endless loop.
 
 ## Full example

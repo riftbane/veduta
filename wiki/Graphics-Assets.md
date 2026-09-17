@@ -1,0 +1,133 @@
+# Graphics Assets
+
+What an entity looks like is two assets: a **model** (its shape) and a **material** (its
+surface), and the material may use a **texture** (an image). All three are JSON files
+that describe how to build the asset: primitive shapes, layer programs, colours. The tool
+compiles them when the game runs (`veduta cook` does it ahead of time), and VS Code
+completes and checks them as you type.
+
+## Models
+
+`assets/models/<name>.model.json`: a list of primitive parts joined into one mesh.
+
+```json
+{
+  "veduta": "model/1",
+  "pivot": "bottom-center",
+  "parts": [
+    { "shape": "box", "size": [0.6, 1.2, 0.4], "position": [0, 0.6, 0], "material": "cloth" },
+    { "shape": "sphere", "radius": 0.3, "position": [0, 1.5, 0], "material": "skin" },
+    { "shape": "cylinder", "radius": 0.05, "height": 0.8, "position": [0.4, 0.8, 0], "rotation_deg": [0, 0, 20] }
+  ]
+}
+```
+
+| Shape | Fields |
+|-------|--------|
+| `box` | `size` |
+| `cylinder` | `radius`, `height`, `segments` |
+| `sphere` | `radius`, `segments`, `rings` |
+| `plane` | a flat rectangle facing +Y (a floor) |
+| `extrude` | a 2D outline pushed along an axis |
+| `lathe` | a profile turned around the Y axis (a vase, a column) |
+| `mirror` | a mirrored copy of other parts |
+
+Every part takes `position`, `rotation_deg`, `scale` and `material`. A part without a
+material uses the entity's `material`. `pivot` (`origin`, `center`, `bottom-center`) sets
+which point of the model sits at the entity's position.
+
+Every new project has `quad`, a 1 × 1 × 0.02 box with its pivot at the center: the model
+of every sprite. Models can also have levels of detail and a draw distance for large 3D
+scenes. The full format is in the [model reference](https://riftbane.github.io/veduta/model.html).
+
+For shapes computed while the game runs (a block world, a generated maze), build the mesh
+from Lua instead: see [3D, Worlds and Blocks](3D-Worlds-and-Blocks#block-worlds-mesh-and-volume).
+
+## Materials
+
+`assets/materials/<name>.mat.json`:
+
+```json
+{ "veduta": "material/1", "albedo": "#80c0ff60", "alpha": "blend", "unlit": true }
+```
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| `albedo` | `"#ffffff"` | colour, multiplied with the texture |
+| `texture` | none | a texture's name |
+| `unlit` | `false` | `true` ignores the scene's light |
+| `alpha` | `"opaque"` | `opaque`, `cutout` (pixels below `cutoff` are not drawn) or `blend` (translucent) |
+| `cutoff` | `0.5` | the threshold of `cutout` |
+| `cull` | `"back"` | `none` draws both sides (leaves, flags) |
+| `filter` | `"bilinear"` | `nearest` keeps pixel art sharp |
+
+A sprite's material is always:
+
+```json
+{ "veduta": "material/1", "texture": "coin", "unlit": true, "alpha": "cutout", "filter": "nearest" }
+```
+
+## Textures
+
+`assets/textures/<name>.tex.json`: an image described as layers painted one over the other,
+bottom first.
+
+```json
+{
+  "veduta": "texture/1",
+  "size": [32, 32],
+  "layers": [
+    { "type": "solid", "color": "#8a5a2b" },
+    { "type": "noise", "color": "#6b4420", "scale": 6, "octaves": 2, "seed": 4 },
+    { "type": "stripes", "width": 4, "angle_deg": 90, "colors": ["#00000000", "#5a3a1a"], "opacity": 0.6 },
+    { "type": "rect", "xy": [1, 1], "size": [30, 30], "color": "#3a2410", "outline": 2 }
+  ]
+}
+```
+
+| Layer | Paints |
+|-------|--------|
+| `solid` | the whole texture |
+| `noise` | smooth value noise (`scale`, `octaves`, `seed`) |
+| `stripes` | parallel bands cycling through `colors` (transparent ones allowed) |
+| `rect` | a rectangle, optionally rounded (`corner`) or outlined (`outline`) |
+| `circle` | a disc or a ring |
+| `gradient` | a linear gradient |
+| `checker` | a checkerboard |
+| `image` | a PNG file from under `assets/` |
+
+Every layer takes `opacity` and `blend` (`normal`, `multiply`, `screen`, `add`). Positions
+are pixels from the top left. Pixels no layer paints stay transparent, which is how a
+sprite gets its shape.
+
+### Pixel art from PNG files
+
+Draw sprites in any editor, save them as PNG under `assets/` and wrap each in a texture of
+the same size:
+
+```json
+{
+  "veduta": "texture/1",
+  "size": [16, 16],
+  "mipmaps": false,
+  "layers": [
+    { "type": "image", "path": "sprites/hero.png" }
+  ]
+}
+```
+
+An image exactly as large as the texture is copied pixel for pixel.
+
+### Textures that repeat
+
+`"tiling": true` makes a texture wrap around seamlessly: ground, walls, water. Worlds require
+it for their ground materials.
+
+The full format, with the exact maths of every layer and blend mode, is in the
+[texture reference](https://riftbane.github.io/veduta/texture.html).
+
+## Checking assets
+
+`veduta inspect model|texture|scene NAME` reports problems ranked by severity (a model over
+its triangle budget, a texture that is not a power of two, a scene with overlapping
+sprites) and writes contact sheets you can look at under `out/`.

@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The GitHub wiki, https://github.com/riftbane/veduta/wiki: making games in Lua, from
+  installation and a first game (Gem Cave) to entities, scenes, assets, input, camera, HUD,
+  2D, 3D and block worlds, testing, debugging, publishing, the Lua API and a FAQ. Its source
+  is `wiki/`, published by the `wiki` workflow; `TestWikiExamples` compiles every Lua and
+  JSON example and `TestWikiFirstGame` builds the tutorial's game from the page and passes
+  its scenarios.
 - `install.ps1`: the Windows installer, `irm …/install.ps1 | iex`. It installs `veduta.exe`
   (checksum verified) into `%LOCALAPPDATA%\Programs\veduta` and puts it on the user's PATH
   without administrator rights, from the stable or beta channel; CI runs it in Windows
@@ -121,6 +127,15 @@ All notable changes to this project are documented here. The format follows
   simulator lives in it too. The CI check that forbade the import is gone.
 - **`lua/aux.go` is `lua/args.go`.** Windows reserves AUX as a device name, and a checkout of
   a file called so fails there.
+
+### Fixed
+
+- `docs/first-game.md` said the first `veduta test` records the goldens; it reports
+  `golden new`, and `veduta test --update-golden` records them.
+- A new Lua game's `main.lua` pointed at `veduta docs lua`, a command that does not exist;
+  it links the Lua API page.
+- `docs/lua.md` lists the standard functions the VM lacks (`math.deg`, `math.rad`, the
+  `string` packing functions).
 
 ## v1.4.1 — 2026-09-16
 

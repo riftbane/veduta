@@ -22,7 +22,8 @@ onto its card ([vedutaos](https://github.com/riftbane/vedutaos)).
   and builds from source on macOS, games are released for linux/arm64.
 
 Documentation: **https://riftbane.github.io/veduta/**, built from [docs/](docs/): getting
-started on Windows, a first game step by step, the Lua API and every format.
+started on Windows, a first game step by step, the Lua API and every format. The
+[wiki](https://github.com/riftbane/veduta/wiki) is the guide to making games in Lua.
 
 ## Install
 
