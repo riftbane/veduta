@@ -53,12 +53,27 @@ func TestAddChangelogEntry(t *testing.T) {
 	}
 }
 
+// gitQuiet stops git from running its automatic maintenance (gc) in the background. It
+// otherwise keeps writing into the test's temporary repositories, in the project and in
+// the bare remote a push reaches, while the test framework is already deleting them:
+// "TempDir RemoveAll cleanup: directory not empty". GIT_CONFIG_* reaches every git the
+// test and the code under test run, including the receive-pack of a push.
+func gitQuiet(t *testing.T) {
+	t.Helper()
+	t.Setenv("GIT_CONFIG_COUNT", "2")
+	t.Setenv("GIT_CONFIG_KEY_0", "gc.auto")
+	t.Setenv("GIT_CONFIG_VALUE_0", "0")
+	t.Setenv("GIT_CONFIG_KEY_1", "maintenance.auto")
+	t.Setenv("GIT_CONFIG_VALUE_1", "false")
+}
+
 // TestReleaseProjectFlow runs the whole release of a game project against a local bare
 // remote: checklist, changelog, commit, tag and push.
 func TestReleaseProjectFlow(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
+	gitQuiet(t)
 	dir, env := newProject(t)
 	remote := filepath.Join(t.TempDir(), "remote.git")
 	git := func(d string, args ...string) string {

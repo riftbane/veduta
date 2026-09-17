@@ -29,6 +29,7 @@ func TestReleaseEngineArm64(t *testing.T) {
 	t.Setenv("GIT_AUTHOR_EMAIL", "t@example.com")
 	t.Setenv("GIT_COMMITTER_NAME", "t")
 	t.Setenv("GIT_COMMITTER_EMAIL", "t@example.com")
+	gitQuiet(t)
 
 	dir := t.TempDir()
 	write := func(name, body string) {
