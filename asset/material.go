@@ -39,6 +39,9 @@ func ParseMaterial(file string, data []byte) (*Material, error) {
 // CompileMaterial validates src and returns the compiled material called name. Every
 // problem is reported, located through loc (nil reports positions as unknown), in one
 // Errors value. The "veduta" header is checked by Decode, not here.
+// MaxGrid is the most columns or rows of frames a material's grid may have.
+const MaxGrid = 256
+
 func CompileMaterial(name string, src *MaterialSource, loc *Locator) (*Material, error) {
 	c := NewChecker(ensureLoc(loc))
 	if err := ValidName(name); err != nil {
@@ -68,6 +71,21 @@ func CompileMaterial(name string, src *MaterialSource, loc *Locator) (*Material,
 	m.Cull = cull
 	filter, _ := gfx.ParseFilter(c.Enum("filter", src.Filter, materialFilters, "bilinear"))
 	m.Filter = filter
+	if src.Grid != nil {
+		switch {
+		case len(src.Grid) != 2:
+			c.Errorf("grid", "must be [columns, rows]")
+		case src.Texture == "":
+			c.Errorf("grid", "needs a texture to cut into frames")
+		default:
+			for i, n := range src.Grid {
+				if n < 1 || n > MaxGrid {
+					c.Errorf(Path("grid", i), "%d out of range [1, %d]", n, MaxGrid)
+				}
+			}
+			m.Grid = [2]int{src.Grid[0], src.Grid[1]}
+		}
+	}
 	if err := c.Err(); err != nil {
 		return nil, err
 	}

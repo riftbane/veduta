@@ -22,6 +22,7 @@
 ---@field model string? a model asset's name
 ---@field material string? a material asset's name
 ---@field layer integer the first key of the draw order
+---@field frame integer the frame of its material's grid (a sprite sheet), from 0; wraps around
 ---@field parent veduta.Entity? the parent; set it to an entity, an entity's name or nil
 ---@field hitbox number[][]? {{min x, y, z}, {max x, y, z}} in the entity's own space, or nil
 ---@field state table your own values; the trace records them as state.<key>
@@ -171,6 +172,7 @@ function scene.entities() end
 ---@field tags? string[]
 ---@field visible? boolean
 ---@field layer? integer
+---@field frame? integer the frame of a sprite sheet material
 ---@field parent? veduta.Entity|string an entity or an entity's name
 ---@field hitbox? number[][] {{min x, y, z}, {max x, y, z}}
 ---@field state? table merged into the kind's

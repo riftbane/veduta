@@ -30,6 +30,7 @@ model that name none. A part that ends up with no material uses the default mate
 | `cutoff` | number | `0.5` | Alpha threshold for `cutout`, in the range (0, 1] (greater than 0, at most 1). Only allowed when `alpha` is `"cutout"`; setting it with any other `alpha` is an error. |
 | `cull` | string | `"back"` | `back`: faces seen from behind (clockwise on screen) are not drawn. `none`: both sides are drawn — use for thin, two-sided geometry such as planes, leaves and flags. |
 | `filter` | string | `"bilinear"` | Texture sampling: `bilinear` (smooth) or `nearest` (sharp texels, for pixel art). The mip level is chosen per triangle from the UV derivatives in both cases. |
+| `grid` | `[columns, rows]` | none | The texture is a sprite sheet of equal frames, 1 to 256 columns and rows; an entity's `frame` (from 0, left to right then top to bottom, wrapping around) picks the one drawn: the model's texture coordinates are scaled into that cell. Needs `texture`. Give sheets `"mipmaps": false` and `"filter": "nearest"`, so neighbouring frames never bleed in. |
 
 Enumerated values are lowercase and case-sensitive. An absent field and an empty string
 both mean "use the default".

@@ -80,6 +80,9 @@ type xform struct {
 	unlit   bool
 	light   gmath.Vec3
 	ambient gmath.Vec3
+	// uvMap is set when the command maps texture coordinates to uv×uvScale + uvOffset.
+	uvMap             bool
+	uvScale, uvOffset gmath.Vec2
 }
 
 // cmdSrc is the validated geometry of a command and the frame-wide index of its first
@@ -154,12 +157,15 @@ func (c *core) setup(dl *gfx.DrawList) error {
 		c.cmds = append(c.cmds, cs)
 		c.stats.Commands++
 		c.xforms = append(c.xforms, xform{
-			mvp:     view.Proj.Mul(view.View).Mul(cmd.Model),
-			nrm:     cmd.Model.NormalMatrix(),
-			color:   cmd.Color.XYZ(),
-			unlit:   cmd.Unlit || view.Overlay,
-			light:   dl.Light.Color,
-			ambient: dl.Light.Ambient,
+			mvp:      view.Proj.Mul(view.View).Mul(cmd.Model),
+			nrm:      cmd.Model.NormalMatrix(),
+			color:    cmd.Color.XYZ(),
+			unlit:    cmd.Unlit || view.Overlay,
+			light:    dl.Light.Color,
+			ambient:  dl.Light.Ambient,
+			uvMap:    cmd.UVScale != (gmath.Vec2{}),
+			uvScale:  cmd.UVScale,
+			uvOffset: cmd.UVOffset,
 		})
 		c.srcs = append(c.srcs, cmdSrc{verts: verts, idx: idx, first: total})
 		total += len(idx) / 3
@@ -273,7 +279,12 @@ func (c *core) vertex(ch *setupCtx, i uint32, verts []gfx.Vertex, x *xform) *cve
 			Z: col.Z * (x.ambient.Z + float32(x.light.Z*d)),
 		}
 	}
-	v.a = [nattr]float32{src.UV.X, src.UV.Y, col.X, col.Y, col.Z, n.X, n.Y, n.Z}
+	u, uv := src.UV.X, src.UV.Y
+	if x.uvMap { // one frame of a sheet; products rounded so arm64 cannot fuse them
+		u = float32(u*x.uvScale.X) + x.uvOffset.X
+		uv = float32(uv*x.uvScale.Y) + x.uvOffset.Y
+	}
+	v.a = [nattr]float32{u, uv, col.X, col.Y, col.Z, n.X, n.Y, n.Z}
 	v.edge = true
 	return v
 }

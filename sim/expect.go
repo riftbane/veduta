@@ -87,6 +87,9 @@ func summaryDoc(s *scene.Scene, e *scene.Entity) (any, error) {
 	if err := dec.Decode(&doc); err != nil {
 		return nil, err
 	}
+	if m, ok := doc.(map[string]any); ok && m["frame"] == nil {
+		m["frame"] = 0.0 // the trace leaves frame 0 out
+	}
 	return doc, nil
 }
 

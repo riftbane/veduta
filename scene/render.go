@@ -257,6 +257,9 @@ func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 			if mat.Texture != "" {
 				cmd.Texture = res.Textures[mat.Texture]
 			}
+			if g := mat.Grid; g[0] > 0 && g[1] > 0 {
+				cmd.UVScale, cmd.UVOffset = FrameUV(g, e.Frame)
+			}
 			cmds = append(cmds, pending{cmd: cmd, layer: e.Layer, blend: mat.Alpha == "blend", dist: dist, id: e.ID, part: pi})
 		}
 	}
@@ -294,6 +297,18 @@ func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 			AddBoxLines(dl, view, e.AABB, color)
 		}
 	}
+}
+
+// FrameUV returns the texture coordinate scale and offset that show frame f of a grid of
+// frames (columns, rows), counted left to right, top to bottom, from 0 and wrapping
+// around, negative frames included.
+func FrameUV(grid [2]int, f int) (scale, offset gmath.Vec2) {
+	n := grid[0] * grid[1]
+	if f %= n; f < 0 {
+		f += n
+	}
+	sx, sy := 1/float32(grid[0]), 1/float32(grid[1])
+	return gmath.V2(sx, sy), gmath.V2(float32(f%grid[0])*sx, float32(f/grid[0])*sy)
 }
 
 // AddBoxLines appends the 12 edges of box b as debug lines (not depth tested).

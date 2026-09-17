@@ -584,6 +584,13 @@ func (g *Game) spawn(vm *lua.VM, args []lua.Value) []lua.Value {
 			e.Tags = append(e.Tags, tag)
 		}
 	}
+	if v := t.GetString("frame"); !v.IsNil() {
+		n, ok := v.Int()
+		if !ok || n < math.MinInt32 || n > math.MaxInt32 {
+			vm.Errorf("scene.spawn: frame must be an integer")
+		}
+		e.Frame = int(n)
+	}
 	if v := t.GetString("parent"); !v.IsNil() {
 		e.Parent = g.toEntity(vm, v, "scene.spawn: parent").ID
 	}
@@ -609,7 +616,7 @@ func (g *Game) spawn(vm *lua.VM, args []lua.Value) []lua.Value {
 
 // installEntity builds the metatable of entity values.
 // EntityFields are the fields of an entity, in the order a debugger shows them.
-var EntityFields = []string{"id", "name", "kind", "alive", "x", "y", "z", "visible", "model", "material", "layer", "parent", "hitbox", "state"}
+var EntityFields = []string{"id", "name", "kind", "alive", "x", "y", "z", "visible", "model", "material", "layer", "frame", "parent", "hitbox", "state"}
 
 func (g *Game) installEntity() {
 	ent := func(vm *lua.VM, args []lua.Value, fname string) *scene.Entity {
@@ -752,6 +759,8 @@ func (g *Game) installEntity() {
 			return vm.Ret(optString(e.Material))
 		case "layer":
 			return vm.Ret(lua.Int(int64(e.Layer)))
+		case "frame":
+			return vm.Ret(lua.Int(int64(e.Frame)))
 		case "parent":
 			if e.Parent == 0 {
 				return vm.Ret(lua.Nil)
@@ -808,6 +817,12 @@ func (g *Game) installEntity() {
 				vm.Errorf("entity.layer must be an integer")
 			}
 			e.Layer = int(n)
+		case "frame":
+			n, ok := v.Int()
+			if !ok || n < math.MinInt32 || n > math.MaxInt32 {
+				vm.Errorf("entity.frame must be an integer")
+			}
+			e.Frame = int(n)
 		case "parent":
 			var p *scene.Entity
 			if !v.IsNil() {
@@ -834,7 +849,7 @@ func (g *Game) installEntity() {
 		case "id", "name", "kind", "alive":
 			vm.Errorf("entity.%s cannot be changed", key)
 		default:
-			vm.Errorf("entity has no field '%s' (entities have x, y, z, visible, model, material, layer, parent, hitbox and state; keep your own values in state)", key)
+			vm.Errorf("entity has no field '%s' (entities have x, y, z, visible, model, material, layer, frame, parent, hitbox and state; keep your own values in state)", key)
 		}
 		return nil
 	})))

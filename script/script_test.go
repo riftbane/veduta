@@ -586,3 +586,58 @@ end
 		t.Fatalf("render: exit %d %+v %s", code, r, stderr)
 	}
 }
+
+// TestSpriteSheet: a material with a grid shows the frame its entity names, wrapping around,
+// and the trace and scenarios see the frame.
+func TestSpriteSheet(t *testing.T) {
+	files := map[string]string{
+		"assets/textures/sheet.tex.json": `{"veduta": "texture/1", "size": [16, 8], "mipmaps": false, "layers": [
+			{"type": "rect", "xy": [0, 0], "size": [4, 4], "color": "#ff0000"},
+			{"type": "rect", "xy": [4, 0], "size": [4, 4], "color": "#00ff00"},
+			{"type": "rect", "xy": [8, 0], "size": [4, 4], "color": "#0000ff"},
+			{"type": "rect", "xy": [12, 0], "size": [4, 4], "color": "#ffffff"},
+			{"type": "rect", "xy": [0, 4], "size": [16, 4], "color": "#ffff00"}]}`,
+		"assets/materials/sheet.mat.json": `{"veduta": "material/1", "texture": "sheet", "grid": [4, 2], "unlit": true, "filter": "nearest"}`,
+		"main.lua": `+
+local init = game.init
+function game.init()
+  init()
+  for i, f in ipairs({2, 9, -1, 4, 0}) do -- 9 wraps to 1, -1 to 7
+    scene.spawn{name = "s" .. i, model = "quad", material = "sheet", frame = f,
+      position = {-6 + 3 * (i - 1), -3, 5}, scale = {2, 2, 1}}
+  end
+end
+kinds.hero.update = function(e)
+  local s = scene.find("s5")
+  s.frame = s.frame + 1
+end
+`,
+		"tests/scenarios/sheet.scenario.json": `{"veduta": "scenario/1", "scene": "main", "ticks": 3,
+			"expect": [{"tick": 3, "entity": "s5", "path": "frame", "op": "==", "value": 3},
+			           {"tick": 0, "entity": "s1", "path": "frame", "op": "==", "value": 2},
+			           {"tick": 3, "entity": "hero", "path": "frame", "op": "==", "value": 0}]}`,
+	}
+	dir := copyGame(t, files)
+	out := filepath.Join(t.TempDir(), "frame.png")
+	if r, stderr, code := run(t, dir, "render", "--out", out); code != 0 {
+		t.Fatalf("exit %d %+v %s", code, r, stderr)
+	}
+	f, _ := os.Open(out)
+	img, err := png.Decode(f)
+	f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The frame is 320×240 and 12 units high: x = 160 + 20·wx, y = 120 − 20·wy.
+	for i, want := range []string{"#0000ff", "#00ff00", "#ffff00", "#ffff00", "#ff0000"} {
+		x, y := 160+20*(-6+3*i), 120+20*3
+		r, g, b, _ := img.At(x, y).RGBA()
+		if got := fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8); got != want {
+			t.Errorf("sprite %d at (%d, %d) is %s, want %s", i+1, x, y, got, want)
+		}
+	}
+	scenario := filepath.Join(dir, "tests", "scenarios", "sheet.scenario.json")
+	if r, stderr, code := run(t, dir, "simulate", "--scenario", scenario, "--out", t.TempDir()); code != 0 || r.Verdict != "pass" {
+		t.Fatalf("scenario: exit %d %+v %s", code, r, stderr)
+	}
+}

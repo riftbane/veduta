@@ -213,6 +213,9 @@ type DrawCmd struct {
 	Unlit   bool    // ignore the light: color = texel × Color
 	Cutoff  float32 // alpha test: discard fragments with alpha < Cutoff (0 disables)
 	ID      uint32  // entity id written to the ID buffer (0 = none)
+	// UVScale and UVOffset map the mesh's texture coordinates to uv×UVScale + UVOffset:
+	// one frame of a sprite sheet. A zero UVScale leaves them as they are.
+	UVScale, UVOffset gmath.Vec2
 }
 
 // DebugLine is a 3D line drawn after all triangles, one pixel wide.

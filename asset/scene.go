@@ -24,6 +24,8 @@ var (
 const (
 	MinLayer = -1000
 	MaxLayer = 1000
+	// MaxFrame is the highest frame an entity may name (a 256 × 256 grid's last).
+	MaxFrame = MaxGrid*MaxGrid - 1
 )
 
 // BuiltinKinds are the entity kinds the engine provides without registration.
@@ -181,6 +183,7 @@ func compileEntities(c *Checker, src []EntitySource, what string) []Entity {
 		}
 		ent.Hitbox = compileHitbox(c, Path(p, "hitbox"), e.Hitbox)
 		ent.Layer = c.Int(Path(p, "layer"), e.Layer, MinLayer, MaxLayer, 0)
+		ent.Frame = c.Int(Path(p, "frame"), e.Frame, 0, MaxFrame, 0)
 		if len(e.Tags) > 0 {
 			ent.Tags = make([]string, 0, len(e.Tags))
 			for k, tag := range e.Tags {

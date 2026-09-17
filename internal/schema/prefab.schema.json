@@ -6,6 +6,10 @@
       "additionalProperties": false,
       "description": "EntitySource is one entity of a scene.",
       "properties": {
+        "frame": {
+          "description": "the frame of a material's grid it shows, from 0",
+          "type": "integer"
+        },
         "hitbox": {
           "description": "Hitbox is [[minx, miny, minz], [maxx, maxy, maxz]] in the entity's local space.",
           "items": {

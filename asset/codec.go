@@ -517,6 +517,8 @@ func EncodeMaterial(m *Material) Chunk {
 	w.f32(m.Cutoff)
 	w.u8(uint8(m.Cull))
 	w.u8(uint8(m.Filter))
+	w.u32(uint32(m.Grid[0]))
+	w.u32(uint32(m.Grid[1]))
 	return Chunk{Type: ChunkMaterial, Data: w.b}
 }
 
@@ -543,6 +545,11 @@ func DecodeMaterial(c Chunk) (*Material, error) {
 		r.failf("cull %d or filter %d out of range", cull, filter)
 	}
 	m.Cull, m.Filter = gfx.CullMode(cull), gfx.Filter(filter)
+	r.field = "grid"
+	m.Grid = [2]int{int(r.u32()), int(r.u32())}
+	if r.err == nil && ((m.Grid[0] == 0) != (m.Grid[1] == 0) || m.Grid[0] > MaxGrid || m.Grid[1] > MaxGrid) {
+		r.failf("grid %v out of range", m.Grid)
+	}
 	if err := r.done(); err != nil {
 		return nil, err
 	}
@@ -601,7 +608,7 @@ func DecodeScene(c Chunk) (*Scene, error) {
 }
 
 // entitySize is the smallest encoding of an entity (every string and list empty).
-const entitySize = 4*4 + 36 + 4 + 4 + 1 + 1 + 8
+const entitySize = 4*4 + 36 + 4 + 4 + 1 + 1 + 8 + 4
 
 func (w *wbuf) u64(v uint64) { w.b = binary.LittleEndian.AppendUint64(w.b, v) }
 
@@ -634,6 +641,7 @@ func (w *wbuf) entities(ents []Entity) {
 			w.vec3(e.Hitbox.Max)
 		}
 		w.i64(e.Layer)
+		w.u32(uint32(e.Frame))
 	}
 }
 
@@ -668,6 +676,9 @@ func (r *rbuf) entities() []Entity {
 		}
 		if e.Layer = r.i64(); r.err == nil && (e.Layer < MinLayer || e.Layer > MaxLayer) {
 			r.failf("layer %d out of range [%d, %d]", e.Layer, MinLayer, MaxLayer)
+		}
+		if e.Frame = int(r.u32()); r.err == nil && e.Frame > MaxFrame {
+			r.failf("frame %d out of range [0, %d]", e.Frame, MaxFrame)
 		}
 	}
 	r.field = field

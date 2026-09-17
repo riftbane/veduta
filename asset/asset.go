@@ -22,7 +22,7 @@ import (
 
 // CompilerVersion is stored in every .vda META chunk; changing it invalidates cooked
 // assets.
-const CompilerVersion = "veduta-asset/0.4.0"
+const CompilerVersion = "veduta-asset/0.5.0"
 
 // Source format headers (the value of the "veduta" field).
 const (
@@ -225,6 +225,7 @@ type Material struct {
 	Cutoff  float32
 	Cull    gfx.CullMode
 	Filter  gfx.Filter
+	Grid    [2]int // columns and rows of frames in the texture; 0, 0 for a single image
 }
 
 // DefaultMaterial is used when neither the model part nor the entity names a material.
@@ -282,6 +283,7 @@ type Entity struct {
 	Visible     bool
 	Hitbox      *gmath.AABB // local-space collision box replacing the model bounds; nil for none
 	Layer       int         // draw order: lower layers are drawn first
+	Frame       int         // the frame of its material's grid, from 0
 }
 
 // Prefab is a compiled prefab: a group of entities placed as one structure in a world

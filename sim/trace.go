@@ -143,6 +143,9 @@ func Summary(s *scene.Scene, e *scene.Entity) map[string]any {
 	if !e.AABB.IsEmpty() {
 		m["aabb"] = map[string]any{"min": e.AABB.Min, "max": e.AABB.Max}
 	}
+	if e.Frame != 0 { // left out at 0, so traces without sprite sheets keep their hashes
+		m["frame"] = e.Frame
+	}
 	if e.State != nil {
 		m["state"] = e.State
 	}

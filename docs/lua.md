@@ -98,6 +98,7 @@ An entity is a value with fields and methods. The same entity is always the same
 | `visible` | drawn or not |
 | `model`, `material` | asset names, or nil |
 | `layer` | first key of the draw order |
+| `frame` | the frame shown when the material has a `grid` (a sprite sheet): an integer from 0, left to right then top to bottom, wrapping around the grid's frames. Animate with `e.frame = engine.tick // 4 % 6` |
 | `parent` | the parent entity, or nil; set it to an entity (or its name) or nil. The position, rotation and scale are relative to the parent, so an entity given a parent moves with it from then on |
 | `hitbox` | `{{min x, y, z}, {max x, y, z}}` in the entity's own space, or nil: replaces the model's bounds for collisions, as a scene file's `hitbox` |
 | `state` | a table of your own values; the trace records it as `state.<key>`, so scenarios can check it (`state.score`). Entities of a Lua kind start with an empty one. |
@@ -127,7 +128,7 @@ Setting any other field is an error: keep your own values in `state`.
 | `scene.find(name)` | the entity, or nil |
 | `scene.tagged(tag)` | a list of entities, in id order |
 | `scene.entities()` | every live entity, in id order |
-| `scene.spawn{...}` | adds an entity and returns it; fields `kind` (default `static`), `name`, `model`, `material`, `position`, `rotation` (degrees), `scale` (each `{x, y, z}`), `tags` (a list), `visible`, `layer`, `parent` (an entity or a name), `hitbox` (`{{min}, {max}}`), `state` (a table merged into the kind's) |
+| `scene.spawn{...}` | adds an entity and returns it; fields `kind` (default `static`), `name`, `model`, `material`, `position`, `rotation` (degrees), `scale` (each `{x, y, z}`), `tags` (a list), `visible`, `layer`, `frame`, `parent` (an entity or a name), `hitbox` (`{{min}, {max}}`), `state` (a table merged into the kind's) |
 | `scene.spawn_prefab(name, x, y, z [, rotation [, prefix]])` | adds the entities of `assets/prefabs/<name>.prefab.json` with the min corner of its footprint at (x, y, z), turned by `rotation` (0, 90, 180 or 270 degrees about +Y) as a world places it, named `<prefix>_<entity>` (prefix defaults to the prefab's name) and parented as the prefab says. Returns a table listing them in prefab order that also holds each under its name in the prefab (`house.door`) |
 | `scene.load(name)` | replaces the scene, as a reset |
 

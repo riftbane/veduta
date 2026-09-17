@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Sprite sheets: a material's `grid` ([columns, rows]) cuts its texture into frames, and an
+  entity's `frame` (scene files, `Entity.Frame`, `e.frame` and `scene.spawn{frame=}` in Lua)
+  picks the one drawn, wrapping around. The renderer maps the model's texture coordinates
+  into the frame's cell per draw command (`DrawCmd.UVScale`, `UVOffset`). The trace records
+  `frame` when it is not 0, so existing traces keep their hashes; scenarios read it as
+  `frame`. `.vda` compiler version 0.5.0.
 - The built-in font draws Latin-1 (à è é ì ò ù ç ñ ä ö ü ß, « », £, ©, …) and Windows-1252's
   extra characters (€, ‘ ’ “ ”, – —, …, ™): 224 glyphs in a 128×112 atlas. Accented capitals
   stay on the baseline under a one-row accent; `Font.Cells` maps the Unicode code points of

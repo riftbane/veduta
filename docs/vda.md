@@ -45,12 +45,12 @@ escaping, `deps` sorted without duplicates and `[]` when empty. Readers reject M
 is not byte-for-byte canonical, so equal metadata always has equal bytes.
 
 ```json
-{"compiler":"veduta-asset/0.4.0","deps":[],"kind":"model","name":"crate","source":"models/crate.model.json","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
+{"compiler":"veduta-asset/0.5.0","deps":[],"kind":"model","name":"crate","source":"models/crate.model.json","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
 ```
 
 | Key | Meaning |
 |-----|---------|
-| `compiler` | Compiler version (`asset.CompilerVersion`: `veduta-asset/0.4.0` since model levels of detail and world terrain and vegetation, `veduta-asset/0.3.0` since prefabs and worlds, `veduta-asset/0.2.0` since scene entities carry a hitbox and a layer, `veduta-asset/0.1.0` before). A different version forces a recompile. |
+| `compiler` | Compiler version (`asset.CompilerVersion`: `veduta-asset/0.5.0` since material grids and entity frames, `veduta-asset/0.4.0` since model levels of detail and world terrain and vegetation, `veduta-asset/0.3.0` since prefabs and worlds, `veduta-asset/0.2.0` since scene entities carry a hitbox and a layer, `veduta-asset/0.1.0` before). A different version forces a recompile. |
 | `deps` | Other input files the compiled output depends on besides the source (for example the PNG of a texture `image` layer), as paths relative to the assets directory. |
 | `kind` | `model`, `texture`, `material`, `scene`, `prefab` or `world`. |
 | `name` | Asset name (the source file name without its suffix). |
@@ -139,6 +139,7 @@ are 1 to 16777216 when levels > 0 and both 0 when levels = 0; wrap is 0 or 1.
 | 6 | cutoff | `f32` | alpha threshold used by `cutout` |
 | 7 | cull | `u8` | `0` = back, `1` = none |
 | 8 | filter | `u8` | `0` = bilinear, `1` = nearest |
+| 9 | grid | `u32` × 2 | columns and rows of frames in the texture, each 1 to 256, or both 0 for none |
 
 ## `SCEN` — compiled scene
 
@@ -162,7 +163,7 @@ entity = `str` name, `str` kind, `str` model (`""` for none), `str` material (`"
 none), `vec3` position, `vec3` rotation_deg, `vec3` scale, `list<str>` tags, `str` parent
 (`""` for none), `bool` visible, `bool` has_hitbox, then only when has_hitbox is true
 `aabb` hitbox (local space, min <= max on every axis; readers reject any other box), then
-`i64` layer (in [-1000, 1000]).
+`i64` layer (in [-1000, 1000]), `u32` frame (in [0, 65535]).
 
 ## `PRFB` — compiled prefab
 

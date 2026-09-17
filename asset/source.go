@@ -90,6 +90,7 @@ type MaterialSource struct {
 	Cutoff  *float32 `json:"cutoff,omitempty"` // cutout threshold, default 0.5
 	Cull    string   `json:"cull,omitempty"`   // back (default), none
 	Filter  string   `json:"filter,omitempty"` // bilinear (default), nearest
+	Grid    []int    `json:"grid,omitempty"`   // [columns, rows]: the texture is a sheet of frames
 }
 
 // SceneSource is assets/scenes/<name>.scene.json.
@@ -134,6 +135,7 @@ type EntitySource struct {
 	// Hitbox is [[minx, miny, minz], [maxx, maxy, maxz]] in the entity's local space.
 	Hitbox [][]float32 `json:"hitbox,omitempty"`
 	Layer  int         `json:"layer,omitempty"` // draw order, -1000..1000, default 0
+	Frame  int         `json:"frame,omitempty"` // the frame of a material's grid it shows, from 0
 }
 
 // ScenarioSource is tests/scenarios/<name>.scenario.json.

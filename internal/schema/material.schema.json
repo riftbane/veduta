@@ -36,6 +36,13 @@
       ],
       "type": "string"
     },
+    "grid": {
+      "description": "[columns, rows]: the texture is a sheet of frames",
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
     "texture": {
       "description": "texture name",
       "type": "string"

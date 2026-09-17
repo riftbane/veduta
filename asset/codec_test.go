@@ -141,8 +141,12 @@ func (g *gen) texture() *Texture {
 }
 
 func (g *gen) material() *Material {
-	return &Material{Name: g.s(), Albedo: g.r.Uint32(), Texture: g.s(), Unlit: g.b(),
+	m := &Material{Name: g.s(), Albedo: g.r.Uint32(), Texture: g.s(), Unlit: g.b(),
 		Alpha: materialAlphas[g.n(2)], Cutoff: g.f(), Cull: gfx.CullMode(g.n(1)), Filter: gfx.Filter(g.n(1))}
+	if g.b() {
+		m.Grid = [2]int{g.n(MaxGrid-1) + 1, g.n(MaxGrid-1) + 1}
+	}
+	return m
 }
 
 func (g *gen) scene() *Scene {
@@ -160,6 +164,7 @@ func (g *gen) scene() *Scene {
 				s.Entities[i].Hitbox = &gmath.AABB{Min: lo, Max: lo.Add(gmath.V3(1, 0, 2))}
 			}
 			s.Entities[i].Layer = g.n(MaxLayer-MinLayer) + MinLayer
+			s.Entities[i].Frame = g.n(MaxFrame)
 		}
 	}
 	return s
@@ -343,6 +348,8 @@ func TestDecodeMaterialValidation(t *testing.T) {
 		"alpha":  {Alpha: "glass"},
 		"cull":   {Alpha: "opaque", Cull: 2},
 		"filter": {Alpha: "opaque", Filter: 9},
+		"grid":   {Alpha: "opaque", Grid: [2]int{3, 0}},
+		"big":    {Alpha: "opaque", Grid: [2]int{MaxGrid + 1, 1}},
 	} {
 		if _, err := DecodeMaterial(EncodeMaterial(m)); err == nil {
 			t.Errorf("%s: accepted", name)

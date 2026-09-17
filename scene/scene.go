@@ -57,6 +57,9 @@ type Entity struct {
 	// aabb). An entity without a model gets an AABB from its hitbox alone.
 	Hitbox *gmath.AABB
 	// Layer is the first key of the draw order: lower layers are drawn first. Within a
+	// Frame picks the frame shown when the entity's material has a grid (a sprite sheet),
+	// counted left to right, top to bottom, from 0; it wraps around the grid's frames.
+	Frame int
 	// layer, opaque parts are drawn in id order, then blended parts back to front. Opaque
 	// and cutout parts write depth, so among them the nearest is in front whatever the
 	// layer. Blended parts write none: the layer decides which blended surface covers
@@ -152,6 +155,7 @@ func Load(src *asset.Scene, bounds BoundsFunc) (*Scene, error) {
 			Visible:  a.Visible,
 			Hitbox:   cloneBox(a.Hitbox),
 			Layer:    a.Layer,
+			Frame:    a.Frame,
 		}
 		s.nextID++
 		s.add(e)
