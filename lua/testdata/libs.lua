@@ -143,6 +143,8 @@ show("math tointeger", math.tointeger(3.0), math.tointeger(3.5), math.tointeger(
 show("math type", math.type(1), math.type(1.0), math.type("1"))
 show("math ult", math.ult(1, -1), math.ult(-1, 1))
 show("math sqrt", math.sqrt(16), math.sqrt(2))
+show("math deg rad", math.deg(math.pi), math.rad(180), math.deg(1), math.rad(-90), math.deg(0))
+try("math deg string", math.deg, "x")
 show("math exp log", math.exp(0), math.log(1), math.log(8, 2), math.log(100, 10), math.log(1000, 10))
 show("math trig", math.sin(0), math.cos(0), math.atan(1, 1) * 4 == math.pi, math.atan(0, -1) == math.pi)
 show("math pow", 2^0.5 == math.sqrt(2), 10^2, (-8)^(1/3) ~= (-8)^(1/3))

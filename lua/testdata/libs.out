@@ -89,6 +89,8 @@ math tointeger	3 | nil | 8 | nil
 math type	integer | float | nil
 math ult	true | false
 math sqrt	4.0f | 1.4142135623731f
+math deg rad	180.0f | 3.1415926535898f | 57.295779513082f | -1.5707963267949f | 0.0f
+math deg string	error: bad argument #1 to 'math.deg' (number expected, got string)
 math exp log	1.0f | 0.0f | 3.0f | 2.0f | 3.0f
 math trig	0.0f | 1.0f | true | true
 math pow	true | 100.0f | true
@@ -106,12 +108,12 @@ concat meta	10,20,30
 unpack meta	10 | 20 | 30
 select	0 | 2 | b | c
 select neg	b | c
-err from lua	error: libs.lua:177: bad argument #1 to 'char' (value out of range)
-err method	error: libs.lua:178: bad argument #1 to 'rep' (number expected, got no value)
-err self	error: libs.lua:179: bad argument #1 to 'rep' (string expected, got no value)
-err global	error: libs.lua:180: bad argument #1 to 'setmetatable' (table expected, got number)
+err from lua	error: libs.lua:179: bad argument #1 to 'char' (value out of range)
+err method	error: libs.lua:180: bad argument #1 to 'rep' (number expected, got no value)
+err self	error: libs.lua:181: bad argument #1 to 'rep' (string expected, got no value)
+err global	error: libs.lua:182: bad argument #1 to 'setmetatable' (table expected, got number)
 err direct	error: bad argument #1 to 'setmetatable' (table expected, got number)
-err level2	error: libs.lua:182: lvl
-err concat	error: libs.lua:183: invalid value (table) at index 1 in table for 'concat'
-err index	error: libs.lua:184: attempt to index a nil value (field 'y')
-err call field	error: libs.lua:185: attempt to call a nil value (field 'nope')
+err level2	error: libs.lua:184: lvl
+err concat	error: libs.lua:185: invalid value (table) at index 1 in table for 'concat'
+err index	error: libs.lua:186: attempt to index a nil value (field 'y')
+err call field	error: libs.lua:187: attempt to call a nil value (field 'nope')

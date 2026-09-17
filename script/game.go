@@ -266,6 +266,10 @@ func (g *Game) Draw(ctx *veduta.Context, dl *gfx.DrawList) {
 	g.hud = nil
 }
 
+// ReplaysSnapshots marks a script game's snapshots as replays: its state is in the
+// interpreter (closures, module variables), which a snapshot cannot encode.
+func (g *Game) ReplaysSnapshots() {}
+
 // Err returns the first error a script raised in this run.
 func (g *Game) Err() error { return g.err }
 

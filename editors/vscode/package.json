@@ -2,7 +2,7 @@
   "name": "veduta",
   "displayName": "Veduta",
   "description": "Make Veduta console games: new game, play and debug (F5), test, build with errors in Problems, deploy to the console's card.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "riftbane",
   "license": "MIT",
   "repository": {

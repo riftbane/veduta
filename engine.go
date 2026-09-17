@@ -42,6 +42,7 @@ type engine struct {
 	tick       uint64
 	seed       uint64
 	recording  bool
+	replay     *snapReplay // the run so far, for a Replayer's snapshots (headless runs only)
 
 	renderer *soft.Renderer
 	res      *scene.Resources
@@ -93,6 +94,10 @@ func (e *engine) prepare(opt runOptions) error {
 	e.invSpecs = opt.Invariants
 	if e.invSpecs == nil {
 		e.invSpecs = e.project.Invariants
+	}
+	e.replay = nil
+	if _, ok := e.game.(Replayer); ok && opt.Headless {
+		e.replay = &snapReplay{Scene: opt.Scene, World: opt.World, At: opt.At, Seed: opt.Seed}
 	}
 	if st, ok := e.game.(Starter); ok {
 		if err := st.Start(&e.ctx); err != nil {
@@ -283,6 +288,9 @@ func (e *engine) tickSize() {
 
 // step runs one tick with the given input.
 func (e *engine) step(in Input) error {
+	if e.replay != nil {
+		e.replay.Inputs = append(e.replay.Inputs, in)
+	}
 	e.tick++
 	e.ctx.Tick = e.tick
 	e.tickSize()
@@ -481,10 +489,33 @@ type snapshot struct {
 	Focus   [2]int32
 	Chunks  []snapChunk
 	Structs []snapStruct
+	// A Replayer's snapshot holds only the run, and restoring plays it again.
+	Replay *snapReplay
+}
+
+// snapReplay is a run from its start: what was loaded, the seed, the input of every tick,
+// and the trace hash it reached, which the replay must reach too.
+type snapReplay struct {
+	Scene  string
+	World  string
+	At     [2]int32
+	Seed   uint64
+	Inputs []Input
+	Hash   string
 }
 
 func (e *engine) snapshot() ([]byte, error) {
 	s := e.ctx.Scene
+	if e.replay != nil {
+		r := *e.replay
+		r.Inputs = append([]Input(nil), r.Inputs...)
+		r.Hash = e.rec.Hash()
+		var out bytes.Buffer
+		if err := gob.NewEncoder(&out).Encode(&snapshot{Version: Version, Scene: s.Name, Tick: e.tick, Replay: &r}); err != nil {
+			return nil, err
+		}
+		return out.Bytes(), nil
+	}
 	snap := snapshot{Version: Version, Scene: s.Name, Tick: e.tick, RNG: e.ctx.RNG.State(), NextID: s.NextID(),
 		Contacts: e.contacts.Active(), Failing: e.monitor.FailingState()}
 	if w := e.world; w != nil {
@@ -530,6 +561,9 @@ func (e *engine) restore(data []byte, trace io.Writer) error {
 	}
 	if snap.Version != Version {
 		return fmt.Errorf("restore: snapshot is from engine %s, this is %s", snap.Version, Version)
+	}
+	if snap.Replay != nil {
+		return e.restoreReplay(snap.Replay, snap.Tick, trace)
 	}
 	var s *scene.Scene
 	e.world = nil
@@ -604,6 +638,29 @@ func (e *engine) restore(data []byte, trace io.Writer) error {
 	e.monitor.SetFailingState(snap.Failing)
 	e.rec = sim.NewRecorder(trace)
 	e.recording = true
+	return nil
+}
+
+// restoreReplay restores a Replayer's snapshot by playing its run again from the start,
+// without a trace, and checks that the run reaches the same trace hash: a different game or
+// project would not.
+func (e *engine) restoreReplay(r *snapReplay, tick uint64, trace io.Writer) error {
+	if uint64(len(r.Inputs)) != tick {
+		return fmt.Errorf("restore: snapshot at tick %d holds %d ticks of input", tick, len(r.Inputs))
+	}
+	opt := runOptions{Scene: r.Scene, World: r.World, At: r.At, Seed: r.Seed, Invariants: e.invSpecs, Headless: true}
+	if err := e.start(opt); err != nil {
+		return fmt.Errorf("restore: replaying the run: %w", err)
+	}
+	for _, in := range r.Inputs {
+		if err := e.step(in); err != nil {
+			return fmt.Errorf("restore: replaying the run: %w", err)
+		}
+	}
+	if h := e.rec.Hash(); h != r.Hash {
+		return fmt.Errorf("restore: the replayed run reached trace hash %s, the snapshot %s (the game or its assets changed since)", h, r.Hash)
+	}
+	e.rec = sim.NewRecorder(trace)
 	return nil
 }
 

@@ -293,3 +293,57 @@ func TestAPILevel(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, r.Error)
 	}
 }
+
+// TestSnapshotReplay: a script game's snapshot is its run, and restoring it plays the run
+// again, so the ticks after a restore are the ticks of an uninterrupted run: the interpreter's
+// module variables (score) and the entities' state tables included.
+func TestSnapshotReplay(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "input.json")
+	os.WriteFile(input, []byte(`[
+		{"tick": 1, "press": ["right"]}, {"tick": 20, "release": ["right"]},
+		{"tick": 21, "press": ["b", "a"]}, {"tick": 22, "release": ["b", "a"]},
+		{"tick": 30, "press": ["left"]}, {"tick": 49, "release": ["left"]}
+	]`), 0o644)
+	lines := func(file string) []string {
+		b, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.Split(strings.TrimSpace(string(b)), "\n")
+	}
+
+	snap := filepath.Join(dir, "s.snap")
+	if r, stderr, code := run(t, testGame, "snapshot", "--tick", "25", "--input", input, "--out", snap); code != 0 || !r.OK {
+		t.Fatalf("snapshot: exit %d %+v %s", code, r, stderr)
+	}
+	restored := filepath.Join(dir, "restored.jsonl")
+	if r, stderr, code := run(t, testGame, "snapshot", "--restore", snap, "--ticks", "30", "--input", input, "--out", restored); code != 0 || !r.OK {
+		t.Fatalf("restore: exit %d %+v %s", code, r, stderr)
+	}
+	whole := filepath.Join(dir, "whole")
+	if _, stderr, code := run(t, testGame, "simulate", "--scene", "main", "--ticks", "55", "--input", input, "--out", whole); code != 0 {
+		t.Fatalf("simulate: exit %d %s", code, stderr)
+	}
+	after, all := lines(restored), lines(filepath.Join(whole, "trace.jsonl"))
+	if len(after) != 30 || len(all) != 56 {
+		t.Fatalf("%d restored ticks and %d simulated, want 30 and 56", len(after), len(all))
+	}
+	for i, line := range after {
+		if line != all[26+i] {
+			t.Fatalf("tick %d after the restore differs from the uninterrupted run:\n%s\n%s", 26+i, line, all[26+i])
+		}
+	}
+	if !strings.Contains(after[len(after)-1], `"score":1`) {
+		t.Errorf("the last tick lost the score: %s", after[len(after)-1])
+	}
+
+	// A snapshot of another game does not restore.
+	other := copyGame(t, nil)
+	main := filepath.Join(other, "main.lua")
+	src, _ := os.ReadFile(main)
+	os.WriteFile(main, bytes.Replace(src, []byte("score = score + 1"), []byte("score = score + 2"), 1), 0o644)
+	if r, _, code := run(t, other, "snapshot", "--restore", snap, "--ticks", "1"); code == 0 || !strings.Contains(r.Error, "replayed run") {
+		t.Fatalf("a changed game restored: exit %d %+v", code, r)
+	}
+}

@@ -130,12 +130,20 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Snapshots of script games: `-headless snapshot` failed as soon as an entity had a Lua
+  state (`gob: type lua.Table has no exported fields`), and could not have held the
+  interpreter's variables anyway. A game that implements `veduta.Replayer`, as script games
+  do, snapshots its run (scene or world, seed, every tick's input) and restoring plays it
+  again, refusing when the replay does not reach the snapshot's trace hash.
+- `math.deg` and `math.rad` were missing from Lua's standard library; they compute as C Lua
+  5.4 does (checked against its output).
+- The VS Code extension (0.3.0) warns when the `veduta` tool is missing or is a v1, which
+  makes Go games, and links the installation page.
 - `docs/first-game.md` said the first `veduta test` records the goldens; it reports
   `golden new`, and `veduta test --update-golden` records them.
 - A new Lua game's `main.lua` pointed at `veduta docs lua`, a command that does not exist;
   it links the Lua API page.
-- `docs/lua.md` lists the standard functions the VM lacks (`math.deg`, `math.rad`, the
-  `string` packing functions).
+- `docs/lua.md` lists the standard functions the VM lacks (the `string` packing functions).
 
 ## v1.4.1 — 2026-09-16
 

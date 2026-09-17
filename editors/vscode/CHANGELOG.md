@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- A warning when the `veduta` tool is missing or is a v1 (which makes Go games), with a
+  link to the installation page.
+
 ## 0.2.0
 
 - Debugging: F5 plays the game under the debugger (`veduta dap`), Ctrl+F5 without; debug

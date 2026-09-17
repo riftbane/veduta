@@ -57,7 +57,7 @@ func openMath(vm *VM) {
 		"fmod": mathFmod, "log": mathLog, "max": mathMax, "min": mathMin, "modf": mathModf,
 		"random": mathRandom, "randomseed": mathRandomseed, "sin": mathUnary(gmath.Sin64),
 		"sqrt": mathUnary(math.Sqrt), "tan": mathUnary(gmath.Tan64), "tointeger": mathToInteger,
-		"type": mathType, "ult": mathUlt,
+		"type": mathType, "ult": mathUlt, "deg": mathUnary(mathDeg), "rad": mathUnary(mathRad),
 	})
 	lib.SetString("pi", Float(math.Pi))
 	lib.SetString("huge", Float(math.Inf(1)))
@@ -65,6 +65,13 @@ func openMath(vm *VM) {
 	lib.SetString("mininteger", Int(math.MinInt64))
 	vm.globals.SetString("math", TableValue(lib))
 }
+
+// piFloat is π as a float64 variable: C Lua divides by the double π at run time, and so must
+// these, where a constant expression would divide by Go's exact π and round differently.
+var piFloat = math.Pi
+
+func mathDeg(x float64) float64 { return x * (180 / piFloat) }
+func mathRad(x float64) float64 { return x * (piFloat / 180) }
 
 func mathUnary(f func(float64) float64) GoFunction {
 	return func(vm *VM, args []Value) []Value {

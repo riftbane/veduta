@@ -244,5 +244,10 @@ game -headless bench    --scenario F | --scene S --ticks N --seed N [--input F] 
   `slowest_tick`, and per frame `triangles` and `drawn` (submitted and rasterized) and
   `culled` and `reduced` entities (`mean`, `max`). The times are the machine's that runs it,
   not the console's.
+- `snapshot` saves the state at `--tick` and `--restore` continues from it. A script game's
+  state lives in its interpreter, which no file can hold, so its snapshot is the run itself
+  (scene or world, seed, every tick's input) and restoring plays that run again; the replay
+  must reach the snapshot's trace hash, so a snapshot of a game that has changed since is
+  refused.
 - `describe` lists registered kinds with their state fields, game invariants, whether a
   state codec is registered, scenes, render modes and camera presets.

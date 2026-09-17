@@ -77,4 +77,28 @@ function launchConfig(config, root) {
   return c;
 }
 
-module.exports = { program, playCommand, diagnostics, isGameFile, validName, launchConfig };
+// INSTALL_URL is where the warnings about the tool send a person.
+const INSTALL_URL = 'https://github.com/riftbane/veduta/wiki/Installation';
+
+// toolProblem says what is wrong with the veduta tool this extension would run, from the
+// error and output of veduta --json version, or returns null. The extension is made for
+// engine v2 (Lua games): a v1 tool, which the stable channel installs until v2.0.0 is
+// released, makes Go games and has no debugger, so it gets a warning, as does no tool at all.
+function toolProblem(err, stdout) {
+  if (err && err.code === 'ENOENT') {
+    return 'Veduta: the veduta tool is not installed, or not on PATH. Install it (beta channel), then restart VS Code.';
+  }
+  let version;
+  try {
+    version = JSON.parse(stdout).version;
+  } catch (_) {
+    return err ? `Veduta: veduta version failed: ${err.message}` : null;
+  }
+  const m = /^v(\d+)\./.exec(version || '');
+  if (m && Number(m[1]) < 2) {
+    return `Veduta: the veduta tool is ${version}, which makes Go games; this extension needs v2 (Lua games). Reinstall it from the beta channel.`;
+  }
+  return null;
+}
+
+module.exports = { program, playCommand, diagnostics, isGameFile, validName, launchConfig, toolProblem, INSTALL_URL };

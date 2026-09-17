@@ -91,6 +91,14 @@ type BehaviourFunc func(ctx *Context, e *scene.Entity, in Input)
 // Update calls f.
 func (f BehaviourFunc) Update(ctx *Context, e *scene.Entity, in Input) { f(ctx, e, in) }
 
+// Replayer is implemented by a game whose state lives where a snapshot cannot encode it: a
+// script game's interpreter, with its closures and module variables. A snapshot of such a
+// game holds the run that led to it instead (the scene or world, the seed and every tick's
+// input), and restoring it plays that run again, which determinism makes exact.
+type Replayer interface {
+	ReplaysSnapshots()
+}
+
 // StateCodec saves and restores a game's own state (everything outside the scene) for
 // snapshots. Games register one in Init with Context.RegisterState.
 type StateCodec interface {

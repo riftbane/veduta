@@ -209,6 +209,23 @@ async function activate(context) {
   if (isProject && vscode.workspace.getConfiguration('veduta').get('buildOnSave')) {
     build(true);
   }
+  checkTool();
+}
+
+// checkTool warns once per window when the veduta tool is missing or too old for this
+// extension.
+function checkTool() {
+  cp.execFile(veduta(), ['--json', 'version'], { timeout: 15000 }, (err, stdout) => {
+    const problem = v.toolProblem(err, stdout);
+    if (!problem) {
+      return;
+    }
+    vscode.window.showWarningMessage(problem, 'How to install').then((choice) => {
+      if (choice) {
+        vscode.env.openExternal(vscode.Uri.parse(v.INSTALL_URL));
+      }
+    });
+  });
 }
 
 function deactivate() {}

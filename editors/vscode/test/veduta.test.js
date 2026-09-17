@@ -52,3 +52,12 @@ test('launchConfig', () => {
   assert.deepStrictEqual(v.launchConfig({ type: 'veduta', request: 'launch', name: 'S', mode: 'scenario', scenario: 'start', project: '/other' }, '/g'),
     { type: 'veduta', request: 'launch', name: 'S', mode: 'scenario', scenario: 'start', project: '/other' });
 });
+
+test('toolProblem', () => {
+  assert.strictEqual(v.toolProblem(null, '{"version":"v2.0.0-rc.4","commit":"x"}'), null);
+  assert.strictEqual(v.toolProblem(null, '{"version":"dev"}'), null);
+  assert.strictEqual(v.toolProblem(null, '{"version":"v10.1.0"}'), null);
+  assert.match(v.toolProblem(null, '{"version":"v1.4.1"}'), /v1\.4\.1, which makes Go games/);
+  assert.match(v.toolProblem({ code: 'ENOENT' }, ''), /not installed/);
+  assert.match(v.toolProblem({ message: 'exit 2' }, 'usage'), /failed: exit 2/);
+});
