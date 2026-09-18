@@ -20,14 +20,24 @@ one.
 ### `veduta` is not recognised
 
 The installer added its folder to your user PATH, which only new terminals see. Close the
-terminal (and VS Code, whose terminals inherit its environment) and open it again.
+terminal and open a new one. In VS Code the extension (0.9.1 or later) gives its terminals
+the folder itself; with an older one, close every VS Code window and start it again.
+
+Still not found in a new terminal? Check that the folder is there and on the user PATH:
+
+```powershell
+Test-Path "$env:LOCALAPPDATA\Programs\veduta\veduta.exe"
+[Environment]::GetEnvironmentVariable('Path', 'User')
+```
+
+If the first line says `False`, install again. If the second does not list
+`...\AppData\Local\Programs\veduta`, run the installer again: it adds it.
 
 ### The Lua extension shows no completion
 
 Accept the recommendation to install **Lua** (`sumneko.lua`) when the project opens, or
 install it from the Extensions panel. The project's `.luarc.json` points it at the API
-definitions in `.veduta/lua/`. After updating the tool, run `veduta upgrade` in the
-project to refresh them.
+definitions in `.veduta/lua/`, which every build refreshes to the tool's version.
 
 ## Writing the game
 

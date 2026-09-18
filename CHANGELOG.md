@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `veduta` was not found in VS Code's terminals when VS Code had started before the
+  installer put it on PATH (a terminal inherits VS Code's PATH): the extension (0.9.1) adds
+  the tool's folder to its terminals.
 - A project set up by an older tool kept that tool's JSON schemas, so VS Code flagged new
   fields (`"map"` in a scene: "Property map is not allowed") that the engine accepts.
   `veduta build`, which the extension runs on every save, now refreshes `.veduta/` as
