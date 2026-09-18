@@ -1,6 +1,8 @@
 package tilemap
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,91 +15,29 @@ import (
 	"github.com/riftbane/veduta/v2/scene"
 )
 
-// Textures of the test map: plain colors with a mark in the top-left pixel, so an image
-// shows which way up each cell and border is drawn.
-var testTextures = map[string]string{
-	"grass": `{"veduta": "texture/1", "size": [16, 16], "layers": [{"type": "solid", "color": "#3f8f3a"},
-		{"type": "rect", "xy": [0, 0], "size": [2, 2], "color": "#204020"}]}`,
-	"water": `{"veduta": "texture/1", "size": [16, 16], "layers": [{"type": "solid", "color": "#2a6fdb"}],
-		"frames": [{"layers": [{"type": "rect", "xy": [2, 2], "size": [4, 2], "color": "#bfe0ff"}]},
-		           {"layers": [{"type": "rect", "xy": [8, 8], "size": [4, 2], "color": "#bfe0ff"}]}],
-		"clips": {"flow": {"frames": [0, 1], "fps": 2}}, "play": "flow",
-		"edge": {"priority": 20, "width": 4, "roughness": 0.6, "seed": 1}}`,
-	"sand": `{"veduta": "texture/1", "size": [16, 16], "layers": [{"type": "solid", "color": "#e3cc8a"}],
-		"edge": {"priority": 10, "width": 5, "roughness": 0.8, "seed": 3}}`,
-	"dirt": `{"veduta": "texture/1", "size": [16, 16], "layers": [{"type": "solid", "color": "#8a5a2b"}],
-		"edge": {"priority": 5, "width": 3, "roughness": 0.7, "seed": 7}}`,
-}
-
-const testMap = `{
-  "veduta": "map/1",
-  "size": [20, 18],
-  "origin": [-10, 9, 0],
-  "terrains": [
-    { "key": ".", "name": "grass", "texture": "grass", "tags": ["tillable"] },
-    { "key": "~", "name": "water", "texture": "water", "tags": ["water", "solid"] },
-    { "key": "s", "name": "sand", "texture": "sand" },
-    { "key": "d", "name": "dirt", "texture": "dirt", "tags": ["path"] }
-  ],
-  "layers": [
-    { "name": "ground", "rows": [
-      "....................",
-      "....................",
-      "..ssss..............",
-      ".ss~~sss............",
-      ".s~~~~~ss...........",
-      ".s~~~~~~s...........",
-      ".ss~~~~ss.......~...",
-      "..ss~~ss............",
-      "...ssss.............",
-      "....................",
-      "............~~~.....",
-      "...........~~~~~....",
-      "...........~~.~~....",
-      "...........~~~~~....",
-      "....................",
-      ".......~............",
-      "......~.~...........",
-      "...................."
-    ] },
-    { "name": "paths", "rows": [
-      "                    ",
-      "          d         ",
-      "          d         ",
-      "          dddddd    ",
-      "               d    ",
-      "   dd          d    ",
-      "   dd     dddddd    ",
-      "          d         ",
-      "          d         ",
-      "          d         ",
-      "          d         ",
-      "          d         ",
-      "          d         ",
-      "          d         ",
-      "          d         ",
-      "          d         ",
-      "          d         ",
-      "          d         "
-    ] }
-  ],
-  "objects": [
-    { "name": "door", "at": [10, 1], "tags": ["door"], "props": { "to": "house", "x": 3, "big": false, "f": 0.5 } },
-    { "name": "field", "at": [14, 14], "size": [4, 3], "tags": ["field"] }
-  ]
-}`
-
+// testLibrary compiles testdata/tilemap: the textures of a farm (grass, sand and water with
+// borders, water animated, a mark in the grass's top-left texel to show which way up it is
+// drawn) and the farm's map. The VS Code extension's tests read the same files.
 func testLibrary(t *testing.T) *asset.Library {
 	t.Helper()
+	dir := filepath.Join("..", "testdata", "tilemap")
 	lib := asset.NewLibrary(nil)
-	for name, src := range testTextures {
-		tx, err := texture.Parse(name+".vtex", []byte(src), texture.Options{})
+	for _, name := range []string{"grass", "water", "sand", "dirt"} {
+		src, err := os.ReadFile(filepath.Join(dir, name+".vtex"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		tx, err := texture.Parse(name+".vtex", src, texture.Options{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		lib.Textures[name] = tx
 	}
-	m, err := asset.ParseMap("farm.vmap", []byte(testMap))
+	src, err := os.ReadFile(filepath.Join(dir, "farm.vmap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := asset.ParseMap("farm.vmap", src)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,6 +88,18 @@ func TestRender(t *testing.T) {
 	m := New(lib.Maps["farm"], lib)
 	golden.Image(t, "tilemap_farm", render(t, m, lib, 0, 0, 18, 400, 360, 0))
 	golden.Image(t, "tilemap_farm_tick10", render(t, m, lib, -5, 4, 6, 320, 240, 10))
+}
+
+// TestPicture: the map composed texel by texel, as the inspector and the VS Code map editor
+// show it, at the start and when the water has moved to its second frame.
+func TestPicture(t *testing.T) {
+	lib := testLibrary(t)
+	m := New(lib.Maps["farm"], lib)
+	if w, h := m.CellSize(); w != 16 || h != 16 {
+		t.Fatalf("cell %d × %d", w, h)
+	}
+	golden.Image(t, "tilemap_farm_picture", m.Picture(0, 20))
+	golden.Image(t, "tilemap_farm_picture_tick10", m.Picture(10, 20))
 }
 
 func TestEdgeAtlas(t *testing.T) {

@@ -8,8 +8,6 @@ import (
 
 	"github.com/riftbane/veduta/v2/asset"
 	"github.com/riftbane/veduta/v2/gfx"
-	"github.com/riftbane/veduta/v2/gmath"
-	"github.com/riftbane/veduta/v2/scene"
 	"github.com/riftbane/veduta/v2/tilemap"
 )
 
@@ -149,36 +147,40 @@ func Map(ir *Renderer, name string, opt Options) (*Report, error) {
 	return rep, nil
 }
 
-// mapPicture draws the whole map from above, at most 1024 × 768 pixels and 32 pixels a
-// cell, with every object outlined.
+// mapPicture is the map's Picture (tick 0) scaled to at most 1024 × 768 pixels (up by a
+// whole factor, at most 4, when it is smaller), with every object outlined.
 func mapPicture(ir *Renderer, src *asset.Map) (*gfx.Image, error) {
-	if _, err := ir.UseMap(src.Name); err != nil {
-		return nil, err
+	m := tilemap.New(src, ir.Lib)
+	pic := m.Picture(0, 0)
+	w, h := pic.W, pic.H
+	if k := min(1024/w, 768/h, 4); k >= 1 {
+		w, h = w*k, h*k
+	} else if w*768 > h*1024 {
+		w, h = 1024, max(1, h*1024/w)
+	} else {
+		w, h = max(1, w*768/h), 768
 	}
-	defer func() { ir.statics = nil }()
-	px := max(1, min(1024/src.W, 768/src.H, 32))
-	w, h := src.W*px, src.H*px
-	t := src.Tile
-	o := src.Origin
-	center := gmath.V2(o.X+float32(float32(src.W)*t/2), o.Y-float32(float32(src.H)*t/2))
-	cam := scene.Camera2D(center, float32(src.H)*t)
-	cam.Position.Z += o.Z
-	s := scene.New("map:"+src.Name, ir.res.Bounds)
-	s.Background = 0xff101018
-	outline := func(dl *gfx.DrawList, view int) {
-		top := o.Z + 50 // lines are not depth tested: any z in view
-		for _, ob := range src.Objects {
-			x0, y0 := o.X+float32(float32(ob.X)*t), o.Y-float32(float32(ob.Y)*t)
-			x1, y1 := o.X+float32(float32(ob.X+ob.W)*t), o.Y-float32(float32(ob.Y+ob.H)*t)
-			c := []gmath.Vec3{gmath.V3(x0, y0, top), gmath.V3(x1, y0, top), gmath.V3(x1, y1, top), gmath.V3(x0, y1, top)}
-			for k := range c {
-				dl.AddLine(gfx.DebugLine{A: c[k], B: c[(k+1)%4], Color: 0xffffe040, View: view})
+	img := gfx.NewImage(w, h)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			c := pic.Pix[y*pic.H/h*pic.W+x*pic.W/w]
+			if c>>24 == 0 {
+				c = 0xff101018
 			}
+			img.Pix[y*w+x] = c
 		}
 	}
-	fb, err := ir.drawScene(s, cam, w, h, gfx.ModeColor, false, outline)
-	if err != nil {
-		return nil, err
+	cw, ch := m.CellSize()
+	px := func(cells, cell, size, out int) int { return min(cells*cell*out/size, out-1) }
+	for _, o := range src.Objects {
+		x0, y0 := px(o.X, cw, pic.W, w), px(o.Y, ch, pic.H, h)
+		x1, y1 := max(x0, px(o.X+o.W, cw, pic.W, w)-1), max(y0, px(o.Y+o.H, ch, pic.H, h)-1)
+		for x := x0; x <= x1; x++ {
+			img.Pix[y0*w+x], img.Pix[y1*w+x] = 0xffffe040, 0xffffe040
+		}
+		for y := y0; y <= y1; y++ {
+			img.Pix[y*w+x0], img.Pix[y*w+x1] = 0xffffe040, 0xffffe040
+		}
 	}
-	return fb.Image(), nil
+	return img, nil
 }

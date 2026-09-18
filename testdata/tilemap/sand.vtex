@@ -1,0 +1,2 @@
+{"veduta": "texture/1", "size": [16, 16], "layers": [{"type": "solid", "color": "#e3cc8a"}],
+  "edge": {"priority": 10, "width": 5, "roughness": 0.8, "seed": 3}}

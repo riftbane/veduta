@@ -322,52 +322,14 @@ func (m *Map) build(l, cx, cy int, name string) *asset.Model {
 	type edgeQuad struct{ x, y, shape, quarter int }
 	edgeQuads := make([][]edgeQuad, nt)
 	x0, y0 := cx*ChunkSize, cy*ChunkSize
-	at := func(x, y int) int { // terrain index + 1, 0 for empty or off the map
-		if !m.Inside(x, y) {
-			return 0
-		}
-		return int(m.cells[l][y*src.W+x])
-	}
-	prio := func(v int) int {
-		if v == 0 {
-			return -1
-		}
-		return m.draws[v-1].priority
-	}
-	var near [8]int
 	for y := y0; y < min(y0+ChunkSize, src.H); y++ {
 		for x := x0; x < min(x0+ChunkSize, src.W); x++ {
-			v := at(x, y)
-			if v > 0 {
+			if v := m.at(l, x, y); v > 0 {
 				cellQuads[v-1] = append(cellQuads[v-1], [4]int{x, y})
 			}
-			// Neighbours: N, NE, E, SE, S, SW, W, NW.
-			near = [8]int{at(x, y-1), at(x+1, y-1), at(x+1, y), at(x+1, y+1), at(x, y+1), at(x-1, y+1), at(x-1, y), at(x-1, y-1)}
-			p := prio(v)
-			for k, u := range near {
-				if u == 0 || m.draws[u-1].edge == nil || prio(u) <= p || slicesIndex(near[:k], u) >= 0 {
-					continue
-				}
-				is := func(i int) bool { return near[i] == u }
-				// Per quarter: the side above or below, the side left or right, the diagonal.
-				for q, sides := range [4][3]int{quarterNW: {0, 6, 7}, quarterNE: {0, 2, 1}, quarterSW: {4, 6, 5}, quarterSE: {4, 2, 3}} {
-					hz, vt, dg := is(sides[0]), is(sides[1]), is(sides[2])
-					shape := -1
-					switch {
-					case hz && vt:
-						shape = shapeL
-					case hz:
-						shape = shapeH
-					case vt:
-						shape = shapeV
-					case dg:
-						shape = shapeCorner
-					}
-					if shape >= 0 {
-						edgeQuads[u-1] = append(edgeQuads[u-1], edgeQuad{x, y, shape, q})
-					}
-				}
-			}
+			m.cellEdges(l, x, y, func(u, shape, quarter int) {
+				edgeQuads[u-1] = append(edgeQuads[u-1], edgeQuad{x, y, shape, quarter})
+			})
 		}
 	}
 	md := gfx.MeshData{}
@@ -418,6 +380,53 @@ func (m *Map) build(l, cx, cy int, name string) *asset.Model {
 	}
 	md.Bounds = gmath.AABB{Min: lo, Max: hi}
 	return &asset.Model{Name: name, Mesh: md, Materials: mats}
+}
+
+// at returns the terrain index + 1 of cell (x, y) of layer l, 0 for an empty cell or one off
+// the map.
+func (m *Map) at(l, x, y int) int {
+	if !m.Inside(x, y) {
+		return 0
+	}
+	return int(m.cells[l][y*m.src.W+x])
+}
+
+// priority returns the edge priority of terrain index + 1 v: -1 for an empty cell, 0 for a
+// terrain without an edge.
+func (m *Map) priority(v int) int {
+	if v == 0 {
+		return -1
+	}
+	return m.draws[v-1].priority
+}
+
+// cellEdges calls f for every border drawn in cell (x, y) of layer l, in the order of the
+// neighbours (N, NE, E, SE, S, SW, W, NW, the first of each terrain) then of the quarters
+// (NW, NE, SW, SE): u is the terrain index + 1 whose border it is, shape and quarter say
+// which image of its edge atlas.
+func (m *Map) cellEdges(l, x, y int, f func(u, shape, quarter int)) {
+	p := m.priority(m.at(l, x, y))
+	near := [8]int{m.at(l, x, y-1), m.at(l, x+1, y-1), m.at(l, x+1, y), m.at(l, x+1, y+1),
+		m.at(l, x, y+1), m.at(l, x-1, y+1), m.at(l, x-1, y), m.at(l, x-1, y-1)}
+	for k, u := range near {
+		if u == 0 || m.draws[u-1].edge == nil || m.priority(u) <= p || slicesIndex(near[:k], u) >= 0 {
+			continue
+		}
+		// Per quarter: the side above or below, the side left or right, the diagonal.
+		for q, sides := range [4][3]int{quarterNW: {0, 6, 7}, quarterNE: {0, 2, 1}, quarterSW: {4, 6, 5}, quarterSE: {4, 2, 3}} {
+			hz, vt, dg := near[sides[0]] == u, near[sides[1]] == u, near[sides[2]] == u
+			switch {
+			case hz && vt:
+				f(u, shapeL, q)
+			case hz:
+				f(u, shapeH, q)
+			case vt:
+				f(u, shapeV, q)
+			case dg:
+				f(u, shapeCorner, q)
+			}
+		}
+	}
 }
 
 func slicesIndex(s []int, v int) int {
