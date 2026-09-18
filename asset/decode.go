@@ -84,6 +84,7 @@ type frame struct {
 	array bool
 	index int
 	key   string // pending object key
+	keyed bool   // key is set: the next token is its value (a key may be "")
 	seen  map[string]bool
 }
 
@@ -124,7 +125,7 @@ func (l *Locator) index() error {
 		if f.array {
 			f.index++
 		} else {
-			f.key = ""
+			f.key, f.keyed = "", false
 		}
 	}
 	rootDone := false
@@ -145,7 +146,7 @@ func (l *Locator) index() error {
 		}
 		// An object key?
 		if len(stack) > 0 {
-			if f := stack[len(stack)-1]; !f.array && f.key == "" {
+			if f := stack[len(stack)-1]; !f.array && !f.keyed {
 				if d, ok := tok.(json.Delim); ok && d == '}' {
 					stack = stack[:len(stack)-1]
 					afterValue()
@@ -157,7 +158,7 @@ func (l *Locator) index() error {
 					return l.errAt(start, fmt.Sprintf("duplicate key %q", name))
 				}
 				f.seen[name] = true
-				f.key = name
+				f.key, f.keyed = name, true
 				l.keys = append(l.keys, keyPos{name: name, path: valuePath(), offset: start})
 				continue
 			}

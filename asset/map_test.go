@@ -134,3 +134,15 @@ func TestSceneMap(t *testing.T) {
 		}
 	}
 }
+
+// An empty key is a key like any other: it is reported, not a crash.
+func TestEmptyKey(t *testing.T) {
+	_, err := ParseMap("m.vmap", []byte(`{"veduta": "map/1", "size": [1, 1], "terrains": [{"key": ".", "name": "g", "texture": "g"}],
+		"layers": [{"name": "g", "rows": ["."]}], "objects": [{"name": "o", "at": [0, 0], "props": {"": 1}}]}`))
+	if err == nil || !strings.Contains(err.Error(), "objects[0].props.: a property name is 1-64 characters") {
+		t.Errorf("empty property name: %v", err)
+	}
+	if _, err := ParseMap("m.vmap", []byte(`{"veduta": "map/1", "a": {"": 2}}`)); err == nil || !strings.Contains(err.Error(), `unknown field`) {
+		t.Errorf("empty key in an unknown field: %v", err)
+	}
+}
