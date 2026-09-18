@@ -21,6 +21,10 @@ const DefaultOctaves = 1;
 const MaxOctaves = 8;
 const MaxCells = 4096;
 const MaxColors = 64;
+const MaxGrid = 256; // columns or rows of a grid
+const MaxFrames = 256; // frames drawn one by one
+const MaxFPS = 1000;
+const MaxPriority = 1000;
 
 const layerTypes = ['solid', 'noise', 'stripes', 'rect', 'circle', 'gradient', 'checker', 'image'];
 const blendNames = ['normal', 'multiply', 'screen', 'add'];
@@ -36,10 +40,12 @@ const layerFields = {
   circle: ['center', 'radius', 'color', 'outline'],
   gradient: ['from', 'to', 'angle_deg'],
   checker: ['cells', 'colors'],
-  image: ['path', 'fit'],
+  image: ['path', 'fit', 'rect'],
 };
 
-const textureFields = ['veduta', 'size', 'tiling', 'mipmaps', 'layers'];
+const textureFields = ['veduta', 'size', 'tiling', 'mipmaps', 'layers', 'grid', 'frames', 'clips', 'play', 'edge'];
+const clipFields = ['frames', 'fps', 'loop', 'next'];
+const edgeFields = ['priority', 'width', 'roughness', 'seed'];
 const allLayerFields = ['type', 'opacity', 'blend'].concat(...Object.values(layerFields));
 
 // ---------------------------------------------------------------- deterministic trigonometry
@@ -258,6 +264,101 @@ function wrap(i, n) {
   return i < 0 ? i + n : i;
 }
 
+// ---------------------------------------------------------------- Go's way of writing values
+// Error messages name values the way the engine's fmt does, so they read the same here.
+
+// goFloat writes x as Go's %v does: the shortest digits that read back as the same
+// float32 (bits32) or float64, in %e form below 1e-4 and from 1e+06 on.
+function goFloat(x, bits32) {
+  if (Number.isNaN(x)) {
+    return 'NaN';
+  }
+  if (!isFinite(x)) {
+    return x > 0 ? '+Inf' : '-Inf';
+  }
+  if (x === 0) {
+    return Object.is(x, -0) ? '-0' : '0';
+  }
+  let e = x.toExponential();
+  if (bits32) {
+    for (let p = 0; p < 9; p++) {
+      const t = x.toExponential(p);
+      if (Math.fround(Number(t)) === x) {
+        e = t;
+        break;
+      }
+    }
+  }
+  const m = /^(-?)(\d)(?:\.(\d+))?e([+-]\d+)$/.exec(e);
+  const neg = m[1];
+  const digits = m[2] + (m[3] || '');
+  const exp = Number(m[4]);
+  if (exp < -4 || exp >= 6) {
+    const a = Math.abs(exp);
+    return `${neg}${digits[0]}${digits.length > 1 ? '.' + digits.slice(1) : ''}e${exp < 0 ? '-' : '+'}${a < 10 ? '0' + a : a}`;
+  }
+  if (exp < 0) {
+    return `${neg}0.${'0'.repeat(-exp - 1)}${digits}`;
+  }
+  if (digits.length <= exp + 1) {
+    return neg + digits + '0'.repeat(exp + 1 - digits.length);
+  }
+  return `${neg}${digits.slice(0, exp + 1)}.${digits.slice(exp + 1)}`;
+}
+
+// goQuote writes s as Go's %q does.
+function goQuote(s) {
+  let out = '"';
+  for (const ch of String(s)) {
+    const r = ch.codePointAt(0);
+    switch (ch) {
+      case '"': out += '\\"'; continue;
+      case '\\': out += '\\\\'; continue;
+      case '\x07': out += '\\a'; continue;
+      case '\b': out += '\\b'; continue;
+      case '\f': out += '\\f'; continue;
+      case '\n': out += '\\n'; continue;
+      case '\r': out += '\\r'; continue;
+      case '\t': out += '\\t'; continue;
+      case '\v': out += '\\v'; continue;
+      default: break;
+    }
+    if (r < 0x20 || r === 0x7f) {
+      out += '\\x' + r.toString(16).padStart(2, '0');
+    } else if (r !== 0x20 && /[\p{C}\p{Z}]/u.test(ch)) {
+      out += r < 0x10000 ? '\\u' + r.toString(16).padStart(4, '0') : '\\U' + r.toString(16).padStart(8, '0');
+    } else {
+      out += ch;
+    }
+  }
+  return out + '"';
+}
+
+// utf8Length is the length of s in bytes, as Go's len counts a string.
+function utf8Length(s) {
+  let n = 0;
+  for (const ch of s) {
+    const r = ch.codePointAt(0);
+    n += r < 0x80 ? 1 : r < 0x800 ? 2 : r < 0x10000 ? 3 : 4;
+  }
+  return n;
+}
+
+// nameError says why s is not a valid asset name (asset.ValidName), or returns ''.
+function nameError(s) {
+  if (utf8Length(s) === 0 || utf8Length(s) > 64) {
+    return `name ${goQuote(s)} must be 1-64 characters`;
+  }
+  let i = 0;
+  for (const ch of s) {
+    if (!(ch >= 'a' && ch <= 'z') && !(ch >= '0' && ch <= '9') && !((ch === '_' || ch === '-') && i > 0)) {
+      return `name ${goQuote(s)} may only contain a-z, 0-9, '_' and '-' (not first)`;
+    }
+    i++;
+  }
+  return '';
+}
+
 // ---------------------------------------------------------------- source validation
 
 // parse reads the JSON text of a texture source.
@@ -277,7 +378,13 @@ function parse(text) {
 // without judging them: a source that does not compile still names the files to read.
 function deps(src) {
   const out = [];
-  for (const l of (src && Array.isArray(src.layers) ? src.layers : [])) {
+  const layers = src && Array.isArray(src.layers) ? src.layers.slice() : [];
+  for (const fr of (src && Array.isArray(src.frames) ? src.frames : [])) {
+    if (fr && Array.isArray(fr.layers)) {
+      layers.push(...fr.layers);
+    }
+  }
+  for (const l of layers) {
     if (l && l.type === 'image' && typeof l.path === 'string' && l.path !== '' && !out.includes(l.path)) {
       out.push(l.path);
     }
@@ -313,8 +420,24 @@ class check {
       return 1;
     }
     if (!(n > 0)) {
-      this.at(path, `must be a positive number, got ${v}`);
+      this.at(path, `must be a positive number, got ${goFloat(n, true)}`);
       return 1;
+    }
+    return n;
+  }
+
+  // float validates an optional float32 in [lo, hi] (asset.Checker.Float).
+  float(path, v, lo, hi, def) {
+    if (v === undefined || v === null) {
+      return def;
+    }
+    const n = this.number(path, v);
+    if (n === null) {
+      return def;
+    }
+    if (n < lo || n > hi) {
+      this.at(path, `${goFloat(n, true)} out of range [${goFloat(f(lo), true)}, ${goFloat(f(hi), true)}]`);
+      return def;
     }
     return n;
   }
@@ -440,7 +563,9 @@ class check {
 // ({w, h, data}) or to {error}.
 function validate(src, images) {
   const c = new check();
-  const spec = { w: 1, h: 1, tiling: false, mipmaps: true, layers: [] };
+  const spec = { w: 1, h: 1, tiling: false, mipmaps: true, layers: [], frames: [], grid: [0, 0], clips: [], play: '', edge: null };
+  const present = (k) => has(src, k) && src[k] !== null;
+  const sheet = present('grid') || present('frames');
   if (!has(src, 'veduta')) {
     c.at('', `missing "veduta" header (want "${HEADER}")`);
   } else if (src.veduta !== HEADER) {
@@ -476,27 +601,185 @@ function validate(src, images) {
       spec.tiling = src.tiling;
     }
   }
-  if (has(src, 'mipmaps')) {
+  // A sheet has no mipmaps unless it asks: small levels would mix its frames.
+  spec.mipmaps = !sheet;
+  if (has(src, 'mipmaps') && src.mipmaps !== null) {
     if (typeof src.mipmaps !== 'boolean') {
       c.at('mipmaps', 'must be true or false');
     } else {
       spec.mipmaps = src.mipmaps;
     }
   }
-  const layers = src.layers;
-  if (!Array.isArray(layers) || layers.length === 0) {
+  const layers = Array.isArray(src.layers) ? src.layers : [];
+  if (has(src, 'layers') && src.layers !== null && !Array.isArray(src.layers)) {
+    c.at('layers', 'must be a list of layers');
+  } else if (layers.length === 0 && !present('frames')) {
     c.at('layers', 'at least one layer is required');
   } else if (layers.length > MaxLayers) {
     c.at('layers', `${layers.length} layers, want at most ${MaxLayers}`);
   }
-  for (let i = 0; Array.isArray(layers) && i < layers.length; i++) {
-    spec.layers.push(validateLayer(c, spec, i, layers[i], images));
+  for (let i = 0; i < layers.length; i++) {
+    spec.layers.push(validateLayer(c, spec, 'layers', i, layers[i], images));
   }
+  validateSheet(c, spec, src, images);
   return { spec, errors: c.errors };
 }
 
-function validateLayer(c, spec, i, l, images) {
-  const lp = `layers[${i}]`;
+// validateSheet checks the frames of a source (a grid, or frames drawn one by one), its
+// clips and its edge, in the order asset/texture's validateSheet does.
+function validateSheet(c, spec, src, images) {
+  const present = (k) => has(src, k) && src[k] !== null;
+  const layers = Array.isArray(src.layers) ? src.layers : [];
+  let frames = 1;
+  if (present('grid') && present('frames')) {
+    c.at('frames', 'not allowed with grid: a texture\'s frames are a grid of its image or drawn one by one');
+  } else if (present('grid')) {
+    const g = src.grid;
+    if (!Array.isArray(g) || g.length !== 2) {
+      c.at('grid', 'must be [columns, rows]');
+    } else {
+      let ok = true;
+      for (let i = 0; i < 2; i++) {
+        if (typeof g[i] !== 'number' || !Number.isInteger(g[i]) || g[i] < 1 || g[i] > MaxGrid) {
+          c.at(`grid[${i}]`, `${g[i]} out of range [1, ${MaxGrid}]`);
+          ok = false;
+        }
+      }
+      if (ok) {
+        if (spec.w % g[0] !== 0 || spec.h % g[1] !== 0) {
+          c.at('grid', `${g[0]} × ${g[1]} frames do not divide the ${spec.w} × ${spec.h} pixels evenly`);
+        } else {
+          spec.grid = [g[0], g[1]];
+          frames = g[0] * g[1];
+        }
+      }
+    }
+  } else if (present('frames')) {
+    const fr = Array.isArray(src.frames) ? src.frames : [];
+    const n = fr.length;
+    if (n === 0 || n > MaxFrames) {
+      c.at('frames', `${n} frames, want 1 to ${MaxFrames}`);
+      return;
+    }
+    if (n * spec.w > MaxSize) {
+      c.at('frames', `${n} frames ${spec.w} pixels wide make a sheet of ${n * spec.w} pixels, want at most ${MaxSize}`);
+      return;
+    }
+    for (let i = 0; i < n; i++) {
+      const fp = `frames[${i}]`;
+      const one = fr[i] !== null && typeof fr[i] === 'object' && !Array.isArray(fr[i]) ? fr[i] : {};
+      for (const k of Object.keys(one)) {
+        if (k !== 'layers') {
+          c.at(`${fp}.${k}`, 'unknown field');
+        }
+      }
+      const ls = Array.isArray(one.layers) ? one.layers : [];
+      if (ls.length === 0) {
+        c.at(`${fp}.layers`, 'at least one layer is required');
+      } else if (layers.length + ls.length > MaxLayers) {
+        c.at(`${fp}.layers`, `${layers.length + ls.length} layers with the texture's own, want at most ${MaxLayers}`);
+      }
+      spec.frames.push(ls.map((l, k) => validateLayer(c, spec, `${fp}.layers`, k, l, images)));
+    }
+    spec.grid = [n, 1];
+    frames = n;
+  }
+  if (present('grid') && spec.tiling) {
+    c.at('tiling', 'a grid of frames cannot tile: its frames would repeat together (frames drawn one by one can)');
+  }
+  const clips = present('clips') && typeof src.clips === 'object' && !Array.isArray(src.clips) ? src.clips : {};
+  const names = Object.keys(clips).sort();
+  if (names.length > 0 && spec.grid[0] === 0) {
+    c.at('clips', 'need frames: a grid or frames');
+  }
+  const clipOf = (name) => (has(clips, name) && clips[name] !== null ? clips[name] : null);
+  for (const name of names) {
+    const cp = `clips.${name}`;
+    const cl = clips[name];
+    const bad = nameError(name);
+    if (bad) {
+      c.at(cp, 'clip ' + bad);
+    }
+    if (cl === null || typeof cl !== 'object' || Array.isArray(cl)) {
+      c.at(cp, 'must be an object with frames and fps');
+      continue;
+    }
+    for (const k of Object.keys(cl)) {
+      if (!clipFields.includes(k)) {
+        c.at(`${cp}.${k}`, 'unknown field');
+      }
+    }
+    const loop = cl.loop === undefined || cl.loop === null || cl.loop === true;
+    const next = typeof cl.next === 'string' ? cl.next : '';
+    const clip = { name, frames: [], fps: 1, loop, next };
+    if (cl.fps === undefined || cl.fps === null) {
+      c.at(`${cp}.fps`, 'is required');
+    } else {
+      clip.fps = c.positive(`${cp}.fps`, cl.fps);
+    }
+    if (clip.fps > MaxFPS) {
+      c.at(`${cp}.fps`, `${goFloat(clip.fps, true)} out of range (0, ${MaxFPS}]`);
+    }
+    const fl = Array.isArray(cl.frames) ? cl.frames : [];
+    if (fl.length === 0) {
+      c.at(`${cp}.frames`, 'at least one frame is required');
+    }
+    fl.forEach((v, i) => {
+      if (!Number.isInteger(v) || v < 0 || v >= frames) {
+        c.at(`${cp}.frames[${i}]`, `frame ${v} out of range [0, ${frames - 1}]`);
+      }
+    });
+    clip.frames = fl.slice();
+    if (next !== '') {
+      if (clip.loop) {
+        c.at(`${cp}.next`, 'only allowed when loop is false (a looping clip never ends)');
+      } else if (!clipOf(next)) {
+        c.at(`${cp}.next`, `no clip ${goQuote(next)}`);
+      }
+    }
+    spec.clips.push(clip);
+  }
+  const play = typeof src.play === 'string' ? src.play : '';
+  if (play !== '' && !clipOf(play)) {
+    c.at('play', `no clip ${goQuote(play)}`);
+  } else {
+    spec.play = play;
+  }
+  if (present('edge')) {
+    const e = typeof src.edge === 'object' && !Array.isArray(src.edge) ? src.edge : {};
+    for (const k of Object.keys(e)) {
+      if (!edgeFields.includes(k)) {
+        c.at(`edge.${k}`, 'unknown field');
+      }
+    }
+    let fw = spec.w;
+    let fh = spec.h;
+    if (spec.grid[0] > 0 && !present('frames')) {
+      fw = spec.w / spec.grid[0];
+      fh = spec.h / spec.grid[1];
+    }
+    const edge = { priority: 0, width: 0, roughness: c.float('edge.roughness', e.roughness, 0, 1, f(0.5)), seed: c.int('edge.seed', e.seed, -Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, 0) };
+    if (e.priority === undefined || e.priority === null) {
+      c.at('edge.priority', `is required (1 to ${MaxPriority}: a higher priority draws its border over a lower one)`);
+    } else if (!Number.isInteger(e.priority) || e.priority < 1 || e.priority > MaxPriority) {
+      c.at('edge.priority', `${e.priority} out of range [1, ${MaxPriority}]`);
+    } else {
+      edge.priority = e.priority;
+    }
+    if (fw % 2 !== 0 || fh % 2 !== 0) {
+      c.at('edge', `a frame's width and height must be even to have an edge, got ${fw} × ${fh}`);
+    }
+    const half = f(Math.min(fw, fh) / 2);
+    edge.width = c.float('edge.width', e.width, 0, half, f(half / 2));
+    if (e.width === 0) {
+      c.at('edge.width', 'must be above 0');
+    }
+    spec.edge = edge;
+  }
+}
+
+function validateLayer(c, spec, list, i, l, images) {
+  const lp = `${list}[${i}]`;
   const field = (name) => `${lp}.${name}`;
   const ls = { type: '', opacity: 1, blend: 'normal' };
   if (l === null || typeof l !== 'object' || Array.isArray(l)) {
@@ -597,6 +880,8 @@ function validateTyped(c, spec, field, l, ls, images) {
         c.at(field('path'), `${JSON.stringify(l.path)}: file not found in the assets directory`);
       } else if (img.error) {
         c.at(field('path'), `${JSON.stringify(l.path)}: ${img.error}`);
+      } else if (has(l, 'rect') && l.rect !== null) {
+        ls.img = crop(c, field('rect'), img, l.rect);
       } else {
         ls.img = img;
       }
@@ -605,6 +890,25 @@ function validateTyped(c, spec, field, l, ls, images) {
     default:
       break;
   }
+}
+
+// crop returns the part [x, y, width, height] of img, or null after saying why it is not
+// inside the image.
+function crop(c, path, img, r) {
+  if (!Array.isArray(r) || r.length !== 4 || !r.every(Number.isInteger)) {
+    c.at(path, 'must be [x, y, width, height] in pixels of the image');
+    return null;
+  }
+  const [x, y, w, h] = r;
+  if (x < 0 || y < 0 || w < 1 || h < 1 || x + w > img.w || y + h > img.h) {
+    c.at(path, `[${r.join(' ')}] is not inside the ${img.w} × ${img.h} image (x and y from 0, width and height at least 1)`);
+    return null;
+  }
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let j = 0; j < h; j++) {
+    data.set(img.data.subarray(((y + j) * img.w + x) * 4, ((y + j) * img.w + x + w) * 4), j * w * 4);
+  }
+  return { w, h, data };
 }
 
 // badImagePath returns why p is not an acceptable image path, or "".
@@ -1074,8 +1378,29 @@ function newPainter(spec, l) {
 }
 
 // render runs the layer program of spec, leaving out the layers in skip, and returns
-// straight 8-bit RGBA rows, top to bottom.
+// straight 8-bit RGBA rows, top to bottom: with frames, the frames side by side.
 function render(spec, skip) {
+  if (spec.frames && spec.frames.length > 0) {
+    return renderFrames(spec, skip);
+  }
+  return renderOne(spec, skip);
+}
+
+// renderFrames draws every frame (the texture's layers, then the frame's own) and puts
+// them side by side, left to right.
+function renderFrames(spec, skip) {
+  const n = spec.frames.length;
+  const data = new Uint8ClampedArray(spec.w * n * spec.h * 4);
+  spec.frames.forEach((own, i) => {
+    const one = renderOne(Object.assign({}, spec, { layers: spec.layers.concat(own), frames: [] }), skip);
+    for (let y = 0; y < spec.h; y++) {
+      data.set(one.data.subarray(y * spec.w * 4, (y + 1) * spec.w * 4), (y * spec.w * n + i * spec.w) * 4);
+    }
+  });
+  return { w: spec.w * n, h: spec.h, data };
+}
+
+function renderOne(spec, skip) {
   const passes = [];
   for (let i = 0; i < spec.layers.length; i++) {
     if (skip && skip[i]) {
@@ -1116,10 +1441,26 @@ function compile(src, images, skip) {
   return { spec, errors, image: render(spec, skip) };
 }
 
+// clipFrame returns the frame of its sheet a clip shows t ticks after it started at rate
+// ticks a second (asset.Clip.Frame): step ⌊t·fps/rate⌋, looping or held on the last.
+function clipFrame(clip, t, rate) {
+  const i = Math.floor((t * clip.fps) / rate);
+  if (clip.loop) {
+    return clip.frames[i % clip.frames.length];
+  }
+  return clip.frames[Math.min(i, clip.frames.length - 1)];
+}
+
+// clipOf returns the clip of spec called name, or null.
+function clipOf(spec, name) {
+  return (spec.clips || []).find((c) => c.name === name) || null;
+}
+
 const textureApi = {
-  HEADER, MaxSize, MaxLayers, MaxCells, MaxColors, MaxOctaves, MaxScale,
+  HEADER, MaxSize, MaxLayers, MaxCells, MaxColors, MaxOctaves, MaxScale, MaxGrid, MaxFrames, MaxFPS, MaxPriority,
   layerTypes, blendNames, fitNames,
-  parse, deps, validate, render, compile, badImagePath, sinCos, direction,
+  parse, deps, validate, render, compile, badImagePath, sinCos, direction, clipFrame, clipOf,
+  goFloat, goQuote, utf8Length, nameError,
 };
 // The webview loads this file with a script tag, Node with require.
 if (typeof module !== 'undefined' && module.exports) {

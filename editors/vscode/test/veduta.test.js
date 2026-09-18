@@ -31,7 +31,7 @@ test('diagnostics', () => {
 });
 
 test('isGameFile', () => {
-  for (const f of ['main.lua', 'lib/a.lua', 'veduta.json', 'C:\\g\\veduta.json', 'assets/scenes/main.vscene', 'tests/scenarios/start.vscenario', 'game/game.go']) {
+  for (const f of ['main.lua', 'lib/a.lua', 'veduta.json', 'C:\\g\\veduta.json', 'assets/scenes/main.vscene', 'tests/scenarios/start.vscenario', 'assets/maps/farm.vmap', 'game/game.go']) {
     assert.ok(v.isGameFile(f), f);
   }
   for (const f of ['package.json', '.vscode/settings.json', 'README.md', 'notveduta.json']) {
@@ -54,9 +54,9 @@ test('launchConfig', () => {
 });
 
 test('toolProblem', () => {
-  assert.strictEqual(v.toolProblem(null, '{"version":"v2.0.0-rc.9","commit":"x"}'), null);
+  assert.strictEqual(v.toolProblem(null, '{"version":"v2.0.0-rc.11","commit":"x"}'), null);
   assert.strictEqual(v.toolProblem(null, '{"version":"v2.0.0"}'), null);
-  assert.match(v.toolProblem(null, '{"version":"v2.0.0-rc.8"}'), /needs v2\.0\.0-rc\.9 or later/);
+  assert.match(v.toolProblem(null, '{"version":"v2.0.0-rc.10"}'), /needs v2\.0\.0-rc\.11 or later/);
   assert.strictEqual(v.toolProblem(null, '{"version":"dev"}'), null);
   assert.strictEqual(v.toolProblem(null, '{"version":"v10.1.0"}'), null);
   assert.match(v.toolProblem(null, '{"version":"v1.4.1"}'), /v1\.4\.1, which makes Go games/);

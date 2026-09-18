@@ -1,8 +1,9 @@
 'use strict';
 // The Veduta extension: the veduta tool's commands inside VS Code. It holds no game logic:
-// every action runs veduta in the project, as a person would in a terminal. The one thing it
-// draws itself is the texture preview, from the engine's layer program transliterated in
-// lib/texture.js and compared with the engine's own images by the tests.
+// every action runs veduta in the project, as a person would in a terminal. What it draws
+// itself, the texture preview and the map editor, comes from the engine's layer program and
+// map picture transliterated in lib/texture.js and lib/tilemap.js, compared with the
+// engine's own images by the tests.
 
 const vscode = require('vscode');
 const cp = require('child_process');
@@ -263,13 +264,295 @@ function previewChanged(doc) {
   preview.timer = setTimeout(() => sendSource(doc), 120);
 }
 
+// --------------------------------------------------------------- the map editor
+// A custom editor for *.vmap: the webview paints the map (lib/tilemap.js, the engine's
+// picture of it) and sends the whole text back, written canonically, after each gesture.
+// The text document stays the truth: its undo, redo, dirty state and save are VS Code's
+// own, and a change made to it anywhere else is sent to the webview.
+
+const mapEditors = new Set(); // the open map editors: {document, panel, sentAssets, pending, queue}
+
+const lf = (s) => s.replace(/\r\n/g, '\n');
+
+// projectOf finds the project a file belongs to: its root (the folder with veduta.json),
+// its assets directory and its tick rate. A file outside a project gets the assets folder
+// its path goes through and 20 ticks a second.
+function projectOf(file) {
+  let dir = path.dirname(file);
+  for (;;) {
+    if (fs.existsSync(path.join(dir, 'veduta.json'))) {
+      let rate = 20;
+      try {
+        const m = JSON.parse(fs.readFileSync(path.join(dir, 'veduta.json'), 'utf8'));
+        if (Number.isInteger(m.tick_rate) && m.tick_rate >= 1 && m.tick_rate <= 1000) {
+          rate = m.tick_rate;
+        }
+      } catch (_) {
+        // a manifest being written: the default
+      }
+      return { root: dir, assets: path.join(dir, ...tree.project(dir).assets.split('/')), tickRate: rate };
+    }
+    const up = path.dirname(dir);
+    if (up === dir) {
+      return { root: null, assets: v.assetsDir(file), tickRate: 20 };
+    }
+    dir = up;
+  }
+}
+
+// assetIndex lists the textures and materials under an assets directory by name: a name
+// is unique across folders. The cooked assets and hidden folders are left out.
+const assetIndexes = new Map();
+function assetIndex(dir) {
+  if (assetIndexes.has(dir)) {
+    return assetIndexes.get(dir);
+  }
+  const index = { textures: new Map(), materials: new Map() };
+  const walk = (d) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(d, { withFileTypes: true });
+    } catch (_) {
+      return;
+    }
+    for (const e of entries) {
+      if (e.name.startsWith('.')) {
+        continue;
+      }
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) {
+        walk(p);
+      } else if (e.name.endsWith('.vtex') && e.name.length > 5) {
+        index.textures.set(e.name.slice(0, -5), p);
+      } else if (e.name.endsWith('.vmat') && e.name.length > 5) {
+        index.materials.set(e.name.slice(0, -5), p);
+      }
+    }
+  };
+  walk(dir);
+  assetIndexes.set(dir, index);
+  return index;
+}
+
+// mapAssets gathers what the map's terrains are drawn with: the sources of their textures
+// (a material's texture for a terrain with a material), the PNGs those read (never from
+// outside the assets directory), every texture name of the project and its tick rate.
+function mapAssets(doc) {
+  const project = projectOf(doc.fileName);
+  const index = assetIndex(project.assets);
+  let src = null;
+  try {
+    src = JSON.parse(doc.getText());
+  } catch (_) {
+    // a map being written: nothing to draw with yet
+  }
+  const wanted = new Set();
+  const materials = {};
+  for (const t of (src && Array.isArray(src.terrains) ? src.terrains : [])) {
+    if (!t || typeof t !== 'object') {
+      continue;
+    }
+    if (typeof t.material === 'string' && t.material !== '') {
+      const file = index.materials.get(t.material);
+      if (!file) {
+        continue;
+      }
+      let name = '';
+      try {
+        const m = JSON.parse(fs.readFileSync(file, 'utf8'));
+        name = typeof m.texture === 'string' ? m.texture : '';
+      } catch (_) {
+        // a material that does not read has no texture to draw
+      }
+      materials[t.material] = name;
+      if (name) {
+        wanted.add(name);
+      }
+    } else if (typeof t.texture === 'string' && t.texture !== '') {
+      wanted.add(t.texture);
+    }
+  }
+  const textures = {};
+  const images = {};
+  for (const name of [...wanted].sort()) {
+    const file = index.textures.get(name);
+    if (!file) {
+      continue;
+    }
+    let text;
+    try {
+      text = fs.readFileSync(file, 'utf8');
+    } catch (e) {
+      textures[name] = { error: `${name}.vtex: ${e.message}` };
+      continue;
+    }
+    textures[name] = { text, file: path.relative(project.root || project.assets, file).split(path.sep).join('/') };
+    for (const p of texture.deps(texture.parse(text).src)) {
+      if (texture.badImagePath(p) !== '' || images[p]) {
+        continue;
+      }
+      try {
+        images[p] = fs.readFileSync(path.join(project.assets, ...p.split('/'))).toString('base64');
+      } catch (e) {
+        images[p] = { error: e.code === 'ENOENT' ? 'file not found in the assets directory' : String(e.message) };
+      }
+    }
+  }
+  return { type: 'assets', textures, materials, images, textureNames: [...index.textures.keys()].sort(), tickRate: project.tickRate };
+}
+
+function mapEditorHtml(webview) {
+  const nonce = crypto.randomBytes(16).toString('base64');
+  const uri = (...p) => webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, ...p));
+  const values = {
+    cspSource: webview.cspSource,
+    nonce,
+    css: uri('media', 'mapeditor.css'),
+    editor: uri('media', 'mapeditor.js'),
+    png: uri('lib', 'png.js'),
+    texture: uri('lib', 'texture.js'),
+    tilemap: uri('lib', 'tilemap.js'),
+  };
+  const page = fs.readFileSync(path.join(context.extensionPath, 'media', 'mapeditor.html'), 'utf8');
+  return page.replace(/{{(\w+)}}/g, (_, k) => String(values[k]));
+}
+
+class MapEditorProvider {
+  resolveCustomTextEditor(document, panel) {
+    const editor = { document, panel, sentAssets: '', pending: [], queue: Promise.resolve(), timer: null };
+    mapEditors.add(editor);
+    panel.webview.options = { enableScripts: true, localResourceRoots: [context.extensionUri] };
+    panel.webview.html = mapEditorHtml(panel.webview);
+    const sendDocument = () => panel.webview.postMessage({ type: 'document', text: document.getText(), file: path.basename(document.fileName) });
+    editor.sendAssets = (force) => {
+      const a = mapAssets(document);
+      const key = JSON.stringify(a);
+      if (force || key !== editor.sentAssets) {
+        editor.sentAssets = key;
+        panel.webview.postMessage(a);
+      }
+    };
+    const subscriptions = [
+      panel.webview.onDidReceiveMessage(async (m) => {
+        if (!m) {
+          return;
+        }
+        switch (m.type) {
+          case 'ready':
+            editor.sendAssets(true);
+            sendDocument();
+            break;
+          case 'edit':
+            // One edit per gesture, applied in order; its echo is not sent back.
+            editor.pending.push(m.text);
+            editor.queue = editor.queue.then(async () => {
+              if (m.text === lf(document.getText())) {
+                return;
+              }
+              const edit = new vscode.WorkspaceEdit();
+              edit.replace(document.uri, document.validateRange(new vscode.Range(0, 0, document.lineCount, 0)), m.text);
+              if (!await vscode.workspace.applyEdit(edit)) {
+                editor.pending = [];
+                sendDocument();
+              }
+            });
+            break;
+          case 'openJson':
+            vscode.commands.executeCommand('vscode.openWith', document.uri, 'default');
+            break;
+          case 'confirm': {
+            const choice = await vscode.window.showWarningMessage(m.message, { modal: true }, m.action);
+            panel.webview.postMessage({ type: 'confirmed', id: m.id, ok: choice === m.action });
+            break;
+          }
+          default:
+            break;
+        }
+      }),
+      vscode.workspace.onDidChangeTextDocument((e) => {
+        if (e.document.uri.toString() !== document.uri.toString() || e.contentChanges.length === 0) {
+          return;
+        }
+        const text = lf(document.getText()); // a CRLF document gets the edit with its own line ends
+        const i = editor.pending.indexOf(text);
+        if (i >= 0) {
+          editor.pending.splice(0, i + 1);
+          editor.sendAssets(false); // a new terrain may need its texture
+          return;
+        }
+        editor.pending = [];
+        clearTimeout(editor.timer);
+        editor.timer = setTimeout(() => {
+          editor.sendAssets(false);
+          sendDocument();
+        }, 60);
+      }),
+    ];
+    panel.onDidDispose(() => {
+      clearTimeout(editor.timer);
+      subscriptions.forEach((s) => s.dispose());
+      mapEditors.delete(editor);
+    });
+  }
+}
+
+// mapAssetsChanged sends the map editors what a texture, a material, an image or the
+// manifest now is, once a burst of file events is over.
+let mapAssetsTimer = null;
+function mapAssetsChanged() {
+  assetIndexes.clear();
+  clearTimeout(mapAssetsTimer);
+  mapAssetsTimer = setTimeout(() => mapEditors.forEach((e) => e.sendAssets(false)), 200);
+}
+
+// mapUri is the map a command is for: the one it was given, else the active editor's.
+function mapUri(arg) {
+  if (arg instanceof vscode.Uri) {
+    return arg;
+  }
+  if (arg && arg.rel && project) {
+    return project.uri(arg);
+  }
+  const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+  const input = tab && tab.input;
+  if (input && input.uri && /\.vmap$/.test(input.uri.path)) {
+    return input.uri;
+  }
+  const editor = vscode.window.activeTextEditor;
+  return editor && /\.vmap$/.test(editor.document.fileName) ? editor.document.uri : undefined;
+}
+
+function registerMapEditor() {
+  const watcher = vscode.workspace.createFileSystemWatcher('**/*.{vtex,vmat,png,PNG}');
+  const manifest = vscode.workspace.createFileSystemWatcher('**/veduta.json');
+  context.subscriptions.push(
+    vscode.window.registerCustomEditorProvider('veduta.mapEditor', new MapEditorProvider(),
+      { webviewOptions: { retainContextWhenHidden: true }, supportsMultipleEditorsPerDocument: true }),
+    watcher, manifest,
+    watcher.onDidCreate(mapAssetsChanged), watcher.onDidChange(mapAssetsChanged), watcher.onDidDelete(mapAssetsChanged),
+    manifest.onDidCreate(mapAssetsChanged), manifest.onDidChange(mapAssetsChanged), manifest.onDidDelete(mapAssetsChanged),
+    vscode.commands.registerCommand('veduta.openMapAsJson', (arg) => {
+      const uri = mapUri(arg);
+      return uri && vscode.commands.executeCommand('vscode.openWith', uri, 'default');
+    }),
+    vscode.commands.registerCommand('veduta.openMapEditor', (arg) => {
+      const uri = mapUri(arg);
+      if (!uri) {
+        vscode.window.showWarningMessage('Veduta: open a map (a .vmap file) first.');
+        return undefined;
+      }
+      return vscode.commands.executeCommand('vscode.openWith', uri, 'veduta.mapEditor');
+    }),
+  );
+}
+
 // --------------------------------------------------------------- the project view
 // The Veduta view in the activity bar: the project as lib/tree.js groups it (the files a
 // person works on, by what they are, in their folders), rebuilt as files come and go. Its
 // menus make new sources with veduta new, so a new file is one the engine accepts.
 
 const KINDS = [
-  ['scene', 'Scene'], ['world', 'World'], ['prefab', 'Prefab'], ['model', 'Model'],
+  ['scene', 'Scene'], ['world', 'World'], ['map', 'Map'], ['prefab', 'Prefab'], ['model', 'Model'],
   ['material', 'Material'], ['texture', 'Texture'], ['scenario', 'Scenario'], ['script', 'Script'],
 ];
 
@@ -427,7 +710,12 @@ async function newSource(kind, node, start = {}) {
   }
   await project.refresh();
   const made = project.files.get(r.file);
-  await vscode.window.showTextDocument(vscode.Uri.file(path.join(project.root, ...r.file.split('/'))), { preview: false });
+  const file = vscode.Uri.file(path.join(project.root, ...r.file.split('/')));
+  if (kind === 'map') {
+    await vscode.commands.executeCommand('vscode.openWith', file, 'veduta.mapEditor', { preview: false }); // it opens painted
+  } else {
+    await vscode.window.showTextDocument(file, { preview: false });
+  }
   if (made && project.view.visible) {
     project.view.reveal(made, { select: true, focus: false }).then(undefined, () => {});
   }
@@ -575,6 +863,8 @@ async function activate(ctx) {
   context = ctx;
   problems = vscode.languages.createDiagnosticCollection('veduta');
   context.subscriptions.push(problems);
+  // First: a map opened before the extension started waits for its editor.
+  registerMapEditor();
 
   const isProject = !!(await projectRoot());
   vscode.commands.executeCommand('setContext', 'veduta.project', isProject);

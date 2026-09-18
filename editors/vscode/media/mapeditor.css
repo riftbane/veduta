@@ -1,0 +1,270 @@
+/* The map editor: VS Code's own colors, the map in the middle, the palette and the forms on
+   the right. */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  overflow: hidden;
+}
+
+#bar, #status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  white-space: nowrap;
+  flex-wrap: wrap;
+}
+
+#status {
+  border-bottom: none;
+  border-top: 1px solid var(--vscode-panel-border);
+  font-family: var(--vscode-editor-font-family);
+  gap: 16px;
+  color: var(--vscode-descriptionForeground);
+  min-height: 1.4em;
+}
+
+.group {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.badge {
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+  min-width: 3.5em;
+  text-align: center;
+}
+
+button {
+  min-width: 26px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 2px;
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+button:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+button[aria-pressed="true"] {
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--vscode-descriptionForeground);
+}
+
+label.block {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+input, select, textarea {
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  padding: 2px 4px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: inherit;
+  min-width: 0;
+  flex: 1;
+}
+
+input[type="checkbox"] {
+  flex: none;
+}
+
+input.short {
+  flex: 0 1 4.5em;
+  width: 4.5em;
+}
+
+#error {
+  padding: 6px 8px;
+  color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground));
+  background: var(--vscode-inputValidation-errorBackground);
+  border-bottom: 1px solid var(--vscode-inputValidation-errorBorder, var(--vscode-panel-border));
+}
+
+#errors {
+  font-family: var(--vscode-editor-font-family);
+  white-space: pre-wrap;
+  margin: 6px 0;
+}
+
+#main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+body.broken #main {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+#view {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  background: var(--vscode-editorWidget-background, #202020);
+}
+
+#view canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  cursor: crosshair;
+}
+
+#view.panning canvas {
+  cursor: grab;
+}
+
+#side {
+  width: 250px;
+  flex: none;
+  overflow-y: auto;
+  border-left: 1px solid var(--vscode-panel-border);
+  padding: 0 8px 8px;
+}
+
+section {
+  border-bottom: 1px solid var(--vscode-panel-border);
+  padding-bottom: 8px;
+}
+
+h3 {
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-descriptionForeground);
+  margin: 10px 0 6px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.row {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.hint {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
+.formerror {
+  color: var(--vscode-errorForeground);
+  font-size: 0.9em;
+  white-space: pre-wrap;
+}
+
+.formerror:empty {
+  display: none;
+}
+
+#palette, #layers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.item:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.item.selected {
+  color: var(--vscode-list-activeSelectionForeground);
+  background: var(--vscode-list-activeSelectionBackground);
+  border-color: var(--vscode-focusBorder);
+}
+
+.item canvas {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  image-rendering: pixelated;
+  border: 1px solid var(--vscode-panel-border);
+}
+
+.item .key {
+  font-family: var(--vscode-editor-font-family);
+  min-width: 1.2em;
+  text-align: center;
+  opacity: 0.8;
+}
+
+.item .name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item .tags, .item .note {
+  font-size: 0.85em;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item .note {
+  color: var(--vscode-errorForeground);
+}
+
+.item button {
+  min-width: 20px;
+  padding: 0 4px;
+}
+
+.item.hidden .name {
+  opacity: 0.5;
+  text-decoration: line-through;
+}

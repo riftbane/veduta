@@ -123,7 +123,7 @@
     if (!spec) {
       return;
     }
-    if (spec.w * spec.h > LIVE_PIXELS && !state.force) {
+    if (spec.w * spec.h * Math.max(spec.frames.length, 1) > LIVE_PIXELS && !state.force) {
       state.image = null;
       note(`${spec.w}x${spec.h} is big to draw while you type.`, 'Draw it anyway', () => {
         state.force = true;
@@ -138,7 +138,8 @@
     off.width = state.image.w;
     off.height = state.image.h;
     offCtx.putImageData(new ImageData(state.image.data, state.image.w, state.image.h), 0, 0);
-    el('size').textContent = `${state.image.w}x${state.image.h}`;
+    const g = spec.grid;
+    el('size').textContent = `${state.image.w}x${state.image.h}` + (g[0] > 0 ? `, ${g[0]}x${g[1]} frames of ${state.image.w / g[0]}x${state.image.h / g[1]}` : '');
     draw();
   }
 

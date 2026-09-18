@@ -32,7 +32,8 @@ async function run() {
   await ext.activate();
   const commands = await vscode.commands.getCommands(true);
   for (const c of ['veduta.newGame', 'veduta.play', 'veduta.test', 'veduta.build', 'veduta.deploy', 'veduta.previewTexture',
-    'veduta.view.new', 'veduta.view.newPrefab', 'veduta.view.newFolder', 'veduta.view.rename', 'veduta.view.delete', 'veduta.view.play']) {
+    'veduta.view.new', 'veduta.view.newPrefab', 'veduta.view.newMap', 'veduta.view.newFolder', 'veduta.view.rename', 'veduta.view.delete',
+    'veduta.view.play', 'veduta.openMapEditor', 'veduta.openMapAsJson']) {
     assert.ok(commands.includes(c), c + ' is registered');
   }
 
@@ -41,7 +42,7 @@ async function run() {
   const project = ext.exports.project();
   await vscode.commands.executeCommand('veduta.view.refresh');
   assert.deepStrictEqual(project.nodes.map((n) => n.label),
-    ['Game', 'Scripts', 'Scenes', 'Worlds', 'Prefabs', 'Models', 'Materials', 'Textures', 'Scenarios']);
+    ['Game', 'Scripts', 'Scenes', 'Worlds', 'Maps', 'Prefabs', 'Models', 'Materials', 'Textures', 'Scenarios']);
   const node = (id) => project.byId.get(id);
   assert.strictEqual(node('scene:assets/scenes/main.vscene').description, 'start');
   const input = vscode.window.showInputBox;
@@ -72,6 +73,22 @@ async function run() {
     await vscode.commands.executeCommand('veduta.view.rename', node('prefab:assets/prefabs/nature/tree.vprefab'));
     assert.ok(fs.existsSync(path.join(root, 'assets', 'prefabs', 'nature', 'pine.vprefab')), 'renamed');
     await until('the renamed prefab in the view', () => node('prefab:assets/prefabs/nature/pine.vprefab'));
+
+    // A map from veduta new map opens in the map editor; Open as JSON and back.
+    answers.push(['farm']);
+    await vscode.commands.executeCommand('veduta.view.newMap', node('map'));
+    const map = path.join(root, 'assets', 'maps', 'farm.vmap');
+    assert.ok(fs.readFileSync(map, 'utf8').includes('"map/1"'), 'veduta new wrote the map');
+    const mapTab = (custom) => vscode.window.tabGroups.all.flatMap((g) => g.tabs).find((t) => (custom
+      ? t.input instanceof vscode.TabInputCustom && t.input.viewType === 'veduta.mapEditor'
+      : t.input instanceof vscode.TabInputText) && t.input.uri.fsPath === map);
+    await until('the map editor', () => mapTab(true) !== undefined);
+    assert.ok(node('map:assets/maps/farm.vmap'), 'the map is in the view');
+    await vscode.commands.executeCommand('veduta.openMapAsJson', vscode.Uri.file(map));
+    await until('the map as JSON', () => vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.fsPath === map);
+    assert.strictEqual(vscode.window.activeTextEditor.document.languageId, 'json');
+    await vscode.commands.executeCommand('veduta.openMapEditor', vscode.Uri.file(map));
+    await until('the map editor again', () => { const t = mapTab(true); return t && t.isActive; });
   } finally {
     vscode.window.showInputBox = input;
   }

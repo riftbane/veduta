@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{cspSource}} data:; style-src {{cspSource}} 'unsafe-inline'; script-src 'nonce-{{nonce}}';">
+<link rel="stylesheet" href="{{css}}">
+<title>Map</title>
+</head>
+<body>
+<div id="bar">
+  <span class="group" id="tools">
+    <button data-tool="brush" title="Brush (B)">Brush</button>
+    <button data-tool="rect" title="Rectangle fill (R)">Rect</button>
+    <button data-tool="fill" title="Bucket fill: the cells of the same terrain around, on this layer (F)">Fill</button>
+    <button data-tool="eraser" title="Eraser: empty cells (E)">Erase</button>
+    <button data-tool="pick" title="Eyedropper (I, or Alt+click with any tool)">Pick</button>
+    <button data-tool="object" title="Objects: drag a rectangle to make one, click to select (O)">Object</button>
+  </span>
+  <span class="group" id="sizes" title="Brush size ([ and ])">
+    <button data-size="1">1</button><button data-size="2">2</button><button data-size="3">3</button><button data-size="5">5</button>
+  </span>
+  <span class="spacer"></span>
+  <button id="animate" title="Play the textures' clips at the game's tick rate">Animate</button>
+  <label title="Show the cells' outlines (H)"><input type="checkbox" id="grid" checked> Grid</label>
+  <button id="zoomout" title="Smaller">&#8722;</button>
+  <span id="zoom" class="badge">100%</span>
+  <button id="zoomin" title="Bigger">+</button>
+  <button id="fit" title="Fit the map in the view">Fit</button>
+</div>
+<div id="error" hidden>
+  <div>The map does not load: fix it in the text, the editor opens again by itself.</div>
+  <pre id="errors"></pre>
+  <button id="openjson">Open as JSON</button>
+</div>
+<div id="main">
+  <div id="view"><canvas id="canvas"></canvas></div>
+  <div id="side">
+    <section>
+      <h3>Terrains</h3>
+      <div id="palette"></div>
+      <div class="row">
+        <select id="texturepick" title="A texture of the project"></select>
+        <button id="addterrain" title="A terrain painted with this texture">Add</button>
+      </div>
+      <form id="terrainform" hidden>
+        <label>Name <input id="t-name" spellcheck="false"></label>
+        <label>Key <input id="t-key" maxlength="1" spellcheck="false" class="short"></label>
+        <label>Tags <input id="t-tags" spellcheck="false" placeholder="solid, water"></label>
+        <div class="formerror" id="t-error"></div>
+        <div class="row"><button id="t-apply" type="submit">Apply</button><button id="t-delete" type="button">Delete</button></div>
+      </form>
+    </section>
+    <section>
+      <h3>Layers</h3>
+      <div id="layers"></div>
+      <div class="row"><button id="addlayer" title="A new empty layer on top">Add layer</button></div>
+      <form id="layerform">
+        <label>Name <input id="l-name" spellcheck="false"></label>
+        <label>z <input id="l-z" class="short" placeholder="auto"></label>
+        <label>Draw order <input id="l-layer" class="short" placeholder="0"></label>
+        <div class="formerror" id="l-error"></div>
+        <div class="row"><button id="l-apply" type="submit">Apply</button></div>
+      </form>
+    </section>
+    <section>
+      <h3>Object</h3>
+      <div id="noobject" class="hint">Choose Object (O): drag over the map to make one, click one to edit it.</div>
+      <form id="objectform" hidden>
+        <label>Name <input id="o-name" spellcheck="false"></label>
+        <label>At <input id="o-x" class="short"> <input id="o-y" class="short"></label>
+        <label>Size <input id="o-w" class="short"> <input id="o-h" class="short"></label>
+        <label>Tags <input id="o-tags" spellcheck="false" placeholder="door"></label>
+        <label class="block">Props <textarea id="o-props" rows="4" spellcheck="false" placeholder="to = house&#10;x = 3&#10;open = false"></textarea></label>
+        <div class="formerror" id="o-error"></div>
+        <div class="row"><button id="o-apply" type="submit">Apply</button><button id="o-delete" type="button">Delete</button></div>
+      </form>
+    </section>
+    <section>
+      <h3>Map</h3>
+      <form id="mapform">
+        <label>Size <input id="m-w" class="short"> <input id="m-h" class="short"></label>
+        <label>Tile <input id="m-tile" class="short" placeholder="1"></label>
+        <label>Origin <input id="m-ox" class="short" placeholder="0"> <input id="m-oy" class="short" placeholder="0"> <input id="m-oz" class="short" placeholder="0"></label>
+        <div class="formerror" id="m-error"></div>
+        <div class="row"><button id="m-apply" type="submit">Apply</button></div>
+      </form>
+    </section>
+  </div>
+</div>
+<div id="status"><span id="pos">&nbsp;</span><span id="cellinfo"></span></div>
+<script nonce="{{nonce}}" src="{{png}}"></script>
+<script nonce="{{nonce}}" src="{{texture}}"></script>
+<script nonce="{{nonce}}" src="{{tilemap}}"></script>
+<script nonce="{{nonce}}" src="{{editor}}"></script>
+</body>
+</html>

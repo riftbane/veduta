@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.9.0
+
+- **The map editor**: a `*.vmap` opens painted (**Veduta: Open as JSON** in its title bar
+  shows the text; **Veduta: Open in the Map Editor** goes back). Brush (1, 2, 3 or 5 cells),
+  rectangle, bucket fill, eraser, eyedropper (Alt+click) and objects (drag to make one, a
+  form for its name, cells, tags and props); a palette of the terrains with their textures,
+  to add from the project's textures, rename, re-key, tag or delete; layers to show or
+  hide (in the editor only), add, rename, reorder, delete, with their z and draw order; the
+  map's size, tile and origin. Zoom with the wheel, pan with the middle button or
+  Space+drag, a grid, the cell under the pointer with its terrains and tags, and the
+  textures' clips played at the game's tick rate. It draws what the engine draws (the tests
+  compare it with the engine's pictures pixel by pixel, borders and all) and every stroke
+  is one edit of the text, written the one canonical way: undo, redo and save are VS
+  Code's. A map the engine would refuse shows its errors, with line and column.
+- The Project view has Maps, with **New Map…** (`veduta new map`).
+- The texture preview draws sheets (`grid`, `frames`) and image `rect`s, and reports clips,
+  `play` and `edge` as the engine does.
+- Needs veduta v2.0.0-rc.11 or later.
+
 ## 0.8.0
 
 - Says when it is older than the extension released with the `veduta` tool, and

@@ -1,8 +1,8 @@
 {
   "name": "veduta",
   "displayName": "Veduta",
-  "description": "Make Veduta console games: the project as a tree with new scenes, prefabs, models and scripts on right-click, play and debug (F5), test, build with errors in Problems, preview a texture while you write it, deploy to the console's card.",
-  "version": "0.8.0",
+  "description": "Make Veduta console games: the project as a tree with new scenes, prefabs, models and scripts on right-click, play and debug (F5), test, build with errors in Problems, preview a texture while you write it, paint maps in the map editor, deploy to the console's card.",
+  "version": "0.9.0",
   "publisher": "riftbane",
   "license": "MIT",
   "repository": {
@@ -40,8 +40,21 @@
           ".vscene",
           ".vscenario",
           ".vprefab",
-          ".vworld"
+          ".vworld",
+          ".vmap"
         ]
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "veduta.mapEditor",
+        "displayName": "Veduta Map Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.vmap"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "commands": [
@@ -78,6 +91,18 @@
         "icon": "$(eye)"
       },
       {
+        "command": "veduta.openMapAsJson",
+        "title": "Open as JSON",
+        "category": "Veduta",
+        "icon": "$(json)"
+      },
+      {
+        "command": "veduta.openMapEditor",
+        "title": "Open in the Map Editor",
+        "category": "Veduta",
+        "icon": "$(map)"
+      },
+      {
         "command": "veduta.view.new",
         "title": "New…",
         "category": "Veduta",
@@ -98,6 +123,12 @@
       {
         "command": "veduta.view.newWorld",
         "title": "New World…",
+        "category": "Veduta",
+        "icon": "$(add)"
+      },
+      {
+        "command": "veduta.view.newMap",
+        "title": "New Map…",
         "category": "Veduta",
         "icon": "$(add)"
       },
@@ -188,12 +219,30 @@
           "command": "veduta.previewTexture",
           "when": "resourceFilename =~ /\\.vtex$/",
           "group": "navigation"
+        },
+        {
+          "command": "veduta.openMapAsJson",
+          "when": "activeCustomEditorId == veduta.mapEditor",
+          "group": "navigation"
+        },
+        {
+          "command": "veduta.openMapEditor",
+          "when": "resourceFilename =~ /\\.vmap$/ && activeCustomEditorId != veduta.mapEditor",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
         {
           "command": "veduta.previewTexture",
           "when": "resourceFilename =~ /\\.vtex$/"
+        },
+        {
+          "command": "veduta.openMapAsJson",
+          "when": "activeCustomEditorId == veduta.mapEditor"
+        },
+        {
+          "command": "veduta.openMapEditor",
+          "when": "resourceFilename =~ /\\.vmap$/ && activeCustomEditorId != veduta.mapEditor"
         },
         {
           "command": "veduta.view.new",
@@ -237,6 +286,10 @@
         },
         {
           "command": "veduta.view.newWorld",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.newMap",
           "when": "false"
         },
         {
@@ -303,6 +356,16 @@
           "group": "1_new@1"
         },
         {
+          "command": "veduta.view.newMap",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.map$/",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.newMap",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.map$/",
+          "group": "1_new@1"
+        },
+        {
           "command": "veduta.view.newPrefab",
           "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.prefab$/",
           "group": "inline"
@@ -364,7 +427,7 @@
         },
         {
           "command": "veduta.view.newFolder",
-          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.(script|scene|world|prefab|model|material|texture)$/",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.(script|scene|world|map|prefab|model|material|texture)$/",
           "group": "1_new@2"
         },
         {
@@ -398,6 +461,11 @@
           "group": "0_run@2"
         },
         {
+          "command": "veduta.openMapAsJson",
+          "when": "view == veduta.project && viewItem == file.map",
+          "group": "0_run@1"
+        },
+        {
           "command": "veduta.previewTexture",
           "when": "view == veduta.project && viewItem == file.texture",
           "group": "inline"
@@ -409,12 +477,12 @@
         },
         {
           "command": "veduta.view.rename",
-          "when": "view == veduta.project && viewItem =~ /^(file|folder)\\.(script|scene|world|prefab|model|material|texture|image|scenario)$/",
+          "when": "view == veduta.project && viewItem =~ /^(file|folder)\\.(script|scene|world|map|prefab|model|material|texture|image|scenario)$/",
           "group": "7_modify@1"
         },
         {
           "command": "veduta.view.delete",
-          "when": "view == veduta.project && viewItem =~ /^(file|folder)\\.(script|scene|world|prefab|model|material|texture|image|scenario)$/",
+          "when": "view == veduta.project && viewItem =~ /^(file|folder)\\.(script|scene|world|map|prefab|model|material|texture|image|scenario)$/",
           "group": "7_modify@2"
         },
         {

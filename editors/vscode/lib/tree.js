@@ -14,6 +14,7 @@ const SECTIONS = [
   { id: 'script', label: 'Scripts', icon: 'code', kind: 'script', ext: '.lua' },
   { id: 'scene', label: 'Scenes', icon: 'window', kind: 'scene', assets: true, dir: 'scenes', ext: '.vscene' },
   { id: 'world', label: 'Worlds', icon: 'globe', kind: 'world', assets: true, dir: 'worlds', ext: '.vworld' },
+  { id: 'map', label: 'Maps', icon: 'map', kind: 'map', assets: true, dir: 'maps', ext: '.vmap' },
   { id: 'prefab', label: 'Prefabs', icon: 'package', kind: 'prefab', assets: true, dir: 'prefabs', ext: '.vprefab' },
   { id: 'model', label: 'Models', icon: 'symbol-structure', kind: 'model', assets: true, dir: 'models', ext: '.vmodel' },
   { id: 'material', label: 'Materials', icon: 'paintcan', kind: 'material', assets: true, dir: 'materials', ext: '.vmat' },

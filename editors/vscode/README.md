@@ -5,10 +5,10 @@ project for you; install the tool first (on Windows, in PowerShell:
 `irm https://raw.githubusercontent.com/riftbane/veduta/main/install.ps1 | iex`).
 
 **The Project view** (the Veduta icon in the activity bar) shows the game as you work on
-it: Game (`veduta.json`, `card.json`, README, CHANGELOG), Scripts, Scenes, Worlds, Prefabs,
-Models, Materials, Textures, Images and Scenarios, each in its own folders, without what
+it: Game (`veduta.json`, `card.json`, README, CHANGELOG), Scripts, Scenes, Worlds, Maps,
+Prefabs, Models, Materials, Textures, Images and Scenarios, each in its own folders, without what
 the tool writes (`out/`, cooked assets, editor files). Right-click a section or one of its
-folders for **New Scene…**, **New Prefab…**, **New Script…** and so on, or **New Folder…**:
+folders for **New Scene…**, **New Map…**, **New Prefab…**, **New Script…** and so on, or **New Folder…**:
 `veduta new` writes a file the engine accepts as it is (a world comes with the ground it
 stands on) and it opens. A name is checked as you type it: the engine's rule, and free in
 every folder of its kind. On a scene or a world, **Play from Here** and **New Scenario
@@ -24,6 +24,7 @@ The view follows files made or removed anywhere else.
 | **Veduta: Test** | `veduta test`: the game's scenarios |
 | **Veduta: Build** | `veduta build`, its errors in Problems; also on every save of a script or an asset |
 | **Veduta: Preview the Texture** (the eye in the title bar of a `*.vtex`) | draws the texture beside its source while you write it |
+| **Veduta: Open as JSON** / **Open in the Map Editor** (title bar of a `*.vmap`) | the map's text, or the map editor again |
 | **Veduta: Deploy to the Console's Card** | `veduta deploy`: the game onto the card, found by its label |
 
 The preview runs no engine: it draws the layer program in the panel itself, the same way
@@ -32,6 +33,32 @@ It has a grid and a ruler to measure the picture by, reads the texel and the col
 the pointer, measures a rectangle you drag over it, switches layers off one at a time, and
 shows a tiling texture repeated. A source the engine would refuse is not drawn: the panel
 names the field that is wrong.
+
+**The map editor** opens every map (`*.vmap`, [the format](https://github.com/riftbane/veduta/blob/main/docs/map.md)):
+the map as the game draws it, with the textures of the project, borders and all.
+
+| Tool | Key | Does |
+|---|---|---|
+| Brush | B, `[` `]` for its size (1, 2, 3, 5) | paints the terrain chosen in the palette on the layer chosen |
+| Rect | R | fills the rectangle dragged |
+| Fill | F | fills the cells of the same terrain around, side by side, on the layer |
+| Erase | E | empties cells |
+| Pick | I, or Alt+click | takes the terrain of a cell (and its layer) |
+| Object | O | drag to make an object (`object_1`…), click one to edit its name, cells, tags and props (`key = value` lines), Delete to remove it |
+
+1–9 choose a terrain, H the grid; the wheel zooms around the pointer, the middle button or
+Space+drag pans, **Fit** shows the whole map; **Animate** plays the textures' clips at the
+game's tick rate. The status line names the cell under the pointer and the terrain of every
+layer there, with its tags. The palette shows every terrain with its texture: **Add** one
+from a texture of the project, change its name, key or tags, or delete it (its cells are
+emptied, after asking). Layers are listed top first: choose the one to paint on, hide one
+while you paint (only in the editor), add, rename, move, delete, set its z and draw order.
+**Map** resizes it (from the top-left corner), and sets its tile and origin.
+
+Every gesture is one edit of the file's text, written the same way every time (a terrain,
+a row, an object per line), so Ctrl+Z, Ctrl+Y and Ctrl+S work as in any file, and the text
+can be edited beside it. A map the engine would refuse is not edited: the editor lists its
+errors with line and column, and **Open as JSON** opens the text to fix it.
 
 The same commands are tasks of type `veduta` (`"command": "sim"`, `"test"`, `"build"`,
 `"deploy"`, with `"args"` such as `["--scene", "level1"]`) for `tasks.json`, and `$veduta` is a problem matcher for their output.

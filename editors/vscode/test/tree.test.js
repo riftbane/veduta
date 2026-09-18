@@ -52,6 +52,8 @@ test('build', () => {
     'assets/scenes/levels/two.vscene': '{}',
     'assets/scenes/stray.json': '{}',
     'assets/prefabs/nature/': '',
+    'assets/maps/farm.vmap': '{}',
+    'assets/maps/town/square.vmap': '{}',
     'assets/models/quad.vmodel': '{}',
     'assets/models/.vmodel': '{}',
     'assets/materials/sprite.vmat': '{}',
@@ -85,6 +87,10 @@ test('build', () => {
     '    two.vscene [file.scene]',
     '  main.vscene [file.scene] start',
     'Worlds [section.world]',
+    'Maps [section.map]',
+    '  town [folder.map]',
+    '    square.vmap [file.map]',
+    '  farm.vmap [file.map]',
     'Prefabs [section.prefab]',
     '  nature [folder.prefab]',
     'Models [section.model]',
@@ -104,6 +110,7 @@ test('build', () => {
   const index = tree.names(nodes);
   assert.strictEqual(index.scene.one, 'assets/scenes/levels/one.vscene');
   assert.strictEqual(index.model.quad, 'assets/models/quad.vmodel');
+  assert.strictEqual(index.map.square, 'assets/maps/town/square.vmap');
   assert.strictEqual(index.script, undefined);
 
   const find = (id) => {
@@ -113,6 +120,7 @@ test('build', () => {
   assert.strictEqual(tree.relIn(find('scene'), p), '');
   assert.strictEqual(tree.relIn(find('scene:assets/scenes/levels'), p), 'levels');
   assert.strictEqual(tree.relIn(find('scene:assets/scenes/levels/one.vscene'), p), 'levels');
+  assert.strictEqual(tree.relIn(find('map:assets/maps/town'), p), 'town');
   assert.strictEqual(tree.relIn(find('script:enemies/boss'), p), 'enemies/boss');
   assert.strictEqual(tree.relIn(find('script:main.lua'), p), '');
 });
@@ -137,7 +145,7 @@ test('a Go game has no Scripts', () => {
   const root = game({ 'veduta.json': JSON.stringify({ veduta: 'project/1', name: 'g' }), 'go.mod': '', 'game/game.go': '' });
   const p = tree.project(root);
   assert.deepStrictEqual(tree.build(tree.scan(root, p), p).map((n) => n.label),
-    ['Game', 'Scenes', 'Worlds', 'Prefabs', 'Models', 'Materials', 'Textures', 'Scenarios']);
+    ['Game', 'Scenes', 'Worlds', 'Maps', 'Prefabs', 'Models', 'Materials', 'Textures', 'Scenarios']);
 });
 
 test('checkName', () => {
