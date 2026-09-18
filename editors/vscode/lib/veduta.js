@@ -130,9 +130,25 @@ function toolProblem(err, stdout) {
     return `Veduta: the veduta tool is ${version}, which makes Go games; this extension needs v2 (Lua games). Reinstall it from the beta channel.`;
   }
   if (m && older(version, MIN_TOOL)) {
-    return `Veduta: the veduta tool is ${version}; this extension needs ${MIN_TOOL} or later (the Project view makes files with veduta new). Run veduta update.`;
+    return `Veduta: the veduta tool is ${version}; this extension needs ${MIN_TOOL} or later (the Project view makes files with veduta new). Update it: install.ps1 again on Windows, veduta update elsewhere.`;
   }
   return null;
+}
+
+// extensionBehind returns the version of the extension released with the tool, from the
+// output of veduta --json version, when this extension (own) is older than it; else null.
+// A development build of the tool has no release to take the extension from.
+function extensionBehind(own, stdout) {
+  let info;
+  try {
+    info = JSON.parse(stdout);
+  } catch (_) {
+    return null;
+  }
+  if (!info || typeof info.extension !== 'string' || !/^v\d/.test(info.version || '')) {
+    return null;
+  }
+  return older('v' + own, 'v' + info.extension) ? info.extension : null;
 }
 
 // MIN_TOOL is the oldest veduta this extension works with: the first with veduta new.
@@ -155,4 +171,4 @@ function older(a, b) {
   return false;
 }
 
-module.exports = { program, playCommand, diagnostics, isGameFile, isTextureFile, assetsDir, launchConfig, validName, toolProblem, older, INSTALL_URL };
+module.exports = { program, playCommand, diagnostics, isGameFile, isTextureFile, assetsDir, launchConfig, validName, toolProblem, older, extensionBehind, INSTALL_URL };

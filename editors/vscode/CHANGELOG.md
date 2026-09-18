@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+- Says when it is older than the extension released with the `veduta` tool, and
+  **Update the Extension** installs that one (fetched by `veduta extension`, checksum
+  verified). Needs veduta v2.0.0-rc.10 or later for the check; older tools do not say.
+
 ## 0.7.0
 
 - The Project view, in the activity bar: the game's scripts, scenes, worlds, prefabs,

@@ -492,3 +492,58 @@ func TestApplyPreRelease(t *testing.T) {
 		t.Fatalf("binary not replaced: %q", data)
 	}
 }
+
+// TestExtension: the extension of a release by its tag, verified against checksums.txt;
+// a corrupt download or a release without it is an error.
+func TestExtension(t *testing.T) {
+	vsix := []byte("PK fake vsix")
+	sum := sha256.Sum256(vsix)
+	corrupt := false
+	mux := http.NewServeMux()
+	var srv *httptest.Server
+	mux.HandleFunc("/repos/"+Repo+"/releases/tags/v2.0.0-rc.10", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"tag_name": "v2.0.0-rc.10", "assets": []map[string]string{
+			{"name": ExtensionFile, "browser_download_url": srv.URL + "/dl/" + ExtensionFile},
+			{"name": "checksums.txt", "browser_download_url": srv.URL + "/dl/checksums.txt"},
+		}})
+	})
+	mux.HandleFunc("/repos/"+Repo+"/releases/tags/v1.0.0", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"tag_name": "v1.0.0", "assets": []map[string]string{}})
+	})
+	mux.HandleFunc("/dl/"+ExtensionFile, func(w http.ResponseWriter, r *http.Request) {
+		if corrupt {
+			w.Write([]byte("PK tampered"))
+			return
+		}
+		w.Write(vsix)
+	})
+	mux.HandleFunc("/dl/checksums.txt", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "%x  veduta_v2.0.0-rc.10_linux_amd64.tar.gz\n%x  %s\n", sha256.Sum256(nil), sum, ExtensionFile)
+	})
+	srv = httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	useServer(t, srv)
+	ctx := context.Background()
+	rel, err := ByTag(ctx, srv.Client(), "v2.0.0-rc.10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, got, err := Extension(ctx, srv.Client(), rel)
+	if err != nil || !bytes.Equal(data, vsix) || got != hex.EncodeToString(sum[:]) {
+		t.Fatalf("extension: %q %s %v", data, got, err)
+	}
+	corrupt = true
+	if _, _, err := Extension(ctx, srv.Client(), rel); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Fatalf("a tampered extension: %v", err)
+	}
+	old, err := ByTag(ctx, srv.Client(), "v1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Extension(ctx, srv.Client(), old); err == nil || !strings.Contains(err.Error(), "has no veduta-vscode.vsix") {
+		t.Fatalf("a release without the extension: %v", err)
+	}
+	if _, err := ByTag(ctx, srv.Client(), "dev"); err == nil {
+		t.Fatal("a dev tag was looked up")
+	}
+}

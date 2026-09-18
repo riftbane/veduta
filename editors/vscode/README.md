@@ -43,5 +43,9 @@ and assets: completion and checks while typing.
 Debug configurations (`.vscode/launch.json`) are of type `veduta`: `"mode": "play"` or
 `"mode": "scenario"` with `"scenario": "<name>"`, and `"stopOnEntry"`.
 
+The extension and the `veduta` tool are released together. When the extension is older
+than the one that came with the tool, it says so, and **Update the Extension** installs
+that one (`veduta extension` fetches it, checksum verified); reload the window after.
+
 Settings: `veduta.path` (the program, when it is not on PATH or where the installer puts it)
 and `veduta.buildOnSave` (default on).

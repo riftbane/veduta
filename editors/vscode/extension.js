@@ -651,15 +651,48 @@ async function activate(ctx) {
 function checkTool() {
   cp.execFile(veduta(), ['--json', 'version'], { timeout: 15000 }, (err, stdout) => {
     const problem = v.toolProblem(err, stdout);
-    if (!problem) {
+    if (problem) {
+      vscode.window.showWarningMessage(problem, 'How to install').then((choice) => {
+        if (choice) {
+          vscode.env.openExternal(vscode.Uri.parse(v.INSTALL_URL));
+        }
+      });
       return;
     }
-    vscode.window.showWarningMessage(problem, 'How to install').then((choice) => {
-      if (choice) {
-        vscode.env.openExternal(vscode.Uri.parse(v.INSTALL_URL));
-      }
-    });
+    // Tool and extension are released together but updated apart: an extension older
+    // than the tool's lacks what the tool's docs describe, so it offers to catch up.
+    const own = context.extension.packageJSON.version;
+    const theirs = v.extensionBehind(own, stdout);
+    if (theirs) {
+      vscode.window.showWarningMessage(`Veduta: this extension is ${own}, and your veduta comes with ${theirs}.`, 'Update the Extension').then((choice) => {
+        if (choice) {
+          updateExtension(theirs);
+        }
+      });
+    }
   });
+}
+
+// updateExtension installs the extension released with the tool: veduta extension fetches
+// it (checksum verified) and VS Code installs it, then the window reloads to run it.
+async function updateExtension(version) {
+  const out = path.join(context.globalStorageUri.fsPath, `veduta-vscode-${version}.vsix`);
+  fs.mkdirSync(context.globalStorageUri.fsPath, { recursive: true });
+  const r = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Veduta: fetching the extension ${version}` },
+    () => vedutaJSON(context.globalStorageUri.fsPath, ['extension', '--out', out]));
+  if (!r) {
+    return;
+  }
+  try {
+    await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(r.file));
+  } catch (e) {
+    vscode.window.showErrorMessage(`Veduta: the extension was not installed: ${e.message}. Install ${r.file} with Extensions → … → Install from VSIX.`);
+    return;
+  }
+  const choice = await vscode.window.showInformationMessage(`Veduta: extension ${version} installed.`, 'Reload Window');
+  if (choice) {
+    vscode.commands.executeCommand('workbench.action.reloadWindow');
+  }
 }
 
 function deactivate() {}

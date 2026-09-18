@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `veduta extension [--out FILE] [--install]`: the VS Code extension of the tool's own
+  release, checksum verified, written out or installed with VS Code's `code`. `veduta
+  version` names that extension's version (`"extension"`), and the extension (0.8.0)
+  offers to update itself when it is older. `install.ps1` finds VS Code where its
+  installers put it when `code` is not on PATH, instead of skipping the extension.
 - `veduta new KIND NAME [--in FOLDER]`: a new scene, world, prefab, model, material,
   texture, scenario (`--scene`/`--world`: where it starts) or Lua module, written from
   `template/new` so that it builds as it is; a first world also gets the `ground` material

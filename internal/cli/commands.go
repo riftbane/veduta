@@ -111,14 +111,20 @@ func Diff(a, b, out string, threshold int) (*inspect.DiffReport, error) {
 	return &r, nil
 }
 
+// ExtensionVersion is the version of the VS Code extension released with this tool
+// (editors/vscode/package.json; a test keeps the two equal). The extension compares it
+// with its own and offers to update itself when it is older.
+const ExtensionVersion = "0.8.0"
+
 // VersionInfo is printed by version.
 type VersionInfo struct {
-	Version string `json:"version"`
-	Commit  string `json:"commit"`
-	Date    string `json:"date"`
-	Go      string `json:"go"`
-	OS      string `json:"os"`
-	Arch    string `json:"arch"`
+	Version   string `json:"version"`
+	Extension string `json:"extension"` // ExtensionVersion
+	Commit    string `json:"commit"`
+	Date      string `json:"date"`
+	Go        string `json:"go"`
+	OS        string `json:"os"`
+	Arch      string `json:"arch"`
 }
 
 // Human prints one line.
@@ -127,7 +133,7 @@ func (v VersionInfo) Human() string {
 }
 
 func versionInfo(env *Env) VersionInfo {
-	v := VersionInfo{Version: env.Version, Commit: env.Commit, Date: env.Date, Go: runtime.Version(), OS: runtime.GOOS, Arch: runtime.GOARCH}
+	v := VersionInfo{Version: env.Version, Extension: ExtensionVersion, Commit: env.Commit, Date: env.Date, Go: runtime.Version(), OS: runtime.GOOS, Arch: runtime.GOARCH}
 	if v.Commit == "" {
 		v.Commit = "unknown"
 	}

@@ -190,6 +190,51 @@ func Latest(ctx context.Context, client *http.Client, channel string) (*Release,
 	return nil, fmt.Errorf("latest release: channel %q (want stable or beta)", channel)
 }
 
+// ExtensionFile is the VS Code extension a release carries beside the archives.
+const ExtensionFile = "veduta-vscode.vsix"
+
+// ByTag asks GitHub for the release of a tag.
+func ByTag(ctx context.Context, client *http.Client, tag string) (*Release, error) {
+	if !IsVersion(tag) {
+		return nil, fmt.Errorf("release: %q is not a version", tag)
+	}
+	var body releaseBody
+	if err := apiGet(ctx, client, "/repos/"+Repo+"/releases/tags/"+tag, 4<<20, &body); err != nil {
+		return nil, err
+	}
+	return body.release(), nil
+}
+
+// Extension downloads the VS Code extension of a release and verifies its SHA-256 against
+// the release's checksums.txt; it returns the file and its checksum.
+func Extension(ctx context.Context, client *http.Client, rel *Release) ([]byte, string, error) {
+	url, ok := rel.Assets[ExtensionFile]
+	if !ok {
+		return nil, "", fmt.Errorf("extension: release %s has no %s", rel.Tag, ExtensionFile)
+	}
+	sumsURL, ok := rel.Assets["checksums.txt"]
+	if !ok {
+		return nil, "", fmt.Errorf("extension: release %s has no checksums.txt", rel.Tag)
+	}
+	sums, err := download(ctx, client, sumsURL, 1<<20)
+	if err != nil {
+		return nil, "", err
+	}
+	want, err := checksumFor(sums, ExtensionFile)
+	if err != nil {
+		return nil, "", err
+	}
+	data, err := download(ctx, client, url, 64<<20)
+	if err != nil {
+		return nil, "", err
+	}
+	got := sha256.Sum256(data)
+	if hex.EncodeToString(got[:]) != want {
+		return nil, "", fmt.Errorf("extension: %s checksum mismatch (got %x, want %s)", ExtensionFile, got, want)
+	}
+	return data, want, nil
+}
+
 // releaseBody is the part of a GitHub release the tool reads. Decoding stays lenient: the
 // rest of the fields are none of its business.
 type releaseBody struct {

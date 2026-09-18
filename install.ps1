@@ -63,7 +63,18 @@
 
 	$archive = "veduta_${version}_windows_amd64.zip"
 	$vsix = 'veduta-vscode.vsix'
-	$code = if ($env:VEDUTA_VSCODE -ne '0') { Get-Command code -ErrorAction SilentlyContinue }
+	# VS Code's code program: on PATH, else where its installers put it (it joins PATH only
+	# for new sessions, and can be told not to at all).
+	$code = $null
+	if ($env:VEDUTA_VSCODE -ne '0') {
+		$found = Get-Command code -ErrorAction SilentlyContinue
+		if ($found) { $code = $found.Source }
+		else {
+			foreach ($p in @("$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code.cmd", "$env:ProgramFiles\Microsoft VS Code\bin\code.cmd")) {
+				if (Test-Path $p) { $code = $p; break }
+			}
+		}
+	}
 	$base = "https://github.com/$repo/releases/download/$version"
 	$tmp = Join-Path ([IO.Path]::GetTempPath()) ("veduta-" + [Guid]::NewGuid())
 	New-Item -ItemType Directory -Path $tmp | Out-Null
@@ -109,7 +120,7 @@
 			Invoke-WebRequest -UseBasicParsing -Uri "$base/$vsix" -OutFile (Join-Path $tmp $vsix)
 			$got = (Get-FileHash -Algorithm SHA256 (Join-Path $tmp $vsix)).Hash.ToLowerInvariant()
 			if ($got -ne $vsixSum) { throw "install.ps1: checksum mismatch for $vsix" }
-			& $code.Source --install-extension (Join-Path $tmp $vsix) --force | Out-Null
+			& $code --install-extension (Join-Path $tmp $vsix) --force | Out-Null
 			Write-Host 'Installed the Veduta extension into VS Code'
 		} elseif (-not $code -and $vsixSum) {
 			Write-Host "VS Code was not found: install it (https://code.visualstudio.com), then run this again for the Veduta extension"

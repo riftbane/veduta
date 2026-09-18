@@ -49,6 +49,7 @@ well in a terminal. Run commands inside a project folder (or pass `--project DIR
 |---------|------|
 | `veduta version` | the tool's version |
 | `veduta update [--channel stable\|beta] [--check]` | updates the tool from GitHub Releases |
+| `veduta extension [--install] [--out FILE]` | fetches the VS Code extension released with the tool (checksum verified); `--install` puts it into VS Code |
 | `veduta upgrade` | moves the project to the tool's engine version and refreshes editor files |
 | `veduta dap` | the debug adapter VS Code starts (not run by hand) |
 | `veduta mcp` | serves the tool to an AI agent (Claude Code) over MCP |

@@ -64,6 +64,16 @@ test('toolProblem', () => {
   assert.match(v.toolProblem({ message: 'exit 2' }, 'usage'), /failed: exit 2/);
 });
 
+test('extensionBehind', () => {
+  const out = (version, extension) => JSON.stringify({ version, extension });
+  assert.strictEqual(v.extensionBehind('0.7.0', out('v2.0.0-rc.10', '0.8.0')), '0.8.0');
+  assert.strictEqual(v.extensionBehind('0.8.0', out('v2.0.0-rc.10', '0.8.0')), null);
+  assert.strictEqual(v.extensionBehind('0.9.0', out('v2.0.0-rc.10', '0.8.0')), null);
+  assert.strictEqual(v.extensionBehind('0.7.0', out('dev', '0.8.0')), null, 'a dev tool has no release');
+  assert.strictEqual(v.extensionBehind('0.7.0', JSON.stringify({ version: 'v2.0.0-rc.9' })), null, 'a tool that does not say');
+  assert.strictEqual(v.extensionBehind('0.7.0', 'usage'), null);
+});
+
 test('older', () => {
   assert.ok(v.older('v2.0.0-rc.8', 'v2.0.0-rc.9'));
   assert.ok(v.older('v2.0.0-rc.9', 'v2.0.0'));

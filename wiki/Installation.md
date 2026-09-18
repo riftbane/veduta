@@ -91,7 +91,14 @@ on (see [Project Layout](Project-Layout#the-project-view)), and these commands:
 |---------|---------|
 | `veduta update` | the tool, from GitHub Releases (checksum verified) |
 | `veduta update --channel beta` | switches to release candidates and remembers it |
+| `veduta extension --install` | the VS Code extension, to the one released with the tool |
 | `veduta upgrade` | a project, to the tool's engine version (run inside the project) |
+
+On Windows `veduta update` cannot replace the running program: run the two lines of
+`install.ps1` again instead, which update the tool and the extension. The tool and the
+extension are released together but VS Code keeps its extensions itself, so they can drift
+apart: when the extension is older than the one that came with your `veduta`, it says so
+and **Update the Extension** installs the right one (then reload the window).
 
 Updating the tool never changes a project; `veduta upgrade` does, explicitly, and also
 refreshes the editor files (`.veduta/`, `.vscode/`, `.luarc.json`).
