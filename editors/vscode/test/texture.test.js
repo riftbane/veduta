@@ -36,7 +36,7 @@ const samples = [
 // draw compiles a sample texture the way the preview does: read the source, decode the
 // images its layers name, render.
 function draw(sample, fit) {
-  const text = fs.readFileSync(path.join(assets, 'textures', sample + '.tex.json'), 'utf8');
+  const text = fs.readFileSync(path.join(assets, 'textures', sample + '.vtex'), 'utf8');
   const { src, error } = tex.parse(text);
   assert.strictEqual(error, null, 'the source parses');
   if (fit) {

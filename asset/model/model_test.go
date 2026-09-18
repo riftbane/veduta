@@ -14,10 +14,10 @@ import (
 	"github.com/riftbane/veduta/v2/internal/golden"
 )
 
-// compile parses src as "test.model.json" and fails the test on error.
+// compile parses src as "test.vmodel" and fails the test on error.
 func compile(t testing.TB, src string) *asset.Model {
 	t.Helper()
-	m, err := Parse("test.model.json", []byte(src))
+	m, err := Parse("test.vmodel", []byte(src))
 	if err != nil {
 		t.Fatalf("compile: %v\n%s", err, src)
 	}
@@ -100,13 +100,13 @@ func TestValidationReportsEverything(t *testing.T) {
 		{19, `parts[9].scale[1]: must be non-zero`},
 		{19, `parts[9].material: name "Bad Name" may only contain`},
 	}
-	es := compileErrs(t, "models/bad.model.json", badSrc)
+	es := compileErrs(t, "models/bad.vmodel", badSrc)
 	for i, e := range es {
 		t.Logf("%v", e)
 		if i >= len(want) {
 			continue
 		}
-		if e.File != "models/bad.model.json" || e.Line != want[i].line || !strings.HasPrefix(e.Msg, want[i].msg) {
+		if e.File != "models/bad.vmodel" || e.Line != want[i].line || !strings.HasPrefix(e.Msg, want[i].msg) {
 			t.Errorf("error %d = %s:%d:%d %q, want line %d %q", i, e.File, e.Line, e.Col, e.Msg, want[i].line, want[i].msg)
 		}
 	}
@@ -164,7 +164,7 @@ func TestShapeValidation(t *testing.T) {
 		{``, "parts: at least one part is required"},
 	}
 	for _, c := range cases {
-		es := compileErrs(t, "m.model.json", model(c.parts))
+		es := compileErrs(t, "m.vmodel", model(c.parts))
 		found := false
 		for _, e := range es {
 			found = found || strings.Contains(e.Msg, c.want)
@@ -178,24 +178,24 @@ func TestShapeValidation(t *testing.T) {
 		`{"shape": "cylinder", "radius": 1, "height": 1, "segments": 0}`,
 		`{"shape": "sphere", "radius": 1, "rings": 0}`,
 	} {
-		compileErrs(t, "m.model.json", model(part))
+		compileErrs(t, "m.vmodel", model(part))
 	}
 }
 
 func TestParseFileAndName(t *testing.T) {
 	src := model(`{"shape": "box", "size": [1, 1, 1]}`)
-	if _, err := Parse("assets/models/crate.json", []byte(src)); err == nil || !strings.Contains(err.Error(), `must end in ".model.json"`) {
+	if _, err := Parse("assets/models/crate.json", []byte(src)); err == nil || !strings.Contains(err.Error(), `must end in ".vmodel"`) {
 		t.Errorf("wrong suffix: %v", err)
 	}
-	if _, err := Parse("Crate.model.json", []byte(src)); err == nil || !strings.Contains(err.Error(), `model name "Crate"`) {
+	if _, err := Parse("Crate.vmodel", []byte(src)); err == nil || !strings.Contains(err.Error(), `model name "Crate"`) {
 		t.Errorf("bad name: %v", err)
 	}
-	m, err := Parse(filepath.Join("assets", "models", "crate.model.json"), []byte(`{"veduta": "model/1", "name": "crate", "parts": [{"shape": "box", "size": [1, 1, 1]}]}`))
+	m, err := Parse(filepath.Join("assets", "models", "crate.vmodel"), []byte(`{"veduta": "model/1", "name": "crate", "parts": [{"shape": "box", "size": [1, 1, 1]}]}`))
 	if err != nil || m.Name != "crate" {
 		t.Fatalf("named model: %v %+v", err, m)
 	}
 	// Decoding errors come from asset.Decode, located.
-	_, err = Parse("m.model.json", []byte("{\n\"veduta\": \"model/1\",\n\"parts\": [{\"shape\": \"box\", \"sise\": [1, 1, 1]}]}"))
+	_, err = Parse("m.vmodel", []byte("{\n\"veduta\": \"model/1\",\n\"parts\": [{\"shape\": \"box\", \"sise\": [1, 1, 1]}]}"))
 	var se *asset.SourceError
 	if !errors.As(err, &se) || se.Line != 3 || !strings.Contains(se.Msg, "parts[0].sise: unknown field") {
 		t.Errorf("unknown field: %v", err)
@@ -304,11 +304,11 @@ func TestPivot(t *testing.T) {
 
 func TestDeterministic(t *testing.T) {
 	data := readModel(t, "crate")
-	a, err := Parse("crate.model.json", data)
+	a, err := Parse("crate.vmodel", data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := Parse("crate.model.json", data)
+	b, err := Parse("crate.vmodel", data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +326,7 @@ func TestDeterministic(t *testing.T) {
 
 // TestCrateExample compiles the model example of spec §8.1.
 func TestCrateExample(t *testing.T) {
-	m, err := Parse("testdata/models/crate.model.json", readModel(t, "crate"))
+	m, err := Parse("testdata/models/crate.vmodel", readModel(t, "crate"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -364,7 +364,7 @@ func TestSamples(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	files, err := filepath.Glob(filepath.Join(root, "testdata", "models", "*.model.json"))
+	files, err := filepath.Glob(filepath.Join(root, "testdata", "models", "*.vmodel"))
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no samples: %v", err)
 	}
@@ -385,7 +385,7 @@ func readModel(t testing.TB, name string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(root, "testdata", "models", name+".model.json"))
+	data, err := os.ReadFile(filepath.Join(root, "testdata", "models", name+".vmodel"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,7 +402,7 @@ func TestGeometryBeyondFloat32(t *testing.T) {
 		{"shape": "box", "size": [1, 1, 1]},
 		{"shape": "box", "size": [3e38, 1, 1], "position": [3e38, 0, 0]}
 	]}`
-	es := compileErrs(t, "test.model.json", src)
+	es := compileErrs(t, "test.vmodel", src)
 	if len(es) != 1 || !strings.Contains(es[0].Error(), "parts[1]: geometry exceeds the float32 range") {
 		t.Fatalf("errors = %v", es)
 	}
@@ -472,7 +472,7 @@ func TestLevelsOfDetail(t *testing.T) {
 		`lod[3].distance: 5 is not farther than the level before (5)`,
 		`lod[3].model: name "Bad" may only contain`,
 	}
-	es := compileErrs(t, "models/lod.model.json", src)
+	es := compileErrs(t, "models/lod.vmodel", src)
 	var got []string
 	for _, e := range es {
 		got = append(got, e.Msg)
@@ -486,7 +486,7 @@ func TestLevelsOfDetail(t *testing.T) {
 			t.Errorf("error %d = %q, want %q", i, got[i], w)
 		}
 	}
-	if es := compileErrs(t, "models/d.model.json", model(`{"shape": "box", "size": [1, 1, 1]}`)[:len(`{"veduta": "model/1",`)]+` "draw_distance": -2, "parts": [{"shape": "box", "size": [1, 1, 1]}]}`); len(es) != 1 || !strings.Contains(es[0].Msg, "-2 out of range") {
+	if es := compileErrs(t, "models/d.vmodel", model(`{"shape": "box", "size": [1, 1, 1]}`)[:len(`{"veduta": "model/1",`)]+` "draw_distance": -2, "parts": [{"shape": "box", "size": [1, 1, 1]}]}`); len(es) != 1 || !strings.Contains(es[0].Msg, "-2 out of range") {
 		t.Errorf("negative draw distance: %v", es)
 	}
 }

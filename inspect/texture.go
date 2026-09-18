@@ -20,7 +20,7 @@ import (
 )
 
 // TexSource is the source of a texture, needed for the per-layer analysis: File is the
-// source path (its base name must be "<name>.tex.json"), Data its bytes and FS the
+// source path (its base name must be "<name>.vtex"), Data its bytes and FS the
 // project's assets directory, from which image layers read their PNG files (nil when the
 // texture has no image layer).
 type TexSource struct {
@@ -122,7 +122,7 @@ func Texture(ir *Renderer, name string, src *TexSource, opt Options) (*Report, e
 		return nil, fmt.Errorf("inspect texture %s: %w", name, err)
 	}
 	var layers *texLayers
-	skipped := texSkip{reason: "no texture source was given", fix: "Inspect with the texture source (its .tex.json) to run them."}
+	skipped := texSkip{reason: "no texture source was given", fix: "Inspect with the texture source (its .vtex) to run them."}
 	if src != nil {
 		if layers, skipped, err = texLoadLayers(src, tex); err != nil {
 			return nil, fmt.Errorf("inspect texture %s: layer analysis: %w", name, err)
@@ -640,7 +640,7 @@ func texCheckAlpha(r *Report, lib *asset.Library, st texStats, users []string) {
 		}
 		files := make([]string, len(users))
 		for i, u := range users {
-			files[i] = "materials/" + u + ".mat.json"
+			files[i] = "materials/" + u + ".vmat"
 		}
 		r.Add(Warning, "TEX_ALPHA_UNUSED", st.nonOpaque,
 			map[string]any{"materials": users, "nonopaque_texels": st.nonOpaque, "alpha_min": st.alphaMin},
@@ -657,10 +657,10 @@ func texCheckAlpha(r *Report, lib *asset.Library, st texStats, users []string) {
 		switch {
 		case m.Alpha == "blend" && minA >= 255:
 			names = append(names, u)
-			what = append(what, fmt.Sprintf("materials/%s.mat.json (\"blend\")", u))
+			what = append(what, fmt.Sprintf("materials/%s.vmat (\"blend\")", u))
 		case m.Alpha == "cutout" && minA/255 >= float64(m.Cutoff):
 			names = append(names, u)
-			what = append(what, fmt.Sprintf("materials/%s.mat.json (\"cutout\", cutoff %g)", u, m.Cutoff))
+			what = append(what, fmt.Sprintf("materials/%s.vmat (\"cutout\", cutoff %g)", u, m.Cutoff))
 		}
 	}
 	if len(names) == 0 {

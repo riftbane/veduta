@@ -7,7 +7,7 @@ import (
 )
 
 func TestParseScenarioSample(t *testing.T) {
-	sc, err := ParseScenario("tests/scenarios/move.scenario.json", readTestdata(t, "scenarios/move.scenario.json"))
+	sc, err := ParseScenario("tests/scenarios/move.vscenario", readTestdata(t, "scenarios/move.vscenario"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestParseScenarioSample(t *testing.T) {
 }
 
 func TestParseScenarioMinimal(t *testing.T) {
-	sc, err := ParseScenario("idle.scenario.json", []byte(`{"veduta": "scenario/1", "scene": "main", "ticks": 1}`))
+	sc, err := ParseScenario("idle.vscenario", []byte(`{"veduta": "scenario/1", "scene": "main", "ticks": 1}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestParseScenarioErrors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ParseScenario("s.scenario.json", []byte(c.src))
+			_, err := ParseScenario("s.vscenario", []byte(c.src))
 			checkErrs(t, c.src, err, c.wants...)
 		})
 	}
@@ -189,7 +189,7 @@ func TestParseScenarioErrors(t *testing.T) {
 // is still reported.
 func TestParseScenarioReportsAll(t *testing.T) {
 	src := "{\n  \"veduta\": \"scenario/1\",\n  \"scene\": \"\",\n  \"ticks\": 0,\n  \"inputs\": [ { \"tick\": 5000, \"press\": [\"left\", \"q\"] } ],\n  \"expect\": [ { \"tick\": 3, \"trace\": \"x\" } ]\n}"
-	_, err := ParseScenario("s.scenario.json", []byte(src))
+	_, err := ParseScenario("s.vscenario", []byte(src))
 	es := sourceErrors(t, err)
 	want := [][2]int{{3, 12}, {4, 12}, {5, 49}, {6, 15}}
 	if len(es) != len(want) {
@@ -266,7 +266,7 @@ func TestParseInvariant(t *testing.T) {
 
 func TestScenarioDocExamples(t *testing.T) {
 	for i, ex := range docJSON(t, "scenario.md") {
-		if _, err := ParseScenario("example.scenario.json", []byte(ex)); err != nil {
+		if _, err := ParseScenario("example.vscenario", []byte(ex)); err != nil {
 			t.Errorf("docs/scenario.md example %d: %v", i, err)
 		}
 	}
@@ -280,7 +280,7 @@ func TestScenarioDocExamples(t *testing.T) {
 }
 
 func TestScenarioSaves(t *testing.T) {
-	sc, err := ParseScenario("s.scenario.json", []byte(`{"veduta": "scenario/1", "scene": "main", "ticks": 1,
+	sc, err := ParseScenario("s.vscenario", []byte(`{"veduta": "scenario/1", "scene": "main", "ticks": 1,
 		"saves": {"slot1": {"z": 2.0, "a": [1, 2]}, "settings": []}}`))
 	if err != nil {
 		t.Fatal(err)
@@ -288,7 +288,7 @@ func TestScenarioSaves(t *testing.T) {
 	if string(sc.Saves["slot1"]) != `{"z":2.0,"a":[1,2]}` || string(sc.Saves["settings"]) != `[]` {
 		t.Fatalf("saves %q", sc.Saves)
 	}
-	_, err = ParseScenario("s.scenario.json", []byte(`{"veduta": "scenario/1", "scene": "main", "ticks": 1,
+	_, err = ParseScenario("s.vscenario", []byte(`{"veduta": "scenario/1", "scene": "main", "ticks": 1,
 		"saves": {"Bad Name": {}, "number": 3}}`))
 	if err == nil || !strings.Contains(err.Error(), "saves.Bad Name") || !strings.Contains(err.Error(), "saves.number: a save is a JSON object or array") {
 		t.Fatalf("errors: %v", err)

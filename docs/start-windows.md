@@ -38,7 +38,7 @@ opens in a new window. From a terminal it is `veduta init mygame` and `code myga
 | `.veduta/`, `.vscode/`, `.luarc.json` | the editor's setup; `veduta upgrade` keeps it current |
 | `CLAUDE.md`, `.mcp.json` | for an AI agent working on the game with `veduta mcp` |
 
-A texture (`assets/textures/<name>.tex.json`) is drawn beside its source while you write it:
+A texture (`assets/textures/<name>.vtex`) is drawn beside its source while you write it:
 the eye in the editor's title bar, or **Veduta: Preview the Texture** ([textures](texture.md)).
 
 ## 3. Play it

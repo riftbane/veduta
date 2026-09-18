@@ -24,13 +24,13 @@ A thing on screen is an entity: a model (its shape), a material (its look), a po
 The new game already has the model `quad`, a 1 × 1 square. The paddle needs a material,
 a flat yellow:
 
-```json assets/materials/hero.mat.json
+```json assets/materials/hero.vmat
 { "veduta": "material/1", "albedo": "#f4c542", "unlit": true }
 ```
 
 and the stars a blue one:
 
-```json assets/materials/star.mat.json
+```json assets/materials/star.vmat
 { "veduta": "material/1", "albedo": "#8fd3ff", "unlit": true }
 ```
 
@@ -38,7 +38,7 @@ The scene lists what is there when the game starts. Add the paddle to its `entit
 camera shows 16 × 12 units around the centre, so `y` −5 is near the bottom, and `scale`
 stretches the square to 2 × 0.5.
 
-```json assets/scenes/main.scene.json
+```json assets/scenes/main.vscene
 {
   "veduta": "scene/1",
   "camera": { "type": "orthographic", "size": 12, "position": [0, 0, 100], "look_at": [0, 0, 0] },
@@ -173,7 +173,7 @@ game without a window, exactly as it plays, and give the same result on every ma
 
 Holding right for ten ticks moves the paddle right:
 
-```json tests/scenarios/move.scenario.json
+```json tests/scenarios/move.vscenario
 {
   "veduta": "scenario/1",
   "scene": "main",
@@ -190,7 +190,7 @@ Holding right for ten ticks moves the paddle right:
 
 Doing nothing loses, once:
 
-```json tests/scenarios/game_over.scenario.json
+```json tests/scenarios/game_over.vscenario
 {
   "veduta": "scenario/1",
   "scene": "main",
@@ -206,7 +206,7 @@ Doing nothing loses, once:
 
 and A starts again with a score of zero:
 
-```json tests/scenarios/restart.scenario.json
+```json tests/scenarios/restart.vscenario
 {
   "veduta": "scenario/1",
   "scene": "main",

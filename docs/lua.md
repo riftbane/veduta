@@ -23,7 +23,7 @@ leaves) or any pad. Three keys work the player itself:
 | Key | Does |
 |-----|------|
 | F1 | shows update, render and frame milliseconds against the tick's budget, and triangles against the console's 1200 |
-| F5 | restarts the game and records the buttons; F5 again saves them as `tests/scenarios/recorded-<time>.scenario.json`, a scenario to add expectations to |
+| F5 | restarts the game and records the buttons; F5 again saves them as `tests/scenarios/recorded-<time>.vscenario`, a scenario to add expectations to |
 | F9 | reads the scripts and assets again and restarts the game from the start |
 
 ### Editing while it plays
@@ -65,7 +65,7 @@ does not redraw. A run under the debugger gives the same trace as one without.
 `sumneko.lua`, which `.vscode/extensions.json` recommends; `.luarc.json` points it there
 and turns off `io`, `os`, `debug` and `package`), and `.veduta/schema/` holds a
 JSON Schema of every source format, which `.vscode/settings.json` maps to `veduta.json`,
-`*.scene.json`, `*.scenario.json` and the other asset files. The editor then completes the
+`*.vscene`, `*.vscenario` and the other asset files. The editor then completes the
 API and the fields of every file, shows their descriptions, and marks a misspelt function,
 a button that does not exist or a field the format does not have. `upgrade` sets only its
 own keys in `.vscode/settings.json`, `.vscode/extensions.json` and `.luarc.json`, and leaves
@@ -149,7 +149,7 @@ Setting any other field is an error: keep your own values in `state`.
 | `scene.tagged(tag)` | a list of entities, in id order |
 | `scene.entities()` | every live entity, in id order |
 | `scene.spawn{...}` | adds an entity and returns it; fields `kind` (default `static`), `name`, `model`, `material`, `position`, `rotation` (degrees), `scale` (each `{x, y, z}`), `tags` (a list), `visible`, `layer`, `frame`, `parent` (an entity or a name), `hitbox` (`{{min}, {max}}`), `state` (a table merged into the kind's) |
-| `scene.spawn_prefab(name, x, y, z [, rotation [, prefix]])` | adds the entities of `assets/prefabs/<name>.prefab.json` with the min corner of its footprint at (x, y, z), turned by `rotation` (0, 90, 180 or 270 degrees about +Y) as a world places it, named `<prefix>_<entity>` (prefix defaults to the prefab's name) and parented as the prefab says. Returns a table listing them in prefab order that also holds each under its name in the prefab (`house.door`) |
+| `scene.spawn_prefab(name, x, y, z [, rotation [, prefix]])` | adds the entities of `assets/prefabs/<name>.vprefab` with the min corner of its footprint at (x, y, z), turned by `rotation` (0, 90, 180 or 270 degrees about +Y) as a world places it, named `<prefix>_<entity>` (prefix defaults to the prefab's name) and parented as the prefab says. Returns a table listing them in prefab order that also holds each under its name in the prefab (`house.door`) |
 | `scene.load(name)` | replaces the scene, as a reset |
 
 The scene does not exist while the main script runs: call these from `game.init` on.
@@ -200,7 +200,7 @@ are pixels from the top left of the frame.
 | `hud.image_size(texture)` | the texture's width and height in texels |
 
 A color is `"#rrggbb"`, `"#rrggbbaa"` or an integer `0xrrggbb`; the default is white. A texture
-drawn in the hud is a texture asset like any other (`assets/textures/<name>.tex.json`,
+drawn in the hud is a texture asset like any other (`assets/textures/<name>.vtex`,
 often a PNG image layer): an icon sheet is one texture and `src` picks each icon.
 
 ## engine

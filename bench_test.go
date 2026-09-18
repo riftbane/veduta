@@ -8,7 +8,7 @@ import (
 // each frame drew.
 func TestHeadlessBench(t *testing.T) {
 	useTestProject(t, walkSpec(t))
-	code, rep := runCmd(t, "-headless", "bench", "--scenario", "walk.scenario.json", "--cpus", "2", "--width", "96", "--height", "72")
+	code, rep := runCmd(t, "-headless", "bench", "--scenario", "walk.vscenario", "--cpus", "2", "--width", "96", "--height", "72")
 	if code != exitOK || rep["ok"] != true {
 		t.Fatalf("code %d report %v", code, rep)
 	}

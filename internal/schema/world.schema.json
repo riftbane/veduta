@@ -377,7 +377,7 @@
       "type": "object"
     }
   },
-  "description": "WorldSource is assets/worlds/<name>.world.json.",
+  "description": "WorldSource is assets/worlds/<name>.vworld.",
   "properties": {
     "background": {
       "type": "string"

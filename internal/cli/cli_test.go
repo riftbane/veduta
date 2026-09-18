@@ -68,7 +68,7 @@ func newProject(t *testing.T) (string, *Env) {
 
 func TestInitAndCommands(t *testing.T) {
 	dir, env := newProject(t)
-	for _, f := range []string{"go.mod", "go.sum", "CLAUDE.md", "CHANGELOG.md", ".mcp.json", ".gitignore", ".github/workflows/release.yml", "cmd/game/main.go", "game/kinds.go", "assets/scenes/main.scene.json", "tests/scenarios/move.scenario.json"} {
+	for _, f := range []string{"go.mod", "go.sum", "CLAUDE.md", "CHANGELOG.md", ".mcp.json", ".gitignore", ".github/workflows/release.yml", "cmd/game/main.go", "game/kinds.go", "assets/scenes/main.vscene", "tests/scenarios/move.vscenario"} {
 		if _, err := os.Stat(filepath.Join(dir, f)); err != nil && f != "go.sum" {
 			t.Fatalf("missing %s: %v", f, err)
 		}

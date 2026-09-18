@@ -1,16 +1,16 @@
-# Scenario — `tests/scenarios/<name>.scenario.json`
+# Scenario — `tests/scenarios/<name>.vscenario`
 
 A scenario is an automated play test: it loads a scene (or a world), simulates a fixed number of ticks
 from a seed with scripted inputs, and checks expectations and invariants along the way,
 capturing screenshots at chosen ticks. The same seed and inputs always produce the same
 trace and the same frames, so a scenario is a regression test. Run one with
-`veduta simulate --scenario tests/scenarios/<name>.scenario.json` (MCP tool `simulate`);
+`veduta simulate --scenario tests/scenarios/<name>.vscenario` (MCP tool `simulate`);
 `veduta test` runs all of them.
 
 ## File and name
 
-- Location: `tests/scenarios/<name>.scenario.json` (relative to the project root, not to
-  `assets/`). The scenario's name is the file name without `.scenario.json`.
+- Location: `tests/scenarios/<name>.vscenario` (relative to the project root, not to
+  `assets/`). The scenario's name is the file name without `.vscenario`.
 - Names (scenario, scene, entity, trace event, tag, invariant) are 1–64 characters of
   `a-z`, `0-9`, `_` and `-`, starting with a letter or a digit.
 - The file is one JSON object. Decoding is strict: unknown fields, duplicate keys, wrong
@@ -30,8 +30,8 @@ update of tick t; at tick 0 it is the initial state. Every tick field in a scena
 | Field | Type | Default | Meaning |
 |-------|------|---------|---------|
 | `veduta` | string | required | Must be exactly `"scenario/1"`. |
-| `scene` | string | required unless `world` | Name of the scene to load (`assets/scenes/<scene>.scene.json`). |
-| `world` | string | none | Name of a world to load instead of a scene (`assets/worlds/<world>.world.json`, `world` topic). Exactly one of `scene` and `world`. Since v1.2.0. |
+| `scene` | string | required unless `world` | Name of the scene to load (`assets/scenes/<scene>.vscene`). |
+| `world` | string | none | Name of a world to load instead of a scene (`assets/worlds/<world>.vworld`, `world` topic). Exactly one of `scene` and `world`. Since v1.2.0. |
 | `at` | `[x, z]` | `[0, 0]` | Start cell of the world (only with `world`): the camera and the persistent entities are placed relative to it and the loaded chunks begin there. |
 | `seed` | integer | `0` | Seed of the simulation's random number generator, 0 to 18446744073709551615. |
 | `ticks` | integer | required | Number of ticks to simulate, 1 to 1000000 (20 Hz: 20 ticks = 1 s). |
@@ -152,11 +152,11 @@ one contact sheet image, labelled with their ticks.
 ## Errors (examples)
 
 ```
-move.scenario.json:7:33: inputs[1].press[0]: unknown button "Up" (did you mean "up"? the buttons are up, down, left, right, a, b, select, cancel)
-move.scenario.json:9:16: inputs[3].tick: tick 5 is before the previous input's tick 80 (inputs must be in tick order)
-move.scenario.json:13:5: expect[1]: mixes an entity comparison (entity, path, op, value) with a trace count (trace, count_min, count_max); use two expectations
-move.scenario.json:14:75: expect[2].op: op contains needs a string, list or state path (path position.x is a number)
-move.scenario.json:17:47: invariants[2]: invariant "entity_count_max:0": N must be in [1, 2147483647]
+move.vscenario:7:33: inputs[1].press[0]: unknown button "Up" (did you mean "up"? the buttons are up, down, left, right, a, b, select, cancel)
+move.vscenario:9:16: inputs[3].tick: tick 5 is before the previous input's tick 80 (inputs must be in tick order)
+move.vscenario:13:5: expect[1]: mixes an entity comparison (entity, path, op, value) with a trace count (trace, count_min, count_max); use two expectations
+move.vscenario:14:75: expect[2].op: op contains needs a string, list or state path (path position.x is a number)
+move.vscenario:17:47: invariants[2]: invariant "entity_count_max:0": N must be in [1, 2147483647]
 ```
 
 ## Full example

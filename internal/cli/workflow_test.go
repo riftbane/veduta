@@ -305,7 +305,7 @@ func TestReleaseWorkflowScript(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"demo/veduta.json", "demo/README.md", "demo/main.lua", "demo/lib/util.lua",
-		"demo/assets/scenes/main.scene.json", "demo/assets/models/quad.model.json"} {
+		"demo/assets/scenes/main.vscene", "demo/assets/models/quad.vmodel"} {
 		if _, ok := files[name]; !ok {
 			t.Errorf("the archive has no %s (it has %v)", name, reflect.ValueOf(files).MapKeys())
 		}

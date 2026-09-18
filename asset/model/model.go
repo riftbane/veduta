@@ -1,4 +1,4 @@
-// Package model compiles model sources (assets/models/<name>.model.json, header
+// Package model compiles model sources (assets/models/<name>.vmodel, header
 // "model/1") into asset.Model: one indexed triangle mesh built as the union of primitive
 // parts (box, cylinder, sphere, plane, extrude, lathe, and mirror copies of earlier
 // parts), with smoothed normals, UVs in meters, one mesh part per source part and the
@@ -63,8 +63,8 @@ var shapeFields = map[string][]string{
 var commonFields = []string{"position", "rotation_deg", "scale", "material", "uv", "flip_normals"}
 
 // Parse decodes and compiles the model source file (for example
-// "assets/models/crate.model.json"). The model name is the file name without its
-// ".model.json" suffix and must be a valid asset name; a "name" field in the source, when
+// "assets/models/crate.vmodel"). The model name is the file name without its
+// ".vmodel" suffix and must be a valid asset name; a "name" field in the source, when
 // present, must equal it. Errors are located *asset.SourceError values (one from
 // decoding) or an asset.Errors list with every validation problem.
 func Parse(file string, data []byte) (*asset.Model, error) {

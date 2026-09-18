@@ -171,7 +171,7 @@ func scnLibrary(t *testing.T) *asset.Library {
 		lib.Scenes[n] = base.Scenes[n]
 	}
 	for _, n := range asset.Names(scnFixtureModels) {
-		m, err := model.Parse("models/"+n+".model.json", []byte(scnFixtureModels[n]))
+		m, err := model.Parse("models/"+n+".vmodel", []byte(scnFixtureModels[n]))
 		if err != nil {
 			t.Fatalf("fixture model %s: %v", n, err)
 		}
@@ -181,7 +181,7 @@ func scnLibrary(t *testing.T) *asset.Library {
 		lib.Materials[m.Name] = m
 	}
 	for _, n := range asset.Names(scnFixtures) {
-		s, err := asset.ParseScene("assets/scenes/"+n+".scene.json", []byte(scnFixtures[n]))
+		s, err := asset.ParseScene("assets/scenes/"+n+".vscene", []byte(scnFixtures[n]))
 		if err != nil {
 			t.Fatalf("fixture scene %s: %v", n, err)
 		}
@@ -386,10 +386,10 @@ func TestSceneMissingAsset(t *testing.T) {
 		count                   int
 		hint                    string
 	}{
-		{"model", "assets/scenes/missing.scene.json", "entities[1].model", "crat", 2, `did you mean "crate"?`},
-		{"material", "assets/scenes/missing.scene.json", "entities[3].material", "nope", 1, "entities[3].material"},
-		{"texture", "assets/materials/painted.mat.json", "texture", "paint", 1, `Material "painted"`},
-		{"material", "assets/models/ghostmat.model.json", "parts[0].material", "ghost", 1, "parts[0].material"},
+		{"model", "assets/scenes/missing.vscene", "entities[1].model", "crat", 2, `did you mean "crate"?`},
+		{"material", "assets/scenes/missing.vscene", "entities[3].material", "nope", 1, "entities[3].material"},
+		{"texture", "assets/materials/painted.vmat", "texture", "paint", 1, `Material "painted"`},
+		{"material", "assets/models/ghostmat.vmodel", "parts[0].material", "ghost", 1, "parts[0].material"},
 	}
 	for i, w := range want {
 		got := is[i]
@@ -624,7 +624,7 @@ func TestSceneUnlit(t *testing.T) {
 		{"dark", Warning, "raise light.color (now #202020) and light.ambient (now #101010)"},
 		{"black", Warning, "both near black"},
 		{"uplight", Warning, "light.direction [0, 1, 0] points up"},
-		{"unlit", Info, `"unlit": false in assets/materials/flat.mat.json`},
+		{"unlit", Info, `"unlit": false in assets/materials/flat.vmat`},
 	} {
 		r := scnInspect(t, ir, tc.scene, Options{Focus: "SCENE_UNLIT"})
 		if len(r.Issues) != 1 || r.Issues[0].Severity != tc.severity || !strings.Contains(r.Issues[0].Hint, tc.hint) {

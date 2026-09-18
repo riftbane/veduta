@@ -96,7 +96,7 @@
       "type": "object"
     }
   },
-  "description": "PrefabSource is assets/prefabs/<name>.prefab.json.",
+  "description": "PrefabSource is assets/prefabs/<name>.vprefab.",
   "properties": {
     "entities": {
       "items": {

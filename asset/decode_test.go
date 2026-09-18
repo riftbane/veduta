@@ -19,7 +19,7 @@ const modelSrc = `{
 
 func TestDecodeOK(t *testing.T) {
 	var m ModelSource
-	loc, err := Decode("crate.model.json", []byte(modelSrc), TypeModel, &m)
+	loc, err := Decode("crate.vmodel", []byte(modelSrc), TypeModel, &m)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestDecodeOK(t *testing.T) {
 		}
 	}
 	e := loc.Errorf("parts[1].radius", "too small")
-	if e.Error() != "crate.model.json:6:38: parts[1].radius: too small" {
+	if e.Error() != "crate.vmodel:6:38: parts[1].radius: too small" {
 		t.Errorf("Errorf = %q", e.Error())
 	}
 }
@@ -49,7 +49,7 @@ func TestDecodeOK(t *testing.T) {
 func decodeErr(t *testing.T, src string) *SourceError {
 	t.Helper()
 	var m ModelSource
-	_, err := Decode("m.model.json", []byte(src), TypeModel, &m)
+	_, err := Decode("m.vmodel", []byte(src), TypeModel, &m)
 	if err == nil {
 		t.Fatalf("expected an error for %s", src)
 	}
@@ -88,7 +88,7 @@ func TestDecodeErrors(t *testing.T) {
 
 func TestCheckerHelpers(t *testing.T) {
 	var m ModelSource
-	loc, err := Decode("m.model.json", []byte(modelSrc), TypeModel, &m)
+	loc, err := Decode("m.vmodel", []byte(modelSrc), TypeModel, &m)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,13 +123,13 @@ func TestValidName(t *testing.T) {
 }
 
 func TestKindFiles(t *testing.T) {
-	if n, ok := KindTexture.NameFromFile("wood.tex.json"); !ok || n != "wood" {
+	if n, ok := KindTexture.NameFromFile("wood.vtex"); !ok || n != "wood" {
 		t.Errorf("texture name = %q %v", n, ok)
 	}
-	if _, ok := KindModel.NameFromFile(".model.json"); ok {
+	if _, ok := KindModel.NameFromFile(".vmodel"); ok {
 		t.Error("empty name accepted")
 	}
-	if KindScenario.Dir() != "tests/scenarios" || KindMaterial.Ext() != ".mat.json" {
+	if KindScenario.Dir() != "tests/scenarios" || KindMaterial.Ext() != ".vmat" {
 		t.Error("kind layout changed")
 	}
 }

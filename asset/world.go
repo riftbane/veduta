@@ -56,8 +56,8 @@ func Reserved(name string) string {
 }
 
 // ParseWorld decodes and compiles the world source file (for example
-// "assets/worlds/overworld.world.json"). The world name is the file name without its
-// ".world.json" suffix and must be a valid asset name. prefabs, when not nil, resolves
+// "assets/worlds/overworld.vworld"). The world name is the file name without its
+// ".vworld" suffix and must be a valid asset name. prefabs, when not nil, resolves
 // prefab names so footprints can be checked against cells, spacing and the extent;
 // unknown prefabs are not errors (inspection reports them).
 func ParseWorld(file string, data []byte, prefabs func(string) *Prefab) (*World, error) {

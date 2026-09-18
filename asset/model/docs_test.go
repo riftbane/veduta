@@ -58,7 +58,7 @@ func TestDocsExamples(t *testing.T) {
 			if i+1 >= len(blocks) || blocks[i+1].lang != "" {
 				t.Fatal("the errors example is not followed by its output block")
 			}
-			_, err := Parse("crate.model.json", []byte(b.body))
+			_, err := Parse("crate.vmodel", []byte(b.body))
 			if want := strings.TrimSpace(blocks[i+1].body); err == nil || err.Error() != want {
 				t.Errorf("errors example reports:\n%v\ndocs say:\n%s", err, want)
 			}
@@ -72,7 +72,7 @@ func TestDocsExamples(t *testing.T) {
 		if name == "" {
 			name = "example"
 		}
-		if _, err := Parse(name+".model.json", []byte(b.body)); err != nil {
+		if _, err := Parse(name+".vmodel", []byte(b.body)); err != nil {
 			t.Errorf("example in section %q: %v", b.section, err)
 		}
 	}

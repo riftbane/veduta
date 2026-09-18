@@ -11,7 +11,7 @@ project for you; install the tool first (on Windows, in PowerShell:
 | **Veduta: Play in the Simulator** (▶ Veduta in the status bar) | `veduta sim` on Windows, `veduta run` on Linux, in the terminal panel |
 | **Veduta: Test** | `veduta test`: the game's scenarios |
 | **Veduta: Build** | `veduta build`, its errors in Problems; also on every save of a script or an asset |
-| **Veduta: Preview the Texture** (the eye in the title bar of a `*.tex.json`) | draws the texture beside its source while you write it |
+| **Veduta: Preview the Texture** (the eye in the title bar of a `*.vtex`) | draws the texture beside its source while you write it |
 | **Veduta: Deploy to the Console's Card** | `veduta deploy`: the game onto the card, found by its label |
 
 The preview runs no engine: it draws the layer program in the panel itself, the same way

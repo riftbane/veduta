@@ -39,7 +39,7 @@ func testPrefabs() func(string) *Prefab {
 }
 
 func TestParseWorldFull(t *testing.T) {
-	w, err := ParseWorld("overworld.world.json", []byte(testWorld), testPrefabs())
+	w, err := ParseWorld("overworld.vworld", []byte(testWorld), testPrefabs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestParseWorldFull(t *testing.T) {
 
 func TestParseWorldDefaults(t *testing.T) {
 	src := `{"veduta": "world/1", "camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]}, "biomes": [{"name": "plain", "ground": "grass"}]}`
-	w, err := ParseWorld("w.world.json", []byte(src), nil)
+	w, err := ParseWorld("w.vworld", []byte(src), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestParseWorldErrors(t *testing.T) {
 			continue
 		}
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ParseWorld("w.world.json", []byte(c.src), testPrefabs())
+			_, err := ParseWorld("w.vworld", []byte(c.src), testPrefabs())
 			checkErrs(t, c.src, err, c.wants...)
 		})
 	}
@@ -171,10 +171,10 @@ func TestWorldWithoutPrefabsSkipsFootprintChecks(t *testing.T) {
 	src := `{"veduta": "world/1", "camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]}, "biomes": [{"name": "plain", "ground": "grass"}],
 	  "scatter": [{"prefab": "big", "density": 0.1}], "sites": [{"tag": "city", "prefabs": ["city_small"], "spacing": 2}],
 	  "places": [{"name": "a", "prefab": "city_small", "cell": [8190, 8190]}]}`
-	if _, err := ParseWorld("w.world.json", []byte(src), nil); err != nil {
+	if _, err := ParseWorld("w.vworld", []byte(src), nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ParseWorld("w.world.json", []byte(src), testPrefabs()); err == nil {
+	if _, err := ParseWorld("w.vworld", []byte(src), testPrefabs()); err == nil {
 		t.Fatal("footprint checks skipped with prefabs")
 	}
 }
@@ -185,7 +185,7 @@ func TestWorldDeps(t *testing.T) {
 		t.Fatal(err)
 	}
 	src.Places = append(src.Places, PlaceSource{Prefab: "Bad Name"})
-	want := []string{"prefabs/city_small.prefab.json", "prefabs/tree.prefab.json"}
+	want := []string{"prefabs/city_small.vprefab", "prefabs/tree.vprefab"}
 	if got := WorldDeps(&src); !reflect.DeepEqual(got, want) {
 		t.Fatalf("deps %v, want %v", got, want)
 	}
@@ -200,14 +200,14 @@ func TestReserved(t *testing.T) {
 }
 
 func TestPrefabAndWorldCodec(t *testing.T) {
-	p, err := ParsePrefab("house.prefab.json", []byte(`{"veduta": "prefab/1", "footprint": [3, 2.5], "tags": ["house"],
+	p, err := ParsePrefab("house.vprefab", []byte(`{"veduta": "prefab/1", "footprint": [3, 2.5], "tags": ["house"],
 	  "rules": {"biomes": ["plain"], "min_distance": {"city": 6, "house": 1}},
 	  "entities": [{"name": "walls", "kind": "static", "model": "house", "hitbox": [[0, 0, 0], [3, 2, 2.5]], "layer": 2},
 	               {"name": "roof", "kind": "static", "parent": "walls", "tags": ["roof"], "visible": false}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := ParseWorld("overworld.world.json", []byte(testWorld), testPrefabs())
+	w, err := ParseWorld("overworld.vworld", []byte(testWorld), testPrefabs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func TestPrefabAndWorldCodec(t *testing.T) {
 }
 
 func TestScenarioWorld(t *testing.T) {
-	sc, err := ParseScenario("w.scenario.json", []byte(`{"veduta": "scenario/1", "world": "overworld", "at": [120, -40], "ticks": 10}`))
+	sc, err := ParseScenario("w.vscenario", []byte(`{"veduta": "scenario/1", "world": "overworld", "at": [120, -40], "ticks": 10}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func TestScenarioWorld(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ParseScenario("s.scenario.json", []byte(c.src))
+			_, err := ParseScenario("s.vscenario", []byte(c.src))
 			checkErrs(t, c.src, err, c.wants...)
 		})
 	}
@@ -298,11 +298,11 @@ func TestWorldDocExamples(t *testing.T) {
 		var err error
 		switch h.Veduta {
 		case TypeWorld:
-			_, err = ParseWorld("example.world.json", []byte(ex), nil)
+			_, err = ParseWorld("example.vworld", []byte(ex), nil)
 		case TypePrefab:
-			_, err = ParsePrefab("example.prefab.json", []byte(ex))
+			_, err = ParsePrefab("example.vprefab", []byte(ex))
 		case TypeScenario:
-			_, err = ParseScenario("example.scenario.json", []byte(ex))
+			_, err = ParseScenario("example.vscenario", []byte(ex))
 		default:
 			t.Errorf("example %d: no parser for %q", i, h.Veduta)
 		}
@@ -329,7 +329,7 @@ func TestParseWorldTerrainAndVegetation(t *testing.T) {
 	    {"name": "tulips", "model": "tulip", "density": 1, "cell": [3, 4], "radius": 5, "scale": [0.5, 2]}
 	  ],
 	  "places": [{"name": "home", "prefab": "tree", "cell": [2, 2]}]}`
-	w, err := ParseWorld("w.world.json", []byte(src), testPrefabs())
+	w, err := ParseWorld("w.vworld", []byte(src), testPrefabs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestParseWorldTerrainAndVegetation(t *testing.T) {
 	if err := json.Unmarshal([]byte(src), &s); err != nil {
 		t.Fatal(err)
 	}
-	if got := WorldDeps(&s); !reflect.DeepEqual(got, []string{"prefabs/tree.prefab.json"}) {
+	if got := WorldDeps(&s); !reflect.DeepEqual(got, []string{"prefabs/tree.vprefab"}) {
 		t.Fatalf("deps %v", got)
 	}
 	back, err := DecodeWorld(EncodeWorld(w))
@@ -409,7 +409,7 @@ func TestParseWorldTerrainErrors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ParseWorld("w.world.json", []byte(c.src), testPrefabs())
+			_, err := ParseWorld("w.vworld", []byte(c.src), testPrefabs())
 			checkErrs(t, c.src, err, c.wants...)
 		})
 	}

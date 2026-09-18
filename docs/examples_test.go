@@ -22,9 +22,9 @@ func TestTwoDExamplesCompile(t *testing.T) {
 		asset.TypeScenario: func(f string, d []byte) error { _, err := asset.ParseScenario(f, d); return err },
 	}
 	files := map[string]string{
-		asset.TypeScene:    "main.scene.json",
-		asset.TypeMaterial: "coin.mat.json",
-		asset.TypeScenario: "coin.scenario.json",
+		asset.TypeScene:    "main.vscene",
+		asset.TypeMaterial: "coin.vmat",
+		asset.TypeScenario: "coin.vscenario",
 	}
 	n := 0
 	for rest := text; ; {
@@ -83,11 +83,11 @@ func TestWorldAndModelExamplesCompile(t *testing.T) {
 			}
 			switch h.Veduta {
 			case asset.TypeWorld:
-				_, err = asset.ParseWorld("overworld.world.json", []byte(block), nil)
+				_, err = asset.ParseWorld("overworld.vworld", []byte(block), nil)
 			case asset.TypePrefab:
-				_, err = asset.ParsePrefab("house.prefab.json", []byte(block))
+				_, err = asset.ParsePrefab("house.vprefab", []byte(block))
 			case asset.TypeScenario:
-				_, err = asset.ParseScenario("walk.scenario.json", []byte(block))
+				_, err = asset.ParseScenario("walk.vscenario", []byte(block))
 			default:
 				continue
 			}

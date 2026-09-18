@@ -11,7 +11,7 @@ func BenchmarkExample(b *testing.B) {
 	opt := Options{FS: os.DirFS(testdataDir(b))}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := Parse("example.tex.json", data, opt); err != nil {
+		if _, err := Parse("example.vtex", data, opt); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -31,7 +31,7 @@ func BenchmarkMaxSize(b *testing.B) {
 	opt := Options{FS: os.DirFS(testdataDir(b))}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := Parse("big.tex.json", data, opt); err != nil {
+		if _, err := Parse("big.vtex", data, opt); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -39,7 +39,7 @@ func BenchmarkMaxSize(b *testing.B) {
 
 func mustReadB(b *testing.B, name string) []byte {
 	b.Helper()
-	data, err := os.ReadFile(testdataDir(b) + "/textures/" + name + ".tex.json")
+	data, err := os.ReadFile(testdataDir(b) + "/textures/" + name + ".vtex")
 	if err != nil {
 		b.Fatal(err)
 	}

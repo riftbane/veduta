@@ -146,7 +146,7 @@
       "type": "object"
     }
   },
-  "description": "SceneSource is assets/scenes/<name>.scene.json.",
+  "description": "SceneSource is assets/scenes/<name>.vscene.",
   "properties": {
     "background": {
       "type": "string"

@@ -8,7 +8,7 @@ completes and checks them as you type.
 
 ## Models
 
-`assets/models/<name>.model.json`: a list of primitive parts joined into one mesh.
+`assets/models/<name>.vmodel`: a list of primitive parts joined into one mesh.
 
 ```json
 {
@@ -45,7 +45,7 @@ from Lua instead: see [3D, Worlds and Blocks](3D-Worlds-and-Blocks#block-worlds-
 
 ## Materials
 
-`assets/materials/<name>.mat.json`:
+`assets/materials/<name>.vmat`:
 
 ```json
 { "veduta": "material/1", "albedo": "#80c0ff60", "alpha": "blend", "unlit": true }
@@ -70,7 +70,7 @@ A sprite's material is always:
 
 ## Textures
 
-`assets/textures/<name>.tex.json`: an image described as layers painted one over the other,
+`assets/textures/<name>.vtex`: an image described as layers painted one over the other,
 bottom first.
 
 ```json
@@ -103,7 +103,7 @@ sprite gets its shape.
 
 ### Seeing it while you write it
 
-In VS Code, the eye in the title bar of a `.tex.json` file (or **Veduta: Preview the
+In VS Code, the eye in the title bar of a `.vtex` file (or **Veduta: Preview the
 Texture**) opens a panel beside it that draws the texture as you type, with nothing to save
 and no game to start. A grid and a ruler measure the picture, the pointer reads the texel it
 is on and that texel's colour — which is how you find the `src` rectangle of one sprite in a

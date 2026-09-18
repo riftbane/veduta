@@ -144,7 +144,7 @@ type cooker struct {
 	report *Report
 	lib    *asset.Library
 	// files are the sources of each kind by asset name, as slash paths under the kind's
-	// directory ("enemies/bat.mat.json"); dups are the later sources of a name already
+	// directory ("enemies/bat.vmat"); dups are the later sources of a name already
 	// taken, each with the path that took it.
 	files map[asset.Kind]map[string]string
 	dups  map[asset.Kind]map[string]string
@@ -169,6 +169,9 @@ func newCooker(root string, p *asset.Project) (*cooker, error) {
 }
 
 func (c *cooker) run() error {
+	if err := CheckNames(c.root, c.proj); err != nil {
+		return fmt.Errorf("cook: %w", err)
+	}
 	sources := map[asset.Kind][]string{}
 	for _, k := range asset.CookedKinds {
 		files, err := c.sources(k)
@@ -190,7 +193,7 @@ func (c *cooker) run() error {
 }
 
 // sources lists the source files of kind k as slash paths under the kind's directory,
-// sorted: sources may sit in folders of their own (materials/enemies/bat.mat.json), and a
+// sorted: sources may sit in folders of their own (materials/enemies/bat.vmat), and a
 // source's asset name is still its file name. It also indexes them by name, and notes a
 // name used twice.
 func (c *cooker) sources(k asset.Kind) ([]string, error) {
@@ -246,6 +249,56 @@ func SourceFiles(assets string, k asset.Kind) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// LegacySources lists the sources under the assets directory and tests/scenarios still
+// named with the suffix of before v2.0.0-rc.8 (Kind.LegacyExt), relative to the project
+// root with forward slashes, sorted.
+func LegacySources(root string, p *asset.Project) ([]string, error) {
+	var out []string
+	for _, dir := range []string{filepath.Join(root, filepath.FromSlash(p.Assets)), filepath.Join(root, "tests", "scenarios")} {
+		err := filepath.WalkDir(dir, func(fp string, d fs.DirEntry, err error) error {
+			if err != nil {
+				if errors.Is(err, fs.ErrNotExist) && fp == dir {
+					return filepath.SkipAll
+				}
+				return err
+			}
+			if d.IsDir() {
+				if fp != dir && strings.HasPrefix(d.Name(), ".") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			for _, k := range asset.SourceKinds {
+				if strings.HasSuffix(d.Name(), k.LegacyExt()) && len(d.Name()) > len(k.LegacyExt()) {
+					rel, err := filepath.Rel(root, fp)
+					if err != nil {
+						return err
+					}
+					out = append(out, filepath.ToSlash(rel))
+					break
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cook: %w", err)
+		}
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// CheckNames returns an error naming the sources LegacySources finds, if any: left as
+// they are, they would be no source at all.
+func CheckNames(root string, p *asset.Project) error {
+	legacy, err := LegacySources(root, p)
+	if err != nil || len(legacy) == 0 {
+		return err
+	}
+	return fmt.Errorf("%s: sources are named <name>%s, <name>%s and so on since v2.0.0-rc.8; run veduta upgrade to rename them",
+		strings.Join(legacy, ", "), asset.KindModel.Ext(), asset.KindTexture.Ext())
 }
 
 // SourcePath returns the source file of asset name of kind k, relative to the project root

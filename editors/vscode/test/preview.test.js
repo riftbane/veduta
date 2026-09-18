@@ -116,11 +116,11 @@ test('a source it is sent is drawn, with its size and its layers', () => {
   const b = browser();
   b.send({
     type: 'source',
-    file: 'probe.tex.json',
+    file: 'probe.vtex',
     text: source([{ type: 'solid', color: '#204080' }, { type: 'circle', center: [8, 8], radius: 5, color: '#ff0000' }]),
     images: {},
   });
-  assert.strictEqual(b.elements.name.textContent, 'probe.tex.json');
+  assert.strictEqual(b.elements.name.textContent, 'probe.vtex');
   assert.strictEqual(b.elements.size.textContent, '16x16');
   assert.strictEqual(b.elements.error.hidden, true);
   assert.deepStrictEqual(b.elements.layers.children.map((c) => c.textContent), ['0 solid', '1 circle']);
@@ -132,14 +132,14 @@ test('a source it is sent is drawn, with its size and its layers', () => {
 
 test('a tiling texture offers the repeat view', () => {
   const b = browser();
-  b.send({ type: 'source', file: 'a.tex.json', text: source([{ type: 'solid', color: '#204080' }], { tiling: true }), images: {} });
+  b.send({ type: 'source', file: 'a.vtex', text: source([{ type: 'solid', color: '#204080' }], { tiling: true }), images: {} });
   assert.strictEqual(b.elements.repeatbox.hidden, false);
 });
 
 test('a source the engine would refuse shows why, and keeps the last picture', () => {
   const b = browser();
-  b.send({ type: 'source', file: 'a.tex.json', text: source([{ type: 'solid', color: '#204080' }]), images: {} });
-  b.send({ type: 'source', file: 'a.tex.json', text: source([{ type: 'solid' }]), images: {} });
+  b.send({ type: 'source', file: 'a.vtex', text: source([{ type: 'solid', color: '#204080' }]), images: {} });
+  b.send({ type: 'source', file: 'a.vtex', text: source([{ type: 'solid' }]), images: {} });
   assert.strictEqual(b.elements.error.hidden, false);
   assert.match(b.elements.error.textContent, /layers\[0\]\.color: is required/);
   assert.ok(b.elements.view.classes.has('stale'), 'the picture on screen is marked out of date');
@@ -147,7 +147,7 @@ test('a source the engine would refuse shows why, and keeps the last picture', (
 
 test('text that is not JSON yet is reported, not thrown', () => {
   const b = browser();
-  b.send({ type: 'source', file: 'a.tex.json', text: '{ "veduta": ', images: {} });
+  b.send({ type: 'source', file: 'a.vtex', text: '{ "veduta": ', images: {} });
   assert.strictEqual(b.elements.error.hidden, false);
   assert.ok(b.elements.error.textContent.length > 0);
 });
@@ -157,7 +157,7 @@ test('an image layer draws the PNG the extension sends', () => {
   const png = fs.readFileSync(path.resolve(dir, '..', '..', 'testdata', 'textures', 'src', 'rb.png'));
   b.send({
     type: 'source',
-    file: 'a.tex.json',
+    file: 'a.vtex',
     text: source([{ type: 'image', path: 'textures/src/rb.png', fit: 'stretch' }]),
     images: { 'textures/src/rb.png': png.toString('base64') },
   });

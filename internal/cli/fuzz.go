@@ -158,7 +158,7 @@ func (g fuzzGame) events(limit int) []asset.InputSource {
 }
 
 // Fuzz plays random games looking for invariant violations and writes a minimized repro
-// of the first one to tests/scenarios/fuzz_<hash>.scenario.json.
+// of the first one to tests/scenarios/fuzz_<hash>.vscenario.
 func (s *Session) Fuzz(o FuzzOptions) (*FuzzReport, error) {
 	start := time.Now()
 	if o.Scene == "" && o.World == "" {
@@ -348,7 +348,7 @@ func (s *Session) minimize(bin, dir string, o FuzzOptions, games []fuzzGame, r *
 	data := marshal(sc, true)
 	sum := sha256.Sum256(data)
 	name := "fuzz_" + hex.EncodeToString(sum[:4])
-	path := filepath.Join(s.Root, "tests", "scenarios", name+".scenario.json")
+	path := filepath.Join(s.Root, "tests", "scenarios", name+".vscenario")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}

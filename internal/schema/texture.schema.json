@@ -113,7 +113,7 @@
       "type": "object"
     }
   },
-  "description": "TextureSource is assets/textures/<name>.tex.json.",
+  "description": "TextureSource is assets/textures/<name>.vtex.",
   "properties": {
     "layers": {
       "items": {

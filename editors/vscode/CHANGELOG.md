@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+- Sources have an extension per format (`.vmodel`, `.vtex`, `.vmat`, `.vscene`,
+  `.vscenario`, `.vprefab`, `.vworld`, engine v2.0.0-rc.8): they open as JSON, saving one
+  builds, and the texture preview is for `*.vtex`.
+
 ## 0.5.0
 
 - **Veduta: Preview the Texture** (the eye in the title bar of a `*.tex.json`): a panel

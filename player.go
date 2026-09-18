@@ -83,7 +83,7 @@ func sourceStamp(dir string, p *asset.Project) (string, error) {
 		rel, _ := filepath.Rel(dir, path)
 		rel = filepath.ToSlash(rel)
 		if strings.HasSuffix(path, ".lua") || rel == asset.ProjectFile ||
-			strings.HasSuffix(path, ".json") && strings.HasPrefix(rel, p.Assets+"/") {
+			isSource(d.Name()) && strings.HasPrefix(rel, p.Assets+"/") {
 			info, err := d.Info()
 			if err != nil {
 				return err
@@ -93,6 +93,12 @@ func sourceStamp(dir string, p *asset.Project) (string, error) {
 		return nil
 	})
 	return b.String(), err
+}
+
+// isSource reports whether a file name is an asset source's (crate.vmodel).
+func isSource(name string) bool {
+	_, ok := asset.KindOfFile(name)
+	return ok
 }
 
 // openWindow opens the player's screen; tests replace it.
@@ -417,7 +423,7 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// stopRecording saves the recording, if any, as tests/scenarios/recorded-<time>.scenario.json.
+// stopRecording saves the recording, if any, as tests/scenarios/recorded-<time>.vscenario.
 func (pl *player) stopRecording() error {
 	rec := pl.rec
 	if rec == nil {
@@ -426,7 +432,7 @@ func (pl *player) stopRecording() error {
 	pl.rec = nil
 	ticks := max(int(pl.e.tick), 1)
 	name := "recorded-" + time.Now().Format("20060102-150405")
-	path := filepath.Join(pl.dir, "tests", "scenarios", name+".scenario.json")
+	path := filepath.Join(pl.dir, "tests", "scenarios", name+".vscenario")
 	var b strings.Builder
 	fmt.Fprintf(&b, "{\n  \"veduta\": %q,\n", asset.TypeScenario)
 	if pl.start.World != "" {
@@ -467,7 +473,7 @@ func (pl *player) stopRecording() error {
 		pl.say("saving the recording: %v", err)
 		return nil
 	}
-	pl.say("saved tests/scenarios/%s.scenario.json (%d ticks)", name, ticks)
+	pl.say("saved tests/scenarios/%s.vscenario (%d ticks)", name, ticks)
 	return nil
 }
 

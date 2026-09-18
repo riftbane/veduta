@@ -84,21 +84,21 @@ func parseWikiAsset(kind, body string) error {
 	var err error
 	switch kind {
 	case asset.TypeScene:
-		_, err = asset.ParseScene("main.scene.json", b)
+		_, err = asset.ParseScene("main.vscene", b)
 	case asset.TypeMaterial:
-		_, err = asset.ParseMaterial("x.mat.json", b)
+		_, err = asset.ParseMaterial("x.vmat", b)
 	case asset.TypeScenario:
-		_, err = asset.ParseScenario("x.scenario.json", b)
+		_, err = asset.ParseScenario("x.vscenario", b)
 	case asset.TypeProject:
 		_, err = asset.ParseProject("veduta.json", b)
 	case asset.TypeTexture:
-		_, err = texture.Parse("x.tex.json", b, texture.Options{FS: wikiPNGs(body)})
+		_, err = texture.Parse("x.vtex", b, texture.Options{FS: wikiPNGs(body)})
 	case asset.TypeModel:
-		_, err = model.Parse("x.model.json", b)
+		_, err = model.Parse("x.vmodel", b)
 	case asset.TypePrefab:
-		_, err = asset.ParsePrefab("x.prefab.json", b)
+		_, err = asset.ParsePrefab("x.vprefab", b)
 	case asset.TypeWorld:
-		_, err = asset.ParseWorld("x.world.json", b, nil)
+		_, err = asset.ParseWorld("x.vworld", b, nil)
 	}
 	return err
 }

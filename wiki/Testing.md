@@ -6,7 +6,7 @@ without a window in a fraction of a second, and checked. That is a **scenario**.
 
 ## Scenarios
 
-`tests/scenarios/<name>.scenario.json`:
+`tests/scenarios/<name>.vscenario`:
 
 ```json
 {
@@ -138,7 +138,7 @@ matter.
 ## One run by hand
 
 ```sh
-veduta simulate --scenario tests/scenarios/walk.scenario.json
+veduta simulate --scenario tests/scenarios/walk.vscenario
 veduta simulate --scene level --ticks 200 --seed 3 --screenshots 0,100,200
 veduta render --scene level --tick 60 --out out/level.png
 ```

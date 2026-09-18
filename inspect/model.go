@@ -1326,10 +1326,10 @@ func (a *mdlAnalysis) partIssues(r *Report, p *mdlPart) {
 			p.name(), p.uvOut, p.uvVerts, p.uvMin[0], p.uvMax[0], p.uvMin[1], p.uvMax[1])
 		switch {
 		case p.tex.clamp:
-			r.Add(Warning, "MESH_UV_OUT_OF_RANGE", p.uvOut, w, span+fmt.Sprintf(" but texture %q does not tile, so its edge texels smear. Set \"tiling\": true in textures/%s.tex.json, or keep the part within 1 m (%s%s).",
+			r.Add(Warning, "MESH_UV_OUT_OF_RANGE", p.uvOut, w, span+fmt.Sprintf(" but texture %q does not tile, so its edge texels smear. Set \"tiling\": true in textures/%s.vtex, or keep the part within 1 m (%s%s).",
 				p.tex.texture, p.tex.texture, p.fields(), p.on()))
 		case p.tex.missing:
-			r.Add(Info, "MESH_UV_OUT_OF_RANGE", p.uvOut, w, span+fmt.Sprintf(" and texture %q of material %q is not in the library. Add textures/%s.tex.json (with \"tiling\": true to repeat).",
+			r.Add(Info, "MESH_UV_OUT_OF_RANGE", p.uvOut, w, span+fmt.Sprintf(" and texture %q of material %q is not in the library. Add textures/%s.vtex (with \"tiling\": true to repeat).",
 				p.tex.texture, p.tex.material, p.tex.texture))
 		default: // tiling or entity-chosen texture: merged into one info issue
 			g := &a.aggOut
@@ -1356,7 +1356,7 @@ func (a *mdlAnalysis) partIssues(r *Report, p *mdlPart) {
 		w["triangles"] = mdlFirst(p.overlap)
 		w["overlap_ratio"] = mdlR(p.overlapR)
 		r.Add(Warning, "MESH_UV_OVERLAP", len(p.overlap), w,
-			fmt.Sprintf("%s maps %d triangle(s) onto UV space other triangles of the part also use (%.0f%% of its covered UV cells, \"uv\": %q) and texture %q does not tile, so those faces show the same texels. Set \"tiling\": true in textures/%s.tex.json or choose another \"uv\" mode%s.",
+			fmt.Sprintf("%s maps %d triangle(s) onto UV space other triangles of the part also use (%.0f%% of its covered UV cells, \"uv\": %q) and texture %q does not tile, so those faces show the same texels. Set \"tiling\": true in textures/%s.vtex or choose another \"uv\" mode%s.",
 				p.name(), len(p.overlap), 100*p.overlapR, p.info.UV, p.tex.texture, p.tex.texture, p.on()))
 	}
 }
@@ -1527,7 +1527,7 @@ func (a *mdlAnalysis) modelIssues(r *Report) {
 			o := a.lib.Models[l.Model]
 			if o == nil {
 				r.Add(Error, "MESH_LOD_MODEL_MISSING", 1, map[string]any{"level": i + 1, "model": l.Model},
-					fmt.Sprintf("Level of detail %d (from %v m) draws model %q, which does not exist: add assets/models/%s.model.json or remove \"model\" from lod[%d] to draw this model with fewer segments.",
+					fmt.Sprintf("Level of detail %d (from %v m) draws model %q, which does not exist: add assets/models/%s.vmodel or remove \"model\" from lod[%d] to draw this model with fewer segments.",
 						i+1, l.Distance, l.Model, l.Model, i))
 				continue
 			}

@@ -13,8 +13,8 @@ const (
 )
 
 // ParsePrefab decodes and compiles the prefab source file (for example
-// "assets/prefabs/house.prefab.json"). The prefab name is the file name without its
-// ".prefab.json" suffix and must be a valid asset name.
+// "assets/prefabs/house.vprefab"). The prefab name is the file name without its
+// ".vprefab" suffix and must be a valid asset name.
 func ParsePrefab(file string, data []byte) (*Prefab, error) {
 	var src PrefabSource
 	loc, err := Decode(file, data, TypePrefab, &src)

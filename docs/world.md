@@ -1,4 +1,4 @@
-# World — `assets/worlds/<name>.world.json`
+# World — `assets/worlds/<name>.vworld`
 
 A world is a map too large to write by hand: a seeded generator paints biomes over an
 integer grid of cells, raises rolling ground and the hills, plains, lakes and seas you
@@ -16,8 +16,8 @@ on the authoring machine and on the console.
 
 ## File and name
 
-- Location: `assets/worlds/<name>.world.json`. The name is the file name without
-  `.world.json`; `render --world`, `simulate --world`, scenarios (`"world": …`) and
+- Location: `assets/worlds/<name>.vworld`. The name is the file name without
+  `.vworld`; `render --world`, `simulate --world`, scenarios (`"world": …`) and
   `ctx.LoadWorld` refer to it. A folder under `assets/worlds/` works too; names must be
   unique across the folders.
 - Decoding is strict (unknown fields, duplicate keys, wrong types and trailing data are

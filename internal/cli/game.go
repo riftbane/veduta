@@ -250,10 +250,10 @@ func (r SimResult) Human() string {
 
 // scenarioPath accepts a scenario name ("collect") as well as a file path.
 func (s *Session) scenarioPath(p string) string {
-	if strings.ContainsAny(p, `/\`) || strings.HasSuffix(p, ".json") {
+	if strings.ContainsAny(p, `/\`) || strings.HasSuffix(p, asset.KindScenario.Ext()) {
 		return p
 	}
-	return filepath.Join(s.Root, "tests", "scenarios", p+".scenario.json")
+	return filepath.Join(s.Root, "tests", "scenarios", p+".vscenario")
 }
 
 // Simulate runs ticks through the game binary; results are kept under out/runs/<id>/.
@@ -261,7 +261,7 @@ func (s *Session) Simulate(o SimulateOptions) (SimResult, error) {
 	name := o.Scene
 	if o.Scenario != "" {
 		o.Scenario = s.scenarioPath(o.Scenario)
-		name = strings.TrimSuffix(filepath.Base(o.Scenario), ".scenario.json")
+		name = strings.TrimSuffix(filepath.Base(o.Scenario), ".vscenario")
 	}
 	if name == "" {
 		name = o.World
@@ -524,7 +524,7 @@ func init() {
 			fs := newFlags("bench", env.Stderr)
 			var o BenchOptions
 			var at string
-			fs.StringVar(&o.Scenario, "scenario", "", "scenario name (tests/scenarios/<name>.scenario.json) or file")
+			fs.StringVar(&o.Scenario, "scenario", "", "scenario name (tests/scenarios/<name>.vscenario) or file")
 			fs.StringVar(&o.Scene, "scene", "", "scene")
 			fs.StringVar(&o.World, "world", "", "world instead of a scene")
 			fs.StringVar(&at, "at", "", "with --world: start cell x,z")
@@ -553,7 +553,7 @@ func init() {
 			fs := newFlags("simulate", env.Stderr)
 			var o SimulateOptions
 			var shots, invs, at string
-			fs.StringVar(&o.Scenario, "scenario", "", "scenario name (tests/scenarios/<name>.scenario.json) or file")
+			fs.StringVar(&o.Scenario, "scenario", "", "scenario name (tests/scenarios/<name>.vscenario) or file")
 			fs.StringVar(&o.Scene, "scene", "", "scene")
 			fs.StringVar(&o.World, "world", "", "world instead of a scene")
 			fs.StringVar(&at, "at", "", "with --world: start cell x,z")

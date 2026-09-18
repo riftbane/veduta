@@ -251,7 +251,7 @@ func (g *Game) texture(vm *lua.VM, args []lua.Value, i int, fname string) (gfx.T
 	name := vm.CheckString(args, i, fname)
 	tex, w, h, ok := g.ctx.Texture(name)
 	if !ok {
-		vm.Errorf("%s: no texture %q (assets/textures/%s.tex.json)", fname, name, name)
+		vm.Errorf("%s: no texture %q (assets/textures/%s.vtex)", fname, name, name)
 	}
 	return tex, w, h
 }

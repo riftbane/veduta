@@ -45,7 +45,7 @@ escaping, `deps` sorted without duplicates and `[]` when empty. Readers reject M
 is not byte-for-byte canonical, so equal metadata always has equal bytes.
 
 ```json
-{"compiler":"veduta-asset/0.5.0","deps":[],"kind":"model","name":"crate","source":"models/crate.model.json","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
+{"compiler":"veduta-asset/0.5.0","deps":[],"kind":"model","name":"crate","source":"models/crate.vmodel","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
 ```
 
 | Key | Meaning |
@@ -54,7 +54,7 @@ is not byte-for-byte canonical, so equal metadata always has equal bytes.
 | `deps` | Other input files the compiled output depends on besides the source (for example the PNG of a texture `image` layer), as paths relative to the assets directory. |
 | `kind` | `model`, `texture`, `material`, `scene`, `prefab` or `world`. |
 | `name` | Asset name (the source file name without its suffix). |
-| `source` | Source path relative to the assets directory, forward slashes (`models/crate.model.json`). |
+| `source` | Source path relative to the assets directory, forward slashes (`models/crate.vmodel`). |
 | `source_hash` | Lowercase hex SHA-256 (64 characters) of the compiler inputs, computed by `cook`: SHA-256 over `veduta-cook/1\n`, the compiler version and `\n`, then `source <path> <length>\n` followed by the source bytes, then for each dependency in `deps` order `dep <path> <length>\n` followed by its bytes (`missing <path>\n` when it cannot be read). It changes whenever the source or any dependency changes. |
 
 ## Primitive encodings

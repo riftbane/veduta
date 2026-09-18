@@ -1,4 +1,4 @@
-# Scene — `assets/scenes/<name>.scene.json`
+# Scene — `assets/scenes/<name>.vscene`
 
 A scene is the starting state of a level: one camera, one directional light, a background
 color and an ordered list of entities. Each entity has a transform, an optional model and
@@ -6,10 +6,10 @@ material, tags, an optional parent, and a `kind` that selects its Go behaviour.
 
 ## File and name
 
-- Location: `assets/scenes/<name>.scene.json`. The scene's name is the file name without
-  `.scene.json` (`main.scene.json` → `main`); it is what `render --scene`, scenarios
+- Location: `assets/scenes/<name>.vscene`. The scene's name is the file name without
+  `.vscene` (`main.vscene` → `main`); it is what `render --scene`, scenarios
   (`"scene": "main"`) and `default_scene` in `veduta.json` refer to. A folder under
-  `assets/scenes/` works too (`assets/scenes/caves/cave_1.scene.json` is the scene
+  `assets/scenes/` works too (`assets/scenes/caves/cave_1.vscene` is the scene
   `cave_1`), so names must be unique across the folders.
 - Names (scene, entity, kind, model, material, tag) are 1–64 characters of `a-z`, `0-9`,
   `_` and `-`, starting with a letter or a digit.
@@ -76,8 +76,8 @@ all three defaults apply; inside `light`, each field is optional.
 |-------|------|---------|---------|
 | `name` | string | required | Unique within the scene. Scenarios, traces and `parent` refer to entities by name. |
 | `kind` | string | required | Behaviour selector. Built-in kinds: `static` (no behaviour: scenery), `camera`, `light`. Any other valid name must be registered by the game in Go with `veduta.RegisterKind`; the scene compiler accepts it, and an unregistered kind is reported when the game loads the scene. |
-| `model` | string | none | Name of a model asset (`assets/models/<name>.model.json`). Without a model the entity is invisible in renders but still exists (triggers, spawn points, logic). |
-| `material` | string | none | Name of a material asset (`assets/materials/<name>.mat.json`). It is used by the model parts that do not name a material of their own; parts with their own material keep it. Parts left without any material use the default material (white, opaque, lit). |
+| `model` | string | none | Name of a model asset (`assets/models/<name>.vmodel`). Without a model the entity is invisible in renders but still exists (triggers, spawn points, logic). |
+| `material` | string | none | Name of a material asset (`assets/materials/<name>.vmat`). It is used by the model parts that do not name a material of their own; parts with their own material keep it. Parts left without any material use the default material (white, opaque, lit). |
 | `position` | vector | `[0, 0, 0]` | Translation in meters. |
 | `rotation_deg` | vector | `[0, 0, 0]` | Rotation in degrees (order above). Any finite value. |
 | `scale` | vector | `[1, 1, 1]` | Scale per axis. Every component must be non-zero; a negative component mirrors along that axis. |
@@ -104,11 +104,11 @@ files is in `docs/vda.md` (chunk `SCEN`).
 ## Errors (examples)
 
 ```
-main.scene.json:4:31: camera.look_at: must differ from camera.position {0 5 10}
-main.scene.json:9:62: entities[1].scale[1]: must be non-zero
-main.scene.json:12:45: entities[3].name: duplicate entity name "gem" (first used by entities[2])
-main.scene.json:14:20: entities[4].parent: parent cycle: arm -> hand -> arm
-main.scene.json:16:52: entities[5].hitbox[1][1]: max y (0) must be at least min y (0.5)
+main.vscene:4:31: camera.look_at: must differ from camera.position {0 5 10}
+main.vscene:9:62: entities[1].scale[1]: must be non-zero
+main.vscene:12:45: entities[3].name: duplicate entity name "gem" (first used by entities[2])
+main.vscene:14:20: entities[4].parent: parent cycle: arm -> hand -> arm
+main.vscene:16:52: entities[5].hitbox[1][1]: max y (0) must be at least min y (0.5)
 ```
 
 ## Full example

@@ -21,12 +21,12 @@ import (
 // sheet with the committed goldens. CI runs this on linux/amd64 and windows/amd64, so the
 // goldens make the two platforms byte-identical transitively (spec §7.6, §15.4).
 func TestGameScenarios(t *testing.T) {
-	files, err := filepath.Glob(filepath.Join("internal", "testgame", "tests", "scenarios", "*.scenario.json"))
+	files, err := filepath.Glob(filepath.Join("internal", "testgame", "tests", "scenarios", "*.vscenario"))
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no test game scenarios: %v", err)
 	}
 	for _, f := range files {
-		name := strings.TrimSuffix(filepath.Base(f), ".scenario.json")
+		name := strings.TrimSuffix(filepath.Base(f), ".vscenario")
 		t.Run(name, func(t *testing.T) {
 			out := t.TempDir()
 			res := simulate(t, "-project", testGame, "-headless", "simulate", "--scenario", f, "--out", out)
@@ -81,7 +81,7 @@ func TestTemplateStarts(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			args := []string{"-project", dir, "-headless", "simulate", "--scenario", filepath.Join(dir, "tests", "scenarios", "start.scenario.json"), "--out", t.TempDir()}
+			args := []string{"-project", dir, "-headless", "simulate", "--scenario", filepath.Join(dir, "tests", "scenarios", "start.vscenario"), "--out", t.TempDir()}
 			var stdout, stderr bytes.Buffer
 			var code int
 			if lang == "lua" {

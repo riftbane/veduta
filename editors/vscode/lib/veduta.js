@@ -55,7 +55,7 @@ function diagnostics(report) {
 // file of the engine's formats.
 function isGameFile(name) {
   return /\.lua$/.test(name) || /(^|[\\/])veduta\.json$/.test(name) ||
-    /\.(model|tex|mat|scene|scenario|prefab|world)\.json$/.test(name) || /\.go$/.test(name);
+    /\.v(model|tex|mat|scene|scenario|prefab|world)$/.test(name) || /\.go$/.test(name);
 }
 
 // validName is the engine's rule for a game's name, so the new game dialog can refuse a
@@ -67,7 +67,7 @@ function validName(name) {
 // isTextureFile reports whether a file is a texture source, the one format the preview
 // panel draws.
 function isTextureFile(name) {
-  return /\.tex\.json$/.test(name);
+  return /\.vtex$/.test(name);
 }
 
 // assetsDir returns the directory an image layer's path is relative to: the assets folder

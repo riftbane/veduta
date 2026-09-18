@@ -31,14 +31,22 @@ func editorFiles(lua bool) (owned map[string][]byte, settings map[string]map[str
 		URL       string   `json:"url"`
 	}
 	var refs []schemaRef
+	// The sources are JSON under suffixes of their own (crate.vmodel): the editor opens
+	// them as JSON.
+	assoc := map[string]string{}
 	for _, f := range formats.Formats {
 		b, _ := formats.FS.ReadFile(f.Schema)
 		p := path.Join(editorDir, "schema", f.Schema)
 		owned[p] = b
 		refs = append(refs, schemaRef{FileMatch: f.Match, URL: "./" + p})
+		for _, m := range f.Match {
+			if path.Ext(m) != ".json" {
+				assoc[m] = "json"
+			}
+		}
 	}
 	settings = map[string]map[string]any{
-		".vscode/settings.json":   {"json.schemas": refs},
+		".vscode/settings.json":   {"json.schemas": refs, "files.associations": assoc},
 		".vscode/extensions.json": {"recommendations": []string{"golang.go"}},
 	}
 	if lua {
@@ -85,6 +93,19 @@ func writeEditorFiles(root string, lua bool) (changed, skipped []string, err err
 					}
 				}
 				v = list
+			}
+			if m, ok := v.(map[string]string); ok {
+				// Keep the project's own associations beside the engine's.
+				merged := map[string]any{}
+				if have, ok := obj[k].(map[string]any); ok {
+					for h, x := range have {
+						merged[h] = x
+					}
+				}
+				for h, x := range m {
+					merged[h] = x
+				}
+				v = merged
 			}
 			obj[k] = v
 		}

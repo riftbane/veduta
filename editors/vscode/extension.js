@@ -217,7 +217,7 @@ function previewDoc() {
 function openPreview() {
   const doc = previewDoc();
   if (!doc) {
-    vscode.window.showWarningMessage('Veduta: open a texture source (a .tex.json file) to preview it.');
+    vscode.window.showWarningMessage('Veduta: open a texture source (a .vtex file) to preview it.');
     return;
   }
   if (preview) {

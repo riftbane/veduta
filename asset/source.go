@@ -5,7 +5,7 @@ package asset
 // that validation can report the exact JSON path — and therefore line and column — of a
 // bad value. Optional scalars whose zero value is meaningful are pointers.
 
-// ModelSource is assets/models/<name>.model.json.
+// ModelSource is assets/models/<name>.vmodel.
 type ModelSource struct {
 	Veduta         string       `json:"veduta"`
 	Name           string       `json:"name,omitempty"`             // must equal the file name when present
@@ -45,7 +45,7 @@ type PartSource struct {
 	FlipNormals bool        `json:"flip_normals,omitempty"`
 }
 
-// TextureSource is assets/textures/<name>.tex.json.
+// TextureSource is assets/textures/<name>.vtex.
 type TextureSource struct {
 	Veduta  string        `json:"veduta"`
 	Size    []int         `json:"size"`
@@ -80,7 +80,7 @@ type LayerSource struct {
 	Fit      string    `json:"fit,omitempty"` // contain (default), cover, stretch
 }
 
-// MaterialSource is assets/materials/<name>.mat.json.
+// MaterialSource is assets/materials/<name>.vmat.
 type MaterialSource struct {
 	Veduta  string   `json:"veduta"`
 	Albedo  string   `json:"albedo,omitempty"`  // default #ffffff
@@ -93,7 +93,7 @@ type MaterialSource struct {
 	Grid    []int    `json:"grid,omitempty"`   // [columns, rows]: the texture is a sheet of frames
 }
 
-// SceneSource is assets/scenes/<name>.scene.json.
+// SceneSource is assets/scenes/<name>.vscene.
 type SceneSource struct {
 	Veduta     string         `json:"veduta"`
 	Camera     CameraSource   `json:"camera"`
@@ -138,7 +138,7 @@ type EntitySource struct {
 	Frame  int         `json:"frame,omitempty"` // the frame of a material's grid it shows, from 0
 }
 
-// ScenarioSource is tests/scenarios/<name>.scenario.json.
+// ScenarioSource is tests/scenarios/<name>.vscenario.
 type ScenarioSource struct {
 	Veduta      string         `json:"veduta"`
 	Scene       string         `json:"scene,omitempty"`
@@ -196,7 +196,7 @@ type ProjectSource struct {
 	Bounds            [][]float32 `json:"bounds"`             // [[min x, y, z], [max x, y, z]] in meters (default [[-100, -50, -100], [100, 100, 100]])
 }
 
-// PrefabSource is assets/prefabs/<name>.prefab.json.
+// PrefabSource is assets/prefabs/<name>.vprefab.
 type PrefabSource struct {
 	Veduta    string         `json:"veduta"`
 	Footprint []float32      `json:"footprint"` // [width, depth] in meters
@@ -211,7 +211,7 @@ type RulesSource struct {
 	MinDistance map[string]float32 `json:"min_distance,omitempty"` // tag → meters of free ground
 }
 
-// WorldSource is assets/worlds/<name>.world.json.
+// WorldSource is assets/worlds/<name>.vworld.
 type WorldSource struct {
 	Veduta     string             `json:"veduta"`
 	Seed       uint64             `json:"seed,omitempty"`

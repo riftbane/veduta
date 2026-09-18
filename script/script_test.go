@@ -49,7 +49,7 @@ func run(t *testing.T, dir string, args ...string) (report, string, int) {
 // TestScenario: the scenario passes, twice with the same trace hash, and the state of Lua
 // kinds is in the trace (the expectations read state.score, state.steps, state.value).
 func TestScenario(t *testing.T) {
-	scenario := filepath.Join(testGame, "tests", "scenarios", "collect.scenario.json")
+	scenario := filepath.Join(testGame, "tests", "scenarios", "collect.vscenario")
 	a, stderr, code := run(t, testGame, "simulate", "--scenario", scenario, "--out", t.TempDir())
 	if code != 0 || a.Verdict != "pass" {
 		t.Fatalf("exit %d, verdict %q: %s\n%+v\nstderr: %s", code, a.Verdict, a.FirstFailure, a, stderr)
@@ -354,7 +354,7 @@ func TestSnapshotReplay(t *testing.T) {
 // later, and spawn prefabs placed and turned as a world places them.
 func TestEntityHierarchy(t *testing.T) {
 	dir := copyGame(t, map[string]string{
-		"assets/prefabs/hut.prefab.json": `{
+		"assets/prefabs/hut.vprefab": `{
 			"veduta": "prefab/1", "footprint": [4, 2],
 			"entities": [
 				{ "name": "roof", "kind": "static", "model": "quad", "parent": "walls", "position": [0, 2, 0] },
@@ -420,10 +420,10 @@ end
 // hud.panel keeps its corners while it stretches.
 func TestHUDImages(t *testing.T) {
 	dir := copyGame(t, map[string]string{
-		"assets/textures/icons.tex.json": `{"veduta": "texture/1", "size": [8, 4], "mipmaps": false, "layers": [
+		"assets/textures/icons.vtex": `{"veduta": "texture/1", "size": [8, 4], "mipmaps": false, "layers": [
 			{"type": "rect", "xy": [0, 0], "size": [4, 4], "color": "#ff0000"},
 			{"type": "rect", "xy": [4, 0], "size": [4, 4], "color": "#0000ff"}]}`,
-		"assets/textures/frame.tex.json": `{"veduta": "texture/1", "size": [6, 6], "mipmaps": false, "layers": [
+		"assets/textures/frame.vtex": `{"veduta": "texture/1", "size": [6, 6], "mipmaps": false, "layers": [
 			{"type": "solid", "color": "#00ff00"},
 			{"type": "rect", "xy": [0, 0], "size": [6, 6], "color": "#ffffff", "outline": 2}]}`,
 		"main.lua": `+
@@ -473,9 +473,9 @@ end
 		"bad border": `hud.panel("frame", 0, 0, 10, 10, {1, 2})`,
 	} {
 		bad := copyGame(t, map[string]string{
-			"assets/textures/icons.tex.json": `{"veduta": "texture/1", "size": [8, 4], "layers": [{"type": "solid", "color": "#ff0000"}]}`,
-			"assets/textures/frame.tex.json": `{"veduta": "texture/1", "size": [6, 6], "layers": [{"type": "solid", "color": "#ff0000"}]}`,
-			"main.lua":                       "+function game.draw() " + src + " end",
+			"assets/textures/icons.vtex": `{"veduta": "texture/1", "size": [8, 4], "layers": [{"type": "solid", "color": "#ff0000"}]}`,
+			"assets/textures/frame.vtex": `{"veduta": "texture/1", "size": [6, 6], "layers": [{"type": "solid", "color": "#ff0000"}]}`,
+			"main.lua":                   "+function game.draw() " + src + " end",
 		})
 		r, _, code := run(t, bad, "render", "--out", filepath.Join(t.TempDir(), "x.png"))
 		if code == 0 || r.Error == "" {
@@ -528,7 +528,7 @@ function game.init()
   trace("saves", {problems = table.concat(problems, "; ")})
 end
 `,
-		"tests/scenarios/saves.scenario.json": `{
+		"tests/scenarios/saves.vscenario": `{
 			"veduta": "scenario/1", "scene": "main", "seed": 1, "ticks": 3,
 			"saves": {"slot1": {"gold": 120, "ratio": 2.0}},
 			"expect": [
@@ -538,7 +538,7 @@ end
 		}`,
 	})
 	out := t.TempDir()
-	r, stderr, code := run(t, dir, "simulate", "--scenario", filepath.Join(dir, "tests", "scenarios", "saves.scenario.json"), "--out", out)
+	r, stderr, code := run(t, dir, "simulate", "--scenario", filepath.Join(dir, "tests", "scenarios", "saves.vscenario"), "--out", out)
 	if code != 0 || r.Verdict != "pass" {
 		t.Fatalf("exit %d %+v %s", code, r, stderr)
 	}
@@ -591,13 +591,13 @@ end
 // and the trace and scenarios see the frame.
 func TestSpriteSheet(t *testing.T) {
 	files := map[string]string{
-		"assets/textures/sheet.tex.json": `{"veduta": "texture/1", "size": [16, 8], "mipmaps": false, "layers": [
+		"assets/textures/sheet.vtex": `{"veduta": "texture/1", "size": [16, 8], "mipmaps": false, "layers": [
 			{"type": "rect", "xy": [0, 0], "size": [4, 4], "color": "#ff0000"},
 			{"type": "rect", "xy": [4, 0], "size": [4, 4], "color": "#00ff00"},
 			{"type": "rect", "xy": [8, 0], "size": [4, 4], "color": "#0000ff"},
 			{"type": "rect", "xy": [12, 0], "size": [4, 4], "color": "#ffffff"},
 			{"type": "rect", "xy": [0, 4], "size": [16, 4], "color": "#ffff00"}]}`,
-		"assets/materials/sheet.mat.json": `{"veduta": "material/1", "texture": "sheet", "grid": [4, 2], "unlit": true, "filter": "nearest"}`,
+		"assets/materials/sheet.vmat": `{"veduta": "material/1", "texture": "sheet", "grid": [4, 2], "unlit": true, "filter": "nearest"}`,
 		"main.lua": `+
 local init = game.init
 function game.init()
@@ -612,7 +612,7 @@ kinds.hero.update = function(e)
   s.frame = s.frame + 1
 end
 `,
-		"tests/scenarios/sheet.scenario.json": `{"veduta": "scenario/1", "scene": "main", "ticks": 3,
+		"tests/scenarios/sheet.vscenario": `{"veduta": "scenario/1", "scene": "main", "ticks": 3,
 			"expect": [{"tick": 3, "entity": "s5", "path": "frame", "op": "==", "value": 3},
 			           {"tick": 0, "entity": "s1", "path": "frame", "op": "==", "value": 2},
 			           {"tick": 3, "entity": "hero", "path": "frame", "op": "==", "value": 0}]}`,
@@ -636,7 +636,7 @@ end
 			t.Errorf("sprite %d at (%d, %d) is %s, want %s", i+1, x, y, got, want)
 		}
 	}
-	scenario := filepath.Join(dir, "tests", "scenarios", "sheet.scenario.json")
+	scenario := filepath.Join(dir, "tests", "scenarios", "sheet.vscenario")
 	if r, stderr, code := run(t, dir, "simulate", "--scenario", scenario, "--out", t.TempDir()); code != 0 || r.Verdict != "pass" {
 		t.Fatalf("scenario: exit %d %+v %s", code, r, stderr)
 	}
@@ -666,12 +666,12 @@ function game.update()
   scene_script()
 end
 `,
-		"tests/scenarios/cutscene.scenario.json": `{"veduta": "scenario/1", "scene": "main", "ticks": 10,
+		"tests/scenarios/cutscene.vscenario": `{"veduta": "scenario/1", "scene": "main", "ticks": 10,
 			"expect": [{"tick": 3, "trace": "line", "count_min": 1, "count_max": 1},
 			           {"tick": 4, "trace": "line", "count_min": 2, "count_max": 2},
 			           {"tick": 6, "trace": "cutscene_done", "count_min": 1, "count_max": 1}]}`,
 	})
-	scenario := filepath.Join(dir, "tests", "scenarios", "cutscene.scenario.json")
+	scenario := filepath.Join(dir, "tests", "scenarios", "cutscene.vscenario")
 	a, stderr, code := run(t, dir, "simulate", "--scenario", scenario, "--out", t.TempDir())
 	if code != 0 || a.Verdict != "pass" {
 		t.Fatalf("exit %d %+v %s", code, a, stderr)

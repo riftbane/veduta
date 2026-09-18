@@ -5,10 +5,10 @@ value noise, stripes, rectangles, circles, gradients, checkerboards and PNG imag
 are painted one over the other, each with a blend mode and an opacity. The compiler
 renders the program into a BGRA8 image with a mip chain. Materials use textures by name.
 
-File: `assets/textures/<name>.tex.json`. The texture name is the file name without
-`.tex.json` (`crate_wood.tex.json` → `crate_wood`); it must be 1–64 characters of
+File: `assets/textures/<name>.vtex`. The texture name is the file name without
+`.vtex` (`crate_wood.vtex` → `crate_wood`); it must be 1–64 characters of
 `a-z`, `0-9`, `_`, `-`, starting with a letter or digit. A folder under
-`assets/textures/` works too (`assets/textures/ui/icons.tex.json`): the name is still the
+`assets/textures/` works too (`assets/textures/ui/icons.vtex`): the name is still the
 file name, so it must be unique across the folders.
 
 ## Minimal example
@@ -275,7 +275,7 @@ source and the same image files always produce the same bytes.
 Decoding is strict. Unknown fields (typos), wrong JSON types (for example `2.5` where an
 integer is expected) and duplicate keys are errors. Validation then reports **every**
 problem at once, each with the file, line, column and JSON path of the offending value.
-For example, `wall.tex.json` containing
+For example, `wall.vtex` containing
 
 ```json
 {
@@ -293,12 +293,12 @@ For example, `wall.tex.json` containing
 reports
 
 ```
-wall.tex.json:3:17: size[1]: 0 out of range [1, 4096]
-wall.tex.json:5:54: layers[0].radius: not used by layer type solid
-wall.tex.json:6:55: layers[1].octaves: 12 out of range [1, 8]
-wall.tex.json:6:70: layers[1].opacity: 2 out of range [0, 1]
-wall.tex.json:7:5: layers[2].radius: is required
-wall.tex.json:8:32: layers[3].path: "../logo.png": must not leave the assets directory ("..")
+wall.vtex:3:17: size[1]: 0 out of range [1, 4096]
+wall.vtex:5:54: layers[0].radius: not used by layer type solid
+wall.vtex:6:55: layers[1].octaves: 12 out of range [1, 8]
+wall.vtex:6:70: layers[1].opacity: 2 out of range [0, 1]
+wall.vtex:7:5: layers[2].radius: is required
+wall.vtex:8:32: layers[3].path: "../logo.png": must not leave the assets directory ("..")
 ```
 
 Checks: required fields present; `size` integers in range; 1–64 layers; `type` known;

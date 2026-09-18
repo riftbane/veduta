@@ -114,7 +114,7 @@
       "type": "object"
     }
   },
-  "description": "ModelSource is assets/models/<name>.model.json.",
+  "description": "ModelSource is assets/models/<name>.vmodel.",
   "properties": {
     "draw_distance": {
       "description": "not drawn beyond (default: always)",

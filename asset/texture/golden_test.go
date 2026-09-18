@@ -22,12 +22,12 @@ func testdataDir(t testing.TB) string {
 	return filepath.Join(root, "testdata")
 }
 
-// parseSample compiles testdata/textures/<name>.tex.json, after edit (when not nil)
+// parseSample compiles testdata/textures/<name>.vtex, after edit (when not nil)
 // changed the decoded source, leaving out the layers in skip.
 func parseSample(t testing.TB, name string, edit func(*asset.TextureSource), skip ...int) *asset.Texture {
 	t.Helper()
 	dir := testdataDir(t)
-	file := filepath.Join(dir, "textures", name+".tex.json")
+	file := filepath.Join(dir, "textures", name+".vtex")
 	data, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)

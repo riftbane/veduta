@@ -59,7 +59,7 @@ kinds.walker = {
 
 ## Streamed worlds
 
-A **world** (`assets/worlds/<name>.world.json`) is a map generated from a seed: biomes,
+A **world** (`assets/worlds/<name>.vworld`) is a map generated from a seed: biomes,
 rolling ground, hills, lakes and seas, vegetation, villages and landmarks. Only the chunks
 around a focus point exist at a time, so a world can span kilometres.
 

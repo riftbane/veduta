@@ -1,5 +1,5 @@
 'use strict';
-// The texture format (assets/textures/<name>.tex.json) drawn in JavaScript: the layer
+// The texture format (assets/textures/<name>.vtex) drawn in JavaScript: the layer
 // program the engine compiles in Go (asset/texture), transliterated so the preview shows
 // what the game will show without running the engine.
 //

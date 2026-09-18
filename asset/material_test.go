@@ -110,7 +110,7 @@ func readTestdata(t *testing.T, rel string) []byte {
 }
 
 func TestParseMaterialDefaults(t *testing.T) {
-	m, err := ParseMaterial("assets/materials/plain.mat.json", []byte(`{"veduta": "material/1"}`))
+	m, err := ParseMaterial("assets/materials/plain.vmat", []byte(`{"veduta": "material/1"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestParseMaterialDefaults(t *testing.T) {
 func TestParseMaterialFull(t *testing.T) {
 	src := `{ "veduta": "material/1", "albedo": "#80c0ff60", "texture": "leaves", "unlit": true,
 	  "alpha": "cutout", "cutoff": 0.25, "cull": "none", "filter": "nearest" }`
-	m, err := ParseMaterial("leaf.mat.json", []byte(src))
+	m, err := ParseMaterial("leaf.vmat", []byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestParseMaterialFull(t *testing.T) {
 	if m.AlphaCutoff() != 0.25 || m.State().Cull != gfx.CullNone {
 		t.Fatal("pipeline helpers disagree with the compiled material")
 	}
-	blend, err := ParseMaterial("glass.mat.json", []byte(`{"veduta": "material/1", "alpha": "blend"}`))
+	blend, err := ParseMaterial("glass.vmat", []byte(`{"veduta": "material/1", "alpha": "blend"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,38 +150,38 @@ func TestParseMaterialErrors(t *testing.T) {
 		name, file, src string
 		wants           []wantErr
 	}{
-		{"bad alpha", "m.mat.json", `{"veduta": "material/1", "alpha": "glass"}`,
+		{"bad alpha", "m.vmat", `{"veduta": "material/1", "alpha": "glass"}`,
 			[]wantErr{{`alpha: unknown value "glass" (want one of [opaque blend cutout])`, `"glass"`}}},
-		{"cutoff without cutout", "m.mat.json", `{"veduta": "material/1", "alpha": "blend", "cutoff": 0.3}`,
+		{"cutoff without cutout", "m.vmat", `{"veduta": "material/1", "alpha": "blend", "cutoff": 0.3}`,
 			[]wantErr{{`cutoff: only allowed when alpha is "cutout"`, `0.3`}}},
-		{"cutoff without alpha", "m.mat.json", `{"veduta": "material/1", "cutoff": 0.3}`,
+		{"cutoff without alpha", "m.vmat", `{"veduta": "material/1", "cutoff": 0.3}`,
 			[]wantErr{{`cutoff: only allowed`, `0.3`}}},
-		{"cutoff zero", "m.mat.json", `{"veduta": "material/1", "alpha": "cutout", "cutoff": 0}`,
+		{"cutoff zero", "m.vmat", `{"veduta": "material/1", "alpha": "cutout", "cutoff": 0}`,
 			[]wantErr{{`cutoff: 0 out of range (0, 1]`, `0}`}}},
-		{"cutoff above one", "m.mat.json", `{"veduta": "material/1", "alpha": "cutout", "cutoff": 1.5}`,
+		{"cutoff above one", "m.vmat", `{"veduta": "material/1", "alpha": "cutout", "cutoff": 1.5}`,
 			[]wantErr{{`out of range (0, 1]`, `1.5`}}},
-		{"bad albedo", "m.mat.json", `{"veduta": "material/1", "albedo": "#fff"}`,
+		{"bad albedo", "m.vmat", `{"veduta": "material/1", "albedo": "#fff"}`,
 			[]wantErr{{`albedo: color "#fff": want #RRGGBB or #RRGGBBAA`, `"#fff"`}}},
-		{"bad texture name", "m.mat.json", `{"veduta": "material/1", "texture": "Wood.png"}`,
+		{"bad texture name", "m.vmat", `{"veduta": "material/1", "texture": "Wood.png"}`,
 			[]wantErr{{`texture: name "Wood.png"`, `"Wood.png"`}}},
-		{"bad cull", "m.mat.json", `{"veduta": "material/1", "cull": "front"}`,
+		{"bad cull", "m.vmat", `{"veduta": "material/1", "cull": "front"}`,
 			[]wantErr{{`cull: unknown value "front"`, `"front"`}}},
-		{"grid without texture", "m.mat.json", `{"veduta": "material/1", "grid": [4, 2]}`,
+		{"grid without texture", "m.vmat", `{"veduta": "material/1", "grid": [4, 2]}`,
 			[]wantErr{{`grid: needs a texture`, `[4, 2]`}}},
-		{"grid of three", "m.mat.json", `{"veduta": "material/1", "texture": "t", "grid": [4, 2, 1]}`,
+		{"grid of three", "m.vmat", `{"veduta": "material/1", "texture": "t", "grid": [4, 2, 1]}`,
 			[]wantErr{{`grid: must be [columns, rows]`, `[4, 2, 1]`}}},
-		{"grid too big", "m.mat.json", `{"veduta": "material/1", "texture": "t", "grid": [4, 300]}`,
+		{"grid too big", "m.vmat", `{"veduta": "material/1", "texture": "t", "grid": [4, 300]}`,
 			[]wantErr{{`grid[1]: 300 out of range [1, 256]`, `300`}}},
-		{"bad filter", "m.mat.json", `{"veduta": "material/1", "filter": "trilinear"}`,
+		{"bad filter", "m.vmat", `{"veduta": "material/1", "filter": "trilinear"}`,
 			[]wantErr{{`filter: unknown value "trilinear"`, `"trilinear"`}}},
-		{"unknown field", "m.mat.json", `{"veduta": "material/1", "colour": "#ffffff"}`,
+		{"unknown field", "m.vmat", `{"veduta": "material/1", "colour": "#ffffff"}`,
 			[]wantErr{{`colour: unknown field`, `"colour"`}}},
-		{"wrong header", "m.mat.json", `{"veduta": "texture/1"}`,
+		{"wrong header", "m.vmat", `{"veduta": "texture/1"}`,
 			[]wantErr{{`want "material/1"`, `"texture/1"`}}},
-		{"bad file name", "Crate.mat.json", `{"veduta": "material/1"}`,
+		{"bad file name", "Crate.vmat", `{"veduta": "material/1"}`,
 			[]wantErr{{`file name: material name "Crate"`, ""}}},
 		{"wrong suffix", "crate.json", `{"veduta": "material/1"}`,
-			[]wantErr{{`must end in ".mat.json"`, ""}}},
+			[]wantErr{{`must end in ".vmat"`, ""}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -194,7 +194,7 @@ func TestParseMaterialErrors(t *testing.T) {
 // Every problem in a file is reported, each at its own line and column.
 func TestParseMaterialReportsAll(t *testing.T) {
 	src := "{\n  \"veduta\": \"material/1\",\n  \"albedo\": \"red\",\n  \"alpha\": \"glass\",\n  \"cutoff\": 2,\n  \"cull\": \"front\",\n  \"texture\": \"-x\"\n}"
-	_, err := ParseMaterial("m.mat.json", []byte(src))
+	_, err := ParseMaterial("m.vmat", []byte(src))
 	es := sourceErrors(t, err)
 	want := []struct {
 		line, col int
@@ -210,7 +210,7 @@ func TestParseMaterialReportsAll(t *testing.T) {
 		t.Fatalf("got %d errors, want %d:\n%v", len(es), len(want), err)
 	}
 	for i, w := range want {
-		if es[i].Line != w.line || es[i].Col != w.col || !strings.Contains(es[i].Msg, w.msg) || es[i].File != "m.mat.json" {
+		if es[i].Line != w.line || es[i].Col != w.col || !strings.Contains(es[i].Msg, w.msg) || es[i].File != "m.vmat" {
 			t.Errorf("error %d = %v, want %d:%d %q", i, es[i], w.line, w.col, w.msg)
 		}
 	}
@@ -232,7 +232,7 @@ func TestCompileMaterialWithoutLocator(t *testing.T) {
 }
 
 func TestMaterialSamples(t *testing.T) {
-	m, err := ParseMaterial("materials/crate_wood.mat.json", readTestdata(t, "materials/crate_wood.mat.json"))
+	m, err := ParseMaterial("materials/crate_wood.vmat", readTestdata(t, "materials/crate_wood.vmat"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestMaterialSamples(t *testing.T) {
 		t.Fatalf("got %+v", m)
 	}
 	for i, ex := range docJSON(t, "material.md") {
-		if _, err := ParseMaterial("example.mat.json", []byte(ex)); err != nil {
+		if _, err := ParseMaterial("example.vmat", []byte(ex)); err != nil {
 			t.Errorf("docs/material.md example %d: %v", i, err)
 		}
 	}
@@ -248,9 +248,9 @@ func TestMaterialSamples(t *testing.T) {
 
 // Compiling the same source twice gives equal results.
 func TestMaterialDeterministic(t *testing.T) {
-	data := readTestdata(t, "materials/crate_wood.mat.json")
-	a, _ := ParseMaterial("crate_wood.mat.json", data)
-	b, _ := ParseMaterial("crate_wood.mat.json", data)
+	data := readTestdata(t, "materials/crate_wood.vmat")
+	a, _ := ParseMaterial("crate_wood.vmat", data)
+	b, _ := ParseMaterial("crate_wood.vmat", data)
 	if !reflect.DeepEqual(a, b) {
 		t.Fatal("material compilation is not deterministic")
 	}

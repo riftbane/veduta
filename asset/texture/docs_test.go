@@ -56,13 +56,13 @@ func TestDocsExamples(t *testing.T) {
 			if i+1 >= len(blocks) || blocks[i+1].lang != "" {
 				t.Fatal("the errors example is not followed by its output block")
 			}
-			_, err := Parse("wall.tex.json", []byte(b.body), opt)
+			_, err := Parse("wall.vtex", []byte(b.body), opt)
 			if want := strings.TrimSpace(blocks[i+1].body); err == nil || err.Error() != want {
 				t.Errorf("errors example reports:\n%v\ndocs say:\n%s", err, want)
 			}
 			continue
 		}
-		if _, err := Parse("example.tex.json", []byte(b.body), opt); err != nil {
+		if _, err := Parse("example.vtex", []byte(b.body), opt); err != nil {
 			t.Errorf("example %d in section %q: %v", n, b.section, err)
 		}
 	}

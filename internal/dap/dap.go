@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	veduta "github.com/riftbane/veduta/v2"
+	"github.com/riftbane/veduta/v2/asset"
 	"github.com/riftbane/veduta/v2/asset/cook"
 	"github.com/riftbane/veduta/v2/lua"
 	"github.com/riftbane/veduta/v2/script"
@@ -309,8 +310,8 @@ func (s *Session) checkLaunch(a *LaunchArgs) error {
 			return fmt.Errorf("launch: scene, world, at and seed are for mode play; a scenario says where it runs")
 		}
 		// A name, as veduta simulate --scenario takes it, is a file of tests/scenarios.
-		if !strings.HasSuffix(a.Scenario, ".json") {
-			a.Scenario = filepath.Join(abs, "tests", "scenarios", a.Scenario+".scenario.json")
+		if !strings.HasSuffix(a.Scenario, asset.KindScenario.Ext()) {
+			a.Scenario = filepath.Join(abs, "tests", "scenarios", a.Scenario+".vscenario")
 		}
 		if _, err := os.Stat(a.Scenario); err != nil {
 			return fmt.Errorf("launch: %v", err)

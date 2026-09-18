@@ -24,7 +24,7 @@ ui/menu.lua, ui/box.lua
 assets/
   materials/characters/…, materials/tiles/…, materials/ui/…
   textures/characters/…, textures/ui/…
-  scenes/town.scene.json, scenes/dungeons/cave_1.scene.json
+  scenes/town.vscene, scenes/dungeons/cave_1.vscene
 tests/scenarios/       flat: name them by area (town_shop_buy, battle_flee)
 ```
 

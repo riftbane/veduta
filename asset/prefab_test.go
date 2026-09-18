@@ -19,7 +19,7 @@ func TestParsePrefabFull(t *testing.T) {
     { "name": "door", "kind": "static", "position": [1.5, 0, 2], "hitbox": [[-0.5, 0, -0.1], [0.5, 2, 0.1]], "tags": ["door"] }
   ]
 }`
-	p, err := ParsePrefab("house.prefab.json", []byte(src))
+	p, err := ParsePrefab("house.vprefab", []byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestParsePrefabFull(t *testing.T) {
 }
 
 func TestParsePrefabMinimal(t *testing.T) {
-	p, err := ParsePrefab("clearing.prefab.json", []byte(`{"veduta": "prefab/1", "footprint": [4, 4], "entities": []}`))
+	p, err := ParsePrefab("clearing.vprefab", []byte(`{"veduta": "prefab/1", "footprint": [4, 4], "entities": []}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestParsePrefabErrors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ParsePrefab("p.prefab.json", []byte(c.src))
+			_, err := ParsePrefab("p.vprefab", []byte(c.src))
 			checkErrs(t, c.src, err, c.wants...)
 		})
 	}
@@ -94,7 +94,7 @@ func TestParsePrefabErrors(t *testing.T) {
 
 func TestPrefabDocExamples(t *testing.T) {
 	for i, ex := range docJSON(t, "prefab.md") {
-		if _, err := ParsePrefab("example.prefab.json", []byte(ex)); err != nil {
+		if _, err := ParsePrefab("example.vprefab", []byte(ex)); err != nil {
 			t.Errorf("docs/prefab.md example %d: %v", i, err)
 		}
 	}

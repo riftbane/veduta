@@ -20,18 +20,18 @@ test('diagnostics', () => {
   const report = {
     ok: false,
     errors: [{ file: 'main.lua', line: 15, col: 0, msg: "<name> expected near 'local'" }],
-    cook_errors: [{ file: 'assets/models/crate.model.json', line: 3, col: 12, msg: 'parts: required' }],
+    cook_errors: [{ file: 'assets/models/crate.vmodel', line: 3, col: 12, msg: 'parts: required' }],
     vet_errors: [{ file: 'game/game.go', line: 7, col: 2, msg: 'unreachable code' }],
   };
   const d = v.diagnostics(report);
   assert.deepStrictEqual(d.get('main.lua'), [{ line: 14, col: 0, message: "<name> expected near 'local'", source: 'veduta build', severity: 'error' }]);
-  assert.deepStrictEqual(d.get('assets/models/crate.model.json')[0], { line: 2, col: 11, message: 'parts: required', source: 'veduta cook', severity: 'error' });
+  assert.deepStrictEqual(d.get('assets/models/crate.vmodel')[0], { line: 2, col: 11, message: 'parts: required', source: 'veduta cook', severity: 'error' });
   assert.strictEqual(d.get('game/game.go')[0].severity, 'warning');
   assert.strictEqual(v.diagnostics({ ok: true, errors: [] }).size, 0);
 });
 
 test('isGameFile', () => {
-  for (const f of ['main.lua', 'lib/a.lua', 'veduta.json', 'C:\\g\\veduta.json', 'assets/scenes/main.scene.json', 'tests/scenarios/start.scenario.json', 'game/game.go']) {
+  for (const f of ['main.lua', 'lib/a.lua', 'veduta.json', 'C:\\g\\veduta.json', 'assets/scenes/main.vscene', 'tests/scenarios/start.vscenario', 'game/game.go']) {
     assert.ok(v.isGameFile(f), f);
   }
   for (const f of ['package.json', '.vscode/settings.json', 'README.md', 'notveduta.json']) {
@@ -63,19 +63,19 @@ test('toolProblem', () => {
 });
 
 test('isTextureFile', () => {
-  for (const f of ['assets/textures/crate.tex.json', 'C:\\g\\assets\\textures\\ui\\panel.tex.json']) {
+  for (const f of ['assets/textures/crate.vtex', 'C:\\g\\assets\\textures\\ui\\panel.vtex']) {
     assert.ok(v.isTextureFile(f), f);
   }
-  for (const f of ['assets/models/crate.model.json', 'veduta.json', 'crate.tex.json.bak']) {
+  for (const f of ['assets/models/crate.vmodel', 'veduta.json', 'crate.vtex.bak']) {
     assert.ok(!v.isTextureFile(f), f);
   }
 });
 
 test('assetsDir', () => {
   const project = (p) => p === '/g/veduta.json';
-  assert.strictEqual(v.assetsDir('/g/assets/textures/ui/panel.tex.json', project), '/g/assets');
-  assert.strictEqual(v.assetsDir('/g/elsewhere/panel.tex.json', project), '/g/assets');
+  assert.strictEqual(v.assetsDir('/g/assets/textures/ui/panel.vtex', project), '/g/assets');
+  assert.strictEqual(v.assetsDir('/g/elsewhere/panel.vtex', project), '/g/assets');
   // No project above it: the assets folder its own path goes through.
-  assert.strictEqual(v.assetsDir('/x/game/assets/textures/panel.tex.json', () => false), '/x/game/assets');
-  assert.strictEqual(v.assetsDir('/x/loose/panel.tex.json', () => false), '/x/loose');
+  assert.strictEqual(v.assetsDir('/x/game/assets/textures/panel.vtex', () => false), '/x/game/assets');
+  assert.strictEqual(v.assetsDir('/x/loose/panel.vtex', () => false), '/x/loose');
 });

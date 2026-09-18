@@ -99,7 +99,7 @@ async function run() {
 
   // The texture preview: the command opens a panel beside the source it draws, and the
   // panel survives the file being typed in.
-  const texFile = path.join(root, 'assets', 'textures', 'probe.tex.json');
+  const texFile = path.join(root, 'assets', 'textures', 'probe.vtex');
   fs.mkdirSync(path.dirname(texFile), { recursive: true });
   fs.writeFileSync(texFile, JSON.stringify({
     veduta: 'texture/1',
@@ -111,7 +111,7 @@ async function run() {
   await vscode.commands.executeCommand('veduta.previewTexture');
   const previewTab = () => vscode.window.tabGroups.all
     .flatMap((g) => g.tabs)
-    .find((t) => t.input instanceof vscode.TabInputWebview && t.label.includes('probe.tex.json'));
+    .find((t) => t.input instanceof vscode.TabInputWebview && t.label.includes('probe.vtex'));
   await until('the preview panel', () => previewTab() !== undefined);
   const texEditor = await vscode.window.showTextDocument(texDoc);
   await texEditor.edit((e) => e.insert(new vscode.Position(2, 0), '  "tiling": true,\n'));

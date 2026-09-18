@@ -49,7 +49,7 @@ func TestDeployScriptGame(t *testing.T) {
 		return err
 	})
 	sort.Strings(files)
-	for _, want := range []string{"README.md", "card.json", "icon.png", "lib/util.lua", "main.lua", "veduta.json", "assets/models/quad.model.json"} {
+	for _, want := range []string{"README.md", "card.json", "icon.png", "lib/util.lua", "main.lua", "veduta.json", "assets/models/quad.vmodel"} {
 		if !contains(files, want) {
 			t.Errorf("the card lacks %s: %v", want, files)
 		}

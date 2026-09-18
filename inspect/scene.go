@@ -249,7 +249,7 @@ func scnAnalyze(ir *Renderer, name string, src *asset.Scene) (*scnAnalysis, erro
 	if a.w <= 0 || a.h <= 0 || a.w > asset.MaxResolution || a.h > asset.MaxResolution {
 		a.w, a.h = asset.DefaultProject.InspectResolution[0], asset.DefaultProject.InspectResolution[1]
 	}
-	a.file = path.Join(a.assets, "scenes", name+".scene.json")
+	a.file = path.Join(a.assets, "scenes", name+".vscene")
 	n := len(a.ents)
 	a.drawn = make([]bool, n)
 	a.shape = make([]gmath.AABB, n)
@@ -475,7 +475,7 @@ func (a *scnAnalysis) checkMissing() {
 		var used []string
 		entityMat := e.Material != "" && a.lib.Materials[e.Material] != nil
 		if m := a.lib.Models[e.Model]; m != nil && e.Model != "" {
-			mfile := path.Join(a.assets, "models", e.Model+".model.json")
+			mfile := path.Join(a.assets, "models", e.Model+".vmodel")
 			for pi, part := range m.Mesh.Parts {
 				pm := scnPartMaterial(m, part)
 				switch {
@@ -492,7 +492,7 @@ func (a *scnAnalysis) checkMissing() {
 		}
 		for _, mn := range used {
 			if t := a.lib.Materials[mn].Texture; t != "" && a.lib.Textures[t] == nil {
-				add("texture", path.Join(a.assets, "materials", mn+".mat.json"), "texture", t, mn, k, -1)
+				add("texture", path.Join(a.assets, "materials", mn+".vmat"), "texture", t, mn, k, -1)
 			}
 		}
 	}
@@ -527,16 +527,16 @@ func (a *scnAnalysis) checkMissing() {
 		switch {
 		case r.kind == "model":
 			hint = fmt.Sprintf("%s: model %q (%s in %s) is not in the library, so nothing is drawn. Create %s or %s%s.",
-				scnCap(users), r.name, fieldText, r.file, path.Join(a.assets, "models", r.name+".model.json"), change, scnSuggest(r.name, asset.Names(a.lib.Models)))
+				scnCap(users), r.name, fieldText, r.file, path.Join(a.assets, "models", r.name+".vmodel"), change, scnSuggest(r.name, asset.Names(a.lib.Models)))
 		case r.kind == "material" && r.owner == "":
 			hint = fmt.Sprintf("%s: material %q (%s in %s) is not in the library, so the default white material is used. Create %s or %s%s.",
-				scnCap(users), r.name, fieldText, r.file, path.Join(a.assets, "materials", r.name+".mat.json"), change, scnSuggest(r.name, asset.Names(a.lib.Materials)))
+				scnCap(users), r.name, fieldText, r.file, path.Join(a.assets, "materials", r.name+".vmat"), change, scnSuggest(r.name, asset.Names(a.lib.Materials)))
 		case r.kind == "material":
 			hint = fmt.Sprintf("Model %q, used by %s, names material %q in %s of %s, which is not in the library (those parts render with the default white material). Create %s or change %s%s.",
-				r.owner, users, r.name, r.field, r.file, path.Join(a.assets, "materials", r.name+".mat.json"), r.field, scnSuggest(r.name, asset.Names(a.lib.Materials)))
+				r.owner, users, r.name, r.field, r.file, path.Join(a.assets, "materials", r.name+".vmat"), r.field, scnSuggest(r.name, asset.Names(a.lib.Materials)))
 		default:
 			hint = fmt.Sprintf("Material %q, used by %s, names texture %q in %s, which is not in the library (it renders untextured). Create %s or change \"texture\" in %s%s.",
-				r.owner, users, r.name, r.file, path.Join(a.assets, "textures", r.name+".tex.json"), r.file, scnSuggest(r.name, asset.Names(a.lib.Textures)))
+				r.owner, users, r.name, r.file, path.Join(a.assets, "textures", r.name+".vtex"), r.file, scnSuggest(r.name, asset.Names(a.lib.Textures)))
 		}
 		a.add(Error, scnMissing, len(r.ents), where, hint)
 	}
@@ -1091,7 +1091,7 @@ func (a *scnAnalysis) checkUnlit() {
 	if a.litParts == 0 {
 		files := make([]string, 0, len(a.unlitMats))
 		for _, m := range a.unlitMats[:min(len(a.unlitMats), scnListMax)] {
-			files = append(files, path.Join(a.assets, "materials", m+".mat.json"))
+			files = append(files, path.Join(a.assets, "materials", m+".vmat"))
 		}
 		a.add(Info, scnUnlit, a.unlitParts, map[string]any{"unlit_parts": a.unlitParts, "materials": a.unlitMats[:min(len(a.unlitMats), scnListMax)]},
 			fmt.Sprintf("Every drawn part (%d) uses an unlit material, so light.direction, light.color and light.ambient have no effect. If shading is wanted, set \"unlit\": false in %s.", a.unlitParts, strings.Join(files, ", ")))
@@ -1151,7 +1151,7 @@ func (a *scnAnalysis) checkUnlit() {
 	if len(fix) == 0 {
 		files := make([]string, 0, len(mats))
 		for _, m := range mats {
-			files = append(files, path.Join(a.assets, "materials", m+".mat.json"))
+			files = append(files, path.Join(a.assets, "materials", m+".vmat"))
 		}
 		what := "the materials of the darkest entities"
 		if len(files) > 0 {
@@ -1595,7 +1595,7 @@ func (a *scnAnalysis) zIssue(z *scnZPair) {
 	} else {
 		hint = fmt.Sprintf("Faces of %s and %s are coplanar (within %s m) and back to back over %s m² around %s (normal %s), but material %q is double-sided (cull \"none\" in %s), so both are drawn and flicker. Set \"cull\": \"back\" there, or %s.",
 			a.ref(z.i), a.ref(z.j), scnF(scnZDist), scnF(z.area), scnFV(z.point.vec3()), scnFV(z.normal.vec3()), z.twoMat,
-			path.Join(a.assets, "materials", z.twoMat+".mat.json"), strings.ToLower(move[:1])+move[1:])
+			path.Join(a.assets, "materials", z.twoMat+".vmat"), strings.ToLower(move[:1])+move[1:])
 	}
 	a.add(Warning, scnZFight, z.pairs, where, hint)
 }

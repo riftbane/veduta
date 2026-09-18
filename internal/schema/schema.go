@@ -21,11 +21,11 @@ type Format struct {
 // Formats are every source format, the manifest first.
 var Formats = []Format{
 	{"project.schema.json", []string{"veduta.json"}},
-	{"model.schema.json", []string{"*.model.json"}},
-	{"texture.schema.json", []string{"*.tex.json"}},
-	{"material.schema.json", []string{"*.mat.json"}},
-	{"scene.schema.json", []string{"*.scene.json"}},
-	{"scenario.schema.json", []string{"*.scenario.json"}},
-	{"prefab.schema.json", []string{"*.prefab.json"}},
-	{"world.schema.json", []string{"*.world.json"}},
+	{"model.schema.json", []string{"*.vmodel"}},
+	{"texture.schema.json", []string{"*.vtex"}},
+	{"material.schema.json", []string{"*.vmat"}},
+	{"scene.schema.json", []string{"*.vscene"}},
+	{"scenario.schema.json", []string{"*.vscenario"}},
+	{"prefab.schema.json", []string{"*.vprefab"}},
+	{"world.schema.json", []string{"*.vworld"}},
 }

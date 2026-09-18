@@ -446,7 +446,7 @@ type simResult struct {
 
 func (h *headless) simulate(args []string) (int, error) {
 	fs := h.flags("simulate")
-	scenario := fs.String("scenario", "", "scenario file (tests/scenarios/<name>.scenario.json)")
+	scenario := fs.String("scenario", "", "scenario file (tests/scenarios/<name>.vscenario)")
 	sceneName := fs.String("scene", "", "scene (without --scenario; default: the project's default world or scene)")
 	worldName := fs.String("world", "", "world instead of a scene (without --scenario)")
 	at := fs.String("at", "", "with --world: start cell x,z (default 0,0)")

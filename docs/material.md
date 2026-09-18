@@ -1,4 +1,4 @@
-# Material — `assets/materials/<name>.mat.json`
+# Material — `assets/materials/<name>.vmat`
 
 A material says how a surface is shaded: its base color, an optional texture, whether it
 is lit, how its alpha is used, which faces are drawn and how the texture is sampled.
@@ -8,9 +8,9 @@ model that name none. A part that ends up with no material uses the default mate
 
 ## File and name
 
-- Location: `assets/materials/<name>.mat.json`, or a folder under it
-  (`assets/materials/enemies/bat.mat.json`). Hidden folders (`.name`) are skipped.
-- The material's name is the file name without `.mat.json` (`crate_wood.mat.json` →
+- Location: `assets/materials/<name>.vmat`, or a folder under it
+  (`assets/materials/enemies/bat.vmat`). Hidden folders (`.name`) are skipped.
+- The material's name is the file name without `.vmat` (`crate_wood.vmat` →
   `crate_wood`). Names are 1–64 characters of `a-z`, `0-9`, `_` and `-`, and must start
   with a letter or a digit. Any other file name is an error. The name ignores the folder,
   so two materials of the same name in different folders are an error.
@@ -24,7 +24,7 @@ model that name none. A part that ends up with no material uses the default mate
 |-------|------|---------|----------------------------|
 | `veduta` | string | required | Must be exactly `"material/1"`. |
 | `albedo` | color string | `"#ffffff"` | Base color multiplier, `"#RRGGBB"` or `"#RRGGBBAA"` (hex digits, either case). The final surface color is texel × albedo; without a texture it is the albedo. The alpha byte only matters when `alpha` is `blend` or `cutout`; `#RRGGBB` means alpha `ff`. |
-| `texture` | string | none | Name of a texture asset (`assets/textures/<name>.tex.json`), for example `"crate_wood"`. Must be a valid asset name. It is a reference by name: the material compiles even if the texture does not exist yet; `inspect scene` reports missing assets. Omit the field for an untextured material. |
+| `texture` | string | none | Name of a texture asset (`assets/textures/<name>.vtex`), for example `"crate_wood"`. Must be a valid asset name. It is a reference by name: the material compiles even if the texture does not exist yet; `inspect scene` reports missing assets. Omit the field for an untextured material. |
 | `unlit` | boolean | `false` | `true` ignores the scene light: color = texel × albedo. `false` applies the directional light and ambient term (Lambert on vertex normals). |
 | `alpha` | string | `"opaque"` | `opaque`: alpha is ignored, depth is written. `blend`: alpha-blended over what is behind (depth tested, not written). `cutout`: fragments whose alpha (texel alpha × albedo alpha) is below `cutoff` are discarded; the rest are drawn opaque. |
 | `cutoff` | number | `0.5` | Alpha threshold for `cutout`, in the range (0, 1] (greater than 0, at most 1). Only allowed when `alpha` is `"cutout"`; setting it with any other `alpha` is an error. |
@@ -45,9 +45,9 @@ set; used only by `cutout`), `Cull` and `Filter`. Its binary layout in `.vda` fi
 ## Errors (examples)
 
 ```
-crate_wood.mat.json:3:13: alpha: unknown value "transparent" (want one of [opaque blend cutout])
-crate_wood.mat.json:4:14: cutoff: only allowed when alpha is "cutout"
-crate_wood.mat.json:2:13: albedo: color "#fff": want #RRGGBB or #RRGGBBAA
+crate_wood.vmat:3:13: alpha: unknown value "transparent" (want one of [opaque blend cutout])
+crate_wood.vmat:4:14: cutoff: only allowed when alpha is "cutout"
+crate_wood.vmat:2:13: albedo: color "#fff": want #RRGGBB or #RRGGBBAA
 ```
 
 ## Examples

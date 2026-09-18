@@ -76,8 +76,21 @@ func (k Kind) Dir() string {
 	return string(k)
 }
 
-// Ext returns the source file suffix of kind k, for example ".model.json".
+// Ext returns the source file suffix of kind k, for example ".vmodel". The file is JSON;
+// the suffix says which format it is.
 func (k Kind) Ext() string {
+	switch k {
+	case KindTexture:
+		return ".vtex"
+	case KindMaterial:
+		return ".vmat"
+	}
+	return ".v" + string(k)
+}
+
+// LegacyExt returns the suffix sources of kind k had before v2.0.0-rc.8, for example
+// ".model.json"; veduta upgrade renames them.
+func (k Kind) LegacyExt() string {
 	switch k {
 	case KindTexture:
 		return ".tex.json"
@@ -85,6 +98,19 @@ func (k Kind) Ext() string {
 		return ".mat.json"
 	}
 	return "." + string(k) + ".json"
+}
+
+// SourceKinds are the kinds with a source file, scenarios included.
+var SourceKinds = []Kind{KindModel, KindTexture, KindMaterial, KindScene, KindScenario, KindPrefab, KindWorld}
+
+// KindOfFile returns the kind whose suffix the file name base has.
+func KindOfFile(base string) (Kind, bool) {
+	for _, k := range SourceKinds {
+		if _, ok := k.NameFromFile(base); ok {
+			return k, true
+		}
+	}
+	return "", false
 }
 
 // Header returns the "veduta" header value of kind k.
@@ -108,7 +134,7 @@ func (k Kind) Header() string {
 	return ""
 }
 
-// NameFromFile returns the asset name of a source file name ("crate.model.json" →
+// NameFromFile returns the asset name of a source file name ("crate.vmodel" →
 // "crate") and whether the suffix matched kind k.
 func (k Kind) NameFromFile(base string) (string, bool) {
 	ext := k.Ext()

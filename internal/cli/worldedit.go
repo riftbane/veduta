@@ -362,7 +362,7 @@ func (s *Session) WorldVegetation(o WorldVegetationOptions) (*WorldVegetationRep
 		rep.Plants = reg.Flora[idx]
 		rep.DrawDistance = m.DrawDistance
 		if m.DrawDistance == 0 {
-			rep.Warnings = append(rep.Warnings, fmt.Sprintf("model %q has no draw_distance: every loaded chunk draws all its plants; give it one (and a lod level) in assets/models/%s.model.json", v.Model, v.Model))
+			rep.Warnings = append(rep.Warnings, fmt.Sprintf("model %q has no draw_distance: every loaded chunk draws all its plants; give it one (and a lod level) in assets/models/%s.vmodel", v.Model, v.Model))
 		}
 		if per > 16 {
 			rep.Warnings = append(rep.Warnings, fmt.Sprintf("each plant of %q has %d triangles: flora should keep to a handful (a lathe cone of 3 or 4 segments)", v.Model, per))

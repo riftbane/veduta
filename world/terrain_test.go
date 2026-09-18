@@ -29,7 +29,7 @@ const terrainWorldSrc = `{
 func terrainGen(t testing.TB) *Gen {
 	t.Helper()
 	pf := testPrefabs(t.(*testing.T))
-	w, err := asset.ParseWorld("terrain.world.json", []byte(terrainWorldSrc), pf)
+	w, err := asset.ParseWorld("terrain.vworld", []byte(terrainWorldSrc), pf)
 	if err != nil {
 		t.Fatal(err)
 	}

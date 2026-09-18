@@ -83,7 +83,7 @@ func TestWorldMapQuery(t *testing.T) {
 
 func TestWorldPlaceAndRemove(t *testing.T) {
 	s, dir := gameSession(t)
-	file := filepath.Join(dir, "assets", "worlds", "overworld.world.json")
+	file := filepath.Join(dir, "assets", "worlds", "overworld.vworld")
 	before, _ := os.ReadFile(file)
 
 	// Outside the world: refused, nothing written.
@@ -113,7 +113,7 @@ func TestWorldPlaceAndRemove(t *testing.T) {
 	if string(after) != want {
 		t.Fatalf("file after place:\n%s\nwant:\n%s", after, want)
 	}
-	w, err := asset.ParseWorld("overworld.world.json", after, nil)
+	w, err := asset.ParseWorld("overworld.vworld", after, nil)
 	if err != nil || len(w.Places) != 1 || w.Places[0].Name != "capital" {
 		t.Fatalf("parsed %v %+v", err, w)
 	}
@@ -238,7 +238,7 @@ func TestWorldToolsRegistered(t *testing.T) {
 
 func TestWorldTerrainAndVegetation(t *testing.T) {
 	s, dir := gameSession(t)
-	file := filepath.Join(dir, "assets", "worlds", "overworld.world.json")
+	file := filepath.Join(dir, "assets", "worlds", "overworld.vworld")
 	before, _ := os.ReadFile(file)
 	h := float32(6)
 	// A hill: the ground rises at its centre; a dry run writes nothing.
@@ -278,7 +278,7 @@ func TestWorldTerrainAndVegetation(t *testing.T) {
 	}
 
 	// Vegetation: a flora model the project has, in an area.
-	os.WriteFile(filepath.Join(dir, "assets", "models", "tuft.model.json"), []byte(`{"veduta": "model/1", "pivot": "bottom-center", "draw_distance": 15,
+	os.WriteFile(filepath.Join(dir, "assets", "models", "tuft.vmodel"), []byte(`{"veduta": "model/1", "pivot": "bottom-center", "draw_distance": 15,
 		"parts": [{"shape": "lathe", "profile": [[0.1, 0], [0, 0.3]], "segments": 4, "material": "leaf"}]}`), 0o644)
 	cell := [2]int32{-12, 10}
 	veg, err := s.WorldVegetation(WorldVegetationOptions{World: "overworld", Name: "tuft_meadow", Model: "tuft", Density: 0.5, Cell: &cell, Radius: 6})

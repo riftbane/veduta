@@ -14,7 +14,7 @@ import (
 // MaxTicks is the longest scenario, in ticks (about 13.9 hours at 20 Hz).
 const MaxTicks = 1_000_000
 
-// Scenario is a compiled scenario test (tests/scenarios/<name>.scenario.json): a scene
+// Scenario is a compiled scenario test (tests/scenarios/<name>.vscenario): a scene
 // simulated for Ticks ticks from Seed with scripted inputs, checked by expectations and
 // invariants, with screenshots at chosen ticks.
 //
@@ -167,8 +167,8 @@ func checkInvariants(c *Checker, path string, list []string) []string {
 }
 
 // ParseScenario decodes and compiles the scenario source file (for example
-// "tests/scenarios/move.scenario.json"). The scenario name is the file name without its
-// ".scenario.json" suffix and must be a valid asset name.
+// "tests/scenarios/move.vscenario"). The scenario name is the file name without its
+// ".vscenario" suffix and must be a valid asset name.
 func ParseScenario(file string, data []byte) (*Scenario, error) {
 	var src ScenarioSource
 	loc, err := Decode(file, data, TypeScenario, &src)

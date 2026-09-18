@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/riftbane/veduta/v2/asset/cook"
 	"github.com/riftbane/veduta/v2/gfx"
 )
 
@@ -75,13 +76,16 @@ func (r *TestReport) Human() string {
 // tests/golden (<scenario>.hash and <scenario>.png). With update, golden files are
 // rewritten (and VEDUTA_UPDATE_GOLDEN=1 is passed to go test).
 func (s *Session) Test(update bool) (*TestReport, error) {
+	if err := cook.CheckNames(s.Root, s.Project); err != nil {
+		return nil, fmt.Errorf("test: %w", err)
+	}
 	start := time.Now()
 	r := &TestReport{Scenarios: []ScenarioResult{}, Failed: []string{}}
 	r.GoTest = s.goTest(update)
 	if !r.GoTest.OK {
 		r.Failed = append(r.Failed, "go test")
 	}
-	files, err := filepath.Glob(filepath.Join(s.Root, "tests", "scenarios", "*.scenario.json"))
+	files, err := filepath.Glob(filepath.Join(s.Root, "tests", "scenarios", "*.vscenario"))
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +133,7 @@ func (s *Session) goTest(update bool) GoTestResult {
 }
 
 func (s *Session) testScenario(file string, update bool) ScenarioResult {
-	name := strings.TrimSuffix(filepath.Base(file), ".scenario.json")
+	name := strings.TrimSuffix(filepath.Base(file), ".vscenario")
 	sc := ScenarioResult{Name: name, Golden: "-"}
 	rep, err := s.Simulate(SimulateOptions{Scenario: file})
 	if err != nil {

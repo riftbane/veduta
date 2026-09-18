@@ -34,7 +34,7 @@ A sprite is an entity with the `quad` model and a material that shows a texture.
 are small programs of layers, so no image editor is needed. The hero is a rounded yellow
 square with two eyes:
 
-```json assets/textures/hero.tex.json
+```json assets/textures/hero.vtex
 {
   "veduta": "texture/1",
   "size": [16, 16],
@@ -48,7 +48,7 @@ square with two eyes:
 
 A gem, a cyan disc with a highlight:
 
-```json assets/textures/gem.tex.json
+```json assets/textures/gem.vtex
 {
   "veduta": "texture/1",
   "size": [16, 16],
@@ -61,7 +61,7 @@ A gem, a cyan disc with a highlight:
 
 A bat, purple wings and red eyes:
 
-```json assets/textures/bat.tex.json
+```json assets/textures/bat.vtex
 {
   "veduta": "texture/1",
   "size": [16, 16],
@@ -78,21 +78,21 @@ Pixels not painted by any layer stay transparent. A material puts a texture on a
 A sprite's material is always `unlit` (the scene's light would darken it), `cutout` (the
 transparent pixels are not drawn) and `nearest` (the pixels stay sharp):
 
-```json assets/materials/hero.mat.json
+```json assets/materials/hero.vmat
 { "veduta": "material/1", "texture": "hero", "unlit": true, "alpha": "cutout", "filter": "nearest" }
 ```
 
-```json assets/materials/gem.mat.json
+```json assets/materials/gem.vmat
 { "veduta": "material/1", "texture": "gem", "unlit": true, "alpha": "cutout", "filter": "nearest" }
 ```
 
-```json assets/materials/bat.mat.json
+```json assets/materials/bat.vmat
 { "veduta": "material/1", "texture": "bat", "unlit": true, "alpha": "cutout", "filter": "nearest" }
 ```
 
 Walls need no texture, just a colour:
 
-```json assets/materials/wall.mat.json
+```json assets/materials/wall.vmat
 { "veduta": "material/1", "albedo": "#3d405b", "unlit": true }
 ```
 
@@ -172,7 +172,7 @@ name with dots (`require("levels.cave")`) is a path under the game's folder.
 A scene is what exists when a level starts. The level's scene holds only a camera and one
 invisible entity, `builder`, whose kind `level` builds the rest:
 
-```json assets/scenes/level.scene.json
+```json assets/scenes/level.vscene
 {
   "veduta": "scene/1",
   "camera": { "type": "orthographic", "size": 12, "position": [1, -1, 100], "look_at": [1, -1, 0] },
@@ -383,7 +383,7 @@ passes on your PC passes on the console. See [Testing](Testing).
 
 Walking right, the hero stops at the first wall (the wall's edge is at x = 6.5):
 
-```json tests/scenarios/walk.scenario.json
+```json tests/scenarios/walk.vscenario
 {
   "veduta": "scenario/1",
   "scene": "level",
@@ -401,7 +401,7 @@ Walking right, the hero stops at the first wall (the wall's edge is at x = 6.5):
 
 Two units down and two to the right is the first gem:
 
-```json tests/scenarios/first_gem.scenario.json
+```json tests/scenarios/first_gem.vscenario
 {
   "veduta": "scenario/1",
   "scene": "level",
@@ -423,7 +423,7 @@ Two units down and two to the right is the first gem:
 
 Walking along the bat's row costs a life:
 
-```json tests/scenarios/bat_hit.scenario.json
+```json tests/scenarios/bat_hit.vscenario
 {
   "veduta": "scenario/1",
   "scene": "level",
@@ -443,7 +443,7 @@ Walking along the bat's row costs a life:
 
 While paused, the D-pad does nothing:
 
-```json tests/scenarios/pause.scenario.json
+```json tests/scenarios/pause.vscenario
 {
   "veduta": "scenario/1",
   "scene": "level",
@@ -463,7 +463,7 @@ While paused, the D-pad does nothing:
 
 And A on the title loads the level:
 
-```json tests/scenarios/title.scenario.json
+```json tests/scenarios/title.vscenario
 {
   "veduta": "scenario/1",
   "scene": "main",

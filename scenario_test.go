@@ -13,7 +13,7 @@ import (
 
 func TestLoadScenarioFile(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "move.scenario.json")
+	path := filepath.Join(dir, "move.vscenario")
 	src := `{
   "veduta": "scenario/1", "scene": "main", "seed": 42, "ticks": 300,
   "inputs": [ {"tick": 10, "press": ["up"]}, {"tick": 70, "release": ["up"]} ],

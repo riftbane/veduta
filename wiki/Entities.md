@@ -137,7 +137,7 @@ own child) is an error. Despawning a parent despawns its children.
 
 ## Prefabs
 
-A prefab (`assets/prefabs/<name>.prefab.json`) is a group of entities placed as one: a
+A prefab (`assets/prefabs/<name>.vprefab`) is a group of entities placed as one: a
 house with its door, a camp, a room. Worlds place them; scripts can too:
 
 ```lua

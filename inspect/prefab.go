@@ -58,13 +58,13 @@ func Prefab(ir *Renderer, name string, opt Options) (*Report, error) {
 		where := map[string]any{"entity": e.Name, "index": i}
 		if e.Model != "" {
 			if m := ir.Lib.Models[e.Model]; m == nil {
-				rep.Add(Error, pfMissing, 1, where, fmt.Sprintf("model %q does not exist: create assets/models/%s.model.json or fix entities[%d].model", e.Model, e.Model, i))
+				rep.Add(Error, pfMissing, 1, where, fmt.Sprintf("model %q does not exist: create assets/models/%s.vmodel or fix entities[%d].model", e.Model, e.Model, i))
 			} else {
 				tris += len(m.Mesh.Indices) / 3
 			}
 		}
 		if e.Material != "" && ir.Lib.Materials[e.Material] == nil {
-			rep.Add(Error, pfMissing, 1, where, fmt.Sprintf("material %q does not exist: create assets/materials/%s.mat.json or fix entities[%d].material", e.Material, e.Material, i))
+			rep.Add(Error, pfMissing, 1, where, fmt.Sprintf("material %q does not exist: create assets/materials/%s.vmat or fix entities[%d].material", e.Material, e.Material, i))
 		}
 		if !slices.Contains(asset.BuiltinKinds, e.Kind) {
 			rep.Add(Info, pfKind, 1, where, fmt.Sprintf("kind %q is checked when the game loads the world (the tool has no game)", e.Kind))

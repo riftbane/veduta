@@ -387,11 +387,11 @@ func TestSceneCodecHitboxAndLayer(t *testing.T) {
 
 // Sources compile, encode, pack, unpack and decode back to the same values.
 func TestCompiledAssetsThroughVDA(t *testing.T) {
-	mat, err := ParseMaterial("crate_wood.mat.json", readTestdata(t, "materials/crate_wood.mat.json"))
+	mat, err := ParseMaterial("crate_wood.vmat", readTestdata(t, "materials/crate_wood.vmat"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	scene, err := ParseScene("main.scene.json", readTestdata(t, "scenes/main.scene.json"))
+	scene, err := ParseScene("main.vscene", readTestdata(t, "scenes/main.vscene"))
 	if err != nil {
 		t.Fatal(err)
 	}

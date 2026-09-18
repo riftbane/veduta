@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/riftbane/veduta/v2/asset"
+	"github.com/riftbane/veduta/v2/asset/cook"
 	"github.com/riftbane/veduta/v2/internal/update"
 )
 
@@ -238,6 +239,16 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 			r.Next = s.consoleNext()
 		}
 	}
+	// Sources named as before v2.0.0-rc.8 (crate.model.json) take the suffix of their
+	// format (crate.vmodel), whether or not the engine version moved.
+	renamed, err := renameLegacySources(s.Root, s.Project)
+	if err != nil {
+		return nil, fmt.Errorf("upgrade: %w", err)
+	}
+	if len(renamed) > 0 {
+		r.Changed = append(r.Changed, renamed...)
+		r.Migrations = append(r.Migrations, fmt.Sprintf("rename %d sources to the suffix of their format (.vmodel, .vtex, .vmat, .vscene, .vscenario, .vprefab, .vworld)", len(renamed)))
+	}
 	// The editor files follow the tool whether or not the engine version moved: a project
 	// made before they existed gets them from the upgrade of a version it already has.
 	editor, skipped, err := writeEditorFiles(s.Root, s.IsScript())
@@ -251,6 +262,34 @@ func (s *Session) Upgrade(env *Env, force bool) (*UpgradeReport, error) {
 		r.Next = append(r.Next, p+" is not plain JSON, so upgrade left it: set by hand what `veduta init` writes there")
 	}
 	return r, nil
+}
+
+// renameLegacySources renames the sources named with a suffix of before v2.0.0-rc.8
+// (cook.LegacySources) to their format's suffix, in place, and returns the new paths. A
+// name already taken by a new-style file is an error, and nothing is renamed.
+func renameLegacySources(root string, p *asset.Project) ([]string, error) {
+	legacy, err := cook.LegacySources(root, p)
+	if err != nil {
+		return nil, err
+	}
+	next := make([]string, len(legacy))
+	for i, f := range legacy {
+		for _, k := range asset.SourceKinds {
+			if base, ok := strings.CutSuffix(f, k.LegacyExt()); ok {
+				next[i] = base + k.Ext()
+				break
+			}
+		}
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(next[i]))); err == nil {
+			return nil, fmt.Errorf("rename %s: %s is there already", f, next[i])
+		}
+	}
+	for i, f := range legacy {
+		if err := os.Rename(filepath.Join(root, filepath.FromSlash(f)), filepath.Join(root, filepath.FromSlash(next[i]))); err != nil {
+			return nil, err
+		}
+	}
+	return next, nil
 }
 
 // consoleNext lists what a project that just left a v0.x engine still needs before veduta

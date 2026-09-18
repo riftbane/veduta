@@ -29,7 +29,7 @@ const vegetationWorldSrc = `{
 func vegetationGen(t *testing.T) (*Gen, func(string) *asset.Model) {
 	t.Helper()
 	pf := testPrefabs(t)
-	w, err := asset.ParseWorld("veg.world.json", []byte(vegetationWorldSrc), pf)
+	w, err := asset.ParseWorld("veg.vworld", []byte(vegetationWorldSrc), pf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func vegetationGen(t *testing.T) (*Gen, func(string) *asset.Model) {
 		"tulip":     `{"veduta": "model/1", "pivot": "bottom-center", "parts": [{"shape": "cylinder", "radius": 0.02, "height": 0.4, "segments": 4, "position": [0.05, 0.2, 0]}, {"shape": "sphere", "radius": 0.08, "segments": 6, "rings": 3, "position": [0.05, 0.45, 0], "material": "petal"}]}`,
 		"unused_ok": `{"veduta": "model/1", "parts": [{"shape": "box", "size": [1, 1, 1]}]}`,
 	} {
-		m, err := model.Parse(name+".model.json", []byte(src))
+		m, err := model.Parse(name+".vmodel", []byte(src))
 		if err != nil {
 			t.Fatal(err)
 		}

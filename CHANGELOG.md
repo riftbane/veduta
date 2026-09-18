@@ -9,7 +9,7 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - A texture preview in the VS Code extension: **Veduta: Preview the Texture** (the eye in
-  the title bar of a `*.tex.json`) opens a panel beside the source and draws it while it is
+  the title bar of a `*.vtex`) opens a panel beside the source and draws it while it is
   written, with nothing saved and no engine running. Over the picture a grid and a ruler
   measure it, the pointer reads the texel and its colour, a drag measures a rectangle,
   every layer can be switched off on its own, and a tiling texture can be shown as a 2x2
@@ -152,6 +152,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **Sources have an extension per format** (breaking): `crate.vmodel`, `wood.vtex`,
+  `bat.vmat`, `main.vscene`, `move.vscenario`, `house.vprefab`, `overworld.vworld` instead
+  of `crate.model.json` and so on; they are still JSON. `veduta upgrade` renames a
+  project's sources in place (and stops, renaming nothing, if a new name is taken); `build`
+  and every command that cooks refuse a source still named the old way and name it. `init`
+  and `upgrade` associate the extensions with JSON in `.vscode/settings.json`, keeping the
+  project's own associations, and the VS Code extension (0.6.0) does too.
 - **The module path is `github.com/riftbane/veduta/v2`** (breaking), as Go requires from
   v2 on: a Go game imports `github.com/riftbane/veduta/v2/...`. `veduta upgrade` across a
   major version rewrites the game's engine imports before `go get`, and names the files;

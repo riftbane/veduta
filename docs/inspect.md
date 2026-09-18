@@ -162,7 +162,7 @@ The world's generator (`world` topic) is checked against the library; chunks are
 
 | Code | Severity | Meaning | What to change |
 |------|----------|---------|----------------|
-| `WORLD_MISSING_PREFAB` | error | A scatter, site or place names a prefab that does not exist. | Create `assets/prefabs/<name>.prefab.json`, or fix the name. |
+| `WORLD_MISSING_PREFAB` | error | A scatter, site or place names a prefab that does not exist. | Create `assets/prefabs/<name>.vprefab`, or fix the name. |
 | `WORLD_MISSING_ASSET` | error | A ground material, or a model or material of a persistent entity, does not exist. | Create it, or fix `biomes[i].ground` / `entities[i]`. |
 | `WORLD_GROUND_NOT_TILING` | error | A biome's ground material has no texture, or one that is not `tiling`; the ground repeats it once per cell. | Give the material a texture with `"tiling": true`. |
 | `WORLD_PLACE_OVERLAP` | error | Two places' footprints share a cell (reported once per pair). | Move one (`world_place` finds a free cell). |

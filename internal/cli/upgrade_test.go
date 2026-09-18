@@ -359,3 +359,58 @@ func TestUpgradeTellsWhatTheConsoleNeeds(t *testing.T) {
 		t.Fatalf("v1 project: %+v %v", r, err)
 	}
 }
+
+// TestUpgradeRenamesSources: sources named as before v2.0.0-rc.8 take their format's
+// suffix, in their folders, whether or not the engine version moves; hidden folders and
+// other JSON files stay as they are, and a name already taken stops the upgrade before any
+// rename.
+func TestUpgradeRenamesSources(t *testing.T) {
+	s := upgradeProject(t, "{\n  \"veduta\": \"project/1\",\n  \"name\": \"mygame\",\n  \"engine\": \"v1.0.0\"\n}\n", "v1.0.0")
+	put := func(rel string) {
+		t.Helper()
+		p := filepath.Join(s.Root, filepath.FromSlash(rel))
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		if err := os.WriteFile(p, []byte("{}"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exists := func(rel string) bool {
+		_, err := os.Stat(filepath.Join(s.Root, filepath.FromSlash(rel)))
+		return err == nil
+	}
+	for _, f := range []string{"assets/models/crate.model.json", "assets/materials/enemies/bat.mat.json", "assets/textures/wood.tex.json",
+		"tests/scenarios/move.scenario.json", "assets/.cooked/x.model.json", "assets/notes.json", "assets/scenes/main.vscene", "assets/scenes/main.scene.json"} {
+		put(f)
+	}
+	// Left as they are, the scenarios would not run: test stops instead of passing none.
+	if _, err := s.Test(false); err == nil || !strings.Contains(err.Error(), "tests/scenarios/move.scenario.json: sources are named") {
+		t.Fatalf("test with legacy names: %v", err)
+	}
+	env := &Env{Version: "v1.0.0"}
+	if _, err := s.Upgrade(env, false); err == nil || !strings.Contains(err.Error(), "assets/scenes/main.vscene is there already") {
+		t.Fatalf("upgrade over a taken name: %v", err)
+	}
+	if !exists("assets/models/crate.model.json") {
+		t.Fatal("a rename happened although the upgrade stopped")
+	}
+	os.Remove(filepath.Join(s.Root, "assets", "scenes", "main.vscene"))
+	r, err := s.Upgrade(env, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"assets/materials/enemies/bat.vmat", "assets/models/crate.vmodel", "assets/scenes/main.vscene", "assets/textures/wood.vtex", "tests/scenarios/move.vscenario"}
+	if !reflect.DeepEqual(r.Changed, want) || len(r.Migrations) != 1 || !strings.Contains(r.Migrations[0], "rename 5 sources") {
+		t.Fatalf("report %+v", r)
+	}
+	for _, f := range append(want, "assets/.cooked/x.model.json", "assets/notes.json") {
+		if !exists(f) {
+			t.Errorf("%s is not there", f)
+		}
+	}
+	if exists("assets/models/crate.model.json") {
+		t.Error("the old name is still there")
+	}
+	if r, err := s.Upgrade(env, false); err != nil || len(r.Changed) != 0 {
+		t.Fatalf("second upgrade: %+v %v", r, err)
+	}
+}

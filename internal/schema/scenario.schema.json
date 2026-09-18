@@ -89,7 +89,7 @@
       "type": "object"
     }
   },
-  "description": "ScenarioSource is tests/scenarios/<name>.scenario.json.",
+  "description": "ScenarioSource is tests/scenarios/<name>.vscenario.",
   "properties": {
     "at": {
       "description": "start cell of a world, default [0, 0]",

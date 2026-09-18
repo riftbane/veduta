@@ -266,7 +266,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 			Name:        "simulate",
 			Description: "Run ticks through the game: a scenario file, or a scene with ticks/seed/inputs. Returns the verdict, the expectations table, invariant violations with their tick, trace event counts, the run_id (for trace) and exactly one contact sheet (screenshots + trajectories: top-down, or in the XY plane for a 2D game whose scene camera is orthographic looking along -Z).",
 			InputSchema: schema(map[string]any{
-				"scenario":    str("scenario name (\"move\" = tests/scenarios/move.scenario.json) or file path"),
+				"scenario":    str("scenario name (\"move\" = tests/scenarios/move.vscenario) or file path"),
 				"scene":       str("scene (without scenario)"),
 				"world":       str("world instead of a scene (without scenario)"),
 				"at":          map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "with world: start cell [x, z]"},
@@ -313,7 +313,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 			Name:        "bench",
 			Description: "Time the game the way the console's player runs it: a scenario (or a scene with ticks) without recording a trace, each tick's update and its frame at the project's resolution. Returns mean, p50, p95 and max milliseconds for update, render and both, the ticks over the tick budget (1000 / tick_rate), the slowest tick, and triangles submitted and drawn per frame. Timings are this machine's; cpus limits the renderer's processors (the console has 4, far slower).",
 			InputSchema: schema(map[string]any{
-				"scenario": str("scenario name (\"move\" = tests/scenarios/move.scenario.json) or file path"),
+				"scenario": str("scenario name (\"move\" = tests/scenarios/move.vscenario) or file path"),
 				"scene":    str("scene (without scenario)"),
 				"world":    str("world instead of a scene (without scenario)"),
 				"at":       map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "with world: start cell [x, z]"},
@@ -458,7 +458,7 @@ func (m *mcpServer) tools() []mcp.Tool {
 		},
 		{
 			Name:        "fuzz",
-			Description: "Play random-input games looking for invariant violations; a minimized repro is written to tests/scenarios/fuzz_<hash>.scenario.json.",
+			Description: "Play random-input games looking for invariant violations; a minimized repro is written to tests/scenarios/fuzz_<hash>.vscenario.",
 			InputSchema: schema(map[string]any{
 				"scene": str("scene (default: the project's default world or scene)"),
 				"world": str("world instead of a scene"),

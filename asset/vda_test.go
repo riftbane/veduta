@@ -128,7 +128,7 @@ func TestVDATruncation(t *testing.T) {
 const testHash = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
 
 func testMeta() Meta {
-	return Meta{Kind: KindMaterial, Name: "crate_wood", Source: "materials/crate_wood.mat.json",
+	return Meta{Kind: KindMaterial, Name: "crate_wood", Source: "materials/crate_wood.vmat",
 		SourceHash: testHash, Compiler: CompilerVersion}
 }
 
@@ -139,7 +139,7 @@ func TestMetaCanonical(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"compiler":"veduta-asset/0.5.0","deps":["textures/src/a&b<c>.png","textures/src/b.png"],"kind":"material","name":"crate_wood","source":"materials/crate_wood.mat.json","source_hash":"` + testHash + `"}`
+	want := `{"compiler":"veduta-asset/0.5.0","deps":["textures/src/a&b<c>.png","textures/src/b.png"],"kind":"material","name":"crate_wood","source":"materials/crate_wood.vmat","source_hash":"` + testHash + `"}`
 	if c.Type != ChunkMeta || string(c.Data) != want {
 		t.Fatalf("META = %s\nwant   %s", c.Data, want)
 	}
@@ -164,7 +164,7 @@ func TestMetaErrors(t *testing.T) {
 	bad := []func(*Meta){
 		func(m *Meta) { m.Kind = KindScenario },
 		func(m *Meta) { m.Name = "Crate" },
-		func(m *Meta) { m.Source = "/abs/x.mat.json" },
+		func(m *Meta) { m.Source = "/abs/x.vmat" },
 		func(m *Meta) { m.Source = "" },
 		func(m *Meta) { m.SourceHash = "abc" },
 		func(m *Meta) { m.SourceHash = strings.ToUpper(testHash) },

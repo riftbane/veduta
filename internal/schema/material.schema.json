@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
-  "description": "MaterialSource is assets/materials/<name>.mat.json.",
+  "description": "MaterialSource is assets/materials/<name>.vmat.",
   "properties": {
     "albedo": {
       "description": "default #ffffff",

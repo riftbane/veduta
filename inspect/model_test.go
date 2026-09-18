@@ -28,7 +28,7 @@ func mdlTestLib(t *testing.T, fixtures ...string) *asset.Library {
 		t.Fatal(err)
 	}
 	for _, f := range fixtures {
-		p := filepath.Join("..", "testdata", "inspect", "models", f+".model.json")
+		p := filepath.Join("..", "testdata", "inspect", "models", f+".vmodel")
 		data, err := os.ReadFile(p)
 		if err != nil {
 			t.Fatal(err)
@@ -247,7 +247,7 @@ func TestModelFlippedNormals(t *testing.T) {
 	golden.Image(t, "inspect_model_hero_flipped_sections", mdlTestDecode(t, filepath.Join(dir, "hero_flipped.sections.png")))
 
 	// A flipped sphere is named by its own index.
-	src, err := os.ReadFile(filepath.Join("..", "internal", "testgame", "assets", "models", "hero.model.json"))
+	src, err := os.ReadFile(filepath.Join("..", "internal", "testgame", "assets", "models", "hero.vmodel"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestModelFlippedNormals(t *testing.T) {
 	if s == string(src) {
 		t.Fatal("hero source changed; update the test")
 	}
-	mdlTestAdd(t, lib, "hero_sphere.model.json", []byte(s))
+	mdlTestAdd(t, lib, "hero_sphere.vmodel", []byte(s))
 	rep = mdlTestInspect(t, &Renderer{Lib: lib}, "hero_sphere", Options{Sheets: []string{"none"}})
 	flips = mdlTestIssues(rep, "MESH_FLIPPED_NORMALS")
 	if len(flips) != 1 || flips[0].Where["part"] != 2 || !strings.HasPrefix(flips[0].Hint, "Part 2 (sphere) has normals pointing inward.") {
@@ -301,7 +301,7 @@ func TestModelOpenBox(t *testing.T) {
 	golden.Image(t, "inspect_model_open_box_wireframe", img)
 
 	// A plane is open by construction: info, not warning.
-	mdlTestAdd(t, lib, "floor.model.json", []byte(`{"veduta": "model/1", "parts": [{"shape": "plane", "size": [2, 2], "material": "grass"}]}`))
+	mdlTestAdd(t, lib, "floor.vmodel", []byte(`{"veduta": "model/1", "parts": [{"shape": "plane", "size": [2, 2], "material": "grass"}]}`))
 	rep = mdlTestInspect(t, &Renderer{Lib: lib}, "floor", Options{Sheets: []string{"none"}})
 	open = mdlTestIssues(rep, "MESH_OPEN_BOUNDARY")
 	if len(open) != 1 || open[0].Severity != Info || open[0].Where["edges"] != 4 {
@@ -426,7 +426,7 @@ func TestModelUVAndDensity(t *testing.T) {
 	lib := mdlTestLib(t, "planar_box")
 	lib.Textures["decal"] = &asset.Texture{Name: "decal", Tiling: false}
 	lib.Materials["decal"] = &asset.Material{Name: "decal", Texture: "decal", Albedo: 0xffffffff, Alpha: "opaque"}
-	mdlTestAdd(t, lib, "decal_box.model.json", []byte(`{"veduta": "model/1", "pivot": "bottom-center", "parts": [{"shape": "box", "size": [2, 1, 1], "material": "decal"}]}`))
+	mdlTestAdd(t, lib, "decal_box.vmodel", []byte(`{"veduta": "model/1", "pivot": "bottom-center", "parts": [{"shape": "box", "size": [2, 1, 1], "material": "decal"}]}`))
 	ir := &Renderer{Lib: lib}
 	opt := Options{Sheets: []string{"none"}}
 
@@ -468,7 +468,7 @@ func TestModelUVAndDensity(t *testing.T) {
 func TestModelDuplicateVertex(t *testing.T) {
 	lib := mdlTestLib(t)
 	// A part pasted twice coincides with itself.
-	mdlTestAdd(t, lib, "twin.model.json", []byte(`{"veduta": "model/1", "parts": [
+	mdlTestAdd(t, lib, "twin.vmodel", []byte(`{"veduta": "model/1", "parts": [
 		{"shape": "box", "size": [1, 1, 1], "material": "hero"},
 		{"shape": "box", "size": [1, 1, 1], "material": "hero_nose"}]}`))
 	rep := mdlTestInspect(t, &Renderer{Lib: lib}, "twin", Options{Sheets: []string{"none"}})
@@ -522,7 +522,7 @@ func TestModelShapes(t *testing.T) {
 	}
 	ir := &Renderer{Lib: lib}
 	for _, name := range asset.Names(srcs) {
-		mdlTestAdd(t, lib, name+".model.json", []byte(srcs[name]))
+		mdlTestAdd(t, lib, name+".vmodel", []byte(srcs[name]))
 		rep := mdlTestInspect(t, ir, name, Options{Sheets: []string{"none"}})
 		t.Logf("%s: %s", name, mdlTestJSON(t, rep.Issues))
 		for _, is := range rep.Issues {
@@ -543,7 +543,7 @@ func TestModelLarge(t *testing.T) {
 		t.Skip("large mesh")
 	}
 	lib := mdlTestLib(t)
-	mdlTestAdd(t, lib, "large.model.json", []byte(`{"veduta": "model/1", "symmetry": "x", "triangle_budget": 1000000, "parts": [
+	mdlTestAdd(t, lib, "large.vmodel", []byte(`{"veduta": "model/1", "symmetry": "x", "triangle_budget": 1000000, "parts": [
 		{"shape": "sphere", "radius": 1, "segments": 256, "rings": 128, "material": "crate"},
 		{"shape": "sphere", "radius": 1, "segments": 256, "rings": 128, "position": [3, 0, 0], "material": "crate"},
 		{"shape": "mirror", "axis": "x", "of": 1}]}`))
@@ -694,7 +694,7 @@ func TestModelEdgeCases(t *testing.T) {
 // naming a missing model.
 func TestModelLevelsOfDetail(t *testing.T) {
 	lib := mdlTestLib(t)
-	mdlTestAdd(t, lib, "models/pine.model.json", []byte(`{"veduta": "model/1", "pivot": "bottom-center",
+	mdlTestAdd(t, lib, "models/pine.vmodel", []byte(`{"veduta": "model/1", "pivot": "bottom-center",
 		"lod": [{"distance": 10}, {"distance": 20, "model": "crate"}, {"distance": 30}, {"distance": 40, "model": "nowhere"}], "draw_distance": 50,
 		"parts": [{"shape": "cylinder", "radius": 0.2, "height": 1, "segments": 8}, {"shape": "box", "size": [1, 1, 1], "position": [0, 1, 0]}]}`))
 	ir := &Renderer{Lib: lib}
@@ -714,7 +714,7 @@ func TestModelLevelsOfDetail(t *testing.T) {
 	if gain := mdlTestIssues(rep, "MESH_LOD_NO_GAIN"); crate > 24 && len(gain) != 0 || crate <= 24 && len(gain) != 1 {
 		t.Errorf("no gain with crate %d: %v", crate, rep.Issues)
 	}
-	mdlTestAdd(t, lib, "models/cube.model.json", []byte(`{"veduta": "model/1", "lod": [{"distance": 10}], "parts": [{"shape": "box", "size": [1, 1, 1]}]}`))
+	mdlTestAdd(t, lib, "models/cube.vmodel", []byte(`{"veduta": "model/1", "lod": [{"distance": 10}], "parts": [{"shape": "box", "size": [1, 1, 1]}]}`))
 	rep = mdlTestInspect(t, ir, "cube", Options{Sheets: []string{"none"}})
 	if gain := mdlTestIssues(rep, "MESH_LOD_NO_GAIN"); len(gain) != 1 || gain[0].Where["triangles"] != 12 || gain[0].Where["previous"] != 12 {
 		t.Errorf("box level: %v", rep.Issues)

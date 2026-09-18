@@ -8,10 +8,10 @@ mygame/
 ├── veduta.json               the manifest: name, engine version, defaults
 ├── card.json                 how the console's dashboard lists the game
 ├── assets/
-│   ├── scenes/main.scene.json
-│   ├── models/quad.model.json      a 1 × 1 square, the shape of every sprite
-│   └── materials/sprite.mat.json   the settings a sprite material needs
-├── tests/scenarios/start.scenario.json
+│   ├── scenes/main.vscene
+│   ├── models/quad.vmodel          a 1 × 1 square, the shape of every sprite
+│   └── materials/sprite.vmat       the settings a sprite material needs
+├── tests/scenarios/start.vscenario
 ├── .github/workflows/release.yml   publishes the game when you tag a version
 ├── .veduta/, .vscode/, .luarc.json editor setup: API definitions and JSON schemas
 ├── CLAUDE.md, .mcp.json            for an AI agent working on the game (veduta mcp)
@@ -27,24 +27,27 @@ by git and never need editing.
 | Path | Holds |
 |------|-------|
 | `*.lua` anywhere in the project | scripts; `main.lua` is the entry point, the others are modules loaded with `require` |
-| `assets/scenes/<name>.scene.json` | [scenes](Scenes) |
-| `assets/models/<name>.model.json` | [models](Graphics-Assets#models) |
-| `assets/materials/<name>.mat.json` | [materials](Graphics-Assets#materials) |
-| `assets/textures/<name>.tex.json` | [textures](Graphics-Assets#textures); PNG files they use can sit anywhere under `assets/` |
-| `assets/worlds/<name>.world.json` | [worlds](3D-Worlds-and-Blocks#streamed-worlds) |
-| `assets/prefabs/<name>.prefab.json` | groups of entities placed by worlds |
-| `tests/scenarios/<name>.scenario.json` | [scenarios](Testing) |
+| `assets/scenes/<name>.vscene` | [scenes](Scenes) |
+| `assets/models/<name>.vmodel` | [models](Graphics-Assets#models) |
+| `assets/materials/<name>.vmat` | [materials](Graphics-Assets#materials) |
+| `assets/textures/<name>.vtex` | [textures](Graphics-Assets#textures); PNG files they use can sit anywhere under `assets/` |
+| `assets/worlds/<name>.vworld` | [worlds](3D-Worlds-and-Blocks#streamed-worlds) |
+| `assets/prefabs/<name>.vprefab` | groups of entities placed by worlds |
+| `tests/scenarios/<name>.vscenario` | [scenarios](Testing) |
 | `tests/golden/` | the recorded outcome of each scenario, written by `veduta test` |
 
-An asset's name is its file name without the extension: `assets/materials/hero.mat.json`
+An asset's name is its file name without the extension: `assets/materials/hero.vmat`
 is the material `hero`. Names are 1 to 64 characters of `a-z`, `0-9`, `_` and `-`,
 starting with a letter or a digit. Sources can be sorted into folders under their kind's
-directory (`assets/materials/enemies/bat.mat.json` is still the material `bat`), so a name
+directory (`assets/materials/enemies/bat.vmat` is still the material `bat`), so a name
 must be unique across the folders; `tests/scenarios/` stays flat. See
 [Structuring a Large Game](Structuring-a-Large-Game).
 
-Every JSON file starts with a `"veduta"` header naming its format (`"scene/1"`,
-`"material/1"`, …). Decoding is strict: an unknown field, a duplicate key or a wrong type is
+Every source is a JSON file with the extension of its format (`.vscene`, `.vmodel`,
+`.vmat`, `.vtex`, `.vworld`, `.vprefab`, `.vscenario`; VS Code opens them as JSON) and
+starts with a `"veduta"` header naming its format (`"scene/1"`, `"material/1"`, …). A
+project made before v2.0.0-rc.8 has `crate.model.json` and so on: `veduta upgrade`
+renames them. Decoding is strict: an unknown field, a duplicate key or a wrong type is
 an error with its file, line and column, and VS Code underlines it as you type.
 
 ## veduta.json

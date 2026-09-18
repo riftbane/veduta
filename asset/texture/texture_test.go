@@ -22,13 +22,13 @@ func tex(size, extra, layers string) string {
 	return `{"veduta": "texture/1", "size": ` + size + extra + `, "layers": [` + layers + `]}`
 }
 
-// compile parses src as "test.tex.json" with the testdata FS and fails on error.
+// compile parses src as "test.vtex" with the testdata FS and fails on error.
 func compile(t testing.TB, src string, opt Options) *asset.Texture {
 	t.Helper()
 	if opt.FS == nil {
 		opt.FS = os.DirFS(testdataDir(t))
 	}
-	tx, err := Parse("test.tex.json", []byte(src), opt)
+	tx, err := Parse("test.vtex", []byte(src), opt)
 	if err != nil {
 		t.Fatalf("compile: %v\n%s", err, src)
 	}
@@ -117,13 +117,13 @@ func TestValidationReportsEverything(t *testing.T) {
 		{14, `layers[8].type: unknown value "blur"`},
 		{15, `layers[9].type: is required`},
 	}
-	es := compileErrs(t, "textures/bad.tex.json", badSrc, Options{})
+	es := compileErrs(t, "textures/bad.vtex", badSrc, Options{})
 	for i, e := range es {
 		t.Logf("%v", e)
 		if i >= len(want) {
 			continue
 		}
-		if e.File != "textures/bad.tex.json" || e.Line != want[i].line || !strings.HasPrefix(e.Msg, want[i].msg) {
+		if e.File != "textures/bad.vtex" || e.Line != want[i].line || !strings.HasPrefix(e.Msg, want[i].msg) {
 			t.Errorf("error %d = %s:%d:%d %q, want line %d %q", i, e.File, e.Line, e.Col, e.Msg, want[i].line, want[i].msg)
 		}
 	}
@@ -191,7 +191,7 @@ func TestLayerValidation(t *testing.T) {
 		{`{"type": "Solid", "color": "#000000"}`, `layers[0].type: unknown value "Solid"`},
 	}
 	for _, c := range cases {
-		es := compileErrs(t, "test.tex.json", tex("[4, 4]", "", c.layers), Options{FS: os.DirFS(testdataDir(t))})
+		es := compileErrs(t, "test.vtex", tex("[4, 4]", "", c.layers), Options{FS: os.DirFS(testdataDir(t))})
 		if len(es) != 1 || !strings.HasPrefix(es[0].Msg, c.want) {
 			t.Errorf("%s:\n got %v\nwant %s", c.layers, es, c.want)
 		}
@@ -209,7 +209,7 @@ func TestTopLevelValidation(t *testing.T) {
 		{tex("[4, 4]", "", strings.Repeat(solid+",", 64)+solid), "layers: 65 layers, want at most 64"},
 	}
 	for _, c := range cases {
-		es := compileErrs(t, "test.tex.json", c.src, Options{})
+		es := compileErrs(t, "test.vtex", c.src, Options{})
 		if len(es) != 1 || !strings.HasPrefix(es[0].Msg, c.want) {
 			t.Errorf("%s:\n got %v\nwant %s", c.src, es, c.want)
 		}
@@ -220,7 +220,7 @@ func TestTopLevelValidation(t *testing.T) {
 		tex("[4, 4]", `, "tilling": true`, solid): `tilling: unknown field`,
 		`{"veduta": "model/1"}`:                   `header is "model/1", want "texture/1"`,
 	} {
-		_, err := Parse("test.tex.json", []byte(src), Options{})
+		_, err := Parse("test.vtex", []byte(src), Options{})
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: got %v, want %q", src, err, want)
 		}
@@ -230,10 +230,10 @@ func TestTopLevelValidation(t *testing.T) {
 func TestNames(t *testing.T) {
 	src := tex("[1, 1]", "", `{"type": "solid", "color": "#000000"}`)
 	for file, want := range map[string]string{
-		"textures/crate.tex.json": "",
-		"crate.json":              `file name "crate.json" must end in ".tex.json"`,
-		".tex.json":               `file name ".tex.json" must end in ".tex.json" with a non-empty name`,
-		"Crate.tex.json":          `file name: texture name "Crate" may only contain`,
+		"textures/crate.vtex": "",
+		"crate.json":          `file name "crate.json" must end in ".vtex"`,
+		".vtex":               `file name ".vtex" must end in ".vtex" with a non-empty name`,
+		"Crate.vtex":          `file name: texture name "Crate" may only contain`,
 	} {
 		tx, err := Parse(file, []byte(src), Options{})
 		switch {
@@ -485,7 +485,7 @@ func TestNoiseProperties(t *testing.T) {
 }
 
 func TestDeterminism(t *testing.T) {
-	data, err := os.ReadFile(testdataDir(t) + "/textures/example.tex.json")
+	data, err := os.ReadFile(testdataDir(t) + "/textures/example.vtex")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,14 +553,14 @@ func TestSkip(t *testing.T) {
 		t.Errorf("skipping every layer gives %s, want transparent", hex(all.Data.Levels[0].Pix[0]))
 	}
 	for _, skip := range [][]int{{2}, {-1}} {
-		_, err := Parse("t.tex.json", []byte(two), Options{Skip: skip})
+		_, err := Parse("t.vtex", []byte(two), Options{Skip: skip})
 		if err == nil || !strings.Contains(err.Error(), "out of range [0, 1]") {
 			t.Errorf("skip %v: %v", skip, err)
 		}
 	}
 	// Skipped layers are still validated.
 	bad := tex("[2, 2]", "", `{"type": "solid", "color": "#ff0000"}, {"type": "solid"}`)
-	if _, err := Parse("t.tex.json", []byte(bad), Options{Skip: []int{1}}); err == nil {
+	if _, err := Parse("t.vtex", []byte(bad), Options{Skip: []int{1}}); err == nil {
 		t.Error("an invalid skipped layer was accepted")
 	}
 }
@@ -679,7 +679,7 @@ func TestImagePaths(t *testing.T) {
 	}
 	for p, want := range bad {
 		src := tex("[4, 4]", "", `{"type": "image", "path": "`+strings.ReplaceAll(p, `\`, `\\`)+`"}`)
-		es := compileErrs(t, "test.tex.json", src, Options{FS: os.DirFS(testdataDir(t))})
+		es := compileErrs(t, "test.vtex", src, Options{FS: os.DirFS(testdataDir(t))})
 		if len(es) != 1 || !strings.HasPrefix(es[0].Msg, "layers[0].path: ") || !strings.Contains(es[0].Msg, want) {
 			t.Errorf("%s: got %v, want %q", p, es, want)
 		}
@@ -702,7 +702,7 @@ func TestImagePaths(t *testing.T) {
 		"a/ok.png":    "",
 	} {
 		src := tex("[4, 4]", "", `{"type": "image", "path": "`+p+`", "fit": "stretch"}`)
-		tx, err := Parse("test.tex.json", []byte(src), Options{FS: mfs})
+		tx, err := Parse("test.vtex", []byte(src), Options{FS: mfs})
 		switch {
 		case want == "" && err != nil:
 			t.Errorf("%s: %v", p, err)
@@ -713,7 +713,7 @@ func TestImagePaths(t *testing.T) {
 		}
 	}
 	// Without a filesystem, image layers are errors.
-	es := compileErrs(t, "test.tex.json", tex("[4, 4]", "", `{"type": "image", "path": "textures/src/logo.png"}`), Options{})
+	es := compileErrs(t, "test.vtex", tex("[4, 4]", "", `{"type": "image", "path": "textures/src/logo.png"}`), Options{})
 	if len(es) != 1 || !strings.Contains(es[0].Msg, "no filesystem") {
 		t.Errorf("nil FS: %v", es)
 	}
@@ -743,7 +743,7 @@ func TestDeps(t *testing.T) {
 	}
 }
 
-// TestSpecExample compiles the example of spec §8.2 (testdata/textures/example.tex.json).
+// TestSpecExample compiles the example of spec §8.2 (testdata/textures/example.vtex).
 func TestSpecExample(t *testing.T) {
 	tx := parseSample(t, "example", nil)
 	if tx.Name != "example" || tx.Layers != 8 || !tx.Tiling || tx.Data.Wrap != gfx.WrapRepeat || len(tx.Data.Levels) != 9 {
@@ -762,7 +762,7 @@ func TestSpecExample(t *testing.T) {
 		t.Errorf("example deps %q", got)
 	}
 	// Skipping the checker shows the layers below it.
-	sk, err := Parse("example.tex.json", mustRead(t, "example"), Options{FS: os.DirFS(testdataDir(t)), Skip: []int{6}})
+	sk, err := Parse("example.vtex", mustRead(t, "example"), Options{FS: os.DirFS(testdataDir(t)), Skip: []int{6}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -773,7 +773,7 @@ func TestSpecExample(t *testing.T) {
 
 func mustRead(t *testing.T, name string) []byte {
 	t.Helper()
-	data, err := os.ReadFile(testdataDir(t) + "/textures/" + name + ".tex.json")
+	data, err := os.ReadFile(testdataDir(t) + "/textures/" + name + ".vtex")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -84,7 +84,7 @@ func parseInputArray(path string, data []byte) ([]sim.InputEvent, error) {
 		return nil, &asset.SourceError{File: path, Msg: "input script must be a JSON array of input events or a scenario: " + err.Error()}
 	}
 	wrapped := []byte(fmt.Sprintf(`{"veduta":%q,"scene":"input","ticks":%d,"inputs":%s}`, asset.TypeScenario, asset.MaxTicks, data))
-	sc, err := asset.ParseScenario("input.scenario.json", wrapped)
+	sc, err := asset.ParseScenario("input.vscenario", wrapped)
 	if err != nil {
 		return nil, fmt.Errorf("input script %s: %w", path, err)
 	}

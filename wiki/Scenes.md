@@ -1,7 +1,7 @@
 # Scenes
 
 A scene is the starting state of a level: a camera, a light, a background colour and the
-entities that exist when it loads. It lives in `assets/scenes/<name>.scene.json`.
+entities that exist when it loads. It lives in `assets/scenes/<name>.vscene`.
 
 The game starts in the project's `default_scene` (`main` unless `veduta.json` says
 otherwise). `scene.load(name)` switches to another one, and `scene.name()` tells which is

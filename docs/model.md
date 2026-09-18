@@ -5,9 +5,9 @@ planes, extrusions, lathed profiles and mirror copies). The compiler turns the p
 one triangle mesh with normals, UVs, one material slot per part and a pivot. Parts are
 joined by concatenation only (no boolean operations): overlapping parts simply overlap.
 
-File: `assets/models/<name>.model.json`. The model name is the file name without
-`.model.json`; it must be 1–64 characters of `a-z`, `0-9`, `_`, `-`, starting with a
-letter or digit. A folder under `assets/models/` works too (`assets/models/enemies/bat.model.json`):
+File: `assets/models/<name>.vmodel`. The model name is the file name without
+`.vmodel`; it must be 1–64 characters of `a-z`, `0-9`, `_`, `-`, starting with a
+letter or digit. A folder under `assets/models/` works too (`assets/models/enemies/bat.vmodel`):
 the name is still the file name, so it must be unique across the folders.
 
 Units and axes: lengths are meters, angles are degrees. Coordinates are right-handed,
@@ -52,7 +52,7 @@ the common fields; **any other field is an error, even when it is `null`, `0` or
 | `position` | [x, y, z] | [0, 0, 0] | Translation in meters. |
 | `rotation_deg` | [x, y, z] | [0, 0, 0] | Euler angles in degrees, applied Z first, then X, then Y (R = Ry·Rx·Rz), the same convention as scene entities. |
 | `scale` | [x, y, z] | [1, 1, 1] | Per-axis scale; every component must be non-zero. Negative components mirror the part; the compiler keeps its faces pointing outwards. |
-| `material` | string | none | Material name (`assets/materials/<name>.mat.json`). A part without a material is drawn with the entity's material (or the default white material). |
+| `material` | string | none | Material name (`assets/materials/<name>.vmat`). A part without a material is drawn with the entity's material (or the default white material). |
 | `uv` | string | per shape | `box`, `planar`, `cylindrical` or `spherical` (see [UV mapping](#uv-mapping)). Defaults: box → `box`, plane → `planar`, cylinder → `cylindrical`, sphere → `spherical`, extrude → `box`, lathe → `cylindrical`. |
 | `flip_normals` | boolean | `false` | Reverses the winding and the normals so the part faces inwards (for example the inside of a room or a sky dome). |
 
@@ -299,7 +299,7 @@ Compilation is deterministic: the same source always produces the same bytes.
 
 Decoding is strict. Unknown fields (typos), wrong JSON types and duplicate keys are
 errors. Validation then reports **every** problem at once, each with the file, line,
-column and JSON path of the offending value. For example, `crate.model.json` containing
+column and JSON path of the offending value. For example, `crate.vmodel` containing
 
 ```json
 {
@@ -315,9 +315,9 @@ column and JSON path of the offending value. For example, `crate.model.json` con
 reports
 
 ```
-crate.model.json:4:52: parts[0].radius: not used by shape box
-crate.model.json:5:68: parts[1].segments: 2 out of range [3, 256]
-crate.model.json:6:45: parts[2].of: 7 is not the index of an earlier part (want 0..1)
+crate.vmodel:4:52: parts[0].radius: not used by shape box
+crate.vmodel:5:68: parts[1].segments: 2 out of range [3, 256]
+crate.vmodel:6:45: parts[2].of: 7 is not the index of an earlier part (want 0..1)
 ```
 
 Checks: required fields present; numbers finite; sizes, radii, heights and depths > 0;

@@ -195,7 +195,7 @@ func (c *Context) RegisterState(codec StateCodec) { c.eng.codec = codec }
 // updated on the next tick.
 func (c *Context) Spawn(tmpl scene.Entity) *scene.Entity { return c.eng.spawn(tmpl) }
 
-// SpawnPrefab adds the entities of a prefab (assets/prefabs/<name>.prefab.json) with the
+// SpawnPrefab adds the entities of a prefab (assets/prefabs/<name>.vprefab) with the
 // min corner of its footprint at origin, turned by rotation (0, 90, 180 or 270 degrees about
 // +Y) about the footprint's centre, as a world places it. They are named
 // "<prefix>_<entity>" (prefix defaults to the prefab's name), returned in prefab order, and
@@ -203,7 +203,7 @@ func (c *Context) Spawn(tmpl scene.Entity) *scene.Entity { return c.eng.spawn(tm
 func (c *Context) SpawnPrefab(name string, origin gmath.Vec3, rotation int, prefix string) ([]*scene.Entity, error) {
 	p := c.eng.assets.Prefab(name)
 	if p == nil {
-		return nil, fmt.Errorf("spawn prefab: no prefab %q (assets/prefabs/%s.prefab.json)", name, name)
+		return nil, fmt.Errorf("spawn prefab: no prefab %q (assets/prefabs/%s.vprefab)", name, name)
 	}
 	if rotation%90 != 0 {
 		return nil, fmt.Errorf("spawn prefab %s: rotation %d is not 0, 90, 180 or 270", name, rotation)

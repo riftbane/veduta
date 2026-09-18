@@ -29,7 +29,7 @@ func (g *Gen) Check(lib *asset.Library) *Report {
 		rep.Issues = append(rep.Issues, Issue{code, sev, msg, where})
 	}
 	for _, name := range g.Missing {
-		add(CodeMissingPrefab, "error", fmt.Sprintf("prefab %q does not exist (assets/prefabs/%s.prefab.json)", name, name), map[string]any{"prefab": name})
+		add(CodeMissingPrefab, "error", fmt.Sprintf("prefab %q does not exist (assets/prefabs/%s.vprefab)", name, name), map[string]any{"prefab": name})
 	}
 	for _, b := range w.Biomes {
 		m := lib.Materials[b.Ground]
@@ -44,7 +44,7 @@ func (g *Gen) Check(lib *asset.Library) *Report {
 	}
 	for _, v := range w.Vegetation {
 		if v.Model != "" && lib.Models[v.Model] == nil {
-			add(CodeMissingAsset, "error", fmt.Sprintf("vegetation %q: model %q does not exist (assets/models/%s.model.json)", v.Name, v.Model, v.Model), map[string]any{"vegetation": v.Name, "model": v.Model})
+			add(CodeMissingAsset, "error", fmt.Sprintf("vegetation %q: model %q does not exist (assets/models/%s.vmodel)", v.Name, v.Model, v.Model), map[string]any{"vegetation": v.Name, "model": v.Model})
 		}
 	}
 	if name := w.Terrain.Water; name != "" && lib.Materials[name] == nil {

@@ -21,8 +21,8 @@ const (
 )
 
 // ParseMaterial decodes and compiles the material source file (for example
-// "assets/materials/crate_wood.mat.json"). The material name is the file name without
-// its ".mat.json" suffix and must be a valid asset name.
+// "assets/materials/crate_wood.vmat"). The material name is the file name without
+// its ".vmat" suffix and must be a valid asset name.
 func ParseMaterial(file string, data []byte) (*Material, error) {
 	var src MaterialSource
 	loc, err := Decode(file, data, TypeMaterial, &src)

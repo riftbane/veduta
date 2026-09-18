@@ -1,4 +1,4 @@
-// Package texture compiles texture sources (assets/textures/<name>.tex.json, header
+// Package texture compiles texture sources (assets/textures/<name>.vtex, header
 // "texture/1") into asset.Texture: a BGRA8 image produced by a layer program (solid
 // fills, value noise, stripes, rectangles, circles, gradients, checkers and PNG images
 // composited bottom to top with a blend mode and an opacity), with its mip chain. The
@@ -68,8 +68,8 @@ var layerFields = map[string][]string{
 }
 
 // Parse decodes and compiles the texture source file (for example
-// "assets/textures/crate_wood.tex.json"). The texture name is the file name without its
-// ".tex.json" suffix and must be a valid asset name. Errors are located
+// "assets/textures/crate_wood.vtex"). The texture name is the file name without its
+// ".vtex" suffix and must be a valid asset name. Errors are located
 // *asset.SourceError values (one from decoding) or an asset.Errors list with every
 // validation problem.
 func Parse(file string, data []byte, opt Options) (*asset.Texture, error) {

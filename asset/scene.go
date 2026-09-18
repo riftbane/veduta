@@ -32,8 +32,8 @@ const (
 var BuiltinKinds = []string{"camera", "light", "static"}
 
 // ParseScene decodes and compiles the scene source file (for example
-// "assets/scenes/main.scene.json"). The scene name is the file name without its
-// ".scene.json" suffix and must be a valid asset name.
+// "assets/scenes/main.vscene"). The scene name is the file name without its
+// ".vscene" suffix and must be a valid asset name.
 func ParseScene(file string, data []byte) (*Scene, error) {
 	var src SceneSource
 	loc, err := Decode(file, data, TypeScene, &src)

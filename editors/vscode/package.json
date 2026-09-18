@@ -2,7 +2,7 @@
   "name": "veduta",
   "displayName": "Veduta",
   "description": "Make Veduta console games: new game, play and debug (F5), test, build with errors in Problems, preview a texture while you write it, deploy to the console's card.",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "publisher": "riftbane",
   "license": "MIT",
   "repository": {
@@ -30,6 +30,20 @@
     "onDebugDynamicConfigurations:veduta"
   ],
   "contributes": {
+    "languages": [
+      {
+        "id": "json",
+        "extensions": [
+          ".vmodel",
+          ".vtex",
+          ".vmat",
+          ".vscene",
+          ".vscenario",
+          ".vprefab",
+          ".vworld"
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "veduta.newGame",
@@ -68,14 +82,14 @@
       "editor/title": [
         {
           "command": "veduta.previewTexture",
-          "when": "resourceFilename =~ /\\.tex\\.json$/",
+          "when": "resourceFilename =~ /\\.vtex$/",
           "group": "navigation"
         }
       ],
       "commandPalette": [
         {
           "command": "veduta.previewTexture",
-          "when": "resourceFilename =~ /\\.tex\\.json$/"
+          "when": "resourceFilename =~ /\\.vtex$/"
         }
       ]
     },
@@ -168,7 +182,7 @@
               },
               "scenario": {
                 "type": "string",
-                "description": "With mode scenario: its name (tests/scenarios/<name>.scenario.json) or file."
+                "description": "With mode scenario: its name (tests/scenarios/<name>.vscenario) or file."
               },
               "scene": {
                 "type": "string",

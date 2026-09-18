@@ -49,7 +49,7 @@ kinds.probe = {
 // with the triangle counts and bounds they should have.
 func TestMeshAndVolume(t *testing.T) {
 	dir := copyGame(t, map[string]string{"main.lua": meshGame})
-	scenario := filepath.Join(t.TempDir(), "mesh.scenario.json")
+	scenario := filepath.Join(t.TempDir(), "mesh.vscenario")
 	writeFile(t, scenario, `{
   "veduta": "scenario/1", "scene": "main", "seed": 1, "ticks": 2,
   "expect": [

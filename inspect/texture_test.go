@@ -98,7 +98,7 @@ func texTestRenderer(t *testing.T) (*Renderer, map[string]*TexSource) {
 	srcs := map[string]*TexSource{}
 	assets := filepath.Join("..", "internal", "testgame", "assets")
 	for _, n := range []string{"grass", "crate"} {
-		file := filepath.Join(assets, "textures", n+".tex.json")
+		file := filepath.Join(assets, "textures", n+".vtex")
 		data, err := os.ReadFile(file)
 		if err != nil {
 			t.Fatal(err)
@@ -106,7 +106,7 @@ func texTestRenderer(t *testing.T) (*Renderer, map[string]*TexSource) {
 		srcs[n] = &TexSource{File: file, Data: data, FS: os.DirFS(assets)}
 	}
 	for _, n := range asset.Names(texFixtures) {
-		file := "textures/" + n + ".tex.json"
+		file := "textures/" + n + ".vtex"
 		data := []byte(texFixtures[n])
 		tex, err := texture.Parse(file, data, texture.Options{})
 		if err != nil {
@@ -356,7 +356,7 @@ func TestTextureAlphaUnused(t *testing.T) {
 	opt := Options{OutDir: t.TempDir(), Sheets: []string{"channels"}}
 	r := texInspect(t, ir, "leaf", srcs["leaf"], opt)
 	au := texIssues(r, "TEX_ALPHA_UNUSED")
-	if len(au) != 1 || au[0].Severity != Warning || au[0].Count == 0 || !strings.Contains(au[0].Hint, "materials/leaf_opaque.mat.json") {
+	if len(au) != 1 || au[0].Severity != Warning || au[0].Count == 0 || !strings.Contains(au[0].Hint, "materials/leaf_opaque.vmat") {
 		t.Fatalf("leaf: %s", texJSON(t, r))
 	}
 	if au[0].Count != r.Metrics["nonopaque_texels"] || r.Metrics["alpha_min"] != 0 {
@@ -497,12 +497,12 @@ func TestTextureErrorsAndEdges(t *testing.T) {
 		t.Errorf("nil renderer: no error")
 	}
 	// A source that does not parse is an error, not a silent skip.
-	bad := &TexSource{File: "textures/crate.tex.json", Data: []byte(`{"veduta": "texture/1", "size": [64, 64], "bogus": 1, "layers": []}`)}
+	bad := &TexSource{File: "textures/crate.vtex", Data: []byte(`{"veduta": "texture/1", "size": [64, 64], "bogus": 1, "layers": []}`)}
 	if _, err := Texture(ir, "crate", bad, Options{Sheets: []string{"none"}}); err == nil {
 		t.Errorf("bad source: no error")
 	}
 	// A stale source (different size) skips the layer checks with a reason.
-	stale := &TexSource{File: "textures/crate.tex.json", Data: []byte(`{"veduta": "texture/1", "size": [32, 32], "layers": [{"type": "solid", "color": "#ffffff"}]}`)}
+	stale := &TexSource{File: "textures/crate.vtex", Data: []byte(`{"veduta": "texture/1", "size": [32, 32], "layers": [{"type": "solid", "color": "#ffffff"}]}`)}
 	r := texInspect(t, ir, "crate", stale, Options{})
 	if nc := texIssues(r, "TEX_LAYERS_NOT_CHECKED"); len(nc) != 1 || !strings.Contains(nc[0].Where["reason"].(string), "cook again") ||
 		!strings.Contains(nc[0].Hint, "Cook the project again") {

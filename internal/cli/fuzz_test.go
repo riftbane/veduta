@@ -25,7 +25,7 @@ func TestFuzzRepro(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sc, err := asset.ParseScenario("fuzz.scenario.json", data)
+	sc, err := asset.ParseScenario("fuzz.vscenario", data)
 	if err != nil {
 		t.Fatalf("the repro does not parse: %v\n%s", err, data)
 	}

@@ -31,8 +31,8 @@ default scene and seed, where assets live, project-wide invariants and world bou
 | `resolution` | `[width, height]` | `[320, 240]` | The frame the game is designed for, in pixels, each 1 to 8192: the size a player asks for, and `ctx.Width`/`ctx.Height` in `Init`, `Update` and behaviours in every mode. On the console the frame actually drawn is the panel's size divided by `VEDUTA_SCALE` (320×240 on the reference panel), so design for that. |
 | `inspect_resolution` | `[width, height]` | `[320, 240]` | Default size of inspection and simulation images, and of `veduta render` and `-headless render` when no `--width`/`--height` is given (the MCP `render` tool defaults to 320×240 instead); each 1 to 8192. |
 | `tick_rate` | integer | `20` | Simulation ticks per second, 1 to 1000. The player renders exactly one frame per tick, and the console's panel shows 20 frames a second, so a higher rate only spends time on frames nobody sees. `ctx.DT` is `1 / tick_rate`, so changing it changes every trace hash. |
-| `default_scene` | string | `"main"` | Scene used when a command does not name one (`assets/scenes/<name>.scene.json`). |
-| `default_world` | string | none | World used instead of `default_scene` when a command names neither a scene nor a world (`assets/worlds/<name>.world.json`, `world` topic), starting at cell `[0, 0]`; the player starts in it. Since v1.2.0. |
+| `default_scene` | string | `"main"` | Scene used when a command does not name one (`assets/scenes/<name>.vscene`). |
+| `default_world` | string | none | World used instead of `default_scene` when a command names neither a scene nor a world (`assets/worlds/<name>.vworld`, `world` topic), starting at cell `[0, 0]`; the player starts in it. Since v1.2.0. |
 | `default_seed` | integer | `1` | Seed used when a command does not give one. `0` also means the default, so the default seed can never be 0 (scenarios can use seed 0). |
 | `assets` | string | `"assets"` | Directory of asset sources. |
 | `cooked` | string | `"assets/.cooked"` | Directory of compiled `.vda` files written by `veduta cook`. Must differ from `assets`. Never edit or commit it. |

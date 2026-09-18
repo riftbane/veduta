@@ -71,7 +71,7 @@ func TestCookIncremental(t *testing.T) {
 		t.Fatalf("second cook: %+v %v", r2, err)
 	}
 	// Touch one source: only it recompiles.
-	mat := filepath.Join(root, "assets", "materials", "hero.mat.json")
+	mat := filepath.Join(root, "assets", "materials", "hero.vmat")
 	os.WriteFile(mat, []byte(`{ "veduta": "material/1", "albedo": "#ff0000" }`), 0o644)
 	r3, _ := Run(Options{Root: root})
 	if st := statuses(r3); r3.Compiled != 1 || st["material/hero"] != StatusCompiled {
@@ -89,7 +89,7 @@ func TestCookIncremental(t *testing.T) {
 		t.Fatalf("force: %+v", r5)
 	}
 	// A removed source removes its cooked file.
-	os.Remove(filepath.Join(root, "assets", "models", "crate.model.json"))
+	os.Remove(filepath.Join(root, "assets", "models", "crate.vmodel"))
 	r6, _ := Run(Options{Root: root})
 	if r6.Removed != 1 {
 		t.Fatalf("prune: %+v", r6)
@@ -111,7 +111,7 @@ func TestCookTextureDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(src, "logo.png"), png, 0o644)
-	os.WriteFile(filepath.Join(root, "assets", "textures", "logo.tex.json"), []byte(`{
+	os.WriteFile(filepath.Join(root, "assets", "textures", "logo.vtex"), []byte(`{
   "veduta": "texture/1", "size": [32, 32],
   "layers": [ { "type": "image", "path": "textures/src/logo.png", "fit": "stretch" } ]
 }`), 0o644)
@@ -157,7 +157,7 @@ func TestLoadUsesCookedAndCompilesStale(t *testing.T) {
 
 func TestCookReportsLocatedErrors(t *testing.T) {
 	root := copyTemplate(t)
-	bad := filepath.Join(root, "assets", "models", "broken.model.json")
+	bad := filepath.Join(root, "assets", "models", "broken.vmodel")
 	os.WriteFile(bad, []byte("{\n  \"veduta\": \"model/1\",\n  \"parts\": [ { \"shape\": \"box\", \"size\": [1, 0, 1] } ]\n}"), 0o644)
 	r, err := Run(Options{Root: root})
 	if err != nil {
@@ -167,7 +167,7 @@ func TestCookReportsLocatedErrors(t *testing.T) {
 		t.Fatalf("failed = %d", r.Failed)
 	}
 	es := r.Errors()
-	if len(es) == 0 || es[0].File != "assets/models/broken.model.json" || es[0].Line != 3 {
+	if len(es) == 0 || es[0].File != "assets/models/broken.vmodel" || es[0].Line != 3 {
 		t.Fatalf("errors %v", es)
 	}
 	if _, err := Load(root); err == nil {
@@ -189,9 +189,9 @@ func TestCookPrefabAndWorld(t *testing.T) {
 		os.MkdirAll(filepath.Dir(p), 0o755)
 		os.WriteFile(p, []byte(data), 0o644)
 	}
-	write("assets/prefabs/shrub.prefab.json", `{"veduta": "prefab/1", "footprint": [1, 1], "tags": ["shrub"],
+	write("assets/prefabs/shrub.vprefab", `{"veduta": "prefab/1", "footprint": [1, 1], "tags": ["shrub"],
 	  "entities": [{"name": "trunk", "kind": "static", "model": "crate", "position": [0.5, 0, 0.5]}]}`)
-	write("assets/worlds/land.world.json", `{"veduta": "world/1", "camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]},
+	write("assets/worlds/land.vworld", `{"veduta": "world/1", "camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]},
 	  "biomes": [{"name": "plain", "ground": "grass"}], "scatter": [{"prefab": "shrub", "density": 0.1}],
 	  "places": [{"name": "home", "prefab": "shrub", "cell": [3, 4]}]}`)
 	r, err := Run(Options{Root: root})
@@ -214,11 +214,11 @@ func TestCookPrefabAndWorld(t *testing.T) {
 	}
 	data, _ := os.ReadFile(filepath.Join(root, "assets", ".cooked", "worlds", "land.vda"))
 	meta, _, err := asset.UnpackVDA(data)
-	if err != nil || len(meta.Deps) != 1 || meta.Deps[0] != "prefabs/shrub.prefab.json" {
+	if err != nil || len(meta.Deps) != 1 || meta.Deps[0] != "prefabs/shrub.vprefab" {
 		t.Fatalf("world meta %+v %v", meta, err)
 	}
 	// A larger shrub no longer fits a scatter cell: the world is recooked and fails.
-	write("assets/prefabs/shrub.prefab.json", `{"veduta": "prefab/1", "footprint": [2, 2], "entities": []}`)
+	write("assets/prefabs/shrub.vprefab", `{"veduta": "prefab/1", "footprint": [2, 2], "entities": []}`)
 	r, err = Run(Options{Root: root})
 	if err != nil {
 		t.Fatal(err)
@@ -227,11 +227,11 @@ func TestCookPrefabAndWorld(t *testing.T) {
 	if st["prefab/shrub"] != StatusCompiled || st["world/land"] != StatusError || r.Failed != 1 {
 		t.Fatalf("after edit: %+v", st)
 	}
-	if es := r.Errors(); len(es) != 1 || es[0].File != "assets/worlds/land.world.json" || es[0].Line != 2 {
+	if es := r.Errors(); len(es) != 1 || es[0].File != "assets/worlds/land.vworld" || es[0].Line != 2 {
 		t.Fatalf("errors %v", r.Errors())
 	}
 	// A missing prefab is only a warning.
-	write("assets/worlds/land.world.json", `{"veduta": "world/1", "camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]},
+	write("assets/worlds/land.vworld", `{"veduta": "world/1", "camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]},
 	  "biomes": [{"name": "plain", "ground": "grass"}], "places": [{"name": "home", "prefab": "castle", "cell": [3, 4]}]}`)
 	r, err = Run(Options{Root: root})
 	if err != nil || r.Failed != 0 || len(r.Warnings) != 1 || r.Warnings[0] != `world land: place home: prefab "castle" not found` {
@@ -257,10 +257,10 @@ func TestCookFolders(t *testing.T) {
 		os.MkdirAll(filepath.Dir(p), 0o755)
 		os.WriteFile(p, []byte(data), 0o644)
 	}
-	move("materials/gem.mat.json", "materials/items/gem.mat.json")
-	move("textures/crate.tex.json", "textures/props/wood/crate.tex.json")
-	move("prefabs/tree.prefab.json", "prefabs/nature/tree.prefab.json")
-	write("materials/.drafts/ghost.mat.json", `{"veduta": "material/1"}`) // hidden folders are not assets
+	move("materials/gem.vmat", "materials/items/gem.vmat")
+	move("textures/crate.vtex", "textures/props/wood/crate.vtex")
+	move("prefabs/tree.vprefab", "prefabs/nature/tree.vprefab")
+	write("materials/.drafts/ghost.vmat", `{"veduta": "material/1"}`) // hidden folders are not assets
 
 	r, err := Run(Options{Root: root})
 	if err != nil {
@@ -271,7 +271,7 @@ func TestCookFolders(t *testing.T) {
 		t.Fatalf("cook: failed %d, %v %v", r.Failed, st, r.Errors())
 	}
 	for _, it := range r.Items {
-		if it.Name == "gem" && it.Kind == asset.KindMaterial && it.Source != "assets/materials/items/gem.mat.json" {
+		if it.Name == "gem" && it.Kind == asset.KindMaterial && it.Source != "assets/materials/items/gem.vmat" {
 			t.Errorf("gem's source %s", it.Source)
 		}
 	}
@@ -280,31 +280,53 @@ func TestCookFolders(t *testing.T) {
 		t.Fatalf("load: %v", err)
 	}
 	data, _ := os.ReadFile(filepath.Join(root, "assets", ".cooked", "worlds", "overworld.vda"))
-	if meta, _, err := asset.UnpackVDA(data); err != nil || !strings.Contains(strings.Join(meta.Deps, " "), "prefabs/nature/tree.prefab.json") {
+	if meta, _, err := asset.UnpackVDA(data); err != nil || !strings.Contains(strings.Join(meta.Deps, " "), "prefabs/nature/tree.vprefab") {
 		t.Fatalf("world deps %v %v", meta.Deps, err)
 	}
-	if got := SourcePath(root, lib.Project, asset.KindPrefab, "tree"); got != "assets/prefabs/nature/tree.prefab.json" {
+	if got := SourcePath(root, lib.Project, asset.KindPrefab, "tree"); got != "assets/prefabs/nature/tree.vprefab" {
 		t.Errorf("SourcePath %s", got)
 	}
-	if got := SourcePath(root, lib.Project, asset.KindWorld, "new"); got != "assets/worlds/new.world.json" {
+	if got := SourcePath(root, lib.Project, asset.KindWorld, "new"); got != "assets/worlds/new.vworld" {
 		t.Errorf("SourcePath of a new world %s", got)
 	}
 
 	// The world follows its prefab into the folder: editing it there recooks the world.
-	tree, _ := os.ReadFile(filepath.Join(root, "assets", "prefabs", "nature", "tree.prefab.json"))
-	write("prefabs/nature/tree.prefab.json", string(tree)+"\n")
+	tree, _ := os.ReadFile(filepath.Join(root, "assets", "prefabs", "nature", "tree.vprefab"))
+	write("prefabs/nature/tree.vprefab", string(tree)+"\n")
 	if r, err = Run(Options{Root: root}); err != nil || statuses(r)["world/overworld"] != StatusCompiled {
 		t.Fatalf("after editing the prefab: %v %v", err, statuses(r))
 	}
 
 	// The same name twice.
-	write("materials/props/gem.mat.json", `{"veduta": "material/1"}`)
+	write("materials/props/gem.vmat", `{"veduta": "material/1"}`)
 	r, err = Run(Options{Root: root})
 	if err != nil {
 		t.Fatal(err)
 	}
 	es := r.Errors()
-	if r.Failed != 1 || len(es) != 1 || es[0].File != "assets/materials/props/gem.mat.json" || !strings.Contains(es[0].Msg, "taken by materials/items/gem.mat.json") {
+	if r.Failed != 1 || len(es) != 1 || es[0].File != "assets/materials/props/gem.vmat" || !strings.Contains(es[0].Msg, "taken by materials/items/gem.vmat") {
 		t.Fatalf("duplicate: failed %d, %v", r.Failed, es)
+	}
+}
+
+// TestCookRefusesLegacyNames: a source still named as before v2.0.0-rc.8 would be left out
+// without a word, so cooking stops and names it, hidden folders excepted.
+func TestCookRefusesLegacyNames(t *testing.T) {
+	root := copyTemplate(t)
+	os.MkdirAll(filepath.Join(root, "assets", "materials", ".drafts"), 0o755)
+	os.WriteFile(filepath.Join(root, "assets", "materials", ".drafts", "old.mat.json"), []byte("{}"), 0o644)
+	if _, err := Run(Options{Root: root}); err != nil {
+		t.Fatalf("a hidden legacy file: %v", err)
+	}
+	if err := os.Rename(filepath.Join(root, "assets", "materials", "gem.vmat"), filepath.Join(root, "assets", "materials", "gem.mat.json")); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(root, "tests", "scenarios", "old.scenario.json"), []byte("{}"), 0o644)
+	_, err := Run(Options{Root: root})
+	if err == nil || !strings.Contains(err.Error(), "assets/materials/gem.mat.json, tests/scenarios/old.scenario.json:") || !strings.Contains(err.Error(), "veduta upgrade") {
+		t.Fatalf("cook with legacy names: %v", err)
+	}
+	if _, err := Load(root); err == nil {
+		t.Fatal("load with legacy names worked")
 	}
 }

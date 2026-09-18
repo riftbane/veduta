@@ -19,7 +19,7 @@ import (
 func TestGoldenSheets(t *testing.T) {
 	for _, name := range []string{"box", "cylinder", "sphere", "plane", "extrude", "lathe", "crate", "mirror", "flipped"} {
 		t.Run(name, func(t *testing.T) {
-			m, err := Parse(name+".model.json", readModel(t, name))
+			m, err := Parse(name+".vmodel", readModel(t, name))
 			if err != nil {
 				t.Fatal(err)
 			}

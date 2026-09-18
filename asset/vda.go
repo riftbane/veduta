@@ -141,7 +141,7 @@ func ReadVDA(data []byte) ([]Chunk, error) {
 type Meta struct {
 	Kind       Kind     // model, texture, material, scene, prefab or world
 	Name       string   // asset name
-	Source     string   // source path relative to the assets directory, e.g. "models/crate.model.json"
+	Source     string   // source path relative to the assets directory, e.g. "models/crate.vmodel"
 	SourceHash string   // lowercase hex SHA-256 (64 characters) of the compiler inputs, see docs/vda.md
 	Compiler   string   // CompilerVersion that produced the file
 	Deps       []string // other input files (relative to the assets directory); written sorted and unique

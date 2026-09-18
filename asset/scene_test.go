@@ -135,13 +135,13 @@ func idStats(fb *gfx.Framebuffer) (count map[uint32]int, meanY map[uint32]float6
 func TestSceneRenderGolden(t *testing.T) {
 	mats := map[string]*Material{}
 	for _, m := range renderMaterials {
-		mat, err := ParseMaterial(m[0]+".mat.json", []byte(m[1]))
+		mat, err := ParseMaterial(m[0]+".vmat", []byte(m[1]))
 		if err != nil {
 			t.Fatal(err)
 		}
 		mats[m[0]] = mat
 	}
-	s, err := ParseScene("render.scene.json", []byte(renderSceneSrc))
+	s, err := ParseScene("render.vscene", []byte(renderSceneSrc))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestSceneRenderGolden(t *testing.T) {
 	}
 
 	// Top-down orthographic view: -Z (the "north" marker) is at the top of the image.
-	top, err := ParseScene("top.scene.json", []byte(strings.Replace(renderSceneSrc,
+	top, err := ParseScene("top.vscene", []byte(strings.Replace(renderSceneSrc,
 		`"camera": {"position": [4, 3.5, 6], "look_at": [0, 0.4, 0], "fov_deg": 45}`,
 		`"camera": {"type": "orthographic", "size": 8, "position": [0, 20, 0], "look_at": [0, 0, 0]}`, 1)))
 	if err != nil {
@@ -198,7 +198,7 @@ func TestSceneRenderGolden(t *testing.T) {
 const minimalScene = `{"veduta": "scene/1", "camera": {"position": [0, 5, 10], "look_at": [0, 0, 0]}}`
 
 func TestParseSceneDefaults(t *testing.T) {
-	s, err := ParseScene("assets/scenes/empty.scene.json", []byte(minimalScene))
+	s, err := ParseScene("assets/scenes/empty.vscene", []byte(minimalScene))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestParseSceneDefaults(t *testing.T) {
 }
 
 func TestParseSceneSample(t *testing.T) {
-	s, err := ParseScene("scenes/main.scene.json", readTestdata(t, "scenes/main.scene.json"))
+	s, err := ParseScene("scenes/main.vscene", readTestdata(t, "scenes/main.vscene"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +248,7 @@ func TestParseSceneFull(t *testing.T) {
     { "name": "arm", "kind": "robot_arm", "position": [1, 2, 3] }
   ]
 }`
-	s, err := ParseScene("robot.scene.json", []byte(src))
+	s, err := ParseScene("robot.vscene", []byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestParseSceneHitboxAndLayer(t *testing.T) {
     {"name": "trigger", "kind": "static", "hitbox": [[0, 0, 0], [2, 1, 0]], "layer": -1000},
     {"name": "plain", "kind": "static", "model": "quad", "layer": 0}
   ]}`
-	s, err := ParseScene("twod.scene.json", []byte(src))
+	s, err := ParseScene("twod.vscene", []byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,7 +384,7 @@ func TestParseSceneErrors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ParseScene("s.scene.json", []byte(c.src))
+			_, err := ParseScene("s.vscene", []byte(c.src))
 			checkErrs(t, c.src, err, c.wants...)
 		})
 	}
@@ -392,7 +392,7 @@ func TestParseSceneErrors(t *testing.T) {
 
 func TestParseSceneReportsAll(t *testing.T) {
 	src := "{\n  \"veduta\": \"scene/1\",\n  \"camera\": { \"fov_deg\": 200, \"position\": [0, 0, 0], \"look_at\": [0, 0, 0] },\n  \"background\": \"#1\",\n  \"entities\": [\n    { \"name\": \"a\", \"kind\": \"static\", \"scale\": [0, 1, 1] },\n    { \"name\": \"a\", \"kind\": \"\" }\n  ]\n}"
-	_, err := ParseScene("s.scene.json", []byte(src))
+	_, err := ParseScene("s.vscene", []byte(src))
 	es := sourceErrors(t, err)
 	want := [][2]int{{3, 26}, {3, 65}, {4, 17}, {6, 48}, {7, 15}, {7, 28}}
 	if len(es) != len(want) {
@@ -425,7 +425,7 @@ func TestCompileSceneWithoutLocator(t *testing.T) {
 
 func TestSceneDocExamples(t *testing.T) {
 	for i, ex := range docJSON(t, "scene.md") {
-		if _, err := ParseScene("example.scene.json", []byte(ex)); err != nil {
+		if _, err := ParseScene("example.vscene", []byte(ex)); err != nil {
 			t.Errorf("docs/scene.md example %d: %v", i, err)
 		}
 	}

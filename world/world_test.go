@@ -13,7 +13,7 @@ import (
 
 func prefab(t *testing.T, name, src string) *asset.Prefab {
 	t.Helper()
-	p, err := asset.ParsePrefab(name+".prefab.json", []byte(src))
+	p, err := asset.ParsePrefab(name+".vprefab", []byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ const testWorldSrc = `{
 func testWorld(t *testing.T, src string) (*asset.World, func(string) *asset.Prefab) {
 	t.Helper()
 	pf := testPrefabs(t)
-	w, err := asset.ParseWorld("test.world.json", []byte(src), pf)
+	w, err := asset.ParseWorld("test.vworld", []byte(src), pf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -516,7 +516,7 @@ func TestCheck(t *testing.T) {
 }
 
 func BenchmarkChunk(b *testing.B) {
-	w, err := asset.ParseWorld("bench.world.json", []byte(testWorldSrc), nil)
+	w, err := asset.ParseWorld("bench.vworld", []byte(testWorldSrc), nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -536,7 +536,7 @@ func testPrefabsB(b *testing.B) func(string) *asset.Prefab {
 		"house":   `{"veduta": "prefab/1", "footprint": [3, 2], "tags": ["house"], "rules": {"min_distance": {"house": 1}}, "entities": [{"name": "walls", "kind": "static", "model": "house"}]}`,
 		"village": `{"veduta": "prefab/1", "footprint": [12, 8], "tags": ["village"], "rules": {"min_distance": {"village": 4}}, "entities": [{"name": "hall", "kind": "static", "model": "house"}]}`,
 	} {
-		p, err := asset.ParsePrefab(name+".prefab.json", []byte(src))
+		p, err := asset.ParsePrefab(name+".vprefab", []byte(src))
 		if err != nil {
 			b.Fatal(err)
 		}

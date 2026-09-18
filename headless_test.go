@@ -55,7 +55,7 @@ func runCmd(t *testing.T, args ...string) (int, map[string]any) {
 func TestHeadlessSimulate(t *testing.T) {
 	useTestProject(t, walkSpec(t))
 	dir := t.TempDir()
-	code, rep := runCmd(t, "-headless", "simulate", "--scenario", "walk.scenario.json", "--out", dir)
+	code, rep := runCmd(t, "-headless", "simulate", "--scenario", "walk.vscenario", "--out", dir)
 	if code != exitOK || rep["verdict"] != "pass" {
 		t.Fatalf("code %d report %v", code, rep)
 	}
@@ -66,7 +66,7 @@ func TestHeadlessSimulate(t *testing.T) {
 	}
 	sheet1, _ := os.ReadFile(filepath.Join(dir, "sheet.png"))
 	dir2 := t.TempDir()
-	_, rep2 := runCmd(t, "-headless", "simulate", "--scenario", "walk.scenario.json", "--out", dir2)
+	_, rep2 := runCmd(t, "-headless", "simulate", "--scenario", "walk.vscenario", "--out", dir2)
 	sheet2, _ := os.ReadFile(filepath.Join(dir2, "sheet.png"))
 	if rep["trace_hash"] != rep2["trace_hash"] || !bytes.Equal(sheet1, sheet2) {
 		t.Fatal("two identical runs differ")

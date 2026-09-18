@@ -44,6 +44,10 @@ func TestEditorFiles(t *testing.T) {
 			t.Errorf("settings name %s, which is not there", url)
 		}
 	}
+	assoc := read(".vscode/settings.json")["files.associations"].(map[string]any)
+	if len(assoc) != 7 || assoc["*.vmodel"] != "json" || assoc["*.vscenario"] != "json" {
+		t.Errorf("files.associations %v", assoc)
+	}
 	if lib := read(".luarc.json")["workspace.library"]; !reflect.DeepEqual(lib, []any{".veduta/lua"}) {
 		t.Errorf(".luarc.json library %v", lib)
 	}
@@ -51,7 +55,7 @@ func TestEditorFiles(t *testing.T) {
 		t.Errorf("recommendations %v", rec)
 	}
 
-	os.WriteFile(filepath.Join(dir, ".vscode", "settings.json"), []byte(`{"editor.tabSize": 2}`), 0o644)
+	os.WriteFile(filepath.Join(dir, ".vscode", "settings.json"), []byte(`{"editor.tabSize": 2, "files.associations": {"*.map": "xml"}}`), 0o644)
 	os.WriteFile(filepath.Join(dir, ".vscode", "extensions.json"), []byte(`{"recommendations": ["mine.ext"]}`), 0o644)
 	os.WriteFile(filepath.Join(dir, ".luarc.json"), []byte("// mine\n{}"), 0o644)
 	os.Remove(filepath.Join(dir, ".veduta", "schema", "world.schema.json"))
@@ -68,6 +72,9 @@ func TestEditorFiles(t *testing.T) {
 	settings := read(".vscode/settings.json")
 	if settings["editor.tabSize"] != 2.0 || settings["json.schemas"] == nil {
 		t.Errorf("settings %v", settings)
+	}
+	if assoc := settings["files.associations"].(map[string]any); len(assoc) != 8 || assoc["*.map"] != "xml" || assoc["*.vtex"] != "json" {
+		t.Errorf("files.associations %v", assoc)
 	}
 	if rec := read(".vscode/extensions.json")["recommendations"]; !reflect.DeepEqual(rec, []any{"sumneko.lua", "mine.ext"}) {
 		t.Errorf("recommendations %v", rec)

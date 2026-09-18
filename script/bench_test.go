@@ -119,7 +119,7 @@ func TestLuaAgainstGo(t *testing.T) {
 	}
 	dir := copyGame(t, map[string]string{"main.lua": benchLua,
 		"veduta.json": `{"veduta": "project/1", "name": "bench", "engine": "v1.4.1", "script": "main.lua", "default_scene": "empty"}`})
-	os.WriteFile(filepath.Join(dir, "assets", "scenes", "empty.scene.json"),
+	os.WriteFile(filepath.Join(dir, "assets", "scenes", "empty.vscene"),
 		[]byte(`{"veduta": "scene/1", "camera": {"type": "orthographic", "size": 20, "position": [0, 0, 100], "look_at": [0, 0, 0]}, "entities": []}`), 0o644)
 	lua := benchUpdate(t, func(args []string, out *bytes.Buffer) int { return Run(args, out, os.Stderr) }, dir)
 	goRes := benchUpdate(t, func(args []string, out *bytes.Buffer) int {

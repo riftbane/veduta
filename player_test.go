@@ -72,7 +72,7 @@ func TestPlayerRecordsAScenario(t *testing.T) {
 	if err := runPlayer(&testGame{}, p, a, dir, &log, playOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	files, _ := filepath.Glob(filepath.Join(dir, "tests", "scenarios", "recorded-*.scenario.json"))
+	files, _ := filepath.Glob(filepath.Join(dir, "tests", "scenarios", "recorded-*.vscenario"))
 	if len(files) != 1 {
 		t.Fatalf("recordings %v; log:\n%s", files, log.String())
 	}
@@ -178,7 +178,7 @@ func TestPlayerStartsWhereTold(t *testing.T) {
 		if err := runPlayer(g, p, a, dir, &log, tc.opt); err != nil {
 			t.Fatal(err)
 		}
-		files, _ := filepath.Glob(filepath.Join(dir, "tests", "scenarios", "recorded-*.scenario.json"))
+		files, _ := filepath.Glob(filepath.Join(dir, "tests", "scenarios", "recorded-*.vscenario"))
 		if len(files) != 1 {
 			t.Fatalf("%+v: recordings %v; log:\n%s", tc.opt, files, log.String())
 		}

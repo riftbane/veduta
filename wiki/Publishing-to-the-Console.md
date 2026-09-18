@@ -85,7 +85,7 @@ out while the game uses only level 1.
 
 - `veduta doctor` checks the project against the console: manifest, card, workflow,
   versions.
-- `veduta bench --scenario tests/scenarios/<a long one>.scenario.json` shows how much of
+- `veduta bench --scenario tests/scenarios/<a long one>.vscenario` shows how much of
   the 50 ms tick budget the game uses. Keep a wide margin: the console is much slower than
   a PC. See [Debugging and Performance](Debugging-and-Performance#performance).
 - Play it on the console itself when you can: the panel's colours are 16-bit, and a
