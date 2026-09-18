@@ -18,7 +18,7 @@ import (
 // testLibrary compiles testdata/tilemap: the textures of a farm (grass, sand and water with
 // borders, water animated, a mark in the grass's top-left texel to show which way up it is
 // drawn) and the farm's map. The VS Code extension's tests read the same files.
-func testLibrary(t *testing.T) *asset.Library {
+func testLibrary(t testing.TB) *asset.Library {
 	t.Helper()
 	dir := filepath.Join("..", "testdata", "tilemap")
 	lib := asset.NewLibrary(nil)

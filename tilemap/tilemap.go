@@ -53,6 +53,7 @@ type drawInfo struct {
 	rank     int            // borders of a higher rank are drawn nearer
 	priority int            // edge priority, 0 without an edge
 	tex      *asset.Texture // its texture, nil when unknown
+	merge    bool           // its texture repeats as one image: cells side by side make one quad
 }
 
 // New returns a map playing src, drawn with the textures and materials of lib.
@@ -98,6 +99,7 @@ func (m *Map) prepare() {
 			base = mat
 		}
 		tx := d.tex
+		d.merge = tx != nil && tx.Data.Wrap == gfx.WrapRepeat && tx.Grid == [2]int{} && base != nil && base.Grid == [2]int{}
 		if tx == nil || tx.Edge == nil || base == nil || len(tx.Data.Levels) == 0 {
 			continue
 		}
@@ -278,8 +280,9 @@ func (m *Map) Models() map[string]*asset.Model {
 			}
 		}
 	}
+	// Nearest layer first: its cells hide those below, which the depth test then skips.
 	m.statics = m.statics[:0]
-	for l := range m.cells {
+	for _, l := range m.nearFirst() {
 		for cy := 0; cy < m.ch; cy++ {
 			for cx := 0; cx < m.cw; cx++ {
 				if name := m.chunkName(l, cx, cy); m.models[name] != nil {
@@ -291,8 +294,18 @@ func (m *Map) Models() map[string]*asset.Model {
 	return m.models
 }
 
+// nearFirst returns the layer indices by z, nearest the camera first.
+func (m *Map) nearFirst() []int {
+	order := make([]int, len(m.src.Layers))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool { return m.src.Layers[order[a]].Z > m.src.Layers[order[b]].Z })
+	return order
+}
+
 // Statics returns what draws the map as of the last Models: one static per chunk that has
-// cells, layer by layer.
+// cells, the nearest layer's first.
 func (m *Map) Statics() []scene.Static { return m.statics }
 
 func (m *Map) chunkName(l, cx, cy int) string {
@@ -344,20 +357,15 @@ func (m *Map) build(l, cx, cy int, name string) *asset.Model {
 	ox, oy, oz := src.Origin.X, src.Origin.Y, src.Origin.Z+src.Layers[l].Z
 	wx := func(x int) float32 { return ox + float32(float32(x)*t) }
 	wy := func(y int) float32 { return oy - float32(float32(y)*t) }
-	for i := 0; i < nt; i++ {
-		first := len(md.Indices)
-		for _, c := range cellQuads[i] {
-			quad(&md, wx(c[0]), wy(c[1]), wx(c[0]+1), wy(c[1]+1), oz, 0, 0, 1, 1)
-		}
-		part(m.draws[i].material, first)
-	}
+	// Borders first, the highest rank (nearest) first, then the cells: what is nearer is
+	// drawn first so the depth test skips what it hides.
 	order := make([]int, 0, nt)
 	for i := range edgeQuads {
 		if len(edgeQuads[i]) > 0 {
 			order = append(order, i)
 		}
 	}
-	sort.SliceStable(order, func(a, b int) bool { return m.draws[order[a]].rank < m.draws[order[b]].rank })
+	sort.SliceStable(order, func(a, b int) bool { return m.draws[order[a]].rank > m.draws[order[b]].rank })
 	half := float32(t / 2)
 	for _, i := range order {
 		d := &m.draws[i]
@@ -370,6 +378,19 @@ func (m *Map) build(l, cx, cy int, name string) *asset.Model {
 			quad(&md, qx, qy, qx+half, qy-half, z, u0, v0, u1, v1)
 		}
 		part(d.edgeMat, first)
+	}
+	for i := 0; i < nt; i++ {
+		first := len(md.Indices)
+		if m.draws[i].merge {
+			for _, r := range mergeCells(cellQuads[i]) {
+				quad(&md, wx(r[0]), wy(r[1]), wx(r[0]+r[2]), wy(r[1]+r[3]), oz, 0, 0, float32(r[2]), float32(r[3]))
+			}
+		} else {
+			for _, c := range cellQuads[i] {
+				quad(&md, wx(c[0]), wy(c[1]), wx(c[0]+1), wy(c[1]+1), oz, 0, 0, 1, 1)
+			}
+		}
+		part(m.draws[i].material, first)
 	}
 	if len(md.Parts) == 0 {
 		return nil
@@ -427,6 +448,52 @@ func (m *Map) cellEdges(l, x, y int, f func(u, shape, quarter int)) {
 			}
 		}
 	}
+}
+
+// mergeCells covers cells (x, y, listed row by row) with rectangles x, y, width, height:
+// each grows right as far as the row goes, then down while the rows below have the same
+// span free.
+func mergeCells(cells [][4]int) [][4]int {
+	if len(cells) == 0 {
+		return nil
+	}
+	x0, y0, x1, y1 := cells[0][0], cells[0][1], cells[0][0], cells[0][1]
+	for _, c := range cells {
+		x0, y0, x1, y1 = min(x0, c[0]), min(y0, c[1]), max(x1, c[0]), max(y1, c[1])
+	}
+	w := x1 - x0 + 1
+	free := make([]bool, w*(y1-y0+1))
+	for _, c := range cells {
+		free[(c[1]-y0)*w+c[0]-x0] = true
+	}
+	var out [][4]int
+	for _, c := range cells {
+		x, y := c[0]-x0, c[1]-y0
+		if !free[y*w+x] {
+			continue
+		}
+		rw := 1
+		for x+rw < w && free[y*w+x+rw] {
+			rw++
+		}
+		rh := 1
+	grow:
+		for y+rh <= y1-y0 {
+			for k := 0; k < rw; k++ {
+				if !free[(y+rh)*w+x+k] {
+					break grow
+				}
+			}
+			rh++
+		}
+		for j := 0; j < rh; j++ {
+			for k := 0; k < rw; k++ {
+				free[(y+j)*w+x+k] = false
+			}
+		}
+		out = append(out, [4]int{c[0], c[1], rw, rh})
+	}
+	return out
 }
 
 func slicesIndex(s []int, v int) int {
