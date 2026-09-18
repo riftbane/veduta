@@ -18,7 +18,9 @@ Rules
 - The game plays on a console: a 320x240 panel at 20 Hz and eight buttons: the D-pad
   (`input.dpad()`, or `input.down("left")`…), `a`, `b`, `select` (the game's menu) and
   `cancel` (back). Home leaves the game and never reaches it. Scenarios press the same names.
-- A map larger than a scene is a world (`docs` topic `world`): write prefabs and rules,
+- A 2D ground seen from above (a farm, a town) is a tile map (`docs` topic `map`): paint
+  its layers as rows of characters, one terrain per character; `inspect map` shows it.
+- A 3D land larger than a scene is a world (`docs` topic `world`): write prefabs and rules,
   never coordinates by hand; `world_terrain`, `world_vegetation`, `world_place`,
   `world_query`, `world_map` and `inspect world` shape and check it.
 - Run `fuzz` before every release; add minimized repros as scenarios. Run `bench` on the

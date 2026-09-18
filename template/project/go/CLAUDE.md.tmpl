@@ -18,7 +18,9 @@ Rules
 - Round every float product that feeds + or -: `y += float32(v * ctx.DT)`. On arm64 the
   compiler fuses a*b+c into one rounding and the console's traces drift from the goldens.
   `doctor` lists the lines where it happened; gmath's own operations are already safe.
-- A map larger than a scene is a world (`docs` topic `world`): write prefabs and rules,
+- A 2D ground seen from above (a farm, a town) is a tile map (`docs` topic `map`): paint
+  its layers as rows of characters, one terrain per character; `inspect map` shows it.
+- A 3D land larger than a scene is a world (`docs` topic `world`): write prefabs and rules,
   never coordinates by hand. `world_terrain` raises hills, levels plains, digs lakes and
   seas; `world_vegetation` plants trees, grass and flowers; `world_place` finds and
   validates a landmark's cell; `world_query` says what is at a cell (height, water,
