@@ -8,7 +8,7 @@ project for you; install the tool first (on Windows, in PowerShell:
 it: Game (`veduta.json`, `card.json`, README, CHANGELOG), Scripts, Scenes, Worlds, Maps,
 Prefabs, Models, Materials, Textures, Images and Scenarios, each in its own folders, without what
 the tool writes (`out/`, cooked assets, editor files). Right-click a section or one of its
-folders for **New Scene…**, **New Map…**, **New Prefab…**, **New Script…** and so on, or **New Folder…**:
+folders for **New Scene…**, **New Map…**, **New Tile…**, **New Prefab…**, **New Script…** and so on, or **New Folder…**:
 `veduta new` writes a file the engine accepts as it is (a world comes with the ground it
 stands on) and it opens. A name is checked as you type it: the engine's rule, and free in
 every folder of its kind. On a scene or a world, **Play from Here** and **New Scenario
@@ -25,6 +25,7 @@ The view follows files made or removed anywhere else.
 | **Veduta: Build** | `veduta build`, its errors in Problems; also on every save of a script or an asset |
 | **Veduta: Preview the Texture** (the eye in the title bar of a `*.vtex`) | draws the texture beside its source while you write it |
 | **Veduta: Open as JSON** / **Open in the Map Editor** (title bar of a `*.vmap`) | the map's text, or the map editor again |
+| **Veduta: Open in the Tile Editor** / **Open as JSON** (title bar of a `*.vtex`) | the texture's pixels, or its text |
 | **Veduta: Deploy to the Console's Card** | `veduta deploy`: the game onto the card, found by its label |
 
 The preview runs no engine: it draws the layer program in the panel itself, the same way
@@ -59,6 +60,32 @@ Every gesture is one edit of the file's text, written the same way every time (a
 a row, an object per line), so Ctrl+Z, Ctrl+Y and Ctrl+S work as in any file, and the text
 can be edited beside it. A map the engine would refuse is not edited: the editor lists its
 errors with line and column, and **Open as JSON** opens the text to fix it.
+
+**The tile editor** draws textures that are one PNG, pixel by pixel: **New Tile…** (on
+Textures in the Project view, or its +) makes a **tile**, an **animated tile** or an
+**autotile** (an island and a lake, 17 tiles a map picks by neighbours:
+[the format](https://github.com/riftbane/veduta/blob/main/docs/texture.md#autotiles)), and
+a tile opens in it from the Project view (**Open in the Tile Editor** in the title bar of
+any `*.vtex`; **Open as JSON** goes back).
+
+| Tool | Key | Does |
+|---|---|---|
+| Pencil | B, Shift+click for a line from the last point | draws with the first color (left button) or the second (right button) |
+| Erase | E | transparent pixels |
+| Line, Rect | L, R (Shift fills) | the line or rectangle dragged |
+| Fill | G | the pixels of the same color around |
+| Pick | I, or Alt+click | takes a pixel's color |
+| Select | M | drag a rectangle, drag it to move it; Ctrl+C, Ctrl+X, Ctrl+V (between tile editors too), Delete, F / Shift+F to flip, T to turn, Enter to place, Escape to put it back |
+
+X swaps the two colors, H the grid; the wheel zooms, the middle button or Space pans.
+Frames sit below the image: **Copy frame** (D) puts a copy of the frame after it to change,
+**New frame**, **Delete**, ◀ ▶ to reorder, `[` `]` to go through them, **Onion skin** (O)
+shows the frame before faintly, and the fps. The preview repeats a tile 3 × 3 times (its
+seams show), plays the frames (P), and paints a small map with an autotile the way the
+engine does; **Start the lake from the island** copies the island's sides into the lake,
+for you to draw the inner corners. Ctrl+S writes the PNG (frames side by side) and the
+`.vtex` (its size, grid, the `play` clip at your fps, `autotile`; its other fields kept);
+undo and redo are VS Code's.
 
 The same commands are tasks of type `veduta` (`"command": "sim"`, `"test"`, `"build"`,
 `"deploy"`, with `"args"` such as `["--scene", "level1"]`) for `tasks.json`, and `$veduta` is a problem matcher for their output.

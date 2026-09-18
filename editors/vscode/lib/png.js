@@ -446,7 +446,89 @@ function decode(bytes) {
   return { w, h, data: rgba };
 }
 
-const pngApi = { decode, inflate, inflateRaw };
+// crcTable is the CRC-32 of every byte, for chunk checksums.
+let crcTable = null;
+function crc32(bytes, start, end) {
+  if (!crcTable) {
+    crcTable = new Int32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) {
+        c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      }
+      crcTable[n] = c;
+    }
+  }
+  let c = -1;
+  for (let i = start; i < end; i++) {
+    c = crcTable[(c ^ bytes[i]) & 255] ^ (c >>> 8);
+  }
+  return (c ^ -1) >>> 0;
+}
+
+// encode writes straight 8-bit RGBA pixels as a PNG (color type 6, every row filtered with
+// the filter that makes it smallest by the usual sum heuristic). deflate compresses zlib
+// data (Node's zlib.deflateSync).
+function encode(w, h, data, deflate) {
+  const stride = w * 4;
+  const raw = new Uint8Array((stride + 1) * h);
+  const trial = new Uint8Array(stride);
+  for (let y = 0; y < h; y++) {
+    const row = y * stride;
+    let best = -1;
+    let bestSum = Infinity;
+    for (let f = 0; f < 5; f++) {
+      let sum = 0;
+      for (let i = 0; i < stride; i++) {
+        const x = data[row + i];
+        const a = i >= 4 ? data[row + i - 4] : 0;
+        const b = y > 0 ? data[row - stride + i] : 0;
+        const c = i >= 4 && y > 0 ? data[row - stride + i - 4] : 0;
+        const p = f === 0 ? 0 : f === 1 ? a : f === 2 ? b : f === 3 ? (a + b) >> 1 : paeth(a, b, c);
+        const v = (x - p) & 255;
+        trial[i] = v;
+        sum += v < 128 ? v : 256 - v;
+      }
+      if (sum < bestSum) {
+        bestSum = sum;
+        best = f;
+        raw[y * (stride + 1)] = f;
+        raw.set(trial, y * (stride + 1) + 1);
+      }
+    }
+  }
+  const idat = deflate(raw);
+  const chunks = [['IHDR', 13], ['IDAT', idat.length], ['IEND', 0]];
+  const out = new Uint8Array(8 + chunks.reduce((n, c) => n + 12 + c[1], 0));
+  out.set(signature, 0);
+  let o = 8;
+  const u32 = (v) => {
+    out[o++] = v >>> 24;
+    out[o++] = (v >>> 16) & 255;
+    out[o++] = (v >>> 8) & 255;
+    out[o++] = v & 255;
+  };
+  for (const [type, len] of chunks) {
+    u32(len);
+    const start = o;
+    for (let i = 0; i < 4; i++) {
+      out[o++] = type.charCodeAt(i);
+    }
+    if (type === 'IHDR') {
+      u32(w);
+      u32(h);
+      out.set([8, 6, 0, 0, 0], o);
+      o += 5;
+    } else if (type === 'IDAT') {
+      out.set(idat, o);
+      o += idat.length;
+    }
+    u32(crc32(out, start, o));
+  }
+  return out;
+}
+
+const pngApi = { decode, encode, inflate, inflateRaw };
 
 // The webview loads this file with a script tag, Node with require.
 if (typeof module !== 'undefined' && module.exports) {

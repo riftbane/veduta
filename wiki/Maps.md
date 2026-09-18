@@ -56,6 +56,30 @@ transition tiles to draw:
 line wander. The frames and the `play` clip make the water ripple by itself, on every cell,
 with no code.
 
+### Tiles drawn by hand: autotiles
+
+A cliff, a hedge or a fence wants borders you draw yourself. An **autotile** is a PNG of
+6 × 3 tiles: on the left an **island** (the terrain in 3 × 3 cells with nothing around:
+its sides and its outer corners), on the right a **lake** (the terrain around one empty
+cell: its inner corners; the middle tile is not used):
+
+```json
+{
+  "veduta": "texture/1",
+  "size": [96, 48],
+  "layers": [
+    { "type": "image", "path": "textures/cliff.png" }
+  ],
+  "autotile": true
+}
+```
+
+A map picks every cell's tile by its 8 neighbours: a cell that looks like a tile of the
+drawing gets that tile whole, any other is put together from quarters of them, so the 17
+tiles cover every shape — lines one cell wide, lone cells, corners that only touch. Put
+cliffs on a layer of their own above the grass: the transparent pixels of the tiles show
+the ground. Frames (`grid` and a `play` clip) animate an autotile like any texture.
+
 ## The map
 
 `assets/maps/farm.vmap` (`veduta new map farm` writes a first one). Each layer is a list of
@@ -227,6 +251,28 @@ draws the map exactly as the engine does, borders and ripples included, and ever
 is an ordinary edit of the file: undo, redo and save work as for any file, and **Open as
 JSON** shows the text. With the simulator open beside it, saving shows the change in the
 running game at once.
+
+## Drawing tiles with the editor
+
+**New Tile…** (on the Textures section of the Veduta view, or its **+**) asks what to
+draw — a **tile**, an **animated tile** or an **autotile** — and its size (16 × 16 pixels
+by default), makes the PNG and its `.vtex` and opens them in the **tile editor**:
+
+- pencil (B), eraser (E), line (L), rectangle (R, Shift fills it), bucket (G), eyedropper
+  (I or Alt+click) and selection (M): drag it to move it, Ctrl+C / Ctrl+X / Ctrl+V (between
+  tile editors too), F and Shift+F flip it, T turns it, Enter places it;
+- left button draws with the first color, right button with the second (X swaps them);
+  a palette, the colors of the frame, alpha;
+- frames below the image: **Copy frame** (D) puts a copy of this frame after it to change,
+  **Onion skin** (O) shows the frame before faintly, fps and **Play** in the preview;
+- the preview repeats a tile 3 × 3 times to show its seams, and paints a small map with an
+  autotile, as the engine draws it; **Start the lake from the island** copies the island's
+  sides into the lake, for you to draw the inner corners;
+- the wheel zooms, the middle button or Space pans, H hides the pixel grid.
+
+Ctrl+S writes the PNG and the `.vtex` (frames side by side, the `play` clip at the fps you
+set); undo and redo are VS Code's. A tile opens in the tile editor from the Veduta view;
+**Open as JSON** shows the `.vtex`, and **Open in the Tile Editor** goes back.
 
 ## Checking
 

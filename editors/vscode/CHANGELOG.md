@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.0
+
+- **The tile editor**: **New Tile…** makes a tile, an animated tile or an autotile (a PNG
+  and its `.vtex`) and opens it. Pencil, eraser, line, rectangle, bucket, eyedropper and a
+  selection to copy, paste (between tile editors too), move, flip and turn; two colors
+  (left and right button), a palette and the frame's colors. Frames: copy a frame to change
+  it, onion skin, reorder, fps, play. The preview repeats a tile 3 × 3 times or paints a
+  map with an autotile as the engine does. Ctrl+S writes the PNG and the `.vtex`; undo and
+  redo are VS Code's. Tiles open in it from the Project view.
+- The map editor draws autotiles (`"autotile": true`) as the engine does.
+
 ## 0.9.1
 
 - VS Code's terminals find `veduta` when it was installed after VS Code started: the

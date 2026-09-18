@@ -1,8 +1,8 @@
 {
   "name": "veduta",
   "displayName": "Veduta",
-  "description": "Make Veduta console games: the project as a tree with new scenes, prefabs, models and scripts on right-click, play and debug (F5), test, build with errors in Problems, preview a texture while you write it, paint maps in the map editor, deploy to the console's card.",
-  "version": "0.9.1",
+  "description": "Make Veduta console games: the project as a tree with new scenes, prefabs, models and scripts on right-click, play and debug (F5), test, build with errors in Problems, preview a texture while you write it, paint maps in the map editor, draw tiles, animations and autotiles in the tile editor, deploy to the console's card.",
+  "version": "0.10.0",
   "publisher": "riftbane",
   "license": "MIT",
   "repository": {
@@ -55,6 +55,16 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "veduta.tileEditor",
+        "displayName": "Veduta Tile Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.vtex"
+          }
+        ],
+        "priority": "option"
       }
     ],
     "commands": [
@@ -101,6 +111,18 @@
         "title": "Open in the Map Editor",
         "category": "Veduta",
         "icon": "$(map)"
+      },
+      {
+        "command": "veduta.openTileEditor",
+        "title": "Open in the Tile Editor",
+        "category": "Veduta",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "veduta.openTileAsJson",
+        "title": "Open as JSON",
+        "category": "Veduta",
+        "icon": "$(json)"
       },
       {
         "command": "veduta.view.new",
@@ -155,6 +177,12 @@
         "title": "New Texture…",
         "category": "Veduta",
         "icon": "$(add)"
+      },
+      {
+        "command": "veduta.view.newTile",
+        "title": "New Tile…",
+        "category": "Veduta",
+        "icon": "$(symbol-color)"
       },
       {
         "command": "veduta.view.newScenario",
@@ -217,7 +245,7 @@
       "editor/title": [
         {
           "command": "veduta.previewTexture",
-          "when": "resourceFilename =~ /\\.vtex$/",
+          "when": "resourceFilename =~ /\\.vtex$/ && activeCustomEditorId != veduta.tileEditor",
           "group": "navigation"
         },
         {
@@ -229,12 +257,22 @@
           "command": "veduta.openMapEditor",
           "when": "resourceFilename =~ /\\.vmap$/ && activeCustomEditorId != veduta.mapEditor",
           "group": "navigation"
+        },
+        {
+          "command": "veduta.openTileAsJson",
+          "when": "activeCustomEditorId == veduta.tileEditor",
+          "group": "navigation"
+        },
+        {
+          "command": "veduta.openTileEditor",
+          "when": "resourceFilename =~ /\\.vtex$/ && activeCustomEditorId != veduta.tileEditor",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
         {
           "command": "veduta.previewTexture",
-          "when": "resourceFilename =~ /\\.vtex$/"
+          "when": "resourceFilename =~ /\\.vtex$/ && activeCustomEditorId != veduta.tileEditor"
         },
         {
           "command": "veduta.openMapAsJson",
@@ -243,6 +281,18 @@
         {
           "command": "veduta.openMapEditor",
           "when": "resourceFilename =~ /\\.vmap$/ && activeCustomEditorId != veduta.mapEditor"
+        },
+        {
+          "command": "veduta.openTileAsJson",
+          "when": "activeCustomEditorId == veduta.tileEditor"
+        },
+        {
+          "command": "veduta.openTileEditor",
+          "when": "resourceFilename =~ /\\.vtex$/ && activeCustomEditorId != veduta.tileEditor"
+        },
+        {
+          "command": "veduta.view.newTile",
+          "when": "veduta.project"
         },
         {
           "command": "veduta.view.new",
@@ -406,6 +456,16 @@
           "group": "1_new@1"
         },
         {
+          "command": "veduta.view.newTile",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.texture$/",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.newTile",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.texture$/",
+          "group": "1_new@0"
+        },
+        {
           "command": "veduta.view.newScenario",
           "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.scenario$/",
           "group": "inline"
@@ -476,6 +536,16 @@
           "group": "0_run@1"
         },
         {
+          "command": "veduta.openTileEditor",
+          "when": "view == veduta.project && viewItem == file.texture",
+          "group": "0_run@2"
+        },
+        {
+          "command": "veduta.openTileAsJson",
+          "when": "view == veduta.project && viewItem == file.texture",
+          "group": "0_run@3"
+        },
+        {
           "command": "veduta.view.rename",
           "when": "view == veduta.project && viewItem =~ /^(file|folder)\\.(script|scene|world|map|prefab|model|material|texture|image|scenario)$/",
           "group": "7_modify@1"
@@ -489,6 +559,13 @@
           "command": "veduta.view.reveal",
           "when": "view == veduta.project && viewItem =~ /^(file|folder)\\./",
           "group": "9_reveal@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "veduta.openTileEditor",
+          "when": "resourceExtname == .vtex",
+          "group": "navigation@9"
         }
       ]
     },

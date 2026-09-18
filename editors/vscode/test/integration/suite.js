@@ -33,7 +33,7 @@ async function run() {
   const commands = await vscode.commands.getCommands(true);
   for (const c of ['veduta.newGame', 'veduta.play', 'veduta.test', 'veduta.build', 'veduta.deploy', 'veduta.previewTexture',
     'veduta.view.new', 'veduta.view.newPrefab', 'veduta.view.newMap', 'veduta.view.newFolder', 'veduta.view.rename', 'veduta.view.delete',
-    'veduta.view.play', 'veduta.openMapEditor', 'veduta.openMapAsJson']) {
+    'veduta.view.play', 'veduta.openMapEditor', 'veduta.openMapAsJson', 'veduta.openTileEditor', 'veduta.openTileAsJson', 'veduta.view.newTile']) {
     assert.ok(commands.includes(c), c + ' is registered');
   }
 
@@ -89,6 +89,27 @@ async function run() {
     assert.strictEqual(vscode.window.activeTextEditor.document.languageId, 'json');
     await vscode.commands.executeCommand('veduta.openMapEditor', vscode.Uri.file(map));
     await until('the map editor again', () => { const t = mapTab(true); return t && t.isActive; });
+
+    // A new autotile: a blank PNG and its .vtex, open in the tile editor; Open as JSON and
+    // back.
+    const quickPick = vscode.window.showQuickPick;
+    vscode.window.showQuickPick = async (items) => (await items).find((i) => i.kind === 'autotile' || i.n === 16);
+    answers.push(['cliff']);
+    try {
+      await vscode.commands.executeCommand('veduta.view.newTile', node('texture'));
+    } finally {
+      vscode.window.showQuickPick = quickPick;
+    }
+    const tile = path.join(root, 'assets', 'textures', 'cliff.vtex');
+    assert.ok(fs.readFileSync(tile, 'utf8').includes('"autotile": true'), 'the tile\'s .vtex');
+    assert.ok(fs.existsSync(path.join(root, 'assets', 'textures', 'cliff.png')), 'its PNG');
+    const tileTab = () => vscode.window.tabGroups.all.flatMap((g) => g.tabs)
+      .find((t) => t.input instanceof vscode.TabInputCustom && t.input.viewType === 'veduta.tileEditor' && t.input.uri.fsPath === tile);
+    await until('the tile editor', () => tileTab() !== undefined);
+    await vscode.commands.executeCommand('veduta.openTileAsJson', vscode.Uri.file(tile));
+    await until('the tile as JSON', () => vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri.fsPath === tile);
+    await vscode.commands.executeCommand('veduta.openTileEditor', vscode.Uri.file(tile));
+    await until('the tile editor again', () => { const t = tileTab(); return t && t.isActive; });
   } finally {
     vscode.window.showInputBox = input;
   }
@@ -102,6 +123,8 @@ async function run() {
   const d = problemsOf(main)[0];
   assert.ok(d.range.start.line >= lines - 1, `error at line ${d.range.start.line + 1}, the file had ${lines} lines`);
   assert.strictEqual(d.severity, vscode.DiagnosticSeverity.Error);
+
+  assert.deepStrictEqual(problemsOf(path.join(root, 'assets', 'textures', 'cliff.vtex')), [], 'the engine takes the new autotile');
 
   // Fixed and saved in the editor: the build on save clears it.
   const doc = await vscode.workspace.openTextDocument(main);

@@ -54,9 +54,9 @@ test('launchConfig', () => {
 });
 
 test('toolProblem', () => {
-  assert.strictEqual(v.toolProblem(null, '{"version":"v2.0.0-rc.11","commit":"x"}'), null);
+  assert.strictEqual(v.toolProblem(null, '{"version":"v2.0.0-rc.14","commit":"x"}'), null);
   assert.strictEqual(v.toolProblem(null, '{"version":"v2.0.0"}'), null);
-  assert.match(v.toolProblem(null, '{"version":"v2.0.0-rc.10"}'), /needs v2\.0\.0-rc\.11 or later/);
+  assert.match(v.toolProblem(null, '{"version":"v2.0.0-rc.13"}'), /needs v2\.0\.0-rc\.14 or later/);
   assert.strictEqual(v.toolProblem(null, '{"version":"dev"}'), null);
   assert.strictEqual(v.toolProblem(null, '{"version":"v10.1.0"}'), null);
   assert.match(v.toolProblem(null, '{"version":"v1.4.1"}'), /v1\.4\.1, which makes Go games/);

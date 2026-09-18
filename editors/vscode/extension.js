@@ -1,7 +1,7 @@
 'use strict';
 // The Veduta extension: the veduta tool's commands inside VS Code. It holds no game logic:
 // every action runs veduta in the project, as a person would in a terminal. What it draws
-// itself, the texture preview and the map editor, comes from the engine's layer program and
+// itself, the texture preview, the map editor and the tile editor, comes from the engine's layer program and
 // map picture transliterated in lib/texture.js and lib/tilemap.js, compared with the
 // engine's own images by the tests.
 
@@ -11,8 +11,11 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const v = require('./lib/veduta');
+const zlib = require('zlib');
 const texture = require('./lib/texture');
 const tree = require('./lib/tree');
+const png = require('./lib/png');
+const tileset = require('./lib/tileset');
 
 let problems;
 let context; // the extension's own folder, for the files the preview panel loads
@@ -546,6 +549,397 @@ function registerMapEditor() {
   );
 }
 
+// --------------------------------------------------------------- the tile editor
+// A pixel texture (a .vtex whose one layer is a PNG as large as it) drawn pixel by pixel:
+// a tile, an animated tile or an autotile. The pixels live in the webview; each gesture is
+// an edit VS Code keeps in its undo stack, and saving writes the PNG and the .vtex.
+
+const tileDocs = new Set(); // the open tile documents
+let tileClipboard = null; // pixels copied in a tile editor, for the others
+
+// readTile reads a pixel texture from disk: {src, model, png} or {error}.
+function readTile(file) {
+  let text;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (e) {
+    return { error: `${path.basename(file)}: ${e.message}` };
+  }
+  let src;
+  try {
+    src = JSON.parse(text);
+  } catch (e) {
+    return { error: `${path.basename(file)} is not JSON (${e.message}): open it as JSON to fix it.` };
+  }
+  const p = tileset.pixelTexture(src);
+  if (p.error) {
+    return { error: `The tile editor draws textures that are one PNG, and ${path.basename(file)} is not: ${p.error}. Open it as JSON, or make a tile with New Tile… in the Veduta view.` };
+  }
+  const project = projectOf(file);
+  const pngFile = path.join(project.assets, ...p.path.split('/'));
+  let image = null;
+  try {
+    image = png.decode(fs.readFileSync(pngFile));
+  } catch (e) {
+    if (e.code !== 'ENOENT') {
+      return { error: `${p.path}: ${e.message}` };
+    }
+  }
+  const model = tileset.read(src, image);
+  if (model.error) {
+    return { error: `${path.basename(file)}: ${model.error}.` };
+  }
+  return { src, model, png: pngFile };
+}
+
+// tileMessage is what the webview draws: the frames, as base64 RGBA each.
+function tileMessage(model, pngPath) {
+  const n = model.frames.length;
+  const kind = model.autotile ? `autotile of ${model.w / 6}-pixel tiles` : `${model.w} × ${model.h} tile`;
+  return {
+    type: 'load', w: model.w, h: model.h, autotile: model.autotile, fps: model.fps,
+    frames: model.frames.map((f) => Buffer.from(f.buffer, f.byteOffset, f.byteLength).toString('base64')),
+    info: `${kind}, ${n} frame${n === 1 ? '' : 's'}${n > 1 ? ` at ${model.fps} fps` : ''}. Saved as ${pngPath}.`,
+  };
+}
+
+function tileEditorHtml(webview) {
+  const nonce = crypto.randomBytes(16).toString('base64');
+  const uri = (...p) => webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, ...p));
+  const values = {
+    cspSource: webview.cspSource,
+    nonce,
+    basecss: uri('media', 'mapeditor.css'),
+    css: uri('media', 'tileeditor.css'),
+    editor: uri('media', 'tileeditor.js'),
+    png: uri('lib', 'png.js'),
+    texture: uri('lib', 'texture.js'),
+    tilemap: uri('lib', 'tilemap.js'),
+    tileset: uri('lib', 'tileset.js'),
+  };
+  const page = fs.readFileSync(path.join(context.extensionPath, 'media', 'tileeditor.html'), 'utf8');
+  return page.replace(/{{(\w+)}}/g, (_, k) => String(values[k]));
+}
+
+class TileDocument {
+  constructor(uri, backup) {
+    this.uri = uri;
+    this.backup = backup; // the model a backup holds, sent instead of the files once
+    this.panel = null;
+    this.requests = new Map();
+    this.next = 1;
+    this.dirty = false;
+    this.written = new Map(); // file → the bytes this editor wrote last
+  }
+
+  dispose() {
+    tileDocs.delete(this);
+  }
+
+  post(m) {
+    if (this.panel) {
+      this.panel.webview.postMessage(m);
+    }
+  }
+
+  // load sends the texture as the files are (or the backup) to the webview.
+  load() {
+    if (this.backup) {
+      const b = this.backup;
+      this.backup = null;
+      this.post(tileMessage(b.model, b.path));
+      return;
+    }
+    const t = readTile(this.uri.fsPath);
+    this.post(t.error ? { type: 'load', error: t.error } : tileMessage(t.model, tileset.pixelTexture(t.src).path));
+  }
+
+  // data asks the webview for the frames: a model, or null.
+  data() {
+    if (!this.panel) {
+      return Promise.resolve(null);
+    }
+    const id = this.next++;
+    return new Promise((resolve) => {
+      this.requests.set(id, resolve);
+      this.post({ type: 'getData', id });
+    });
+  }
+
+  // write saves the model as the PNG and the .vtex target (this document, or another for
+  // Save As).
+  async write(target) {
+    const d = await this.data();
+    if (!d) {
+      throw new Error('the tile editor has no frames to save');
+    }
+    const model = { w: d.w, h: d.h, autotile: d.autotile, fps: d.fps, frames: d.frames.map((f) => new Uint8ClampedArray(Buffer.from(f, 'base64'))) };
+    const file = target.fsPath;
+    let src = null;
+    try {
+      src = JSON.parse(fs.readFileSync(target.toString() === this.uri.toString() ? file : this.uri.fsPath, 'utf8'));
+    } catch (_) {
+      // a new file, or one that no longer reads: the editor's own fields
+    }
+    const project = projectOf(file);
+    let pngPath = src && target.toString() === this.uri.toString() ? tileset.pixelTexture(src).path : undefined;
+    if (!pngPath) {
+      const rel = path.relative(project.assets, path.dirname(file)).split(path.sep).join('/');
+      pngPath = [rel, path.basename(file).replace(/\.vtex$/, '') + '.png'].filter(Boolean).join('/');
+    }
+    const img = tileset.sheet(model);
+    const pngBytes = Buffer.from(png.encode(img.w, img.h, img.data, (raw) => zlib.deflateSync(raw, { level: 9 })));
+    const pngFile = path.join(project.assets, ...pngPath.split('/'));
+    const text = tileset.format(tileset.write(model, src, pngPath));
+    fs.mkdirSync(path.dirname(pngFile), { recursive: true });
+    this.written.set(pngFile, pngBytes);
+    this.written.set(file, Buffer.from(text));
+    fs.writeFileSync(pngFile, pngBytes);
+    fs.writeFileSync(file, text);
+    if (vscode.workspace.getConfiguration('veduta').get('buildOnSave')) {
+      build(true);
+    }
+  }
+
+  // changedOnDisk loads the files again when one of them changed outside the editor and
+  // nothing is left unsaved here.
+  changedOnDisk(file) {
+    const own = this.uri.fsPath;
+    const t = readTile(own);
+    if (file !== own && (t.error || t.png !== file)) {
+      return;
+    }
+    let bytes = null;
+    try {
+      bytes = fs.readFileSync(file);
+    } catch (_) {
+      return;
+    }
+    const mine = this.written.get(file);
+    if ((mine && mine.equals(bytes)) || this.dirty) {
+      return;
+    }
+    this.load();
+  }
+}
+
+class TileEditorProvider {
+  constructor() {
+    this.changes = new vscode.EventEmitter();
+    this.onDidChangeCustomDocument = this.changes.event;
+  }
+
+  openCustomDocument(uri, open) {
+    let backup = null;
+    if (open.backupId) {
+      try {
+        const b = JSON.parse(fs.readFileSync(open.backupId, 'utf8'));
+        b.model.frames = b.model.frames.map((f) => new Uint8ClampedArray(Buffer.from(f, 'base64')));
+        backup = b;
+      } catch (_) {
+        // no backup to read: the files
+      }
+    }
+    const doc = new TileDocument(uri, backup);
+    tileDocs.add(doc);
+    return doc;
+  }
+
+  resolveCustomEditor(doc, panel) {
+    doc.panel = panel;
+    panel.webview.options = { enableScripts: true, localResourceRoots: [context.extensionUri] };
+    panel.webview.html = tileEditorHtml(panel.webview);
+    if (doc.backup) {
+      doc.dirty = true;
+    }
+    const sub = panel.webview.onDidReceiveMessage((m) => {
+      if (!m) {
+        return;
+      }
+      switch (m.type) {
+        case 'ready':
+          doc.load();
+          if (tileClipboard) {
+            doc.post({ type: 'clipboard', block: tileClipboard });
+          }
+          if (doc.dirty) {
+            // A backup: VS Code shows the document as changed.
+            this.changes.fire({ document: doc, label: 'Restore', undo: () => {}, redo: () => {} });
+          }
+          break;
+        case 'edit':
+          doc.dirty = true;
+          this.changes.fire({
+            document: doc,
+            label: m.label,
+            undo: () => doc.post({ type: 'undo' }),
+            redo: () => doc.post({ type: 'redo' }),
+          });
+          break;
+        case 'data': {
+          const resolve = doc.requests.get(m.id);
+          doc.requests.delete(m.id);
+          if (resolve) {
+            resolve(m.data);
+          }
+          break;
+        }
+        case 'clipboard':
+          tileClipboard = m.block;
+          tileDocs.forEach((d) => d !== doc && d.post({ type: 'clipboard', block: m.block }));
+          break;
+        case 'openJson':
+          vscode.commands.executeCommand('vscode.openWith', doc.uri, 'default');
+          break;
+        default:
+          break;
+      }
+    });
+    panel.onDidDispose(() => {
+      sub.dispose();
+      doc.panel = null;
+      doc.requests.forEach((resolve) => resolve(null));
+      doc.requests.clear();
+    });
+  }
+
+  async saveCustomDocument(doc) {
+    await doc.write(doc.uri);
+    doc.dirty = false;
+  }
+
+  async saveCustomDocumentAs(doc, target) {
+    await doc.write(target);
+  }
+
+  async revertCustomDocument(doc) {
+    doc.dirty = false;
+    doc.load();
+  }
+
+  async backupCustomDocument(doc, backup) {
+    const d = await doc.data();
+    const t = readTile(doc.uri.fsPath);
+    const file = backup.destination.fsPath;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ model: d, path: t.error ? '' : tileset.pixelTexture(t.src).path }));
+    return { id: file, delete: () => fs.rmSync(file, { force: true }) };
+  }
+}
+
+// tileUri is the texture a command is for: the one it was given, else the active editor's.
+function tileUri(arg) {
+  if (arg instanceof vscode.Uri) {
+    return arg;
+  }
+  if (arg && arg.rel && project) {
+    return project.uri(arg);
+  }
+  const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+  const input = tab && tab.input;
+  if (input && input.uri && /\.vtex$/.test(input.uri.path)) {
+    return input.uri;
+  }
+  const editor = vscode.window.activeTextEditor;
+  return editor && /\.vtex$/.test(editor.document.fileName) ? editor.document.uri : undefined;
+}
+
+// isTile tells whether a .vtex is a texture the tile editor draws (one PNG).
+function isTile(file) {
+  try {
+    return !tileset.pixelTexture(JSON.parse(fs.readFileSync(file, 'utf8'))).error;
+  } catch (_) {
+    return false;
+  }
+}
+
+function registerTileEditor() {
+  const watcher = vscode.workspace.createFileSystemWatcher('**/*.{vtex,png,PNG}');
+  const changed = (uri) => tileDocs.forEach((d) => d.changedOnDisk(uri.fsPath));
+  context.subscriptions.push(
+    vscode.window.registerCustomEditorProvider('veduta.tileEditor', new TileEditorProvider(),
+      { webviewOptions: { retainContextWhenHidden: true }, supportsMultipleEditorsPerDocument: false }),
+    watcher, watcher.onDidChange(changed), watcher.onDidCreate(changed),
+    vscode.commands.registerCommand('veduta.openTileEditor', (arg) => {
+      const uri = tileUri(arg);
+      if (!uri) {
+        vscode.window.showWarningMessage('Veduta: open a texture (a .vtex file) first.');
+        return undefined;
+      }
+      return vscode.commands.executeCommand('vscode.openWith', uri, 'veduta.tileEditor');
+    }),
+    vscode.commands.registerCommand('veduta.openTileAsJson', (arg) => {
+      const uri = tileUri(arg);
+      return uri && vscode.commands.executeCommand('vscode.openWith', uri, 'default');
+    }),
+    vscode.commands.registerCommand('veduta.view.newTile', newTile),
+  );
+}
+
+const TILE_KINDS = [
+  { label: 'Tile', kind: 'tile', detail: 'One image: a map cell, a sprite, an icon. Repeats without a seam in a map.' },
+  { label: 'Animated tile', kind: 'animated', detail: 'Frames played in a loop (water, a torch): copy a frame and change it.' },
+  { label: 'Autotile', kind: 'autotile', detail: 'An island and a lake, 17 tiles a map picks by the cells around (cliffs, hedges, paths).' },
+];
+
+// newTile makes a new pixel texture, a blank PNG and its .vtex, in the folder of node
+// (the Textures section's by default), and opens it in the tile editor.
+async function newTile(node) {
+  await project.refresh();
+  if (!project.root) {
+    vscode.window.showWarningMessage('Veduta: open a game project (a folder with veduta.json) first.');
+    return;
+  }
+  const kind = await vscode.window.showQuickPick(TILE_KINDS, { title: 'Veduta: new tile', placeHolder: 'What to draw' });
+  if (!kind) {
+    return;
+  }
+  const sizes = tileset.SIZES.filter((n) => !tileset.checkSize(kind.kind, n))
+    .map((n) => ({ label: `${n} × ${n}`, n, description: n === 16 ? 'pixels a tile' : '' }));
+  const size = await vscode.window.showQuickPick(sizes, { title: `Veduta: new ${kind.label.toLowerCase()}`, placeHolder: 'Pixels of a tile (a map cell)' });
+  if (!size) {
+    return;
+  }
+  const section = tree.SECTIONS.find((s) => s.id === 'texture');
+  const inFolder = node && node.section && node.section.id === 'texture' ? tree.relIn(node, project.info) : '';
+  const dir = [tree.sectionRoot(section, project.info), inFolder].filter(Boolean).join('/');
+  const index = tree.names(project.nodes);
+  const folder = path.join(project.root, ...dir.split('/').filter(Boolean));
+  const name = await vscode.window.showInputBox({
+    title: `Veduta: new ${kind.label.toLowerCase()}, ${size.label}`,
+    prompt: `Its name, which is also the name of its files, in ${dir}/ (name.vtex and name.png)`,
+    validateInput: (s) => {
+      const bad = tree.checkName(s, 'texture', index);
+      if (bad) {
+        return bad;
+      }
+      for (const ext of ['.vtex', '.png']) {
+        if (fs.existsSync(path.join(folder, s + ext))) {
+          return `${s}${ext} is there already`;
+        }
+      }
+      return undefined;
+    },
+  });
+  if (!name) {
+    return;
+  }
+  const assets = path.join(project.root, ...project.info.assets.split('/'));
+  const pngPath = path.relative(assets, path.join(folder, name + '.png')).split(path.sep).join('/');
+  const model = tileset.blank(kind.kind, size.n);
+  const img = tileset.sheet(model);
+  fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(path.join(folder, name + '.png'), Buffer.from(png.encode(img.w, img.h, img.data, (raw) => zlib.deflateSync(raw, { level: 9 }))));
+  const file = path.join(folder, name + '.vtex');
+  fs.writeFileSync(file, tileset.format(tileset.newSource(kind.kind, model, pngPath)));
+  await project.refresh();
+  await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(file), 'veduta.tileEditor', { preview: false });
+  const made = project.files.get([dir, name + '.vtex'].join('/'));
+  if (made && project.view.visible) {
+    project.view.reveal(made, { select: true, focus: false }).then(undefined, () => {});
+  }
+}
+
 // --------------------------------------------------------------- the project view
 // The Veduta view in the activity bar: the project as lib/tree.js groups it (the files a
 // person works on, by what they are, in their folders), rebuilt as files come and go. Its
@@ -626,6 +1020,9 @@ class ProjectTree {
     } else {
       item.iconPath = vscode.ThemeIcon.File;
       item.command = { command: 'vscode.open', title: 'Open', arguments: [item.resourceUri] };
+      if (node.section.id === 'texture' && isTile(item.resourceUri.fsPath)) {
+        item.command = { command: 'vscode.openWith', title: 'Open', arguments: [item.resourceUri, 'veduta.tileEditor'] };
+      }
     }
     return item;
   }
@@ -726,8 +1123,12 @@ async function newSource(kind, node, start = {}) {
 
 // pickKind asks which kind of source to make, for the + of the view's title.
 async function pickKind() {
-  const pick = await vscode.window.showQuickPick(KINDS.map(([kind, label]) => ({ label, kind })), { title: 'Veduta: new', placeHolder: 'What to make' });
-  if (pick) {
+  const items = KINDS.map(([kind, label]) => ({ label, kind }));
+  items.splice(items.findIndex((i) => i.kind === 'texture') + 1, 0, { label: 'Tile', kind: 'tile', description: 'drawn pixel by pixel: a PNG' });
+  const pick = await vscode.window.showQuickPick(items, { title: 'Veduta: new', placeHolder: 'What to make' });
+  if (pick && pick.kind === 'tile') {
+    await newTile(undefined);
+  } else if (pick) {
     await newSource(pick.kind, undefined);
   }
 }
@@ -865,6 +1266,7 @@ async function activate(ctx) {
   context.subscriptions.push(problems);
   // First: a map opened before the extension started waits for its editor.
   registerMapEditor();
+  registerTileEditor();
 
   const isProject = !!(await projectRoot());
   vscode.commands.executeCommand('setContext', 'veduta.project', isProject);

@@ -1,0 +1,107 @@
+/* The tile editor, over the map editor's styles: the image in the middle, colors and the
+   preview on the right, the frames below. */
+.swatch {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, #7c7c7c 25%, transparent 25%, transparent 75%, #7c7c7c 75%),
+    linear-gradient(45deg, #7c7c7c 25%, transparent 25%, transparent 75%, #7c7c7c 75%);
+  background-color: #6a6a6a;
+  background-size: 8px 8px;
+  background-position: 0 0, 4px 4px;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.swatch > i {
+  position: absolute;
+  inset: 0;
+}
+
+.swatch.big {
+  width: 24px;
+  height: 24px;
+}
+
+.swatch.selected {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.row.wrap {
+  flex-wrap: wrap;
+}
+
+input[type="color"] {
+  flex: 0 0 36px;
+  padding: 0;
+  height: 24px;
+}
+
+input[type="range"] {
+  flex: 1;
+}
+
+#previewbox {
+  overflow: auto;
+  max-height: 320px;
+  border: 1px solid var(--vscode-panel-border);
+  background: #6a6a6a;
+}
+
+#preview {
+  display: block;
+  image-rendering: pixelated;
+}
+
+#frames {
+  border-top: 1px solid var(--vscode-panel-border);
+  padding: 4px 8px;
+}
+
+#strip {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.frame {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+}
+
+.frame:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.frame.selected {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.frame canvas {
+  height: 40px;
+  image-rendering: pixelated;
+  background: #6a6a6a;
+}

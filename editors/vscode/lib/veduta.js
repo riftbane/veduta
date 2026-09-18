@@ -146,7 +146,7 @@ function toolProblem(err, stdout) {
     return `Veduta: the veduta tool is ${version}, which makes Go games; this extension needs v2 (Lua games). Reinstall it from the beta channel.`;
   }
   if (m && older(version, MIN_TOOL)) {
-    return `Veduta: the veduta tool is ${version}; this extension needs ${MIN_TOOL} or later (the Project view makes files with veduta new, and maps with veduta new map). Update it: install.ps1 again on Windows, veduta update elsewhere.`;
+    return `Veduta: the veduta tool is ${version}; this extension needs ${MIN_TOOL} or later (the Project view makes files with veduta new, and the tile editor autotiles). Update it: install.ps1 again on Windows, veduta update elsewhere.`;
   }
   return null;
 }
@@ -167,9 +167,9 @@ function extensionBehind(own, stdout) {
   return older('v' + own, 'v' + info.extension) ? info.extension : null;
 }
 
-// MIN_TOOL is the oldest veduta this extension works with: the first with maps (veduta new
-// map, the .vmap format the map editor writes).
-const MIN_TOOL = 'v2.0.0-rc.11';
+// MIN_TOOL is the oldest veduta this extension works with: the first with autotiles (the
+// "autotile" field the tile editor writes).
+const MIN_TOOL = 'v2.0.0-rc.14';
 
 // older reports whether version a comes before b; both are vX.Y.Z with an optional -rc.N,
 // and a release comes after its candidates.

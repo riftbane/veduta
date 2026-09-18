@@ -21,6 +21,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The tile editor in the VS Code extension (0.10.0), for people (no MCP tool): **New
+  Tile…** makes a tile, an animated tile or an autotile, a PNG and its `.vtex`, and draws
+  them pixel by pixel — pencil, eraser, line, rectangle, bucket, eyedropper, a selection
+  to copy, paste, move, flip and turn; frames copied from the one before, onion skin, fps;
+  a preview that repeats a tile or paints a map with an autotile as the engine does. Saving
+  writes the PNG (`lib/png.js` now encodes) and the `.vtex`, keeping the fields it does not
+  draw. The extension needs the tool at v2.0.0-rc.14 (autotiles).
 - Autotiles: `"autotile": true` in a `.vtex` makes every frame 6 × 3 hand-drawn tiles, an
   island (convex corners) and a lake (concave corners); a map picks each cell's tile, or
   each quarter's, from its 8 neighbours, so 17 tiles draw every shape. Animated with

@@ -128,7 +128,9 @@ the same size:
 }
 ```
 
-An image exactly as large as the texture is copied pixel for pixel.
+An image exactly as large as the texture is copied pixel for pixel. VS Code's **tile
+editor** draws such textures itself — tiles, animations frame by frame and autotiles —
+and saves the PNG with its `.vtex`: see [Maps](Maps#drawing-tiles-with-the-editor).
 
 ### Textures that repeat
 

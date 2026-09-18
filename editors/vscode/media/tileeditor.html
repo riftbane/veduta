@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{cspSource}} data:; style-src {{cspSource}} 'unsafe-inline'; script-src 'nonce-{{nonce}}';">
+<link rel="stylesheet" href="{{basecss}}">
+<link rel="stylesheet" href="{{css}}">
+<title>Tile</title>
+</head>
+<body>
+<div id="bar">
+  <span class="group" id="tools">
+    <button data-tool="pencil" title="Pencil (B). Shift+click: a line from the last point">Pencil</button>
+    <button data-tool="eraser" title="Eraser: transparent pixels (E)">Erase</button>
+    <button data-tool="line" title="Line (L)">Line</button>
+    <button data-tool="rect" title="Rectangle (R); hold Shift to fill it">Rect</button>
+    <button data-tool="fill" title="Bucket fill: the pixels of the same color around (G)">Fill</button>
+    <button data-tool="pick" title="Eyedropper (I, or Alt+click with any tool)">Pick</button>
+    <button data-tool="select" title="Select (M): drag a rectangle, drag it to move it; Ctrl+C, Ctrl+X, Ctrl+V, Delete">Select</button>
+  </span>
+  <span class="group" title="Left button: the first color; right button: the second (X swaps them)">
+    <span class="swatch big" id="primary"></span><span class="swatch big" id="secondary"></span>
+  </span>
+  <span class="spacer"></span>
+  <label title="Show the previous frame faintly under this one (O)"><input type="checkbox" id="onion"> Onion skin</label>
+  <label title="Show the pixels' outlines (H)"><input type="checkbox" id="grid" checked> Grid</label>
+  <button id="zoomout" title="Smaller">&#8722;</button>
+  <span id="zoom" class="badge">100%</span>
+  <button id="zoomin" title="Bigger">+</button>
+  <button id="fit" title="Fit the image in the view">Fit</button>
+</div>
+<div id="error" hidden>
+  <div id="errortext"></div>
+  <button id="openjson">Open as JSON</button>
+</div>
+<div id="main">
+  <div id="view"><canvas id="canvas"></canvas></div>
+  <div id="side">
+    <section>
+      <h3>Preview</h3>
+      <div id="previewbox"><canvas id="preview"></canvas></div>
+      <div class="row">
+        <button id="play" title="Play the frames at their fps (P)">Play</button>
+        <select id="pscale" title="Preview scale"><option value="1">1×</option><option value="2" selected>2×</option><option value="3">3×</option><option value="4">4×</option></select>
+      </div>
+      <div class="hint" id="previewhint"></div>
+    </section>
+    <section>
+      <h3>Color</h3>
+      <div class="row">
+        <input type="color" id="colorpick" title="The first color">
+        <input id="hex" spellcheck="false" title="#RRGGBB, or #RRGGBBAA with its opacity">
+      </div>
+      <label title="Opacity: a map draws a pixel of 128 or more whole and leaves out the rest">Alpha <input type="range" id="alpha" min="0" max="255"> <span id="alphavalue" class="badge"></span></label>
+      <div class="palette" id="swatches"></div>
+      <h3>In this frame</h3>
+      <div class="palette" id="used"></div>
+    </section>
+    <section id="selsection" hidden>
+      <h3>Selection</h3>
+      <div class="row wrap">
+        <button id="copy" title="Copy (Ctrl+C)">Copy</button>
+        <button id="cut" title="Cut (Ctrl+X)">Cut</button>
+        <button id="paste" title="Paste (Ctrl+V)">Paste</button>
+        <button id="clear" title="Clear (Delete)">Clear</button>
+      </div>
+      <div class="row wrap">
+        <button id="fliph" title="Mirror left to right (F)">Flip &#8596;</button>
+        <button id="flipv" title="Mirror top to bottom (Shift+F)">Flip &#8597;</button>
+        <button id="rotate" title="Turn a quarter clockwise (T)">Rotate</button>
+      </div>
+      <div class="hint">Enter places what moves, Escape puts it back.</div>
+    </section>
+    <section id="autosection" hidden>
+      <h3>Autotile</h3>
+      <div class="hint">Left: an island, the terrain with nothing around it. Right: a lake, the terrain around one empty cell. A map picks each cell's tile, or quarter, by its neighbours.</div>
+      <div class="row"><button id="lake" title="Copy the island's sides into the lake's opposite sides and its middle into the lake's corners, to draw the concave corners over">Start the lake from the island</button></div>
+    </section>
+    <section>
+      <h3>Texture</h3>
+      <div id="info" class="hint"></div>
+    </section>
+  </div>
+</div>
+<div id="frames">
+  <div id="strip"></div>
+  <div class="row">
+    <button id="dupframe" title="A copy of this frame after it, to change (D)">Copy frame</button>
+    <button id="newframe" title="An empty frame after this one">New frame</button>
+    <button id="delframe" title="Delete this frame">Delete</button>
+    <button id="left" title="Move this frame earlier">&#9664;</button>
+    <button id="right" title="Move this frame later">&#9654;</button>
+    <label title="Frames a second of the animation">fps <input id="fps" class="short"></label>
+  </div>
+</div>
+<div id="status"><span id="pos">&nbsp;</span><span id="pixel"></span><span id="tile"></span></div>
+<script nonce="{{nonce}}" src="{{png}}"></script>
+<script nonce="{{nonce}}" src="{{texture}}"></script>
+<script nonce="{{nonce}}" src="{{tilemap}}"></script>
+<script nonce="{{nonce}}" src="{{tileset}}"></script>
+<script nonce="{{nonce}}" src="{{editor}}"></script>
+</body>
+</html>
