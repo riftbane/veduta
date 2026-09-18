@@ -6,8 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- A source with an empty object key (`"props": {"": 1}`) crashed the tool instead of
+  being reported.
+
 ### Added
 
+- The map editor in the VS Code extension (0.9.0): a `.vmap` opens painted, as the engine
+  draws it (borders and play clips included: `editors/vscode/lib/tilemap.js` is compared
+  pixel by pixel with `tilemap.Picture`'s goldens, and its checks give the compiler's
+  messages). A palette of terrains drawn with their textures; brush, rectangle, bucket,
+  eraser and eyedropper; layers to show, hide, add, rename, reorder; objects dragged out,
+  named and given tags and properties; map size, tile and origin; zoom, pan, grid, and the
+  clips playing. Every gesture is one edit of the document, so undo, redo and save are VS
+  Code's; **Open as JSON** shows the text, and editing it updates the editor. The Project
+  view has a Maps section and **New Map…**; the extension needs the tool at v2.0.0-rc.11.
 - Tile maps (`docs/map.md`): `assets/maps/<name>.vmap` (header `map/1`) is a grid of cells
   painted with terrains (a texture or a material each, with tags), in up to 16 layers
   written as rows of characters, plus objects (named rectangles with tags and properties)

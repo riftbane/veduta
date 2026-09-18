@@ -18,7 +18,7 @@ import (
 )
 
 // Version is the engine version.
-const Version = "v2.0.0-rc.10"
+const Version = "v2.0.0-rc.11"
 
 // Input is what the player did with the console's buttons during one tick: the buttons
 // pressed, held and released. It is identical whether it comes from the console or a
