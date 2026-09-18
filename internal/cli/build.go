@@ -101,6 +101,7 @@ func parseCompileErrors(out string) (errs []CompileError, rest string) {
 func (s *Session) Build(vet bool) (*BuildReport, error) {
 	start := time.Now()
 	r := &BuildReport{Errors: []CompileError{}, Vet: vet}
+	refreshEditorFiles(s.Root, s.IsScript())
 	cr, err := cook.Run(cook.Options{Root: s.Root, Project: s.Project})
 	if err != nil {
 		return nil, err

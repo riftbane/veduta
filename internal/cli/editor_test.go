@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/riftbane/veduta/v2/script"
@@ -81,5 +82,37 @@ func TestEditorFiles(t *testing.T) {
 	}
 	if again, _, _ := writeEditorFiles(dir, true); len(again) != 0 {
 		t.Errorf("a second write changed %v", again)
+	}
+}
+
+// TestBuildRefreshesEditorFiles: a project set up by an older tool gets this tool's schemas
+// when it builds, so VS Code checks sources against the formats the engine reads; settings
+// that already say what the engine wants keep their own layout.
+func TestBuildRefreshesEditorFiles(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "game")
+	env := &Env{Version: "dev", Stdout: io.Discard, Stderr: io.Discard}
+	if _, err := Init(env, InitOptions{Dir: dir}); err != nil {
+		t.Fatal(err)
+	}
+	schema := filepath.Join(dir, ".veduta", "schema", "scene.schema.json")
+	settings := filepath.Join(dir, ".vscode", "settings.json")
+	os.WriteFile(schema, []byte(`{"old": true}`), 0o644)
+	b, _ := os.ReadFile(settings)
+	var obj map[string]any
+	json.Unmarshal(b, &obj)
+	mine, _ := json.Marshal(obj) // the same keys on one line: the project's own layout
+	os.WriteFile(settings, mine, 0o644)
+	s, err := OpenSession(dir, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r, err := s.Build(false); err != nil || !r.OK {
+		t.Fatalf("build: %+v %v", r, err)
+	}
+	if got, _ := os.ReadFile(schema); !strings.Contains(string(got), `"map"`) {
+		t.Errorf("the scene schema was not refreshed:\n%s", got)
+	}
+	if got, _ := os.ReadFile(settings); string(got) != string(mine) {
+		t.Errorf("settings rewritten:\n%s", got)
 	}
 }

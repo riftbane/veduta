@@ -82,6 +82,12 @@ func writeEditorFiles(root string, lua bool) (changed, skipped []string, err err
 			skipped = append(skipped, p)
 			continue
 		}
+		before := map[string]string{} // the engine's keys as the file has them
+		for k := range keys {
+			b, _ := json.Marshal(obj[k])
+			before[k] = string(b)
+		}
+		same := err == nil
 		for k, v := range keys {
 			if list, ok := v.([]string); ok && k == "recommendations" {
 				// Keep the project's own recommendations beside the engine's.
@@ -108,6 +114,12 @@ func writeEditorFiles(root string, lua bool) (changed, skipped []string, err err
 				v = merged
 			}
 			obj[k] = v
+			if b, _ := json.Marshal(v); string(b) != before[k] {
+				same = false
+			}
+		}
+		if same { // left as the project wrote it, down to its layout
+			continue
 		}
 		files[p] = editorJSON(obj)
 	}
@@ -126,6 +138,15 @@ func writeEditorFiles(root string, lua bool) (changed, skipped []string, err err
 	}
 	slices.Sort(skipped)
 	return changed, skipped, nil
+}
+
+// refreshEditorFiles brings the editor files of a project set up for editors (it has
+// editorDir) to this tool's version, as upgrade does: a tool that learned a format or a
+// field is then what VS Code checks sources against. Failures are not the build's.
+func refreshEditorFiles(root string, lua bool) {
+	if _, err := os.Stat(filepath.Join(root, editorDir)); err == nil {
+		writeEditorFiles(root, lua)
+	}
 }
 
 func editorJSON(v any) []byte {
