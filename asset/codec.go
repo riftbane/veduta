@@ -439,6 +439,27 @@ func EncodeTexture(t *Texture) Chunk {
 			w.u32(px)
 		}
 	}
+	w.u32(uint32(t.Grid[0]))
+	w.u32(uint32(t.Grid[1]))
+	w.count(len(t.Clips))
+	for _, c := range t.Clips {
+		w.str(c.Name)
+		w.count(len(c.Frames))
+		for _, f := range c.Frames {
+			w.u32(uint32(f))
+		}
+		w.f32(c.FPS)
+		w.bool(c.Loop)
+		w.str(c.Next)
+	}
+	w.str(t.Play)
+	w.bool(t.Edge != nil)
+	if e := t.Edge; e != nil {
+		w.i64(e.Priority)
+		w.f32(e.Width)
+		w.f32(e.Roughness)
+		w.i64(int(e.Seed))
+	}
 	return Chunk{Type: ChunkTexture, Data: w.b}
 }
 
@@ -499,6 +520,43 @@ func DecodeTexture(c Chunk) (*Texture, error) {
 			}
 			t.Data.Levels[i] = img
 		}
+	}
+	r.field = "grid"
+	t.Grid = [2]int{int(r.u32()), int(r.u32())}
+	if r.err == nil && ((t.Grid[0] == 0) != (t.Grid[1] == 0) || t.Grid[0] > MaxGrid || t.Grid[1] > MaxGrid) {
+		r.failf("grid %v out of range", t.Grid)
+	}
+	r.field = "clips"
+	n := r.count(4 + 4 + 4 + 1 + 4)
+	for i := 0; i < n && r.err == nil; i++ {
+		r.field = fmt.Sprintf("clip %d", i)
+		c := Clip{Name: r.str()}
+		nf := r.count(4)
+		for k := 0; k < nf && r.err == nil; k++ {
+			c.Frames = append(c.Frames, int(r.u32()))
+		}
+		c.FPS = r.f32()
+		c.Loop = r.bool()
+		c.Next = r.str()
+		if r.err == nil && (len(c.Frames) == 0 || !(c.FPS > 0) || i > 0 && c.Name <= t.Clips[i-1].Name) {
+			r.failf("clip %q: no frames, fps %v or not in name order", c.Name, c.FPS)
+		}
+		for _, f := range c.Frames {
+			if r.err == nil && f >= max(1, t.Grid[0]*t.Grid[1]) {
+				r.failf("clip %q: frame %d out of the grid", c.Name, f)
+			}
+		}
+		t.Clips = append(t.Clips, c)
+	}
+	r.field = "play"
+	t.Play = r.str()
+	r.field = "edge"
+	if r.bool() {
+		e := &Edge{Priority: r.i64(), Width: r.f32(), Roughness: r.f32(), Seed: int64(r.i64())}
+		if r.err == nil && (e.Priority < 1 || !(e.Width > 0) || !(e.Roughness >= 0 && e.Roughness <= 1)) {
+			r.failf("priority %d, width %v or roughness %v out of range", e.Priority, e.Width, e.Roughness)
+		}
+		t.Edge = e
 	}
 	if err := r.done(); err != nil {
 		return nil, err
@@ -573,6 +631,7 @@ func EncodeScene(s *Scene) Chunk {
 	w.vec3(s.Light.Ambient)
 	w.u32(s.Background)
 	w.entities(s.Entities)
+	w.str(s.Map)
 	return Chunk{Type: ChunkScene, Data: w.b}
 }
 
@@ -601,6 +660,8 @@ func DecodeScene(c Chunk) (*Scene, error) {
 	s.Background = r.u32()
 	r.field = "entities"
 	s.Entities = r.entities()
+	r.field = "map"
+	s.Map = r.str()
 	if err := r.done(); err != nil {
 		return nil, err
 	}
@@ -608,7 +669,7 @@ func DecodeScene(c Chunk) (*Scene, error) {
 }
 
 // entitySize is the smallest encoding of an entity (every string and list empty).
-const entitySize = 4*4 + 36 + 4 + 4 + 1 + 1 + 8 + 4
+const entitySize = 4*4 + 36 + 4 + 4 + 1 + 1 + 8 + 4 + 4
 
 func (w *wbuf) u64(v uint64) { w.b = binary.LittleEndian.AppendUint64(w.b, v) }
 
@@ -642,6 +703,7 @@ func (w *wbuf) entities(ents []Entity) {
 		}
 		w.i64(e.Layer)
 		w.u32(uint32(e.Frame))
+		w.str(e.Anim)
 	}
 }
 
@@ -680,6 +742,7 @@ func (r *rbuf) entities() []Entity {
 		if e.Frame = int(r.u32()); r.err == nil && e.Frame > MaxFrame {
 			r.failf("frame %d out of range [0, %d]", e.Frame, MaxFrame)
 		}
+		e.Anim = r.str()
 	}
 	r.field = field
 	return ents

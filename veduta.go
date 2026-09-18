@@ -13,6 +13,7 @@ import (
 	"github.com/riftbane/veduta/v2/scene"
 	"github.com/riftbane/veduta/v2/sim"
 	"github.com/riftbane/veduta/v2/sprite"
+	"github.com/riftbane/veduta/v2/tilemap"
 	"github.com/riftbane/veduta/v2/world"
 )
 
@@ -282,6 +283,21 @@ func (c *Context) RemoveModel(name string) { delete(c.eng.runtime, name) }
 
 // Model returns the model set with SetModel under name, or nil.
 func (c *Context) Model(name string) *asset.Model { return c.eng.runtime[name] }
+
+// Clip returns the clip called name of the textures e draws with (its material's, then its
+// model's parts'), or nil. Set e.Anim to a clip's name to play it (scene.Entity.SetAnim).
+func (c *Context) Clip(e *scene.Entity, name string) *asset.Clip { return c.eng.clip(e, name) }
+
+// Clips returns the names of the clips e can play, sorted.
+func (c *Context) Clips(e *scene.Entity) []string { return c.eng.clipNames(e) }
+
+// Map returns the scene's tile map (docs/map.md), or nil when it has none. Its Set paints
+// cells and records a map_set event in the trace.
+func (c *Context) Map() *tilemap.Map { return c.eng.tmap }
+
+// LoadMap replaces the scene's tile map with the one called name, as its file describes
+// it, or removes it for "". The entities stay. It emits a map_load event.
+func (c *Context) LoadMap(name string) error { return c.eng.loadMap(name) }
 
 // World returns the loaded world, or nil when the game is in a scene. Call its Focus
 // every tick with the position the chunks should follow.

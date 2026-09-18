@@ -14,7 +14,7 @@ import (
 var files embed.FS
 
 // Topics are the documented topics (spec §11): the source formats and the game API.
-var Topics = []string{"model", "texture", "material", "scene", "prefab", "world", "scenario", "api", "lua"}
+var Topics = []string{"model", "texture", "material", "scene", "prefab", "world", "map", "scenario", "api", "lua"}
 
 // Extra topics that are also available.
 var Extra = []string{"project", "vda", "inspect", "config", "2d", "start-windows", "first-game"}

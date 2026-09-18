@@ -169,7 +169,7 @@ func TestAPIDocumented(t *testing.T) {
 	if code := veduta.RunArgs(g, []string{"-project", testGame, "-headless", "simulate", "--scene", "main", "--ticks", "1", "--out", t.TempDir()}, &out, io.Discard); code != 0 {
 		t.Fatalf("run: %s", out.String())
 	}
-	for _, lib := range []string{"input", "scene", "camera", "world", "hud", "mesh", "volume", "save"} {
+	for _, lib := range []string{"input", "scene", "camera", "world", "hud", "mesh", "volume", "save", "map"} {
 		g.vm.Global(lib).Table().ForEach(func(k, _ lua.Value) bool {
 			if name := lib + "." + k.String(); !strings.Contains(string(doc), "`"+name) {
 				t.Errorf("docs/lua.md does not document %s", name)
@@ -210,7 +210,7 @@ func TestTypesMatchAPI(t *testing.T) {
 		declared[m[1]] = true
 	}
 	have := map[string]bool{"trace": true, "invariant": true, "require": true}
-	for _, lib := range []string{"input", "scene", "camera", "world", "hud", "mesh", "volume", "save"} {
+	for _, lib := range []string{"input", "scene", "camera", "world", "hud", "mesh", "volume", "save", "map"} {
 		g.vm.Global(lib).Table().ForEach(func(k, _ lua.Value) bool {
 			have[lib+"."+k.String()] = true
 			return true
@@ -691,5 +691,217 @@ end
 	after, _ := os.ReadFile(trace)
 	if strings.Count(string(after), `"event":"cutscene_done"`) != 1 {
 		t.Fatalf("the restored run did not finish the cutscene where it was:\n%s", after)
+	}
+}
+
+// TestClips: an entity plays the clips of its texture: frames follow the ticks, a clip
+// that ends goes on with its next, anim_done tells when one ends for good, and the trace
+// and scenarios see the clip. A texture's play clip runs by itself.
+func TestClips(t *testing.T) {
+	files := map[string]string{
+		"assets/textures/hero_sheet.vtex": `{"veduta": "texture/1", "size": [16, 8], "grid": [4, 2],
+			"layers": [{"type": "solid", "color": "#808080"}],
+			"clips": {"walk": {"frames": [0, 1, 2, 3], "fps": 10},
+			          "hit": {"frames": [5, 6], "fps": 20, "loop": false, "next": "idle"},
+			          "idle": {"frames": [4], "fps": 1},
+			          "tele": {"frames": [7], "fps": 20, "loop": false}}}`,
+		"assets/materials/hero_sheet.vmat": `{"veduta": "material/1", "texture": "hero_sheet", "unlit": true, "filter": "nearest"}`,
+		"assets/textures/water.vtex": `{"veduta": "texture/1", "size": [4, 4],
+			"frames": [{"layers": [{"type": "solid", "color": "#ff0000"}]}, {"layers": [{"type": "solid", "color": "#00ff00"}]}],
+			"clips": {"flow": {"frames": [0, 1], "fps": 20}}, "play": "flow"}`,
+		"assets/materials/water.vmat": `{"veduta": "material/1", "texture": "water", "unlit": true, "filter": "nearest"}`,
+		"main.lua": `+
+local init = game.init
+function game.init()
+  init()
+  scene.spawn{name = "a", model = "quad", material = "hero_sheet", anim = "walk"}
+  scene.spawn{name = "b", model = "quad", material = "hero_sheet", anim = "tele"}
+  scene.spawn{name = "w", model = "quad", material = "water", position = {0, -3, 5}, scale = {4, 4, 1}}
+end
+kinds.hero.update = function(e)
+  local a, b = scene.find("a"), scene.find("b")
+  if engine.tick == 4 then a:play("hit") end
+  if engine.tick == 8 then a.anim = "idle" end -- playing already: no restart
+  if b.anim_done and not e.state.done_at then e.state.done_at = engine.tick end
+  local ok, err = pcall(function() a.anim = "fly" end)
+  e.state.bad = not ok and string.find(err, 'has no clip "fly" %(it has hit, idle, tele, walk%)') ~= nil
+  e.state.clips = #a:clips()
+  if engine.tick == 10 then b.anim = nil end
+end
+`,
+		"tests/scenarios/clips.vscenario": `{"veduta": "scenario/1", "scene": "main", "ticks": 10,
+			"expect": [{"tick": 0, "entity": "a", "path": "frame", "op": "==", "value": 0},
+			           {"tick": 2, "entity": "a", "path": "frame", "op": "==", "value": 1},
+			           {"tick": 3, "entity": "a", "path": "frame", "op": "==", "value": 1},
+			           {"tick": 4, "entity": "a", "path": "anim", "op": "==", "value": "hit"},
+			           {"tick": 4, "entity": "a", "path": "frame", "op": "==", "value": 5},
+			           {"tick": 5, "entity": "a", "path": "frame", "op": "==", "value": 6},
+			           {"tick": 6, "entity": "a", "path": "anim", "op": "==", "value": "idle"},
+			           {"tick": 6, "entity": "a", "path": "frame", "op": "==", "value": 4},
+			           {"tick": 1, "entity": "b", "path": "frame", "op": "==", "value": 7},
+			           {"tick": 10, "entity": "b", "path": "anim", "op": "==", "value": ""},
+			           {"tick": 10, "entity": "w", "path": "anim", "op": "==", "value": ""},
+			           {"tick": 3, "entity": "hero", "path": "state.done_at", "op": "==", "value": 1},
+			           {"tick": 3, "entity": "hero", "path": "state.bad", "op": "==", "value": true},
+			           {"tick": 3, "entity": "hero", "path": "state.clips", "op": "==", "value": 4}]}`,
+	}
+	dir := copyGame(t, files)
+	scenario := filepath.Join(dir, "tests", "scenarios", "clips.vscenario")
+	if r, stderr, code := run(t, dir, "simulate", "--scenario", scenario, "--out", t.TempDir()); code != 0 || r.Verdict != "pass" {
+		t.Fatalf("scenario: exit %d %+v %s", code, r, stderr)
+	}
+	// The water plays its clip by itself: red on even ticks, green on odd ones.
+	for tick, want := range []string{"#ff0000", "#00ff00", "#ff0000"} {
+		out := filepath.Join(t.TempDir(), "frame.png")
+		if r, stderr, code := run(t, dir, "render", "--tick", fmt.Sprint(tick), "--out", out); code != 0 {
+			t.Fatalf("render: exit %d %+v %s", code, r, stderr)
+		}
+		f, _ := os.Open(out)
+		img, err := png.Decode(f)
+		f.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		r, g, b, _ := img.At(160, 120+60+30).RGBA()
+		if got := fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8); got != want {
+			t.Errorf("water at tick %d is %s, want %s", tick, got, want)
+		}
+	}
+	// A spawn names only a clip the entity has.
+	dir = copyGame(t, map[string]string{"main.lua": `+
+local init = game.init
+function game.init()
+  init()
+  scene.spawn{name = "c", model = "quad", anim = "walk"}
+end
+`})
+	if r, stderr, code := run(t, dir, "simulate", "--ticks", "1", "--out", t.TempDir()); code == 0 || !strings.Contains(stderr+r.FirstFailure+fmt.Sprint(r), `has no clip "walk" (its textures have no clips)`) {
+		t.Errorf("spawn with an unknown clip: exit %d %+v %s", code, r, stderr)
+	}
+}
+
+// TestMap: a scene's tile map is drawn under its entities and the game reads and paints its
+// cells, finds its objects and swaps it for another; the trace records every change.
+func TestMap(t *testing.T) {
+	files := map[string]string{
+		"assets/textures/grass.vtex": `{"veduta": "texture/1", "size": [4, 4], "layers": [{"type": "solid", "color": "#00ff00"}]}`,
+		"assets/textures/soil.vtex":  `{"veduta": "texture/1", "size": [4, 4], "layers": [{"type": "solid", "color": "#804000"}]}`,
+		"assets/textures/water.vtex": `{"veduta": "texture/1", "size": [4, 4], "layers": [{"type": "solid", "color": "#0000ff"}],
+			"edge": {"priority": 5, "width": 1, "roughness": 0}}`,
+		"assets/maps/farm.vmap": `{"veduta": "map/1", "size": [8, 6], "origin": [-4, 3, 0],
+			"terrains": [{"key": ".", "name": "grass", "texture": "grass", "tags": ["tillable"]},
+			             {"key": "=", "name": "soil", "texture": "soil", "tags": ["soil"]},
+			             {"key": "~", "name": "water", "texture": "water", "tags": ["water", "solid"]}],
+			"layers": [{"name": "ground", "rows": ["........", "........", "......~~", "......~~", "........", "........"]},
+			           {"name": "top", "rows": ["        ", "        ", "        ", "        ", "        ", "        "]}],
+			"objects": [{"name": "door", "at": [1, 0], "tags": ["door"], "props": {"to": "house", "x": 3, "f": 0.5, "big": true}},
+			            {"name": "field", "at": [0, 4], "size": [3, 2], "tags": ["field"]}]}`,
+		"assets/maps/house.vmap": `{"veduta": "map/1", "size": [2, 2], "terrains": [{"key": "#", "name": "floor", "texture": "soil"}],
+			"layers": [{"name": "floor", "rows": ["##", "##"]}]}`,
+		"assets/scenes/farm.vscene": `{"veduta": "scene/1", "map": "farm",
+			"camera": {"type": "orthographic", "size": 6, "position": [0, 0, 100], "look_at": [0, 0, 0]},
+			"entities": [{"name": "farmer", "kind": "farmer", "position": [0, 0, 1]}]}`,
+		"main.lua": `+
+kinds.farmer = {
+  update = function(e)
+    local s = e.state
+    if engine.tick == 1 then
+      s.name = map.name()
+      local w, h = map.size()
+      s.size = w * 10 + h
+      s.tile = map.tile()
+      s.layers = table.concat(map.layers(), ",")
+      local x, y = map.cell(e.x, e.y)
+      s.cell = x * 10 + y
+      local cx, cy = map.center(0, 0)
+      s.center = cx * 10 + cy
+      s.inside = map.inside(7, 5) and not map.inside(8, 0)
+      s.water = map.get(6, 2)
+      s.empty = map.get(0, 0, "top") == nil and map.get(-1, 0) == nil
+      s.solid = map.has(7, 3, "solid") and not map.has(7, 3, "solid", "top")
+      map.set(1, 4, "soil")
+      map.set(1, 4, "water", "top")
+      s.tags = table.concat(map.tags(1, 4), ",")
+      s.ground_tags = table.concat(map.tags(1, 4, "ground"), ",")
+      s.doors = #map.objects("door")
+      s.objects = #map.objects()
+      local d = map.object("door")
+      s.door = d.props.to .. d.props.x .. d.props.f .. tostring(d.props.big) .. d.x .. d.y .. d.w .. d.h .. d.tags[1]
+      s.none = map.object("gate") == nil
+      local ok, err = pcall(map.set, 0, 0, "lava")
+      s.bad_terrain = not ok and string.find(err, 'no terrain "lava" %(it has grass, soil, water%)') ~= nil
+      ok, err = pcall(map.get, 0, 0, "roof")
+      s.bad_layer = not ok and string.find(err, 'has no layer "roof"') ~= nil
+      ok, err = pcall(map.set, 9, 0, "soil")
+      s.off = not ok and string.find(err, "off the 8 × 6 map") ~= nil
+    elseif engine.tick == 3 then
+      map.load("house")
+      s.house = map.get(1, 1)
+    elseif engine.tick == 4 then
+      map.load(nil)
+      s.gone = map.name() == nil
+      local ok, err = pcall(map.size)
+      s.no_map = not ok and string.find(err, "the scene has no map") ~= nil
+    end
+  end,
+}
+`,
+		"tests/scenarios/farm.vscenario": `{"veduta": "scenario/1", "scene": "farm", "ticks": 4,
+			"expect": [
+				{"tick": 1, "entity": "farmer", "path": "state.name", "op": "==", "value": "farm"},
+				{"tick": 1, "entity": "farmer", "path": "state.size", "op": "==", "value": 86},
+				{"tick": 1, "entity": "farmer", "path": "state.tile", "op": "==", "value": 1},
+				{"tick": 1, "entity": "farmer", "path": "state.layers", "op": "==", "value": "ground,top"},
+				{"tick": 1, "entity": "farmer", "path": "state.cell", "op": "==", "value": 43},
+				{"tick": 1, "entity": "farmer", "path": "state.center", "op": "==", "value": -32.5},
+				{"tick": 1, "entity": "farmer", "path": "state.inside", "op": "==", "value": true},
+				{"tick": 1, "entity": "farmer", "path": "state.water", "op": "==", "value": "water"},
+				{"tick": 1, "entity": "farmer", "path": "state.empty", "op": "==", "value": true},
+				{"tick": 1, "entity": "farmer", "path": "state.solid", "op": "==", "value": true},
+				{"tick": 1, "entity": "farmer", "path": "state.tags", "op": "==", "value": "soil,solid,water"},
+				{"tick": 1, "entity": "farmer", "path": "state.ground_tags", "op": "==", "value": "soil"},
+				{"tick": 1, "entity": "farmer", "path": "state.doors", "op": "==", "value": 1},
+				{"tick": 1, "entity": "farmer", "path": "state.objects", "op": "==", "value": 2},
+				{"tick": 1, "entity": "farmer", "path": "state.door", "op": "==", "value": "house30.5true1011door"},
+				{"tick": 1, "entity": "farmer", "path": "state.none", "op": "==", "value": true},
+				{"tick": 1, "entity": "farmer", "path": "state.bad_terrain", "op": "==", "value": true},
+				{"tick": 1, "entity": "farmer", "path": "state.bad_layer", "op": "==", "value": true},
+				{"tick": 1, "entity": "farmer", "path": "state.off", "op": "==", "value": true},
+				{"tick": 1, "trace": "map_set", "count_min": 2, "count_max": 2},
+				{"tick": 3, "entity": "farmer", "path": "state.house", "op": "==", "value": "floor"},
+				{"tick": 3, "trace": "map_load", "count_min": 1, "count_max": 1},
+				{"tick": 4, "entity": "farmer", "path": "state.gone", "op": "==", "value": true},
+				{"tick": 4, "entity": "farmer", "path": "state.no_map", "op": "==", "value": true}]}`,
+	}
+	dir := copyGame(t, files)
+	scenario := filepath.Join(dir, "tests", "scenarios", "farm.vscenario")
+	if r, stderr, code := run(t, dir, "simulate", "--scenario", scenario, "--out", t.TempDir()); code != 0 || r.Verdict != "pass" {
+		t.Fatalf("scenario: exit %d %+v %s", code, r, stderr)
+	}
+	// Drawn: grass, the water with its border over the grass beside it, and after tick 1 the
+	// tilled cell under the water of the top layer.
+	out := filepath.Join(t.TempDir(), "farm.png")
+	if r, stderr, code := run(t, dir, "render", "--scene", "farm", "--tick", "2", "--out", out); code != 0 {
+		t.Fatalf("render: exit %d %+v %s", code, r, stderr)
+	}
+	f, _ := os.Open(out)
+	img, err := png.Decode(f)
+	f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 6 meters high on 240 pixels: 40 pixels a cell; cell (x, y) is centered at pixel
+	// (160 + 40·(x − 3.5), 120 + 40·(y − 2.5)).
+	at := func(x, y float64) string {
+		r, g, b, _ := img.At(int(160+40*(x-3.5)), int(120+40*(y-2.5))).RGBA()
+		return fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)
+	}
+	for _, c := range []struct {
+		x, y float64
+		want string
+	}{{0, 0, "#00ff00"}, {6, 2, "#0000ff"}, {5.1, 2.5, "#00ff00"}, {5.45, 2.5, "#0000ff"}, {1, 4, "#0000ff"}, {1.6, 4, "#0000ff"}, {1.8, 4, "#00ff00"}} {
+		if got := at(c.x, c.y); got != c.want {
+			t.Errorf("cell (%v, %v) is %s, want %s", c.x, c.y, got, c.want)
+		}
 	}
 }

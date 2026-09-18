@@ -37,6 +37,7 @@ chunk = type length payload crc
 | `SCEN` | scene | compiled scene |
 | `PRFB` | prefab | compiled prefab (since v1.2.0) |
 | `WRLD` | world | compiled world (since v1.2.0) |
+| `TMAP` | map | compiled tile map (since v2.0.0-rc.11) |
 
 ## `META`
 
@@ -45,14 +46,14 @@ escaping, `deps` sorted without duplicates and `[]` when empty. Readers reject M
 is not byte-for-byte canonical, so equal metadata always has equal bytes.
 
 ```json
-{"compiler":"veduta-asset/0.5.0","deps":[],"kind":"model","name":"crate","source":"models/crate.vmodel","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
+{"compiler":"veduta-asset/0.6.0","deps":[],"kind":"model","name":"crate","source":"models/crate.vmodel","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
 ```
 
 | Key | Meaning |
 |-----|---------|
-| `compiler` | Compiler version (`asset.CompilerVersion`: `veduta-asset/0.5.0` since material grids and entity frames, `veduta-asset/0.4.0` since model levels of detail and world terrain and vegetation, `veduta-asset/0.3.0` since prefabs and worlds, `veduta-asset/0.2.0` since scene entities carry a hitbox and a layer, `veduta-asset/0.1.0` before). A different version forces a recompile. |
+| `compiler` | Compiler version (`asset.CompilerVersion`: `veduta-asset/0.6.0` since texture frames, clips and edges, maps and entity clips, `veduta-asset/0.5.0` since material grids and entity frames, `veduta-asset/0.4.0` since model levels of detail and world terrain and vegetation, `veduta-asset/0.3.0` since prefabs and worlds, `veduta-asset/0.2.0` since scene entities carry a hitbox and a layer, `veduta-asset/0.1.0` before). A different version forces a recompile. |
 | `deps` | Other input files the compiled output depends on besides the source (for example the PNG of a texture `image` layer), as paths relative to the assets directory. |
-| `kind` | `model`, `texture`, `material`, `scene`, `prefab` or `world`. |
+| `kind` | `model`, `texture`, `material`, `scene`, `prefab`, `world` or `map`. |
 | `name` | Asset name (the source file name without its suffix). |
 | `source` | Source path relative to the assets directory, forward slashes (`models/crate.vmodel`). |
 | `source_hash` | Lowercase hex SHA-256 (64 characters) of the compiler inputs, computed by `cook`: SHA-256 over `veduta-cook/1\n`, the compiler version and `\n`, then `source <path> <length>\n` followed by the source bytes, then for each dependency in `deps` order `dep <path> <length>\n` followed by its bytes (`missing <path>\n` when it cannot be read). It changes whenever the source or any dependency changes. |
@@ -122,10 +123,16 @@ as many mesh parts as the base mesh, or none and a model.
 | 6 | levels | `u32` | number of mip levels (1 without mipmaps) |
 | 7 | wrap | `u8` | `0` = repeat (tiling), `1` = clamp |
 | 8 | level × levels | | for level i = 0 … levels−1: `u32` w, `u32` h, then w × h `color` pixels, row-major, top row first |
+| 9 | grid | `u32` × 2 | columns and rows of frames, `0 0` for a single image |
+| 10 | clips | `u32` count, then per clip | `str` name, `u32` count and that many `u32` frames, `f32` fps, `bool` loop, `str` next (`""` for none) |
+| 11 | play | `str` | the clip shown when nothing picks a frame, `""` for none |
+| 12 | edge | `bool`, then when true | `i64` priority, `f32` width, `f32` roughness, `i64` seed |
 
 Readers check: level i measures exactly max(1, width >> i) × max(1, height >> i); levels
 is at most 1 + ⌊log₂ max(width, height)⌋ (the chain stops at 1 × 1); width and height
-are 1 to 16777216 when levels > 0 and both 0 when levels = 0; wrap is 0 or 1.
+are 1 to 16777216 when levels > 0 and both 0 when levels = 0; wrap is 0 or 1; grid is
+both 0 or both 1 to 256; clips are in name order, each with at least one frame of the grid
+and fps above 0; an edge has priority at least 1, width above 0 and roughness 0 to 1.
 
 ## `MATL` — compiled material
 
@@ -158,12 +165,13 @@ are 1 to 16777216 when levels > 0 and both 0 when levels = 0; wrap is 0 or 1.
 | 11 | light.ambient | `vec3` | linear RGB in [0, 1] |
 | 12 | background | `color` | clear color |
 | 13 | entities | `list<entity>` | in scene-file order |
+| 14 | map | `str` | the scene's tile map, `""` for none |
 
 entity = `str` name, `str` kind, `str` model (`""` for none), `str` material (`""` for
 none), `vec3` position, `vec3` rotation_deg, `vec3` scale, `list<str>` tags, `str` parent
 (`""` for none), `bool` visible, `bool` has_hitbox, then only when has_hitbox is true
 `aabb` hitbox (local space, min <= max on every axis; readers reject any other box), then
-`i64` layer (in [-1000, 1000]), `u32` frame (in [0, 65535]).
+`i64` layer (in [-1000, 1000]), `u32` frame (in [0, 65535]), `str` anim (`""` for none).
 
 ## `PRFB` — compiled prefab
 
@@ -206,3 +214,15 @@ none), `vec3` position, `vec3` rotation_deg, `vec3` scale, `list<str>` tags, `st
 Encoding the same compiled asset twice yields identical bytes, and decoding then
 re-encoding a file reproduces it byte for byte: every field has one encoding, floats are
 stored as raw bits and META is canonical.
+
+## `TMAP` — compiled tile map
+
+| # | Field | Type | Meaning |
+|---|-------|------|---------|
+| 1 | name | `str` | map name |
+| 2 | columns, rows | `u32` × 2 | 1 to 1024 each |
+| 3 | tile | `f32` | meters per cell, above 0 |
+| 4 | origin | `vec3` | the top-left corner |
+| 5 | terrains | `u32` count, then per terrain | `u8` key, `str` name, `str` texture, `str` material (exactly one of the two not `""`), `list<str>` tags |
+| 6 | layers | `u32` count, then per layer | `str` name, `f32` z, `i64` layer, then columns × rows `u8` cells, row by row from the top: 0 empty, else a terrain's index + 1 |
+| 7 | objects | `u32` count, then per object | `str` name, `u32` x, y, columns, rows (on the map), `list<str>` tags, `u32` count of props, each `str` name, `u8` type and its value: 0 `str`, 1 `f64` (8 bytes little-endian), 2 `bool` |

@@ -18,12 +18,14 @@ type Library struct {
 	Scenes    map[string]*Scene
 	Prefabs   map[string]*Prefab
 	Worlds    map[string]*World
+	Maps      map[string]*Map
 }
 
 // NewLibrary returns an empty library.
 func NewLibrary(p *Project) *Library {
 	return &Library{Project: p, Models: map[string]*Model{}, Textures: map[string]*Texture{},
-		Materials: map[string]*Material{}, Scenes: map[string]*Scene{}, Prefabs: map[string]*Prefab{}, Worlds: map[string]*World{}}
+		Materials: map[string]*Material{}, Scenes: map[string]*Scene{}, Prefabs: map[string]*Prefab{}, Worlds: map[string]*World{},
+		Maps: map[string]*Map{}}
 }
 
 // ModelBounds returns the local bounds of a model (a scene.BoundsFunc).
@@ -46,6 +48,21 @@ func Names[V any](m map[string]V) []string {
 
 // Prefab returns the prefab called name, or nil (a CompileWorld lookup).
 func (l *Library) Prefab(name string) *Prefab { return l.Prefabs[name] }
+
+// hasClip reports whether a texture of the materials e draws with (its own, its model's
+// parts') has the clip called name.
+func (l *Library) hasClip(e Entity, name string) bool {
+	mats := []string{e.Material}
+	if m := l.Models[e.Model]; m != nil {
+		mats = append(mats, m.Materials...)
+	}
+	for _, n := range mats {
+		if m := l.Materials[n]; m != nil && l.Textures[m.Texture] != nil && l.Textures[m.Texture].Clip(name) != nil {
+			return true
+		}
+	}
+	return false
+}
 
 // References returns a sorted warning for every name that does not resolve: material
 // textures, model part materials, scene, prefab and world entity models and materials,
@@ -77,10 +94,26 @@ func (l *Library) References() []string {
 			if e.Material != "" && l.Materials[e.Material] == nil {
 				w = append(w, fmt.Sprintf("%s %s: entity %s: material %q not found", what, name, e.Name, e.Material))
 			}
+			if e.Anim != "" && !l.hasClip(e, e.Anim) {
+				w = append(w, fmt.Sprintf("%s %s: entity %s: clip %q not found in its textures", what, name, e.Name, e.Anim))
+			}
 		}
 	}
 	for _, name := range Names(l.Scenes) {
 		entities("scene", name, l.Scenes[name].Entities)
+		if m := l.Scenes[name].Map; m != "" && l.Maps[m] == nil {
+			w = append(w, fmt.Sprintf("scene %s: map %q not found", name, m))
+		}
+	}
+	for _, name := range Names(l.Maps) {
+		for _, t := range l.Maps[name].Terrains {
+			if t.Texture != "" && l.Textures[t.Texture] == nil {
+				w = append(w, fmt.Sprintf("map %s: terrain %s: texture %q not found", name, t.Name, t.Texture))
+			}
+			if t.Material != "" && l.Materials[t.Material] == nil {
+				w = append(w, fmt.Sprintf("map %s: terrain %s: material %q not found", name, t.Name, t.Material))
+			}
+		}
 	}
 	for _, name := range Names(l.Prefabs) {
 		entities("prefab", name, l.Prefabs[name].Entities)

@@ -159,9 +159,10 @@ func (o Options) wants(kind string, isDefault bool) bool {
 // Renderer renders assets of a library for inspection. It owns a software renderer; call
 // Close when done.
 type Renderer struct {
-	Lib *asset.Library
-	r   *soft.Renderer
-	res *scene.Resources
+	Lib     *asset.Library
+	r       *soft.Renderer
+	res     *scene.Resources
+	statics []scene.Static // the tile map drawn with scenes (UseMap)
 }
 
 // NewRenderer uploads the library's assets.
@@ -225,7 +226,7 @@ func (ir *Renderer) drawScene(s *scene.Scene, cam scene.Camera, w, h int, mode g
 		return nil, fmt.Errorf("inspect: bad size %dx%d", w, h)
 	}
 	var dl gfx.DrawList
-	s.Draw(&dl, ir.res, scene.DrawOptions{Camera: cam, Width: w, Height: h, Mode: mode})
+	s.Draw(&dl, ir.res, scene.DrawOptions{Camera: cam, Width: w, Height: h, Mode: mode, Statics: ir.statics})
 	if extra != nil {
 		extra(&dl, 0)
 	}

@@ -12,8 +12,9 @@ import (
 // Resources maps asset names to backend handles for drawing.
 type Resources struct {
 	Models    map[string]*ModelRes
-	Materials map[string]*asset.Material
+	Materials map[string]*asset.Material // a material without a grid takes its texture's
 	Textures  map[string]gfx.TextureID
+	Plays     map[string]*asset.Clip // by texture name: the clip it plays when nothing picks a frame
 
 	free []gfx.MeshID // handles of removed models, reused by AddModel
 }
@@ -36,13 +37,12 @@ func (r *Resources) Bounds(model string) (gmath.AABB, bool) {
 // Upload creates backend meshes and textures for every asset, in name order so handles
 // are deterministic.
 func Upload(b gfx.Backend, models map[string]*asset.Model, textures map[string]*asset.Texture, materials map[string]*asset.Material) (*Resources, error) {
-	r := &Resources{Models: map[string]*ModelRes{}, Materials: map[string]*asset.Material{}, Textures: map[string]gfx.TextureID{}}
+	r := &Resources{Models: map[string]*ModelRes{}, Materials: map[string]*asset.Material{}, Textures: map[string]gfx.TextureID{},
+		Plays: map[string]*asset.Clip{}}
 	for _, name := range sortedKeys(textures) {
-		id, err := b.CreateTexture(&textures[name].Data)
-		if err != nil {
-			return nil, fmt.Errorf("upload texture %s: %w", name, err)
+		if err := r.AddTexture(b, name, textures[name]); err != nil {
+			return nil, err
 		}
-		r.Textures[name] = id
 	}
 	for _, name := range sortedKeys(models) {
 		if err := r.AddModel(b, name, models[name]); err != nil {
@@ -50,9 +50,33 @@ func Upload(b gfx.Backend, models map[string]*asset.Model, textures map[string]*
 		}
 	}
 	for name, m := range materials {
-		r.Materials[name] = m
+		r.AddMaterial(name, m, textures[m.Texture])
 	}
 	return r, nil
+}
+
+// AddTexture uploads a texture under name and keeps its play clip.
+func (r *Resources) AddTexture(b gfx.Backend, name string, t *asset.Texture) error {
+	id, err := b.CreateTexture(&t.Data)
+	if err != nil {
+		return fmt.Errorf("upload texture %s: %w", name, err)
+	}
+	r.Textures[name] = id
+	if c := t.Clip(t.Play); c != nil {
+		r.Plays[name] = c
+	}
+	return nil
+}
+
+// AddMaterial adds a material drawn with texture t (nil when it has none). A material
+// without a grid of its own cuts t into t's frames.
+func (r *Resources) AddMaterial(name string, m *asset.Material, t *asset.Texture) {
+	if t != nil && m.Grid == [2]int{} && t.Grid != [2]int{} {
+		c := *m
+		c.Grid = t.Grid
+		m = &c
+	}
+	r.Materials[name] = m
 }
 
 // AddModel uploads a model and its levels of detail under name. A model created at
@@ -145,6 +169,20 @@ type DrawOptions struct {
 	Height int
 	Mode   gfx.RenderMode
 	Stats  *DrawStats // when set, receives what Draw left out
+	// Tick and Rate (ticks per second) time the clips textures play when nothing picks
+	// their frame.
+	Tick uint64
+	Rate int
+	// Statics are drawn with the entities.
+	Statics []Static
+}
+
+// A Static is a model drawn like an entity that is not one: it has no id, is in no trace
+// and collides with nothing. Tile maps are drawn with statics.
+type Static struct {
+	Model string
+	World gmath.Mat4
+	Layer int
 }
 
 // DrawStats counts the entities with a model that Draw considered and what it did with
@@ -157,12 +195,13 @@ type DrawStats struct {
 }
 
 type pending struct {
-	cmd   gfx.DrawCmd
-	layer int
-	blend bool
-	dist  float32
-	id    uint32
-	part  int
+	cmd    gfx.DrawCmd
+	layer  int
+	blend  bool
+	dist   float32
+	id     uint32
+	static int // statics have id 0 and are ordered by their index
+	part   int
 }
 
 // Draw appends the scene to dl: clear to the background, one view for the camera, one
@@ -232,36 +271,20 @@ func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 			}
 		}
 		dist := box.Center().Sub(opt.Camera.Position).Dot(forward)
-		for pi, part := range md.Parts {
-			if part.Count == 0 {
-				continue
-			}
-			partMat := ""
-			if part.Material >= 0 && part.Material < len(materials) {
-				partMat = materials[part.Material]
-			}
-			mat := res.Material(partMat, e.Material)
-			cmd := gfx.DrawCmd{
-				View:   view,
-				Mesh:   mesh,
-				First:  part.First,
-				Count:  part.Count,
-				Model:  e.world,
-				Color:  gfx.ColorVec4(mat.Albedo),
-				State:  mat.State(),
-				Filter: mat.Filter,
-				Unlit:  mat.Unlit,
-				Cutoff: mat.AlphaCutoff(),
-				ID:     e.ID,
-			}
-			if mat.Texture != "" {
-				cmd.Texture = res.Textures[mat.Texture]
-			}
-			if g := mat.Grid; g[0] > 0 && g[1] > 0 {
-				cmd.UVScale, cmd.UVOffset = FrameUV(g, e.Frame)
-			}
-			cmds = append(cmds, pending{cmd: cmd, layer: e.Layer, blend: mat.Alpha == "blend", dist: dist, id: e.ID, part: pi})
+		cmds = opt.parts(cmds, res, view, e, mesh, md, materials, e.world, pending{layer: e.Layer, dist: dist, id: e.ID})
+	}
+	for i := range opt.Statics {
+		st := &opt.Statics[i]
+		mr, ok := res.Models[st.Model]
+		if !ok {
+			continue
 		}
+		box := mr.Model.Mesh.Bounds.Transform(st.World)
+		if box.IsEmpty() || fr.outside(box) {
+			continue
+		}
+		dist := box.Center().Sub(opt.Camera.Position).Dot(forward)
+		cmds = opt.parts(cmds, res, view, nil, mr.Mesh, &mr.Model.Mesh, mr.Model.Materials, st.World, pending{layer: st.Layer, dist: dist, static: i})
 	}
 	sort.SliceStable(cmds, func(i, j int) bool {
 		a, b := &cmds[i], &cmds[j]
@@ -276,6 +299,9 @@ func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 		}
 		if a.id != b.id {
 			return a.id < b.id
+		}
+		if a.static != b.static {
+			return a.static < b.static
 		}
 		return a.part < b.part
 	})
@@ -297,6 +323,63 @@ func (s *Scene) Draw(dl *gfx.DrawList, res *Resources, opt DrawOptions) {
 			AddBoxLines(dl, view, e.AABB, color)
 		}
 	}
+}
+
+// parts appends a command for every part of mesh md (uploaded as mesh) drawn with world
+// matrix w by entity e (nil for a static), each a copy of p with its part, blend and command.
+func (opt *DrawOptions) parts(cmds []pending, res *Resources, view int, e *Entity, mesh gfx.MeshID, md *gfx.MeshData, materials []string, w gmath.Mat4, p pending) []pending {
+	entMat := ""
+	if e != nil {
+		entMat = e.Material
+	}
+	for pi, part := range md.Parts {
+		if part.Count == 0 {
+			continue
+		}
+		partMat := ""
+		if part.Material >= 0 && part.Material < len(materials) {
+			partMat = materials[part.Material]
+		}
+		mat := res.Material(partMat, entMat)
+		cmd := gfx.DrawCmd{
+			View:   view,
+			Mesh:   mesh,
+			First:  part.First,
+			Count:  part.Count,
+			Model:  w,
+			Color:  gfx.ColorVec4(mat.Albedo),
+			State:  mat.State(),
+			Filter: mat.Filter,
+			Unlit:  mat.Unlit,
+			Cutoff: mat.AlphaCutoff(),
+			ID:     p.id,
+		}
+		if mat.Texture != "" {
+			cmd.Texture = res.Textures[mat.Texture]
+		}
+		if g := mat.Grid; g[0] > 0 && g[1] > 0 {
+			cmd.UVScale, cmd.UVOffset = FrameUV(g, opt.frame(res, mat, e))
+		}
+		p.cmd, p.part, p.blend = cmd, pi, mat.Alpha == "blend"
+		cmds = append(cmds, p)
+	}
+	return cmds
+}
+
+// frame returns the frame of mat's grid an entity shows (nil for a static): its own while it
+// plays a clip, else the texture's play clip's, else its own.
+func (opt *DrawOptions) frame(res *Resources, mat *asset.Material, e *Entity) int {
+	if e != nil && e.Anim != "" {
+		return e.Frame
+	}
+	if c := res.Plays[mat.Texture]; c != nil && opt.Rate > 0 {
+		f, _ := c.Frame(int(opt.Tick), opt.Rate)
+		return f
+	}
+	if e != nil {
+		return e.Frame
+	}
+	return 0
 }
 
 // FrameUV returns the texture coordinate scale and offset that show frame f of a grid of

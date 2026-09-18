@@ -2,6 +2,74 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "definitions": {
+    "ClipSource": {
+      "additionalProperties": false,
+      "description": "ClipSource is a named animation of a texture's frames.",
+      "properties": {
+        "fps": {
+          "type": "number"
+        },
+        "frames": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "loop": {
+          "description": "default true",
+          "type": "boolean"
+        },
+        "next": {
+          "description": "the clip that follows a clip that does not loop",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fps",
+        "frames"
+      ],
+      "type": "object"
+    },
+    "EdgeSource": {
+      "additionalProperties": false,
+      "description": "EdgeSource shapes the border a terrain draws over the cells of lower terrains around it.",
+      "properties": {
+        "priority": {
+          "type": "integer"
+        },
+        "roughness": {
+          "description": "0 to 1, default 0.5",
+          "type": "number"
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "width": {
+          "description": "pixels, default a quarter of a frame's smaller side",
+          "type": "number"
+        }
+      },
+      "required": [
+        "priority"
+      ],
+      "type": "object"
+    },
+    "FrameSource": {
+      "additionalProperties": false,
+      "description": "FrameSource is one frame of a texture drawn frame by frame.",
+      "properties": {
+        "layers": {
+          "items": {
+            "$ref": "#/definitions/LayerSource"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "layers"
+      ],
+      "type": "object"
+    },
     "LayerSource": {
       "additionalProperties": false,
       "description": "LayerSource is one step of a texture's layer program. Which fields are allowed depends on Type.",
@@ -68,6 +136,13 @@
         "radius": {
           "type": "number"
         },
+        "rect": {
+          "description": "image: [x, y, width, height] of the PNG to use (default all)",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
         "scale": {
           "type": "number"
         },
@@ -115,6 +190,31 @@
   },
   "description": "TextureSource is assets/textures/<name>.vtex.",
   "properties": {
+    "clips": {
+      "additionalProperties": {
+        "$ref": "#/definitions/ClipSource"
+      },
+      "description": "named sequences of frames",
+      "type": "object"
+    },
+    "edge": {
+      "$ref": "#/definitions/EdgeSource",
+      "description": "how the texture spills over lower terrains in a map"
+    },
+    "frames": {
+      "description": "Frames draws the frames one by one, each size wide, over Layers.",
+      "items": {
+        "$ref": "#/definitions/FrameSource"
+      },
+      "type": "array"
+    },
+    "grid": {
+      "description": "Grid cuts the image into frames: [columns, rows].",
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
     "layers": {
       "items": {
         "$ref": "#/definitions/LayerSource"
@@ -122,8 +222,12 @@
       "type": "array"
     },
     "mipmaps": {
-      "description": "default true",
+      "description": "default true, false for a sheet of frames",
       "type": "boolean"
+    },
+    "play": {
+      "description": "the clip shown when nothing picks a frame",
+      "type": "string"
     },
     "size": {
       "items": {
@@ -139,7 +243,6 @@
     }
   },
   "required": [
-    "layers",
     "size",
     "veduta"
   ],

@@ -50,8 +50,36 @@ type TextureSource struct {
 	Veduta  string        `json:"veduta"`
 	Size    []int         `json:"size"`
 	Tiling  bool          `json:"tiling,omitempty"`
-	Mipmaps *bool         `json:"mipmaps,omitempty"` // default true
-	Layers  []LayerSource `json:"layers"`
+	Mipmaps *bool         `json:"mipmaps,omitempty"` // default true, false for a sheet of frames
+	Layers  []LayerSource `json:"layers,omitempty"`
+	// Grid cuts the image into frames: [columns, rows].
+	Grid []int `json:"grid,omitempty"`
+	// Frames draws the frames one by one, each size wide, over Layers.
+	Frames []FrameSource          `json:"frames,omitempty"`
+	Clips  map[string]*ClipSource `json:"clips,omitempty"` // named sequences of frames
+	Play   string                 `json:"play,omitempty"`  // the clip shown when nothing picks a frame
+	Edge   *EdgeSource            `json:"edge,omitempty"`  // how the texture spills over lower terrains in a map
+}
+
+// FrameSource is one frame of a texture drawn frame by frame.
+type FrameSource struct {
+	Layers []LayerSource `json:"layers"`
+}
+
+// ClipSource is a named animation of a texture's frames.
+type ClipSource struct {
+	Frames []int    `json:"frames"`
+	FPS    *float32 `json:"fps"`
+	Loop   *bool    `json:"loop,omitempty"` // default true
+	Next   string   `json:"next,omitempty"` // the clip that follows a clip that does not loop
+}
+
+// EdgeSource shapes the border a terrain draws over the cells of lower terrains around it.
+type EdgeSource struct {
+	Priority  *int     `json:"priority"`
+	Width     *float32 `json:"width,omitempty"`     // pixels, default a quarter of a frame's smaller side
+	Roughness *float32 `json:"roughness,omitempty"` // 0 to 1, default 0.5
+	Seed      int64    `json:"seed,omitempty"`
 }
 
 // LayerSource is one step of a texture's layer program. Which fields are allowed depends
@@ -77,7 +105,8 @@ type LayerSource struct {
 	To       string    `json:"to,omitempty"`
 	Cells    int       `json:"cells,omitempty"`
 	Path     string    `json:"path,omitempty"`
-	Fit      string    `json:"fit,omitempty"` // contain (default), cover, stretch
+	Fit      string    `json:"fit,omitempty"`  // contain (default), cover, stretch
+	Rect     []int     `json:"rect,omitempty"` // image: [x, y, width, height] of the PNG to use (default all)
 }
 
 // MaterialSource is assets/materials/<name>.vmat.
@@ -100,6 +129,7 @@ type SceneSource struct {
 	Light      *LightSource   `json:"light,omitempty"`
 	Background string         `json:"background,omitempty"`
 	Entities   []EntitySource `json:"entities"`
+	Map        string         `json:"map,omitempty"` // a tile map drawn under the entities
 }
 
 // CameraSource is the scene camera.
@@ -136,6 +166,7 @@ type EntitySource struct {
 	Hitbox [][]float32 `json:"hitbox,omitempty"`
 	Layer  int         `json:"layer,omitempty"` // draw order, -1000..1000, default 0
 	Frame  int         `json:"frame,omitempty"` // the frame of a material's grid it shows, from 0
+	Anim   string      `json:"anim,omitempty"`  // the clip of its texture it plays
 }
 
 // ScenarioSource is tests/scenarios/<name>.vscenario.
@@ -297,4 +328,41 @@ type PlaceSource struct {
 	Prefab   string `json:"prefab"`
 	Cell     []int  `json:"cell"` // [x, z] in cells
 	Rotation int    `json:"rotation,omitempty"`
+}
+
+// MapSource is assets/maps/<name>.vmap.
+type MapSource struct {
+	Veduta   string             `json:"veduta"`
+	Size     []int              `json:"size"`             // [columns, rows]
+	Tile     *float32           `json:"tile,omitempty"`   // meters per cell, default 1
+	Origin   []float32          `json:"origin,omitempty"` // world position of the top-left corner, default [0, 0, 0]
+	Terrains []MapTerrainSource `json:"terrains"`
+	Layers   []MapLayerSource   `json:"layers"`
+	Objects  []MapObjectSource  `json:"objects,omitempty"`
+}
+
+// MapTerrainSource is what a map paints cells with.
+type MapTerrainSource struct {
+	Key      string   `json:"key"` // the character standing for it in rows
+	Name     string   `json:"name"`
+	Texture  string   `json:"texture,omitempty"`
+	Material string   `json:"material,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+}
+
+// MapLayerSource is one layer of a map's cells.
+type MapLayerSource struct {
+	Name  string   `json:"name"`
+	Z     *float32 `json:"z,omitempty"`     // default 0.1 × its index
+	Layer int      `json:"layer,omitempty"` // draw order
+	Rows  []string `json:"rows"`            // one string per row, one character per cell, a space for none
+}
+
+// MapObjectSource is a named rectangle of cells a game reads.
+type MapObjectSource struct {
+	Name  string         `json:"name"`
+	At    []int          `json:"at"`             // [column, row] of its top-left cell
+	Size  []int          `json:"size,omitempty"` // [columns, rows], default [1, 1]
+	Tags  []string       `json:"tags,omitempty"`
+	Props map[string]any `json:"props,omitempty"` // strings, numbers and booleans
 }

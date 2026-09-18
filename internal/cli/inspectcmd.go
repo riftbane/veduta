@@ -44,9 +44,9 @@ func (r InspectResult) Human() string {
 }
 
 // InspectKinds are the inspectable asset kinds.
-var InspectKinds = []string{"model", "texture", "scene", "prefab", "world"}
+var InspectKinds = []string{"model", "texture", "scene", "prefab", "world", "map"}
 
-// Inspect produces the report and sheets of one model, texture, scene, prefab or world.
+// Inspect produces the report and sheets of one model, texture, scene, prefab, world or map.
 func (s *Session) Inspect(kind, name, focus string, sheets []string) (*inspect.Report, error) {
 	lib, errs, err := s.PartialLibrary()
 	if err != nil {
@@ -64,6 +64,8 @@ func (s *Session) Inspect(kind, name, focus string, sheets []string) (*inspect.R
 		k = asset.KindPrefab
 	case "world":
 		k = asset.KindWorld
+	case "map":
+		k = asset.KindMap
 	default:
 		return nil, usagef("inspect: kind %q (want one of %s)", kind, strings.Join(InspectKinds, ", "))
 	}
@@ -108,6 +110,8 @@ func (s *Session) Inspect(kind, name, focus string, sheets []string) (*inspect.R
 		rep, err = inspect.Prefab(ir, name, opt)
 	case "world":
 		rep, err = inspect.World(ir, name, opt)
+	case "map":
+		rep, err = inspect.Map(ir, name, opt)
 	}
 	if err != nil {
 		return nil, err
@@ -126,8 +130,8 @@ func (s *Session) PartialLibrary() (*asset.Library, asset.Errors, error) {
 func init() {
 	register(command{
 		name:    "inspect",
-		usage:   "inspect model|texture|scene|prefab|world NAME [--focus ISSUE] [--sheets list]",
-		summary: "report (issues ranked by severity, metrics) and sheets for a model, texture, scene, prefab or world",
+		usage:   "inspect model|texture|scene|prefab|world|map NAME [--focus ISSUE] [--sheets list]",
+		summary: "report (issues ranked by severity, metrics) and sheets for a model, texture, scene, prefab, world or map",
 		project: true,
 		run: func(env *Env, s *Session, args []string) (any, error) {
 			fs := newFlags("inspect", env.Stderr)
@@ -162,7 +166,7 @@ func init() {
 	mcpExtraTools = func(m *mcpServer) []mcp.Tool {
 		return append(prev(m), mcp.Tool{
 			Name:        "inspect",
-			Description: "Inspect a model, texture, scene, prefab or world: a report with issues ranked by severity (codes like MESH_FLIPPED_NORMALS, TEX_SEAM, SCENE_MISSING_ASSET, PREFAB_FOOTPRINT_SMALL, WORLD_PLACE_OVERLAP, each with where it is and a hint naming the source field to change) and metrics, plus the requested sheets as images (default: one summary sheet; a world's is its map around the origin). Read the report first.",
+			Description: "Inspect a model, texture, scene, prefab, world or map: a report with issues ranked by severity (codes like MESH_FLIPPED_NORMALS, TEX_SEAM, SCENE_MISSING_ASSET, PREFAB_FOOTPRINT_SMALL, WORLD_PLACE_OVERLAP, MAP_MISSING_ASSET, each with where it is and a hint naming the source field to change) and metrics, plus the requested sheets as images (default: one summary sheet; a world's is its map around the origin, a map's the whole map with its objects outlined). Read the report first.",
 			InputSchema: schema(map[string]any{
 				"kind":   enum("asset kind", InspectKinds...),
 				"name":   str("asset name"),

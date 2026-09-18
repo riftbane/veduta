@@ -62,7 +62,7 @@ func TestTwoDExamplesCompile(t *testing.T) {
 // Every JSON example of the world and model topics compiles, so the formats an agent
 // copies are valid.
 func TestWorldAndModelExamplesCompile(t *testing.T) {
-	for _, topic := range []string{"world", "model", "prefab"} {
+	for _, topic := range []string{"world", "model", "prefab", "map"} {
 		text, err := docs.Get(topic)
 		if err != nil {
 			t.Fatal(err)
@@ -88,6 +88,10 @@ func TestWorldAndModelExamplesCompile(t *testing.T) {
 				_, err = asset.ParsePrefab("house.vprefab", []byte(block))
 			case asset.TypeScenario:
 				_, err = asset.ParseScenario("walk.vscenario", []byte(block))
+			case asset.TypeMap:
+				_, err = asset.ParseMap("farm.vmap", []byte(block))
+			case asset.TypeScene:
+				_, err = asset.ParseScene("farm.vscene", []byte(block))
 			default:
 				continue
 			}

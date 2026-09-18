@@ -28,4 +28,5 @@ var Formats = []Format{
 	{"scenario.schema.json", []string{"*.vscenario"}},
 	{"prefab.schema.json", []string{"*.vprefab"}},
 	{"world.schema.json", []string{"*.vworld"}},
+	{"map.schema.json", []string{"*.vmap"}},
 }

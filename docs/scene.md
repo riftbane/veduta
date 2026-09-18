@@ -36,6 +36,7 @@ material, tags, an optional parent, and a `kind` that selects its Go behaviour.
 | `light` | object | see Light | The directional light and ambient term. May be omitted entirely. |
 | `background` | color | `"#202830"` | Clear color behind everything. An alpha byte is kept (it becomes the alpha of empty pixels). |
 | `entities` | array of objects | `[]` | The entities, in order. Entity ids are assigned 1, 2, 3, … in this order when the scene is loaded; entities spawned later get the following ids. |
+| `map` | string | none | A tile map ([docs/map.md](map.md)) drawn under the entities: `assets/maps/<map>.vmap`. |
 
 ## Camera
 
@@ -86,6 +87,7 @@ all three defaults apply; inside `light`, each field is optional.
 | `visible` | boolean | `true` | `false` keeps the entity in the simulation but does not draw it. |
 | `hitbox` | `[[minx, miny, minz], [maxx, maxy, maxz]]` | none | A box in the entity's local space (before its scale, rotation and translation) that replaces the model's bounds as the entity's AABB: collisions, `ctx.Overlapping`, `no_overlap` invariants and the trace's `aabb` all use it. Two vectors of finite numbers with min ≤ max on every axis. An entity without a model gets an AABB from its hitbox alone (a trigger zone). Use it to give a flat sprite some thickness, or to make a collision box smaller than the drawing. |
 | `frame` | integer | `0` | The frame of the material's `grid` (a sprite sheet) the entity shows, 0 to 65535, left to right then top to bottom; without a grid it has no effect. |
+| `anim` | string | none | A clip of the entity's texture ([docs/texture.md](texture.md#frames-and-clips)) it plays from the start: the engine sets `frame` every tick. |
 | `layer` | integer | `0` | Draw order, in [-1000, 1000]: entities on lower layers are drawn first. Within a layer, opaque parts are drawn in id order, then blended parts back to front by the depth of their center along the camera's view axis. Opaque and cutout parts write depth, so among them the nearest surface is in front whatever the layer. Blended parts write no depth: the layer decides which blended surface covers which, and an opaque or cutout part on a higher layer is drawn over a blended part on a lower layer whatever their depth. A translucent overlay must therefore be nearer the camera than what it covers and on a layer at least as high. |
 
 `model` and `material` are references by name: the scene compiles even if the assets do

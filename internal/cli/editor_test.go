@@ -35,7 +35,7 @@ func TestEditorFiles(t *testing.T) {
 		t.Error("the Lua definitions are not the runtime's")
 	}
 	schemas := read(".vscode/settings.json")["json.schemas"].([]any)
-	if len(schemas) != 8 {
+	if len(schemas) != 9 {
 		t.Fatalf("json.schemas %v", schemas)
 	}
 	for _, s := range schemas {
@@ -45,7 +45,7 @@ func TestEditorFiles(t *testing.T) {
 		}
 	}
 	assoc := read(".vscode/settings.json")["files.associations"].(map[string]any)
-	if len(assoc) != 7 || assoc["*.vmodel"] != "json" || assoc["*.vscenario"] != "json" {
+	if len(assoc) != 8 || assoc["*.vmap"] != "json" || assoc["*.vmodel"] != "json" || assoc["*.vscenario"] != "json" {
 		t.Errorf("files.associations %v", assoc)
 	}
 	if lib := read(".luarc.json")["workspace.library"]; !reflect.DeepEqual(lib, []any{".veduta/lua"}) {
@@ -73,7 +73,7 @@ func TestEditorFiles(t *testing.T) {
 	if settings["editor.tabSize"] != 2.0 || settings["json.schemas"] == nil {
 		t.Errorf("settings %v", settings)
 	}
-	if assoc := settings["files.associations"].(map[string]any); len(assoc) != 8 || assoc["*.map"] != "xml" || assoc["*.vtex"] != "json" {
+	if assoc := settings["files.associations"].(map[string]any); len(assoc) != 9 || assoc["*.map"] != "xml" || assoc["*.vtex"] != "json" {
 		t.Errorf("files.associations %v", assoc)
 	}
 	if rec := read(".vscode/extensions.json")["recommendations"]; !reflect.DeepEqual(rec, []any{"sumneko.lua", "mine.ext"}) {

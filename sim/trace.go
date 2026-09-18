@@ -146,6 +146,9 @@ func Summary(s *scene.Scene, e *scene.Entity) map[string]any {
 	if e.Frame != 0 { // left out at 0, so traces without sprite sheets keep their hashes
 		m["frame"] = e.Frame
 	}
+	if e.Anim != "" { // left out when none, likewise
+		m["anim"] = e.Anim
+	}
 	if e.State != nil {
 		m["state"] = e.State
 	}

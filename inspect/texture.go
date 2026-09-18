@@ -131,7 +131,7 @@ func Texture(ir *Renderer, name string, src *TexSource, opt Options) (*Report, e
 
 	base := tex.Data.Levels[0]
 	st := texImageStats(base)
-	seam := texSeamStats(base)
+	seam := texSeamStats(texFrame0(tex))
 	ratio, hasRatio := texMipContrast(tex)
 	users := texUsers(ir.Lib, name)
 
@@ -146,6 +146,15 @@ func Texture(ir *Renderer, name string, src *TexSource, opt Options) (*Report, e
 	m["tiling"] = tex.Tiling
 	m["wrap"] = wrap
 	m["layers"] = tex.Layers
+	m["grid"] = tex.Grid
+	var clips []string
+	for _, c := range tex.Clips {
+		clips = append(clips, c.Name)
+	}
+	m["clips"] = clips
+	if tex.Edge != nil {
+		m["edge_priority"] = tex.Edge.Priority
+	}
 	m["mean_color"] = gfx.FormatColor(st.mean)
 	m["luminance_mean"] = round4(st.lumMean)
 	m["luminance_std"] = round4(st.lumStd)
@@ -167,7 +176,7 @@ func Texture(ir *Renderer, name string, src *TexSource, opt Options) (*Report, e
 
 	texCheckPOT(r, tex)
 	if tex.Tiling {
-		texCheckSeam(r, base, seam, layers)
+		texCheckSeam(r, texFrame0(tex), seam, layers)
 	}
 	texCheckContrast(r, st)
 	texCheckAlpha(r, ir.Lib, st, users)
@@ -396,7 +405,7 @@ type texLayers struct {
 func texNewVariant(t *asset.Texture) texVariant {
 	v := texVariant{tex: t, stats: texImageStats(t.Data.Levels[0])}
 	if t.Tiling {
-		v.seam = texSeamStats(t.Data.Levels[0])
+		v.seam = texSeamStats(texFrame0(t))
 	}
 	if lv := t.Data.Levels; len(lv) >= 3 {
 		v.mips, v.ratio = true, 1
@@ -518,6 +527,20 @@ func texUse(tiling, mipmapped bool) string {
 		return "tiles"
 	}
 	return "has mipmaps"
+}
+
+// texFrame0 returns what tiles: a sheet's first frame, else the whole image.
+func texFrame0(t *asset.Texture) *gfx.Image {
+	b := t.Data.Levels[0]
+	if t.Grid == [2]int{} {
+		return b
+	}
+	w, h := b.W/t.Grid[0], b.H/t.Grid[1]
+	out := gfx.NewImage(w, h)
+	for y := 0; y < h; y++ {
+		copy(out.Pix[y*w:(y+1)*w], b.Pix[y*b.W:y*b.W+w])
+	}
+	return out
 }
 
 func texCheckSeam(r *Report, img *gfx.Image, s texSeam, layers *texLayers) {

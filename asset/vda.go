@@ -25,6 +25,7 @@ const (
 	ChunkScene    = "SCEN" // compiled Scene (EncodeScene)
 	ChunkPrefab   = "PRFB" // compiled Prefab (EncodePrefab)
 	ChunkWorld    = "WRLD" // compiled World (EncodeWorld)
+	ChunkMap      = "TMAP" // compiled Map (EncodeMap)
 )
 
 // Chunk is one chunk of a .vda file. Type is exactly 4 ASCII letters or digits.
@@ -48,12 +49,14 @@ func BodyChunkType(k Kind) (string, bool) {
 		return ChunkPrefab, true
 	case KindWorld:
 		return ChunkWorld, true
+	case KindMap:
+		return ChunkMap, true
 	}
 	return "", false
 }
 
 func isBodyChunk(t string) bool {
-	return t == ChunkMesh || t == ChunkTexture || t == ChunkMaterial || t == ChunkScene || t == ChunkPrefab || t == ChunkWorld
+	return t == ChunkMesh || t == ChunkTexture || t == ChunkMaterial || t == ChunkScene || t == ChunkPrefab || t == ChunkWorld || t == ChunkMap
 }
 
 func checkChunkType(t string) error {

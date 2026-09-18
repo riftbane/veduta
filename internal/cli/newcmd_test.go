@@ -29,6 +29,7 @@ func TestNew(t *testing.T) {
 		{NewOptions{Kind: "scene", Name: "level1"}, []string{"assets/scenes/level1.vscene"}},
 		{NewOptions{Kind: "world", Name: "land"}, []string{"assets/worlds/land.vworld", "assets/materials/ground.vmat", "assets/textures/ground.vtex"}},
 		{NewOptions{Kind: "world", Name: "caves", In: "under"}, []string{"assets/worlds/under/caves.vworld"}},
+		{NewOptions{Kind: "map", Name: "farm"}, []string{"assets/maps/farm.vmap"}},
 		{NewOptions{Kind: "prefab", Name: "tree", In: "nature/big"}, []string{"assets/prefabs/nature/big/tree.vprefab"}},
 		{NewOptions{Kind: "model", Name: "crate"}, []string{"assets/models/crate.vmodel"}},
 		{NewOptions{Kind: "material", Name: "wood", In: "props"}, []string{"assets/materials/props/wood.vmat"}},
@@ -78,5 +79,21 @@ func TestNew(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "assets", "scenes", "x.vscene")); err == nil {
 		t.Error("a refused new wrote its file")
+	}
+
+	// A first map brings the texture it paints with.
+	dir = filepath.Join(t.TempDir(), "game")
+	if _, err := Init(env, InitOptions{Dir: dir}); err != nil {
+		t.Fatal(err)
+	}
+	if s, err = OpenSession(dir, env); err != nil {
+		t.Fatal(err)
+	}
+	nr, err := s.New(NewOptions{Kind: "map", Name: "town"})
+	if want := []string{"assets/maps/town.vmap", "assets/textures/ground.vtex"}; err != nil || !reflect.DeepEqual(nr.Files, want) {
+		t.Fatalf("new map wrote %v (%v), want %v", nr.Files, err, want)
+	}
+	if b, err := s.Build(false); err != nil || !b.OK {
+		t.Fatalf("build with a new map: %+v %v", b, err)
 	}
 }

@@ -46,6 +46,7 @@ func (g *Game) install() {
 	g.installEntity()
 	g.installMesh()
 	g.installSave()
+	g.installMap()
 	g.global("require", func(vm *lua.VM, args []lua.Value) []lua.Value {
 		name := vm.CheckString(args, 0, "require")
 		v, err := g.require(g.moduleFile(name))
@@ -597,6 +598,9 @@ func (g *Game) spawn(vm *lua.VM, args []lua.Value) []lua.Value {
 	if v := t.GetString("hitbox"); !v.IsNil() {
 		e.Hitbox = toBox(vm, v, "scene.spawn: hitbox")
 	}
+	if e.Anim = str("anim"); e.Anim != "" {
+		g.checkClip(vm, &e, e.Anim, "scene.spawn: anim")
+	}
 	_ = s
 	ent := g.ctx.Spawn(e)
 	if st := t.GetString("state"); st.Table() != nil {
@@ -616,7 +620,7 @@ func (g *Game) spawn(vm *lua.VM, args []lua.Value) []lua.Value {
 
 // installEntity builds the metatable of entity values.
 // EntityFields are the fields of an entity, in the order a debugger shows them.
-var EntityFields = []string{"id", "name", "kind", "alive", "x", "y", "z", "visible", "model", "material", "layer", "frame", "parent", "hitbox", "state"}
+var EntityFields = []string{"id", "name", "kind", "alive", "x", "y", "z", "visible", "model", "material", "layer", "frame", "anim", "anim_done", "parent", "hitbox", "state"}
 
 func (g *Game) installEntity() {
 	ent := func(vm *lua.VM, args []lua.Value, fname string) *scene.Entity {
@@ -722,6 +726,21 @@ func (g *Game) installEntity() {
 			g.ctx.Despawn(ent(vm, args, "despawn"))
 			return nil
 		},
+		"play": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			e := ent(vm, args, "play")
+			clip := vm.CheckString(args, 1, "play")
+			g.checkClip(vm, e, clip, "entity:play")
+			e.Play(clip)
+			return nil
+		},
+		"clips": func(vm *lua.VM, args []lua.Value) []lua.Value {
+			names := g.ctx.Clips(ent(vm, args, "clips"))
+			t := lua.NewTable(len(names), 0)
+			for i, n := range names {
+				t.SetInt(int64(i+1), lua.String(n))
+			}
+			return vm.Ret(lua.TableValue(t))
+		},
 	}
 	methodValues := map[string]lua.Value{}
 	for name, f := range methods {
@@ -761,6 +780,15 @@ func (g *Game) installEntity() {
 			return vm.Ret(lua.Int(int64(e.Layer)))
 		case "frame":
 			return vm.Ret(lua.Int(int64(e.Frame)))
+		case "anim":
+			return vm.Ret(optString(e.Anim))
+		case "anim_done":
+			c := g.ctx.Clip(e, e.Anim)
+			if c == nil || c.Loop || g.ctx.Clip(e, c.Next) != nil {
+				return vm.Ret(lua.False)
+			}
+			_, ended := c.Frame(e.AnimTime, g.ctx.Project.TickRate)
+			return vm.Ret(lua.Bool(ended))
 		case "parent":
 			if e.Parent == 0 {
 				return vm.Ret(lua.Nil)
@@ -823,6 +851,13 @@ func (g *Game) installEntity() {
 				vm.Errorf("entity.frame must be an integer")
 			}
 			e.Frame = int(n)
+		case "anim":
+			if clip := name(); clip != "" {
+				g.checkClip(vm, e, clip, "entity.anim")
+				e.SetAnim(clip)
+			} else {
+				e.Anim, e.AnimTime = "", 0
+			}
 		case "parent":
 			var p *scene.Entity
 			if !v.IsNil() {
@@ -846,10 +881,10 @@ func (g *Game) installEntity() {
 			default:
 				vm.Errorf("entity.state must be a table or nil")
 			}
-		case "id", "name", "kind", "alive":
+		case "id", "name", "kind", "alive", "anim_done":
 			vm.Errorf("entity.%s cannot be changed", key)
 		default:
-			vm.Errorf("entity has no field '%s' (entities have x, y, z, visible, model, material, layer, frame, parent, hitbox and state; keep your own values in state)", key)
+			vm.Errorf("entity has no field '%s' (entities have x, y, z, visible, model, material, layer, frame, anim, parent, hitbox and state; keep your own values in state)", key)
 		}
 		return nil
 	})))
@@ -858,6 +893,18 @@ func (g *Game) installEntity() {
 		return vm.Ret(lua.String(fmt.Sprintf("entity %d %q (%s)", e.ID, e.Name, e.Kind)))
 	})))
 	g.entityMeta = meta
+}
+
+// checkClip raises an error unless e can play clip: one of its textures has it.
+func (g *Game) checkClip(vm *lua.VM, e *scene.Entity, clip, what string) {
+	if g.ctx.Clip(e, clip) != nil {
+		return
+	}
+	names := g.ctx.Clips(e)
+	if len(names) == 0 {
+		vm.Errorf("%s: %q has no clip %q (its textures have no clips)", what, e.Name, clip)
+	}
+	vm.Errorf("%s: %q has no clip %q (it has %s)", what, e.Name, clip, strings.Join(names, ", "))
 }
 
 func optString(s string) lua.Value {

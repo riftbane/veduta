@@ -30,8 +30,13 @@ file name, so it must be unique across the folders.
 | `veduta` | string | required | Must be `"texture/1"`. |
 | `size` | [width, height] | required | Integers in pixels, each 1–4096. Non-power-of-two sizes are allowed (`inspect texture` warns with `TEX_NOT_POWER_OF_TWO`). |
 | `tiling` | boolean | `false` | `true`: the texture is meant to repeat. It is sampled with wrap-around (repeat) addressing, and `noise` layers wrap so the texture repeats without a seam (see [Tiling](#tiling)). `false`: texture coordinates outside [0, 1] clamp to the edge. |
-| `mipmaps` | boolean | `true` | `true`: the compiler also produces the mip chain (each level half the size of the previous one, down to 1×1). `false`: only the full-size image. |
-| `layers` | array | required | 1–64 layer objects, painted in list order: **the first layer is at the bottom**, each later layer is painted over the result of the previous ones. |
+| `mipmaps` | boolean | `true`, `false` for a sheet | `true`: the compiler also produces the mip chain (each level half the size of the previous one, down to 1×1). `false`: only the full-size image. A sheet of frames (`grid` or `frames`) has no mipmaps unless it asks: small levels would mix neighbouring frames. |
+| `layers` | array | required | 1–64 layer objects, painted in list order: **the first layer is at the bottom**, each later layer is painted over the result of the previous ones. Optional with `frames`, where they are painted under every frame. |
+| `grid` | [columns, rows] | none | The image is a sheet of frames: columns × rows frames of equal size, counted left to right, top to bottom, from 0. Each 1–256, dividing `size` evenly. See [Frames and clips](#frames-and-clips). |
+| `frames` | array | none | Frames painted one by one: 1–256 objects `{ "layers": [...] }`, each `size` large, painted over the texture's own `layers`. They are put side by side (grid [n, 1]); n × width must stay within 4096. Not with `grid`. With `tiling`, every frame tiles (its noise wraps), so a map can lay it next to itself; the sheet itself does not repeat. |
+| `clips` | object | none | Named animations of the frames: name → clip (below). Needs `grid` or `frames`. |
+| `play` | string | none | A clip shown wherever the texture is drawn and nothing picks a frame: the tiles of a map, an entity without a clip of its own. |
+| `edge` | object | none | How the texture spills over lower terrains around it when a map paints with it. See [Edges](#edges). |
 
 ## Coordinates, angles and colors
 
@@ -214,6 +219,7 @@ last and first cells of a row have the same color).
 |-------|------|---------|---------|
 | `path` | string | required | A PNG file relative to the assets directory, for example `"textures/src/logo.png"`. |
 | `fit` | string | `"contain"` | How the image is placed: `contain`, `cover` or `stretch` (below). An empty string also means `contain`. |
+| `rect` | [x, y, width, height] | the whole image | Integers in pixels of the PNG: only this part of the image is used, as if it were the whole file. It must lie inside the image. Many textures can take their part of one atlas this way. |
 
 `path` rules: forward slashes only; no leading `/`, no drive letter or `:`, no `..`
 segment (the file must be inside the assets directory), no `.` or empty segments, no
@@ -238,6 +244,96 @@ alias. The layer's coverage at a pixel is the fraction of the pixel's area cover
 placed image (letterbox edges are anti-aliased); the image's own alpha multiplies it. The
 image never repeats, even when `tiling` is true. An image exactly as large as the texture
 is copied pixel for pixel (fully transparent pixels become transparent black).
+
+## Frames and clips
+
+A texture with frames is a **sheet**: the frames of an animation side by side in one
+image. `grid` cuts the image into equal frames; `frames` paints each frame with its own
+layers. A material that uses a sheet shows one frame at a time: the frame an entity picks
+with `frame`, the frame of the clip it plays with `anim`, or else the frame of the
+texture's `play` clip.
+
+A walking hero, from a PNG of 4 × 2 frames of 16 × 16 pixels:
+
+```json
+{
+  "veduta": "texture/1",
+  "size": [64, 32],
+  "layers": [
+    { "type": "image", "path": "textures/src/logo.png", "fit": "stretch" }
+  ],
+  "grid": [4, 2],
+  "clips": {
+    "walk": { "frames": [0, 1, 2, 3], "fps": 8 },
+    "idle": { "frames": [4], "fps": 1 },
+    "hit":  { "frames": [5, 6], "fps": 12, "loop": false, "next": "idle" }
+  }
+}
+```
+
+Water that ripples by itself, drawn frame by frame (every frame is the blue below, then
+its own noise; `tiling` makes each frame seamless, for the cells of a map):
+
+```json
+{
+  "veduta": "texture/1",
+  "size": [16, 16],
+  "tiling": true,
+  "layers": [
+    { "type": "solid", "color": "#2a6fdb" }
+  ],
+  "frames": [
+    { "layers": [ { "type": "noise", "seed": 1, "scale": 4, "color": "#ffffff", "opacity": 0.3 } ] },
+    { "layers": [ { "type": "noise", "seed": 2, "scale": 4, "color": "#ffffff", "opacity": 0.3 } ] },
+    { "layers": [ { "type": "noise", "seed": 3, "scale": 4, "color": "#ffffff", "opacity": 0.3 } ] }
+  ],
+  "clips": { "flow": { "frames": [0, 1, 2], "fps": 4 } },
+  "play": "flow"
+}
+```
+
+A clip:
+
+| Field | Type | Default | Meaning |
+|-------|------|---------|---------|
+| `frames` | [integer, …] | required | The frames shown in turn, each from 0 to the number of frames − 1. A frame may repeat. |
+| `fps` | number | required | Frames per second, above 0 and at most 1000. The clip shows step ⌊t · fps / tick_rate⌋ at t ticks after it started: at 20 ticks a second and 8 fps, a frame lasts 2 or 3 ticks. |
+| `loop` | boolean | `true` | `false`: the clip stops on its last frame. |
+| `next` | string | none | Only with `"loop": false`: the clip that starts when this one ends (a hit, then idle again). |
+
+Clip names follow the asset name rules. Clips run on ticks, so they are deterministic: the
+same run shows the same frame at the same tick, in the player, in tests and in traces.
+
+## Edges
+
+`edge` makes a texture a terrain with a border when a map ([docs/map.md](map.md)) paints
+cells with it: next to a lower terrain it spills over the neighbouring cells with a
+wandering border, so water meets grass without square corners and without drawing
+transition tiles. Priority decides who spills over whom: the higher draws its border on
+the lower. A cell next to an empty cell of an upper map layer counts as lower than any
+terrain, so a path painted on an upper layer gets a border over the ground below.
+
+```json
+{
+  "veduta": "texture/1",
+  "size": [16, 16],
+  "layers": [
+    { "type": "solid", "color": "#2a6fdb" },
+    { "type": "noise", "seed": 4, "scale": 4, "color": "#ffffff", "opacity": 0.2 }
+  ],
+  "edge": { "priority": 20, "width": 4, "roughness": 0.5, "seed": 1 }
+}
+```
+
+| Field | Type | Default | Meaning |
+|-------|------|---------|---------|
+| `priority` | integer | required | 1–1000. A terrain draws its border over neighbours of lower priority. |
+| `width` | number | a quarter of a frame's smaller side | How far the border reaches into the neighbouring cell, in pixels of a frame, above 0 and at most half the smaller side. |
+| `roughness` | number | `0.5` | 0–1: 0 is a straight border, 1 wanders by up to the whole width. |
+| `seed` | integer | `0` | Shapes the wandering; the same seed always gives the same border. |
+
+A frame's width and height must be even (the border is built from the four quarters of a
+cell). The border is part of the texture: an animated texture's border moves with it.
 
 ## Tiling
 
@@ -264,9 +360,10 @@ bottom when the texture has no intended transparency.
 
 ## What the compiler produces
 
-`asset.Texture`: `Name`; `Data.Levels` (level 0 is `size`; pixels are 32-bit
-`0xAARRGGBB`, straight alpha, rows top to bottom); `Data.Wrap` (repeat when `tiling`,
-else clamp); `Tiling`; `Layers` (the number of source layers). Its binary layout in
+`asset.Texture`: `Name`; `Data.Levels` (level 0 is `size`, or the frames side by side;
+pixels are 32-bit `0xAARRGGBB`, straight alpha, rows top to bottom); `Data.Wrap` (repeat
+when `tiling`, else clamp); `Tiling`; `Layers` (the number of source layers); `Grid`
+(columns and rows of frames, 0 0 for a single image); `Clips` (by name); `Play`; `Edge`. Its binary layout in
 `.vda` files is in `docs/vda.md` (chunk `TEXR`). Compilation is deterministic: the same
 source and the same image files always produce the same bytes.
 
@@ -304,7 +401,9 @@ wall.vtex:8:32: layers[3].path: "../logo.png": must not leave the assets directo
 Checks: required fields present; `size` integers in range; 1–64 layers; `type` known;
 fields the type does not use absent; colors valid; numbers finite and in range (an
 explicit `0` for `octaves` or `cells` is out of range, not "default"); enum values from
-the lists above; image paths valid, and the file present, a PNG and not too large.
+the lists above; image paths valid, and the file present, a PNG and not too large; an
+image `rect` inside the image; a `grid` that divides `size`; clip frames inside the sheet;
+`next` and `play` naming clips; a `grid` not `tiling`.
 
 ## Limits
 
@@ -318,6 +417,10 @@ the lists above; image paths valid, and the file present, a PNG and not too larg
 | stripes `colors` | 2–64 |
 | checker `cells` | 1–4096 |
 | image file | PNG, 1–8192 pixels per side |
+| `grid` | 1–256 columns and rows |
+| `frames` | 1–256, all side by side within 4096 pixels |
+| clip `fps` | (0, 1000] |
+| edge `priority` | 1–1000 |
 
 ## Full examples
 

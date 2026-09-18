@@ -446,7 +446,7 @@ var ExpectPaths = []string{
 	"scale", "scale.x", "scale.y", "scale.z",
 	"aabb.min", "aabb.min.x", "aabb.min.y", "aabb.min.z",
 	"aabb.max", "aabb.max.x", "aabb.max.y", "aabb.max.z",
-	"visible", "tags", "kind", "model", "material", "parent", "frame",
+	"visible", "tags", "kind", "model", "material", "parent", "frame", "anim",
 	"state.<field>[.<field>…]",
 }
 
@@ -490,7 +490,7 @@ func expectPathType(path string) (pathType, error) {
 		if len(segs) == 1 {
 			return ptStrings, nil
 		}
-	case "kind", "model", "material", "parent":
+	case "kind", "model", "material", "parent", "anim":
 		if len(segs) == 1 {
 			return ptString, nil
 		}

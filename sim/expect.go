@@ -90,6 +90,9 @@ func summaryDoc(s *scene.Scene, e *scene.Entity) (any, error) {
 	if m, ok := doc.(map[string]any); ok && m["frame"] == nil {
 		m["frame"] = 0.0 // the trace leaves frame 0 out
 	}
+	if m, ok := doc.(map[string]any); ok && m["anim"] == nil {
+		m["anim"] = "" // and no clip
+	}
 	return doc, nil
 }
 

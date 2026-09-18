@@ -233,6 +233,11 @@ func scnAnalyze(ir *Renderer, name string, src *asset.Scene) (*scnAnalysis, erro
 	if err != nil {
 		return nil, err
 	}
+	if src.Map != "" && ir.Lib.Maps[src.Map] != nil { // drawn under the entities
+		if _, err := ir.UseMap(src.Map); err != nil {
+			return nil, err
+		}
+	}
 	p := ir.Lib.Project
 	if p == nil {
 		d := asset.DefaultProject
@@ -836,7 +841,7 @@ func (a *scnAnalysis) inView(p gmath.Vec3) bool {
 }
 
 func (a *scnAnalysis) checkSeesNothing() {
-	if a.entityPixels > 0 {
+	if a.entityPixels > 0 || a.drawnCount == 0 && a.src.Map != "" { // a map with nothing on it yet
 		return
 	}
 	cam := a.s.Camera

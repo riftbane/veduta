@@ -64,7 +64,7 @@ var layerFields = map[string][]string{
 	"circle":   {"center", "radius", "color", "outline"},
 	"gradient": {"from", "to", "angle_deg"},
 	"checker":  {"cells", "colors"},
-	"image":    {"path", "fit"},
+	"image":    {"path", "fit", "rect"},
 }
 
 // Parse decodes and compiles the texture source file (for example
@@ -113,21 +113,45 @@ func Compile(name string, src *asset.TextureSource, loc *asset.Locator, opt Opti
 		}
 		skip[i] = true
 	}
-	base := render(s, skip)
+	var base *gfx.Image
+	if len(s.frames) > 0 {
+		base = renderFrames(s, skip)
+	} else {
+		base = render(s, skip)
+	}
 	levels := []*gfx.Image{base}
 	if s.mipmaps {
 		levels = gfx.BuildMips(base)
 	}
 	wrap := gfx.WrapClamp
-	if s.tiling {
-		wrap = gfx.WrapRepeat
+	if s.tiling && len(s.frames) == 0 {
+		wrap = gfx.WrapRepeat // frames tile one by one: the sheet does not repeat
 	}
 	return &asset.Texture{
 		Name:   name,
 		Data:   gfx.TextureData{Levels: levels, Wrap: wrap},
 		Tiling: s.tiling,
 		Layers: len(src.Layers),
+		Grid:   s.grid,
+		Clips:  s.clips,
+		Play:   s.play,
+		Edge:   s.edge,
 	}, nil
+}
+
+// renderFrames draws every frame of s (its layers, then the frame's own) and puts them
+// side by side, left to right.
+func renderFrames(s *spec, skip []bool) *gfx.Image {
+	sheet := gfx.NewImage(s.w*len(s.frames), s.h)
+	for i, f := range s.frames {
+		fs := *s
+		fs.layers = append(append([]layerSpec(nil), s.layers...), f...)
+		img := render(&fs, append(append([]bool(nil), skip...), make([]bool, len(f))...))
+		for y := 0; y < s.h; y++ {
+			copy(sheet.Pix[y*sheet.W+i*s.w:y*sheet.W+(i+1)*s.w], img.Pix[y*s.w:(y+1)*s.w])
+		}
+	}
+	return sheet
 }
 
 // Deps returns the image files (paths relative to the assets directory) that src reads:
@@ -139,7 +163,11 @@ func Deps(src *asset.TextureSource) []string {
 		return nil
 	}
 	var out []string
-	for _, l := range src.Layers {
+	layers := append([]asset.LayerSource(nil), src.Layers...)
+	for _, f := range src.Frames {
+		layers = append(layers, f.Layers...)
+	}
+	for _, l := range layers {
 		if l.Type == "image" && checkImagePath(l.Path) == "" {
 			out = append(out, l.Path)
 		}
@@ -157,10 +185,15 @@ func Deps(src *asset.TextureSource) []string {
 
 // spec is a validated texture source with every default resolved.
 type spec struct {
-	w, h    int
+	w, h    int // with frames, the size of one frame
 	tiling  bool
 	mipmaps bool
 	layers  []layerSpec
+	frames  [][]layerSpec // each frame's own layers, drawn over layers
+	grid    [2]int        // of the compiled image
+	clips   []asset.Clip
+	play    string
+	edge    *asset.Edge
 }
 
 // rgba is a straight-alpha color with components in [0, 1].
@@ -195,7 +228,8 @@ func validate(c *asset.Checker, name string, src *asset.TextureSource, opt Optio
 	if err := asset.ValidName(name); err != nil {
 		c.Errorf("", "texture %v", err)
 	}
-	s := &spec{w: 1, h: 1, tiling: src.Tiling, mipmaps: src.Mipmaps == nil || *src.Mipmaps}
+	sheet := src.Grid != nil || src.Frames != nil
+	s := &spec{w: 1, h: 1, tiling: src.Tiling, mipmaps: src.Mipmaps == nil && !sheet || src.Mipmaps != nil && *src.Mipmaps}
 	switch {
 	case src.Size == nil:
 		c.Errorf("size", "is required ([width, height] in pixels)")
@@ -214,21 +248,159 @@ func validate(c *asset.Checker, name string, src *asset.TextureSource, opt Optio
 		}
 	}
 	switch {
-	case len(src.Layers) == 0:
+	case len(src.Layers) == 0 && src.Frames == nil:
 		c.Errorf("layers", "at least one layer is required")
 	case len(src.Layers) > MaxLayers:
 		c.Errorf("layers", "%d layers, want at most %d", len(src.Layers), MaxLayers)
 	}
 	s.layers = make([]layerSpec, len(src.Layers))
 	for i := range src.Layers {
-		s.layers[i] = validateLayer(c, i, &src.Layers[i], opt)
+		s.layers[i] = validateLayer(c, "layers", i, &src.Layers[i], opt)
 	}
+	validateSheet(c, s, src, opt)
 	return s
 }
 
-// validateLayer checks layer i and loads its image, if any.
-func validateLayer(c *asset.Checker, i int, l *asset.LayerSource, opt Options) layerSpec {
-	lp := asset.Path("layers", i)
+// Limits of sheets and edges (docs/texture.md).
+const (
+	MaxGrid     = asset.MaxGrid // columns or rows of a grid
+	MaxFrames   = 256           // frames drawn one by one
+	MaxFPS      = 1000
+	MaxPriority = 1000
+)
+
+// validateSheet checks the frames of s (a grid or frames drawn one by one), its clips and
+// its edge.
+func validateSheet(c *asset.Checker, s *spec, src *asset.TextureSource, opt Options) {
+	frames := 1
+	switch {
+	case src.Grid != nil && src.Frames != nil:
+		c.Errorf("frames", "not allowed with grid: a texture's frames are a grid of its image or drawn one by one")
+	case src.Grid != nil:
+		if len(src.Grid) != 2 {
+			c.Errorf("grid", "must be [columns, rows]")
+			break
+		}
+		ok := true
+		for i, n := range src.Grid {
+			if n < 1 || n > MaxGrid {
+				c.Errorf(asset.Path("grid", i), "%d out of range [1, %d]", n, MaxGrid)
+				ok = false
+			}
+		}
+		if !ok {
+			break
+		}
+		if s.w%src.Grid[0] != 0 || s.h%src.Grid[1] != 0 {
+			c.Errorf("grid", "%d × %d frames do not divide the %d × %d pixels evenly", src.Grid[0], src.Grid[1], s.w, s.h)
+			break
+		}
+		s.grid = [2]int{src.Grid[0], src.Grid[1]}
+		frames = s.grid[0] * s.grid[1]
+	case src.Frames != nil:
+		switch n := len(src.Frames); {
+		case n == 0 || n > MaxFrames:
+			c.Errorf("frames", "%d frames, want 1 to %d", n, MaxFrames)
+			return
+		case n*s.w > MaxSize:
+			c.Errorf("frames", "%d frames %d pixels wide make a sheet of %d pixels, want at most %d", n, s.w, n*s.w, MaxSize)
+			return
+		}
+		for i, f := range src.Frames {
+			fp := asset.Path("frames", i)
+			switch {
+			case len(f.Layers) == 0:
+				c.Errorf(asset.Path(fp, "layers"), "at least one layer is required")
+			case len(src.Layers)+len(f.Layers) > MaxLayers:
+				c.Errorf(asset.Path(fp, "layers"), "%d layers with the texture's own, want at most %d", len(src.Layers)+len(f.Layers), MaxLayers)
+			}
+			ls := make([]layerSpec, len(f.Layers))
+			for k := range f.Layers {
+				ls[k] = validateLayer(c, asset.Path(fp, "layers"), k, &f.Layers[k], opt)
+			}
+			s.frames = append(s.frames, ls)
+		}
+		s.grid = [2]int{len(src.Frames), 1}
+		frames = len(src.Frames)
+	}
+	if src.Grid != nil && s.tiling {
+		c.Errorf("tiling", "a grid of frames cannot tile: its frames would repeat together (frames drawn one by one can)")
+	}
+	names := make([]string, 0, len(src.Clips))
+	for name := range src.Clips {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	if len(names) > 0 && s.grid[0] == 0 {
+		c.Errorf("clips", "need frames: a grid or frames")
+	}
+	for _, name := range names {
+		cp := asset.Path("clips", name)
+		cl := src.Clips[name]
+		if err := asset.ValidName(name); err != nil {
+			c.Errorf(cp, "clip %v", err)
+		}
+		if cl == nil {
+			c.Errorf(cp, "must be an object with frames and fps")
+			continue
+		}
+		clip := asset.Clip{Name: name, FPS: c.RequirePositive(asset.Path(cp, "fps"), cl.FPS), Loop: cl.Loop == nil || *cl.Loop, Next: cl.Next}
+		if clip.FPS > MaxFPS {
+			c.Errorf(asset.Path(cp, "fps"), "%v out of range (0, %d]", clip.FPS, MaxFPS)
+		}
+		if len(cl.Frames) == 0 {
+			c.Errorf(asset.Path(cp, "frames"), "at least one frame is required")
+		}
+		for i, f := range cl.Frames {
+			if f < 0 || f >= frames {
+				c.Errorf(asset.Path(asset.Path(cp, "frames"), i), "frame %d out of range [0, %d]", f, frames-1)
+			}
+		}
+		clip.Frames = append([]int(nil), cl.Frames...)
+		if cl.Next != "" {
+			switch {
+			case clip.Loop:
+				c.Errorf(asset.Path(cp, "next"), "only allowed when loop is false (a looping clip never ends)")
+			case src.Clips[cl.Next] == nil:
+				c.Errorf(asset.Path(cp, "next"), "no clip %q", cl.Next)
+			}
+		}
+		s.clips = append(s.clips, clip)
+	}
+	if src.Play != "" && src.Clips[src.Play] == nil {
+		c.Errorf("play", "no clip %q", src.Play)
+	} else {
+		s.play = src.Play
+	}
+	if e := src.Edge; e != nil {
+		fw, fh := s.w, s.h
+		if s.grid[0] > 0 && src.Frames == nil {
+			fw, fh = s.w/s.grid[0], s.h/s.grid[1]
+		}
+		edge := &asset.Edge{Seed: e.Seed, Roughness: c.Float("edge.roughness", e.Roughness, 0, 1, 0.5)}
+		switch {
+		case e.Priority == nil:
+			c.Errorf("edge.priority", "is required (1 to %d: a higher priority draws its border over a lower one)", MaxPriority)
+		case *e.Priority < 1 || *e.Priority > MaxPriority:
+			c.Errorf("edge.priority", "%d out of range [1, %d]", *e.Priority, MaxPriority)
+		default:
+			edge.Priority = *e.Priority
+		}
+		if fw%2 != 0 || fh%2 != 0 {
+			c.Errorf("edge", "a frame's width and height must be even to have an edge, got %d × %d", fw, fh)
+		}
+		half := float32(min(fw, fh)) / 2
+		edge.Width = c.Float("edge.width", e.Width, 0, half, half/2)
+		if e.Width != nil && *e.Width == 0 {
+			c.Errorf("edge.width", "must be above 0")
+		}
+		s.edge = edge
+	}
+}
+
+// validateLayer checks layer i of the list at path list and loads its image, if any.
+func validateLayer(c *asset.Checker, list string, i int, l *asset.LayerSource, opt Options) layerSpec {
+	lp := asset.Path(list, i)
 	field := func(name string) string { return asset.Path(lp, name) }
 	ls := layerSpec{typ: l.Type, opacity: 1}
 	switch {
@@ -258,6 +430,7 @@ func validateLayer(c *asset.Checker, i int, l *asset.LayerSource, opt Options) l
 			"cells":     has("cells", l.Cells != 0),
 			"path":      has("path", l.Path != ""),
 			"fit":       has("fit", l.Fit != ""),
+			"rect":      has("rect", l.Rect != nil),
 		}
 		for _, f := range layerFields[l.Type] {
 			delete(set, f)
@@ -337,8 +510,32 @@ func validateTyped(c *asset.Checker, field func(string) string, l *asset.LayerSo
 			c.Errorf(field("path"), "%v", err)
 			return
 		}
+		if l.Rect != nil {
+			if img = crop(c, field("rect"), img, l.Rect); img == nil {
+				return
+			}
+		}
 		ls.img = img
 	}
+}
+
+// crop returns the part [x, y, width, height] of img, or nil after reporting why it is not
+// inside the image.
+func crop(c *asset.Checker, path string, img *gfx.Image, r []int) *gfx.Image {
+	if len(r) != 4 {
+		c.Errorf(path, "must be [x, y, width, height] in pixels of the image")
+		return nil
+	}
+	x, y, w, h := r[0], r[1], r[2], r[3]
+	if x < 0 || y < 0 || w < 1 || h < 1 || x+w > img.W || y+h > img.H {
+		c.Errorf(path, "%v is not inside the %d × %d image (x and y from 0, width and height at least 1)", r, img.W, img.H)
+		return nil
+	}
+	out := gfx.NewImage(w, h)
+	for j := 0; j < h; j++ {
+		copy(out.Pix[j*w:(j+1)*w], img.Pix[(y+j)*img.W+x:(y+j)*img.W+x+w])
+	}
+	return out
 }
 
 // checkImagePath returns why p is not an acceptable image path, or "".

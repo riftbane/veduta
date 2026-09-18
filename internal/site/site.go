@@ -33,7 +33,7 @@ type Entry struct{ Topic, Name string }
 var Nav = []Section{
 	{"Start", []Entry{{"index", "Home"}, {"start-windows", "Getting started on Windows"}, {"first-game", "Your first game"}}},
 	{"Making games", []Entry{{"lua", "Lua API"}, {"2d", "2D games"}, {"project", "veduta.json"}, {"scenario", "Scenarios"}}},
-	{"Assets", []Entry{{"scene", "Scenes"}, {"model", "Models"}, {"material", "Materials"}, {"texture", "Textures"}, {"prefab", "Prefabs"}, {"world", "Worlds"}}},
+	{"Assets", []Entry{{"scene", "Scenes"}, {"model", "Models"}, {"material", "Materials"}, {"texture", "Textures"}, {"prefab", "Prefabs"}, {"world", "Worlds"}, {"map", "Maps"}}},
 	{"Tools", []Entry{{"inspect", "Inspection"}, {"config", "Tool settings"}}},
 	{"Go games", []Entry{{"api", "Go API"}, {"vda", "Cooked assets"}}},
 }

@@ -14,6 +14,8 @@ package asset
 
 import (
 	"fmt"
+	"math"
+	"sort"
 	"strings"
 
 	"github.com/riftbane/veduta/v2/gfx"
@@ -22,7 +24,7 @@ import (
 
 // CompilerVersion is stored in every .vda META chunk; changing it invalidates cooked
 // assets.
-const CompilerVersion = "veduta-asset/0.5.0"
+const CompilerVersion = "veduta-asset/0.6.0"
 
 // Source format headers (the value of the "veduta" field).
 const (
@@ -33,6 +35,7 @@ const (
 	TypeScenario = "scenario/1"
 	TypePrefab   = "prefab/1"
 	TypeWorld    = "world/1"
+	TypeMap      = "map/1"
 	TypeProject  = "project/1"
 )
 
@@ -49,10 +52,11 @@ const (
 	KindScenario Kind = "scenario"
 	KindPrefab   Kind = "prefab"
 	KindWorld    Kind = "world"
+	KindMap      Kind = "map"
 )
 
 // CookedKinds are the kinds compiled into .vda files by Cook, in cooking order.
-var CookedKinds = []Kind{KindTexture, KindMaterial, KindModel, KindPrefab, KindScene, KindWorld}
+var CookedKinds = []Kind{KindTexture, KindMaterial, KindModel, KindPrefab, KindScene, KindWorld, KindMap}
 
 // Dir returns the directory holding sources of kind k, relative to assets/
 // (scenarios live in tests/scenarios, relative to the project root).
@@ -72,6 +76,8 @@ func (k Kind) Dir() string {
 		return "prefabs"
 	case KindWorld:
 		return "worlds"
+	case KindMap:
+		return "maps"
 	}
 	return string(k)
 }
@@ -89,19 +95,21 @@ func (k Kind) Ext() string {
 }
 
 // LegacyExt returns the suffix sources of kind k had before v2.0.0-rc.8, for example
-// ".model.json"; veduta upgrade renames them.
+// ".model.json"; veduta upgrade renames them. Kinds that came later have none: "".
 func (k Kind) LegacyExt() string {
 	switch k {
 	case KindTexture:
 		return ".tex.json"
 	case KindMaterial:
 		return ".mat.json"
+	case KindMap:
+		return ""
 	}
 	return "." + string(k) + ".json"
 }
 
 // SourceKinds are the kinds with a source file, scenarios included.
-var SourceKinds = []Kind{KindModel, KindTexture, KindMaterial, KindScene, KindScenario, KindPrefab, KindWorld}
+var SourceKinds = []Kind{KindModel, KindTexture, KindMaterial, KindScene, KindScenario, KindPrefab, KindWorld, KindMap}
 
 // KindOfFile returns the kind whose suffix the file name base has.
 func KindOfFile(base string) (Kind, bool) {
@@ -130,6 +138,8 @@ func (k Kind) Header() string {
 		return TypePrefab
 	case KindWorld:
 		return TypeWorld
+	case KindMap:
+		return TypeMap
 	}
 	return ""
 }
@@ -239,6 +249,64 @@ type Texture struct {
 	Data   gfx.TextureData // Wrap is WrapRepeat when Tiling, else WrapClamp
 	Tiling bool
 	Layers int // number of source layers
+	// Grid is the columns and rows of frames the image holds; 0, 0 for a single image.
+	Grid  [2]int
+	Clips []Clip // by name
+	Play  string // the clip shown when nothing picks a frame; "" for none
+	Edge  *Edge  // nil: the texture draws no border in maps
+}
+
+// Frames returns the number of frames of the texture: 1 without a grid.
+func (t *Texture) Frames() int {
+	if t.Grid[0] == 0 {
+		return 1
+	}
+	return t.Grid[0] * t.Grid[1]
+}
+
+// Clip returns the clip called name, or nil.
+func (t *Texture) Clip(name string) *Clip {
+	i := sort.Search(len(t.Clips), func(i int) bool { return t.Clips[i].Name >= name })
+	if i < len(t.Clips) && t.Clips[i].Name == name {
+		return &t.Clips[i]
+	}
+	return nil
+}
+
+// Clip is a named animation of a texture's frames (docs/texture.md).
+type Clip struct {
+	Name   string
+	Frames []int // frames of the grid, from 0
+	FPS    float32
+	Loop   bool
+	Next   string // the clip that follows when a clip that does not loop ends; "" holds its last frame
+}
+
+// Index returns which step of the clip shows t ticks after it started at rate ticks per
+// second, before looping or holding: ⌊t·fps/rate⌋.
+func (c *Clip) Index(t, rate int) int {
+	return int(math.Floor(float64(t) * float64(c.FPS) / float64(rate)))
+}
+
+// Frame returns the frame of the grid the clip shows t ticks after it started, and whether
+// it has ended (a clip that does not loop, past its last step).
+func (c *Clip) Frame(t, rate int) (frame int, ended bool) {
+	i := c.Index(t, rate)
+	if c.Loop {
+		return c.Frames[i%len(c.Frames)], false
+	}
+	if i >= len(c.Frames) {
+		return c.Frames[len(c.Frames)-1], true
+	}
+	return c.Frames[i], false
+}
+
+// Edge is how a terrain texture spills over lower terrains in a map (docs/map.md).
+type Edge struct {
+	Priority  int     // a higher priority draws its border over a lower one
+	Width     float32 // pixels of a frame
+	Roughness float32 // 0 to 1: how much the border wanders
+	Seed      int64
 }
 
 // Material is a compiled material.
@@ -282,6 +350,7 @@ type Scene struct {
 	Light      gfx.Light
 	Background uint32
 	Entities   []Entity // scene-file order; entity ids are assigned in this order
+	Map        string   // the tile map drawn under the entities, "" for none
 }
 
 // Camera is the scene camera.
@@ -310,6 +379,7 @@ type Entity struct {
 	Hitbox      *gmath.AABB // local-space collision box replacing the model bounds; nil for none
 	Layer       int         // draw order: lower layers are drawn first
 	Frame       int         // the frame of its material's grid, from 0
+	Anim        string      // the clip of its texture it plays, "" for none
 }
 
 // Prefab is a compiled prefab: a group of entities placed as one structure in a world

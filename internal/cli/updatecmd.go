@@ -275,7 +275,7 @@ func renameLegacySources(root string, p *asset.Project) ([]string, error) {
 	next := make([]string, len(legacy))
 	for i, f := range legacy {
 		for _, k := range asset.SourceKinds {
-			if base, ok := strings.CutSuffix(f, k.LegacyExt()); ok {
+			if base, ok := strings.CutSuffix(f, k.LegacyExt()); ok && k.LegacyExt() != "" {
 				next[i] = base + k.Ext()
 				break
 			}

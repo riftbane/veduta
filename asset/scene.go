@@ -63,6 +63,9 @@ func CompileScene(name string, src *SceneSource, loc *Locator) (*Scene, error) {
 		Background: c.Color("background", src.Background, defaultBackground),
 	}
 	s.Entities = compileEntities(c, src.Entities, "scene")
+	if src.Map != "" && c.Name("map", src.Map) {
+		s.Map = src.Map
+	}
 	if err := c.Err(); err != nil {
 		return nil, err
 	}
@@ -184,6 +187,9 @@ func compileEntities(c *Checker, src []EntitySource, what string) []Entity {
 		ent.Hitbox = compileHitbox(c, Path(p, "hitbox"), e.Hitbox)
 		ent.Layer = c.Int(Path(p, "layer"), e.Layer, MinLayer, MaxLayer, 0)
 		ent.Frame = c.Int(Path(p, "frame"), e.Frame, 0, MaxFrame, 0)
+		if e.Anim != "" && c.Name(Path(p, "anim"), e.Anim) {
+			ent.Anim = e.Anim
+		}
 		if len(e.Tags) > 0 {
 			ent.Tags = make([]string, 0, len(e.Tags))
 			for k, tag := range e.Tags {

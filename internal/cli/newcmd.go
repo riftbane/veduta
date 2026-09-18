@@ -15,7 +15,7 @@ import (
 )
 
 // NewKinds are what veduta new makes: every source format, and a Lua module.
-var NewKinds = []string{"scene", "world", "prefab", "model", "material", "texture", "scenario", "script"}
+var NewKinds = []string{"scene", "world", "map", "prefab", "model", "material", "texture", "scenario", "script"}
 
 // NewOptions configures new.
 type NewOptions struct {
@@ -48,7 +48,8 @@ func (r *NewReport) Human() string {
 
 // New writes a new source of a kind, valid as it is, so that the game builds with it: an
 // empty scene, a 1 m box, a grey texture and material, an empty prefab, a flat world
-// (with a "ground" material and texture if the project has none), a scenario that runs 20 ticks and
+// (with a "ground" material and texture if the project has none), a 16 × 12 map of
+// ground (with the "ground" texture if the project has none), a scenario that runs 20 ticks and
 // checks the invariants, or an empty Lua module. It never overwrites: an asset name must
 // be free in every folder of its kind.
 func (s *Session) New(o NewOptions) (*NewReport, error) {
@@ -128,9 +129,9 @@ func (s *Session) New(o NewOptions) (*NewReport, error) {
 		}
 		add(path.Join(s.Project.Assets, k.Dir(), in, o.Name+k.Ext()), data)
 		// A world stands on a ground material with a tiling texture: both come with the
-		// first world.
+		// first world. A map paints with the texture.
 		for _, g := range []asset.Kind{asset.KindMaterial, asset.KindTexture} {
-			if k != asset.KindWorld || s.sourceOf(g, "ground") != "" {
+			if !(k == asset.KindWorld || k == asset.KindMap && g == asset.KindTexture) || s.sourceOf(g, "ground") != "" {
 				continue
 			}
 			ground, err := projtemplate.FS.ReadFile("new/ground" + g.Ext())

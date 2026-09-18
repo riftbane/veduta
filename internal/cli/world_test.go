@@ -231,7 +231,7 @@ func TestWorldToolsRegistered(t *testing.T) {
 			t.Errorf("missing tool %s", want)
 		}
 	}
-	if !reflect.DeepEqual(InspectKinds, []string{"model", "texture", "scene", "prefab", "world"}) {
+	if !reflect.DeepEqual(InspectKinds, []string{"model", "texture", "scene", "prefab", "world", "map"}) {
 		t.Fatal(InspectKinds)
 	}
 }

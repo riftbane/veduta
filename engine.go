@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/riftbane/veduta/v2/scene"
 	"github.com/riftbane/veduta/v2/sim"
 	"github.com/riftbane/veduta/v2/sprite"
+	"github.com/riftbane/veduta/v2/tilemap"
 	"github.com/riftbane/veduta/v2/world"
 )
 
@@ -30,6 +32,7 @@ type engine struct {
 	assets  *Assets
 	ctx     Context
 	world   *World                  // the loaded world, nil for a scene
+	tmap    *tilemap.Map            // the scene's tile map, nil for none
 	runtime map[string]*asset.Model // models the game built with Context.SetModel
 
 	behaviours map[uint32]Behaviour
@@ -173,7 +176,42 @@ func (e *engine) loadScene(name string) error {
 	if err := e.install(s); err != nil {
 		return err
 	}
-	e.emit(sim.EventSceneLoad, map[string]any{"scene": name, "entities": s.Len()})
+	if err := e.setMap(src.Map); err != nil {
+		return fmt.Errorf("scene %s: %w", name, err)
+	}
+	fields := map[string]any{"scene": name, "entities": s.Len()}
+	if src.Map != "" {
+		fields["map"] = src.Map
+	}
+	e.emit(sim.EventSceneLoad, fields)
+	return nil
+}
+
+// setMap makes the tile map called name the scene's, as its file describes it, or leaves
+// the scene without one for "".
+func (e *engine) setMap(name string) error {
+	e.tmap = nil
+	if name == "" {
+		return nil
+	}
+	src := e.assets.Maps[name]
+	if src == nil {
+		return fmt.Errorf("unknown map %q", name)
+	}
+	e.tmap = tilemap.New(src, e.assets)
+	e.tmap.OnEvent = e.emit
+	return nil
+}
+
+// loadMap replaces the scene's tile map with the one called name ("" for none).
+func (e *engine) loadMap(name string) error {
+	if e.world != nil && name != "" {
+		return fmt.Errorf("map %q: a world has no tile map; load a scene first", name)
+	}
+	if err := e.setMap(name); err != nil {
+		return err
+	}
+	e.emit("map_load", map[string]any{"map": name})
 	return nil
 }
 
@@ -192,6 +230,7 @@ func (e *engine) loadWorld(name string, at [2]int32) error {
 		return err
 	}
 	e.world = w
+	e.tmap = nil
 	e.ctx.Scene = s
 	e.behaviours = map[uint32]Behaviour{}
 	for _, ent := range s.Entities() {
@@ -286,7 +325,7 @@ func (e *engine) spawnAll(ents []asset.Entity) []*scene.Entity {
 			Name: a.Name, Kind: a.Kind,
 			Transform: scene.Transform{Position: a.Position, Rotation: gmath.QuatEulerDeg(a.RotationDeg), Scale: a.Scale},
 			Model:     a.Model, Material: a.Material, Tags: a.Tags, Visible: a.Visible, Hitbox: a.Hitbox, Layer: a.Layer,
-			Frame: a.Frame,
+			Frame: a.Frame, Anim: a.Anim,
 		})
 		byName[a.Name] = out[i]
 	}
@@ -365,6 +404,7 @@ func (e *engine) endTick() error {
 		}
 	}
 	s.Flush()
+	e.animate()
 	s.Update()
 	for _, p := range e.contacts.Step(s) {
 		a, b := s.Get(p.A), s.Get(p.B)
@@ -378,6 +418,87 @@ func (e *engine) endTick() error {
 		return nil
 	}
 	return e.rec.EndTick(e.tick, sim.Summaries(s))
+}
+
+// animate advances the clips entities play: each shows the frame of its clip at its
+// AnimTime, and a clip that ends switches to its next one.
+func (e *engine) animate() {
+	rate := e.project.TickRate
+	for _, ent := range e.ctx.Scene.Entities() {
+		if ent.Anim == "" || !ent.Alive() {
+			continue
+		}
+		c := e.clip(ent, ent.Anim)
+		if c == nil {
+			continue
+		}
+		f, ended := c.Frame(ent.AnimTime, rate)
+		if n := e.clip(ent, c.Next); ended && n != nil {
+			ent.Anim, ent.AnimTime = n.Name, 0
+			f, _ = n.Frame(0, rate)
+		}
+		ent.Frame = f
+		ent.AnimTime++
+	}
+}
+
+// clip returns the clip called name of the textures the entity draws with (its material's,
+// then its model's parts' in order), or nil.
+func (e *engine) clip(ent *scene.Entity, name string) *asset.Clip {
+	if name == "" {
+		return nil
+	}
+	for _, t := range e.entityTextures(ent) {
+		if c := t.Clip(name); c != nil {
+			return c
+		}
+	}
+	return nil
+}
+
+// entityTextures returns the textures of the materials an entity draws with, its own
+// first, without repeats.
+func (e *engine) entityTextures(ent *scene.Entity) []*asset.Texture {
+	mats := []string{ent.Material}
+	if m := e.model(ent.Model); m != nil {
+		mats = append(mats, m.Materials...)
+	}
+	var out []*asset.Texture
+	for _, name := range mats {
+		m := e.assets.Materials[name]
+		if m == nil || m.Texture == "" {
+			continue
+		}
+		t := e.assets.Textures[m.Texture]
+		if t == nil || slices.Contains(out, t) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+// clipNames returns the clips of the textures an entity draws with, sorted, for messages.
+func (e *engine) clipNames(ent *scene.Entity) []string {
+	var out []string
+	for _, t := range e.entityTextures(ent) {
+		for _, c := range t.Clips {
+			out = append(out, c.Name)
+		}
+	}
+	sort.Strings(out)
+	return slices.Compact(out)
+}
+
+// model returns a model entities can name: the game's, the world's or the library's.
+func (e *engine) model(name string) *asset.Model {
+	if m := e.runtime[name]; m != nil {
+		return m
+	}
+	if e.world != nil && e.world.models[name] != nil {
+		return e.world.models[name]
+	}
+	return e.assets.Models[name]
 }
 
 // frame renders the current state.
@@ -420,7 +541,11 @@ func (e *engine) render(cam scene.Camera, w, h int, mode gfx.RenderMode, normals
 	}
 	e.dl.Reset()
 	var ds scene.DrawStats
-	e.ctx.Scene.Draw(&e.dl, e.res, scene.DrawOptions{Camera: cam, Width: w, Height: h, Mode: mode, Stats: &ds})
+	opt := scene.DrawOptions{Camera: cam, Width: w, Height: h, Mode: mode, Stats: &ds, Tick: e.tick, Rate: e.project.TickRate}
+	if e.tmap != nil {
+		opt.Statics = e.tmap.Statics()
+	}
+	e.ctx.Scene.Draw(&e.dl, e.res, opt)
 	if e.extra != nil {
 		e.extra(&e.dl, 0)
 	}
@@ -457,6 +582,18 @@ func (e *engine) modelBounds(name string) (gmath.AABB, bool) {
 // never do.
 func (e *engine) syncModels() error {
 	want := e.runtime
+	if e.tmap != nil {
+		if err := e.syncMap(); err != nil {
+			return err
+		}
+		want = make(map[string]*asset.Model, len(e.runtime))
+		for k, m := range e.runtime {
+			want[k] = m
+		}
+		for k, m := range e.tmap.Models() {
+			want[k] = m
+		}
+	}
 	if e.world != nil {
 		want = make(map[string]*asset.Model, len(e.runtime)+len(e.world.models))
 		for k, m := range e.runtime {
@@ -484,6 +621,30 @@ func (e *engine) syncModels() error {
 	return nil
 }
 
+// syncMap uploads the textures and adds the materials the tile map makes that the renderer
+// does not have yet.
+func (e *engine) syncMap() error {
+	tex := e.tmap.Textures()
+	for _, name := range sortedNames(tex) {
+		if _, ok := e.res.Textures[name]; !ok {
+			if err := e.res.AddTexture(e.renderer, name, tex[name]); err != nil {
+				return err
+			}
+		}
+	}
+	mats := e.tmap.Materials()
+	for _, name := range sortedNames(mats) {
+		if e.res.Materials[name] != mats[name] {
+			t := e.assets.Textures[mats[name].Texture]
+			if t == nil {
+				t = tex[mats[name].Texture]
+			}
+			e.res.AddMaterial(name, mats[name], t)
+		}
+	}
+	return nil
+}
+
 func (e *engine) close() {
 	if e.renderer != nil {
 		e.renderer.Close()
@@ -505,6 +666,8 @@ type snapEntity struct {
 	Hitbox    *gmath.AABB
 	Layer     int
 	Frame     int
+	Anim      string
+	AnimTime  int
 	State     []byte
 }
 
@@ -524,6 +687,9 @@ type snapshot struct {
 	Focus   [2]int32
 	Chunks  []snapChunk
 	Structs []snapStruct
+	// The scene's tile map and its cells.
+	Map      string
+	MapCells [][]byte
 	// A Replayer's snapshot holds only the run, and restoring plays it again.
 	Replay *snapReplay
 }
@@ -558,12 +724,19 @@ func (e *engine) snapshot() ([]byte, error) {
 		snap.World, snap.Start, snap.Focus = w.Name, w.Start, w.focus
 		snap.Chunks, snap.Structs = w.snapshot()
 	}
+	if m := e.tmap; m != nil {
+		snap.Map = m.Name()
+		for l := range m.Source().Layers {
+			snap.MapCells = append(snap.MapCells, append([]byte(nil), m.Cells(l)...))
+		}
+	}
 	for _, ent := range s.Entities() {
 		if !ent.Alive() {
 			continue
 		}
 		se := snapEntity{ID: ent.ID, Name: ent.Name, Kind: ent.Kind, Transform: ent.Transform, Model: ent.Model,
-			Material: ent.Material, Tags: ent.Tags, Visible: ent.Visible, Parent: ent.Parent, Hitbox: ent.Hitbox, Layer: ent.Layer, Frame: ent.Frame}
+			Material: ent.Material, Tags: ent.Tags, Visible: ent.Visible, Parent: ent.Parent, Hitbox: ent.Hitbox, Layer: ent.Layer, Frame: ent.Frame,
+			Anim: ent.Anim, AnimTime: ent.AnimTime}
 		if ent.State != nil {
 			var buf bytes.Buffer
 			gob.Register(ent.State)
@@ -633,13 +806,22 @@ func (e *engine) restore(data []byte, trace io.Writer) error {
 	ents := make([]scene.Entity, len(snap.Entities))
 	for i, se := range snap.Entities {
 		ents[i] = scene.Entity{ID: se.ID, Name: se.Name, Kind: se.Kind, Transform: se.Transform, Model: se.Model,
-			Material: se.Material, Tags: se.Tags, Visible: se.Visible, Parent: se.Parent, Hitbox: se.Hitbox, Layer: se.Layer, Frame: se.Frame}
+			Material: se.Material, Tags: se.Tags, Visible: se.Visible, Parent: se.Parent, Hitbox: se.Hitbox, Layer: se.Layer, Frame: se.Frame,
+			Anim: se.Anim, AnimTime: se.AnimTime}
 	}
 	if err := s.Restore(ents, snap.NextID); err != nil {
 		return fmt.Errorf("restore: %w", err)
 	}
 	s.OnEvent = e.emit
 	e.ctx.Scene = s
+	if err := e.setMap(snap.Map); err != nil {
+		return fmt.Errorf("restore: %w", err)
+	}
+	if e.tmap != nil {
+		if err := e.tmap.SetCells(snap.MapCells); err != nil {
+			return fmt.Errorf("restore: %w", err)
+		}
+	}
 	e.behaviours = map[uint32]Behaviour{}
 	for i, ent := range s.Entities() {
 		if err := e.attach(ent); err != nil {

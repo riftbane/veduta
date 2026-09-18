@@ -22,7 +22,9 @@
 ---@field model string? a model asset's name
 ---@field material string? a material asset's name
 ---@field layer integer the first key of the draw order
----@field frame integer the frame of its material's grid (a sprite sheet), from 0; wraps around
+---@field frame integer the frame of its texture's sheet (a grid or frames), from 0; wraps around
+---@field anim string? the clip it plays: another starts it, the same changes nothing, nil stops
+---@field anim_done boolean a clip that does not loop has ended with no next (read only)
 ---@field parent veduta.Entity? the parent; set it to an entity, an entity's name or nil
 ---@field hitbox number[][]? {{min x, y, z}, {max x, y, z}} in the entity's own space, or nil
 ---@field state table your own values; the trace records them as state.<key>
@@ -92,6 +94,14 @@ function Entity:despawn() end
 ---The live entities whose parent is this one, in id order.
 ---@return veduta.Entity[]
 function Entity:children() end
+
+---Starts a clip from its first frame, even when it is playing.
+---@param clip string
+function Entity:play(clip) end
+
+---The clips the entity can play (its textures'), sorted.
+---@return string[]
+function Entity:clips() end
 
 ---A kind: the behaviour of the entities whose `kind` names it.
 ---@class veduta.Kind
@@ -173,6 +183,7 @@ function scene.entities() end
 ---@field visible? boolean
 ---@field layer? integer
 ---@field frame? integer the frame of a sprite sheet material
+---@field anim? string a clip of its texture to play
 ---@field parent? veduta.Entity|string an entity or an entity's name
 ---@field hitbox? number[][] {{min x, y, z}, {max x, y, z}}
 ---@field state? table merged into the kind's
@@ -251,6 +262,96 @@ function world.height(x, z) end
 ---@param z number
 ---@return number?
 function world.water(x, z) end
+
+---The scene's tile map: cells painted with terrains, in layers, and objects. Cell (x, y)
+---counts columns right and rows down from the top-left cell, from 0.
+map = {}
+
+---A map object: a named rectangle of cells with tags and properties.
+---@class veduta.MapObject
+---@field name string
+---@field x integer its top-left cell
+---@field y integer
+---@field w integer columns
+---@field h integer rows
+---@field tags string[]
+---@field props table<string, string|number|boolean>
+
+---The scene's map, or nil.
+---@return string?
+function map.name() end
+
+---Replaces the scene's map with a map as its file describes it; nil removes it.
+---@param name string?
+function map.load(name) end
+
+---Columns and rows.
+---@return integer w, integer h
+function map.size() end
+
+---Meters per cell.
+---@return number
+function map.tile() end
+
+---The layers' names, bottom first.
+---@return string[]
+function map.layers() end
+
+---The cell holding a point of the world (it may be off the map).
+---@param x number
+---@param y number
+---@return integer x, integer y
+function map.cell(x, y) end
+
+---The point of the world at the center of a cell.
+---@param x integer
+---@param y integer
+---@return number x, number y
+function map.center(x, y) end
+
+---@param x integer
+---@param y integer
+---@return boolean
+function map.inside(x, y) end
+
+---The terrain painting a cell, or nil.
+---@param x integer
+---@param y integer
+---@param layer? string default the first layer
+---@return string?
+function map.get(x, y, layer) end
+
+---Paints a cell with a terrain; nil empties it.
+---@param x integer
+---@param y integer
+---@param terrain string?
+---@param layer? string default the first layer
+function map.set(x, y, terrain, layer) end
+
+---Whether a terrain with the tag paints the cell.
+---@param x integer
+---@param y integer
+---@param tag string
+---@param layer? string default any layer
+---@return boolean
+function map.has(x, y, tag, layer) end
+
+---The tags of the terrains painting the cell, sorted.
+---@param x integer
+---@param y integer
+---@param layer? string default every layer
+---@return string[]
+function map.tags(x, y, layer) end
+
+---The map's objects in file order, only those with the tag when given.
+---@param tag? string
+---@return veduta.MapObject[]
+function map.objects(tag) end
+
+---The object called name, or nil.
+---@param name string
+---@return veduta.MapObject?
+function map.object(name) end
 
 ---Drawing over the frame, only inside game.draw. Coordinates are pixels from the top left.
 hud = {}

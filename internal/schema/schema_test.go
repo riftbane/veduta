@@ -33,6 +33,7 @@ var roots = map[string]struct{ root, header string }{
 	"scenario.schema.json": {"ScenarioSource", asset.TypeScenario},
 	"prefab.schema.json":   {"PrefabSource", asset.TypePrefab},
 	"world.schema.json":    {"WorldSource", asset.TypeWorld},
+	"map.schema.json":      {"MapSource", asset.TypeMap},
 }
 
 // enums are the values fields allow, by struct and JSON name, as the compilers check them
@@ -61,9 +62,13 @@ var enums = map[string][]any{
 // required overrides the rule (a field without omitempty that is not a pointer is required)
 // where the checks say otherwise.
 var required = map[string][]string{
-	"ProjectSource": {"veduta", "name", "engine"},
-	"SceneSource":   {"veduta", "camera"},
-	"WorldSource":   {"veduta", "camera", "biomes"},
+	"ProjectSource":    {"veduta", "name", "engine"},
+	"SceneSource":      {"veduta", "camera"},
+	"WorldSource":      {"veduta", "camera", "biomes"},
+	"TextureSource":    {"veduta", "size"},
+	"ClipSource":       {"frames", "fps"},
+	"EdgeSource":       {"priority"},
+	"MapTerrainSource": {"key", "name"},
 }
 
 func anys(s []string) []any {

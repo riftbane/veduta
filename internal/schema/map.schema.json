@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "MapLayerSource": {
+      "additionalProperties": false,
+      "description": "MapLayerSource is one layer of a map's cells.",
+      "properties": {
+        "layer": {
+          "description": "draw order",
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "rows": {
+          "description": "one string per row, one character per cell, a space for none",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "z": {
+          "description": "default 0.1 × its index",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "MapObjectSource": {
+      "additionalProperties": false,
+      "description": "MapObjectSource is a named rectangle of cells a game reads.",
+      "properties": {
+        "at": {
+          "description": "[column, row] of its top-left cell",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "props": {
+          "additionalProperties": {},
+          "description": "strings, numbers and booleans",
+          "type": "object"
+        },
+        "size": {
+          "description": "[columns, rows], default [1, 1]",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "at",
+        "name"
+      ],
+      "type": "object"
+    },
+    "MapTerrainSource": {
+      "additionalProperties": false,
+      "description": "MapTerrainSource is what a map paints cells with.",
+      "properties": {
+        "key": {
+          "description": "the character standing for it in rows",
+          "type": "string"
+        },
+        "material": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "texture": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "MapSource is assets/maps/<name>.vmap.",
+  "properties": {
+    "layers": {
+      "items": {
+        "$ref": "#/definitions/MapLayerSource"
+      },
+      "type": "array"
+    },
+    "objects": {
+      "items": {
+        "$ref": "#/definitions/MapObjectSource"
+      },
+      "type": "array"
+    },
+    "origin": {
+      "description": "world position of the top-left corner, default [0, 0, 0]",
+      "items": {
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "size": {
+      "description": "[columns, rows]",
+      "items": {
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "terrains": {
+      "items": {
+        "$ref": "#/definitions/MapTerrainSource"
+      },
+      "type": "array"
+    },
+    "tile": {
+      "description": "meters per cell, default 1",
+      "type": "number"
+    },
+    "veduta": {
+      "const": "map/1"
+    }
+  },
+  "required": [
+    "layers",
+    "size",
+    "terrains",
+    "veduta"
+  ],
+  "title": "map",
+  "type": "object"
+}

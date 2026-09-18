@@ -271,7 +271,7 @@ func LegacySources(root string, p *asset.Project) ([]string, error) {
 				return nil
 			}
 			for _, k := range asset.SourceKinds {
-				if strings.HasSuffix(d.Name(), k.LegacyExt()) && len(d.Name()) > len(k.LegacyExt()) {
+				if ext := k.LegacyExt(); ext != "" && strings.HasSuffix(d.Name(), ext) && len(d.Name()) > len(ext) {
 					rel, err := filepath.Rel(root, fp)
 					if err != nil {
 						return err
@@ -455,6 +455,14 @@ func (c *cooker) cookOne(k asset.Kind, file string) {
 		}
 		c.lib.Worlds[name] = w
 		body = asset.EncodeWorld(w)
+	case asset.KindMap:
+		m, err := asset.ParseMap(it.Source, data)
+		if err != nil {
+			fail(err)
+			return
+		}
+		c.lib.Maps[name] = m
+		body = asset.EncodeMap(m)
 	}
 	if c.write {
 		meta := asset.Meta{Kind: k, Name: name, Source: srcAssetRel, SourceHash: hash, Compiler: asset.CompilerVersion, Deps: deps}
@@ -530,6 +538,13 @@ func (c *cooker) decodeInto(k asset.Kind, name string, body asset.Chunk) error {
 		}
 		w.Name = name
 		c.lib.Worlds[name] = w
+	case asset.KindMap:
+		m, err := asset.DecodeMap(body)
+		if err != nil {
+			return err
+		}
+		m.Name = name
+		c.lib.Maps[name] = m
 	}
 	return nil
 }

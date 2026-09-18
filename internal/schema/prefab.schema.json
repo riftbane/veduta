@@ -6,6 +6,10 @@
       "additionalProperties": false,
       "description": "EntitySource is one entity of a scene.",
       "properties": {
+        "anim": {
+          "description": "the clip of its texture it plays",
+          "type": "string"
+        },
         "frame": {
           "description": "the frame of a material's grid it shows, from 0",
           "type": "integer"

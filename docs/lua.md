@@ -118,7 +118,9 @@ An entity is a value with fields and methods. The same entity is always the same
 | `visible` | drawn or not |
 | `model`, `material` | asset names, or nil |
 | `layer` | first key of the draw order |
-| `frame` | the frame shown when the material has a `grid` (a sprite sheet): an integer from 0, left to right then top to bottom, wrapping around the grid's frames. Animate with `e.frame = engine.tick // 4 % 6` |
+| `frame` | the frame shown when the texture is a sheet (a `grid` or `frames`, or a material `grid`): an integer from 0, left to right then top to bottom, wrapping around the grid's frames. Animate with `e.frame = engine.tick // 4 % 6`, or with a clip |
+| `anim` | the clip of the entity's texture it plays, or nil: setting another clip starts it, setting the one playing changes nothing, nil stops (the frame stays). While a clip plays, the engine sets `frame` at the end of every tick; a clip that does not loop ends on its last frame or goes on with its `next` |
+| `anim_done` | true once a clip that does not loop has shown its last frame and has no `next` (read only) |
 | `parent` | the parent entity, or nil; set it to an entity (or its name) or nil. The position, rotation and scale are relative to the parent, so an entity given a parent moves with it from then on |
 | `hitbox` | `{{min x, y, z}, {max x, y, z}}` in the entity's own space, or nil: replaces the model's bounds for collisions, as a scene file's `hitbox` |
 | `state` | a table of your own values; the trace records it as `state.<key>`, so scenarios can check it (`state.score`). Entities of a Lua kind start with an empty one. |
@@ -138,6 +140,8 @@ Setting any other field is an error: keep your own values in `state`.
 | `e:overlapping([tag])` | the live entities whose bounds overlap this one's (last tick's), in id order, only those with `tag` when given |
 | `e:bounds()` | min x, y, z, max x, y, z, or nil for an entity without bounds |
 | `e:children()` | the live entities whose parent is this one, in id order |
+| `e:play(clip)` | starts the clip from its first frame, even when it is playing |
+| `e:clips()` | the clips the entity can play (its textures'), sorted |
 | `e:despawn()` | removed at the end of the tick, with its children |
 
 ## scene
@@ -148,7 +152,7 @@ Setting any other field is an error: keep your own values in `state`.
 | `scene.find(name)` | the entity, or nil |
 | `scene.tagged(tag)` | a list of entities, in id order |
 | `scene.entities()` | every live entity, in id order |
-| `scene.spawn{...}` | adds an entity and returns it; fields `kind` (default `static`), `name`, `model`, `material`, `position`, `rotation` (degrees), `scale` (each `{x, y, z}`), `tags` (a list), `visible`, `layer`, `frame`, `parent` (an entity or a name), `hitbox` (`{{min}, {max}}`), `state` (a table merged into the kind's) |
+| `scene.spawn{...}` | adds an entity and returns it; fields `kind` (default `static`), `name`, `model`, `material`, `position`, `rotation` (degrees), `scale` (each `{x, y, z}`), `tags` (a list), `visible`, `layer`, `frame`, `anim`, `parent` (an entity or a name), `hitbox` (`{{min}, {max}}`), `state` (a table merged into the kind's) |
 | `scene.spawn_prefab(name, x, y, z [, rotation [, prefix]])` | adds the entities of `assets/prefabs/<name>.vprefab` with the min corner of its footprint at (x, y, z), turned by `rotation` (0, 90, 180 or 270 degrees about +Y) as a world places it, named `<prefix>_<entity>` (prefix defaults to the prefab's name) and parented as the prefab says. Returns a table listing them in prefab order that also holds each under its name in the prefab (`house.door`) |
 | `scene.load(name)` | replaces the scene, as a reset |
 
@@ -183,6 +187,31 @@ game's menu) and `cancel` (back). Home leaves the game and never reaches it.
 | `world.focus(x, y, z)` | where the chunks follow; call it every tick |
 | `world.height(x, z)` | the ground's height |
 | `world.water(x, z)` | the water level there, or nil |
+
+## map
+
+The scene's tile map ([docs/map.md](map.md)): a grid of cells painted with terrains, in
+layers, and objects. Cell (x, y) counts columns right and rows down from the top-left cell,
+from 0. A `layer` argument is a layer's name.
+
+| Function | Meaning |
+|----------|---------|
+| `map.name()` | the scene's map, or nil |
+| `map.load(name)` | replaces the scene's map with a map as its file describes it (nil removes it); the entities stay |
+| `map.size()` | columns, rows |
+| `map.tile()` | meters per cell |
+| `map.layers()` | the layers' names, bottom first |
+| `map.cell(x, y)` | the cell holding a point of the world (it may be off the map) |
+| `map.center(x, y)` | the point of the world at the center of cell (x, y) |
+| `map.inside(x, y)` | whether the cell is on the map |
+| `map.get(x, y [, layer])` | the terrain painting the cell (default the first layer), or nil for an empty cell or one off the map |
+| `map.set(x, y, terrain [, layer])` | paints the cell (default the first layer); nil empties it. Drawn at once, borders included; a `map_set` event in the trace |
+| `map.has(x, y, tag [, layer])` | whether a terrain with the tag paints the cell, on any layer unless one is named |
+| `map.tags(x, y [, layer])` | the tags of the terrains painting the cell, on every layer unless one is named, sorted |
+| `map.objects([tag])` | the map's objects in file order (only those with the tag): tables `{name, x, y, w, h, tags, props}` |
+| `map.object(name)` | the object, or nil |
+
+A scene without a map raises an error from every function but `map.name` and `map.load`.
 
 ## hud
 

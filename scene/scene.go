@@ -56,10 +56,17 @@ type Entity struct {
 	// bounds as the source of AABB (collisions, Overlapping, no_overlap and the trace's
 	// aabb). An entity without a model gets an AABB from its hitbox alone.
 	Hitbox *gmath.AABB
-	// Layer is the first key of the draw order: lower layers are drawn first. Within a
 	// Frame picks the frame shown when the entity's material has a grid (a sprite sheet),
 	// counted left to right, top to bottom, from 0; it wraps around the grid's frames.
+	// While Anim is set, the engine sets it every tick.
 	Frame int
+	// Anim is the clip of the entity's texture it plays ("" for none): at the end of every
+	// tick the engine sets Frame to the clip's frame AnimTime ticks after it started and
+	// counts AnimTime up; a clip that ends and names a next one switches to it. Play starts a
+	// clip over.
+	Anim     string
+	AnimTime int
+	// Layer is the first key of the draw order: lower layers are drawn first. Within a
 	// layer, opaque parts are drawn in id order, then blended parts back to front. Opaque
 	// and cutout parts write depth, so among them the nearest is in front whatever the
 	// layer. Blended parts write none: the layer decides which blended surface covers
@@ -71,6 +78,16 @@ type Entity struct {
 	world gmath.Mat4
 	stamp uint32
 	dead  bool
+}
+
+// Play starts clip from its first frame, even when it is already playing.
+func (e *Entity) Play(clip string) { e.Anim, e.AnimTime = clip, 0 }
+
+// SetAnim starts clip unless it is already playing.
+func (e *Entity) SetAnim(clip string) {
+	if e.Anim != clip {
+		e.Play(clip)
+	}
 }
 
 // World returns the world matrix computed by the last Scene.Update.
@@ -156,6 +173,7 @@ func Load(src *asset.Scene, bounds BoundsFunc) (*Scene, error) {
 			Hitbox:   cloneBox(a.Hitbox),
 			Layer:    a.Layer,
 			Frame:    a.Frame,
+			Anim:     a.Anim,
 		}
 		s.nextID++
 		s.add(e)

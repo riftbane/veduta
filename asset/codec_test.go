@@ -338,8 +338,22 @@ func TestDecodeTextureValidation(t *testing.T) {
 	// Pixels are stored as B, G, R, A bytes.
 	one := &Texture{Data: gfx.TextureData{Levels: []*gfx.Image{{W: 1, H: 1, Pix: []uint32{gfx.RGBA(0x11, 0x22, 0x33, 0x44)}}}}}
 	c := EncodeTexture(one)
-	if !bytes.HasSuffix(c.Data, []byte{0x33, 0x22, 0x11, 0x44}) {
+	if !bytes.Contains(c.Data, []byte{1, 0, 0, 0, 0x33, 0x22, 0x11, 0x44, 0, 0, 0, 0}) {
 		t.Fatalf("pixel bytes % x", c.Data)
+	}
+	// Frames, clips and an edge round trip.
+	sheet := &Texture{Name: "hero", Data: gfx.TextureData{Levels: []*gfx.Image{img(8, 4)}, Wrap: gfx.WrapClamp}, Layers: 1,
+		Grid: [2]int{4, 2}, Play: "walk",
+		Clips: []Clip{{Name: "hit", Frames: []int{5, 6}, FPS: 12, Next: "walk"}, {Name: "walk", Frames: []int{0, 1, 2, 3}, FPS: 8, Loop: true}},
+		Edge:  &Edge{Priority: 20, Width: 1.5, Roughness: 0.25, Seed: -7}}
+	back, err = DecodeTexture(EncodeTexture(sheet))
+	if err != nil || !reflect.DeepEqual(back, sheet) {
+		t.Fatalf("sheet round trip: %v\n%+v\n%+v", err, back, sheet)
+	}
+	bad := *sheet
+	bad.Clips = []Clip{{Name: "walk", Frames: []int{8}, FPS: 8}}
+	if _, err := DecodeTexture(EncodeTexture(&bad)); err == nil {
+		t.Errorf("frame outside the grid accepted")
 	}
 }
 

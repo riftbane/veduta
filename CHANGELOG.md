@@ -8,6 +8,33 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Tile maps (`docs/map.md`): `assets/maps/<name>.vmap` (header `map/1`) is a grid of cells
+  painted with terrains (a texture or a material each, with tags), in up to 16 layers
+  written as rows of characters, plus objects (named rectangles with tags and properties)
+  the game reads. A scene names its map (`"map"`) and the engine draws it under the
+  entities in chunks of 16 × 16 cells (package `tilemap`, drawn as `scene.Static`s: no
+  entities, nothing in the trace but changes). A terrain whose texture has an `edge`
+  spills over lower neighbours with a wandering border built from an edge atlas made at
+  load (four shapes per quarter of a cell), so no transition tiles are drawn; an empty cell
+  of an upper layer counts lowest, so paths get borders too. In Lua the `map` library
+  reads and paints cells (`map.get`, `map.set`, `map.has`, `map.tags`, `map.cell`,
+  `map.center`, `map.objects`, `map.load`, …); in Go `ctx.Map()` and `ctx.LoadMap`. A
+  change rebuilds only the chunks it shows in, is a `map_set` event, and snapshots keep
+  the cells. `veduta new map`, `veduta inspect map` (terrain and layer counts, missing
+  assets, overlapping objects, a picture of the map with its objects), and `inspect scene`
+  draws a scene's map.
+- Textures: an image layer's `rect` takes a part of the PNG (many textures from one
+  atlas); `grid` cuts a texture into frames and `frames` paints them one by one (each
+  seamless with `tiling`); `clips` name animations (frames, fps, loop, next) and `play`
+  runs one wherever nothing picks a frame (the cells of a map, water on a model); `edge`
+  gives a terrain its border in maps (priority, width, roughness, seed). A sheet has no
+  mipmaps unless it asks, and a material without a grid takes its texture's.
+- Clips on entities: `anim` in scene files, `e.anim` (starts a clip unless it plays),
+  `e:play(clip)` (starts over), `e.anim_done`, `e:clips()` and `scene.spawn{anim=}` in Lua,
+  `Entity.Anim`, `SetAnim`, `Play` and `ctx.Clip` in Go. The engine sets `frame` at the end
+  of every tick from the tick count, so animations are deterministic and in the trace
+  (`anim` when set, a scenario path too); a clip that ends goes on with its `next`.
+
 - `veduta extension [--out FILE] [--install]`: the VS Code extension of the tool's own
   release, checksum verified, written out or installed with VS Code's `code`. `veduta
   version` names that extension's version (`"extension"`), and the extension (0.8.0)

@@ -111,6 +111,7 @@ yield:
 | `aabb.min`, `aabb.max`, `aabb.min.x` … `aabb.max.z` | vector / number | World-space axis-aligned bounding box of the entity's hitbox when it has one, else of its model. |
 | `visible` | boolean | Whether the entity is drawn. |
 | `frame` | number | The frame of its material's sprite sheet (0 when it has none). The trace records it only when it is not 0. |
+| `anim` | string | The clip it plays (`""` when none). The trace records it only when there is one. |
 | `tags` | list of strings | The entity's tags. |
 | `kind`, `model`, `material`, `parent` | string | As in the scene file (`""` when unset). |
 | `state.<field>`, `state.<field>.<field>` … | game value | A field of the entity's exported game state (the behaviour's state), for example `state.score` or `state.health`. Its type is known only when the scenario runs. |
