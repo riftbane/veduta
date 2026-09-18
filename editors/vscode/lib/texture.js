@@ -43,7 +43,7 @@ const layerFields = {
   image: ['path', 'fit', 'rect'],
 };
 
-const textureFields = ['veduta', 'size', 'tiling', 'mipmaps', 'layers', 'grid', 'frames', 'clips', 'play', 'edge'];
+const textureFields = ['veduta', 'size', 'tiling', 'mipmaps', 'layers', 'grid', 'frames', 'clips', 'play', 'edge', 'autotile'];
 const clipFields = ['frames', 'fps', 'loop', 'next'];
 const edgeFields = ['priority', 'width', 'roughness', 'seed'];
 const allLayerFields = ['type', 'opacity', 'blend'].concat(...Object.values(layerFields));
@@ -563,7 +563,7 @@ class check {
 // ({w, h, data}) or to {error}.
 function validate(src, images) {
   const c = new check();
-  const spec = { w: 1, h: 1, tiling: false, mipmaps: true, layers: [], frames: [], grid: [0, 0], clips: [], play: '', edge: null };
+  const spec = { w: 1, h: 1, tiling: false, mipmaps: true, layers: [], frames: [], grid: [0, 0], clips: [], play: '', edge: null, autotile: false };
   const present = (k) => has(src, k) && src[k] !== null;
   const sheet = present('grid') || present('frames');
   if (!has(src, 'veduta')) {
@@ -745,18 +745,30 @@ function validateSheet(c, spec, src, images) {
   } else {
     spec.play = play;
   }
+  let fw = spec.w; // a frame's pixels
+  let fh = spec.h;
+  if (spec.grid[0] > 0 && !present('frames')) {
+    fw = spec.w / spec.grid[0];
+    fh = spec.h / spec.grid[1];
+  }
+  if (has(src, 'autotile') && src.autotile !== null) {
+    if (typeof src.autotile !== 'boolean') {
+      c.at('autotile', 'must be true or false');
+    } else if (src.autotile) {
+      if (present('edge')) {
+        c.at('autotile', 'not with edge: an autotile draws its own borders');
+      } else if (fw % 6 !== 0 || fh % 3 !== 0 || fw / 6 !== fh / 3 || (fw / 6) % 2 !== 0) {
+        c.at('autotile', `a frame must be 6 × 3 square tiles of an even size (the island's 3 × 3, then the lake's), got ${fw} × ${fh}`);
+      }
+      spec.autotile = true;
+    }
+  }
   if (present('edge')) {
     const e = typeof src.edge === 'object' && !Array.isArray(src.edge) ? src.edge : {};
     for (const k of Object.keys(e)) {
       if (!edgeFields.includes(k)) {
         c.at(`edge.${k}`, 'unknown field');
       }
-    }
-    let fw = spec.w;
-    let fh = spec.h;
-    if (spec.grid[0] > 0 && !present('frames')) {
-      fw = spec.w / spec.grid[0];
-      fh = spec.h / spec.grid[1];
     }
     const edge = { priority: 0, width: 0, roughness: c.float('edge.roughness', e.roughness, 0, 1, f(0.5)), seed: c.int('edge.seed', e.seed, -Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, 0) };
     if (e.priority === undefined || e.priority === null) {

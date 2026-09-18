@@ -190,6 +190,10 @@
   },
   "description": "TextureSource is assets/textures/<name>.vtex.",
   "properties": {
+    "autotile": {
+      "description": "Autotile: every frame is 6 × 3 tiles, an island and a lake, picked by a map's cells.",
+      "type": "boolean"
+    },
     "clips": {
       "additionalProperties": {
         "$ref": "#/definitions/ClipSource"

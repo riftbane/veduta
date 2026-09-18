@@ -37,6 +37,7 @@ file name, so it must be unique across the folders.
 | `clips` | object | none | Named animations of the frames: name → clip (below). Needs `grid` or `frames`. |
 | `play` | string | none | A clip shown wherever the texture is drawn and nothing picks a frame: the tiles of a map, an entity without a clip of its own. |
 | `edge` | object | none | How the texture spills over lower terrains around it when a map paints with it. See [Edges](#edges). |
+| `autotile` | boolean | `false` | `true`: every frame is 6 × 3 tiles, an island and a lake, and a map picks a cell's tile by its neighbours. See [Autotiles](#autotiles). Not with `edge`. |
 
 ## Coordinates, angles and colors
 
@@ -335,6 +336,54 @@ terrain, so a path painted on an upper layer gets a border over the ground below
 A frame's width and height must be even (the border is built from the four quarters of a
 cell). The border is part of the texture: an animated texture's border moves with it.
 
+## Autotiles
+
+`"autotile": true` makes a texture a terrain drawn with tiles made by hand: its borders
+where it meets anything else (another terrain, or an empty cell of its layer) are the
+ones drawn in the image, not generated. Every frame is 6 × 3 square tiles of an even size:
+
+```
+ island (convex)   lake (concave)
+ ┌──┬──┬──┐        ┌──┬──┬──┐
+ │NW│N │NE│        │nw│n │ne│
+ ├──┼──┼──┤        ├──┼──┼──┤
+ │W │C │E │        │w │  │e │   the lake's middle is not used
+ ├──┼──┼──┤        ├──┼──┼──┤
+ │SW│S │SE│        │sw│s │se│
+ └──┴──┴──┘        └──┴──┴──┘
+```
+
+The island is the terrain in 3 × 3 cells with nothing around it; the lake is the terrain
+in the 8 cells around one empty cell, going on outside. Draw them as one picture each:
+the map cuts them where it needs.
+
+A 16-pixel autotile, animated in 2 frames by a PNG of 192 × 48 pixels:
+
+```json
+{
+  "veduta": "texture/1",
+  "size": [192, 48],
+  "layers": [ { "type": "image", "path": "textures/src/cliff.png" } ],
+  "grid": [2, 1],
+  "clips": { "shine": { "frames": [0, 1], "fps": 2 } },
+  "play": "shine",
+  "autotile": true
+}
+```
+
+A map cell of the terrain looks at its 8 neighbours: the same terrain on its layer counts
+as itself, and so does a neighbour off the map. Each quarter of the cell falls in one of
+seven cases from the two sides and the corner it touches: all of them the terrain (C),
+the sides but not the corner (a concave corner: the lake corner diagonal to the empty
+cell), neither side (a convex corner: the island's corner), or one side missing, with the
+corner missing too (a straight border: the island's side) or not (a border that turns in:
+the lake's side). When the four quarters are those of a tile as it sits in its drawing,
+the cell draws the whole tile; else each quarter is cut from the tile of its case. So the
+17 tiles give every shape: lines one cell wide, lone cells, diagonal touches.
+
+A frame's tiles are its width / 6; the height must be half the width. The VS Code
+extension has a tile editor that draws autotiles, animated tiles and plain tiles as PNGs.
+
 ## Tiling
 
 With `"tiling": true` the compiled texture uses repeat addressing, and `noise` layers are
@@ -363,7 +412,7 @@ bottom when the texture has no intended transparency.
 `asset.Texture`: `Name`; `Data.Levels` (level 0 is `size`, or the frames side by side;
 pixels are 32-bit `0xAARRGGBB`, straight alpha, rows top to bottom); `Data.Wrap` (repeat
 when `tiling`, else clamp); `Tiling`; `Layers` (the number of source layers); `Grid`
-(columns and rows of frames, 0 0 for a single image); `Clips` (by name); `Play`; `Edge`. Its binary layout in
+(columns and rows of frames, 0 0 for a single image); `Clips` (by name); `Play`; `Edge`; `Autotile`. Its binary layout in
 `.vda` files is in `docs/vda.md` (chunk `TEXR`). Compilation is deterministic: the same
 source and the same image files always produce the same bytes.
 
@@ -403,7 +452,8 @@ fields the type does not use absent; colors valid; numbers finite and in range (
 explicit `0` for `octaves` or `cells` is out of range, not "default"); enum values from
 the lists above; image paths valid, and the file present, a PNG and not too large; an
 image `rect` inside the image; a `grid` that divides `size`; clip frames inside the sheet;
-`next` and `play` naming clips; a `grid` not `tiling`.
+`next` and `play` naming clips; a `grid` not `tiling`; an `autotile` frame of 6 × 3 even
+square tiles, without `edge`.
 
 ## Limits
 

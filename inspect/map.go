@@ -103,6 +103,8 @@ func Map(ir *Renderer, name string, opt Options) (*Report, error) {
 		}
 		if tx := ir.Lib.Textures[tex]; tx != nil && tx.Edge != nil {
 			tm["edge_priority"] = tx.Edge.Priority
+		} else if tx != nil && tx.Autotile {
+			tm["autotile"] = true
 		}
 		if counts[i] == 0 {
 			rep.Add(Info, MapUnusedTerrain, 1, map[string]any{"terrain": t.Name},

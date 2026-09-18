@@ -8,12 +8,15 @@ import (
 )
 
 // CellSize returns the pixels of a cell in Picture: the largest frame of the map's
-// terrains' textures (at least 1 × 1).
+// terrains' textures, or tile of an autotile (at least 1 × 1).
 func (m *Map) CellSize() (w, h int) {
 	w, h = 1, 1
 	for i := range m.draws {
 		if t := m.draws[i].tex; t != nil && len(t.Data.Levels) > 0 {
 			fw, fh := t.Data.Levels[0].W/max(t.Grid[0], 1), t.Data.Levels[0].H/max(t.Grid[1], 1)
+			if ts := m.draws[i].auto; ts > 0 {
+				fw, fh = ts, ts // a tile of it
+			}
 			w, h = max(w, fw), max(h, fh)
 		}
 	}
@@ -72,6 +75,19 @@ func (m *Map) Picture(tick uint64, rate int) *gfx.Image {
 				gc, gr := max(t.Grid[0], 1), max(t.Grid[1], 1)
 				fw, fh := base.W/gc, base.H/gr
 				f := frame(t) % (gc * gr)
+				if ts := m.draws[v-1].auto; ts > 0 {
+					tiles, whole := autoPick(m.autoMask(l, x, y, v))
+					for q, tile := range tiles {
+						sx, sy := f%gc*fw+tile%autoCols*ts, f/gc*fh+tile/autoCols*ts
+						if whole {
+							blit(base, sx, sy, ts, ts, x*cw, y*ch, cw, ch)
+							break
+						}
+						dx, dy, dw, dh := quarterRect(q, x*cw, y*ch, cw, ch)
+						blit(base, sx+q%2*ts/2, sy+q/2*ts/2, ts/2, ts/2, dx, dy, dw, dh)
+					}
+					continue
+				}
 				blit(base, f%gc*fw, f/gc*fh, fw, fh, x*cw, y*ch, cw, ch)
 			}
 		}
@@ -100,18 +116,24 @@ func (m *Map) Picture(tick uint64, rate int) *gfx.Image {
 			f := frame(d.tex) % max(atlas.Grid[1], 1)
 			for _, e := range byTerrain[i] {
 				sx, sy := e.shape*(qw+2)+1, f*band+e.quarter*(qh+2)+1
-				// Quarters split the cell: an odd cell's right and bottom ones are a pixel larger.
-				hw, hh := cw/2, ch/2
-				dx, dy, dw, dh := e.x*cw, e.y*ch, hw, hh
-				if e.quarter%2 == 1 {
-					dx, dw = dx+hw, cw-hw
-				}
-				if e.quarter/2 == 1 {
-					dy, dh = dy+hh, ch-hh
-				}
+				dx, dy, dw, dh := quarterRect(e.quarter, e.x*cw, e.y*ch, cw, ch)
 				blit(a, sx, sy, qw, qh, dx, dy, dw, dh)
 			}
 		}
 	}
 	return img
+}
+
+// quarterRect returns quarter q of the cw × ch cell at (x, y) of the picture: an odd cell's
+// right and bottom quarters are a pixel larger.
+func quarterRect(q, x, y, cw, ch int) (dx, dy, dw, dh int) {
+	hw, hh := cw/2, ch/2
+	dx, dy, dw, dh = x, y, hw, hh
+	if q%2 == 1 {
+		dx, dw = dx+hw, cw-hw
+	}
+	if q/2 == 1 {
+		dy, dh = dy+hh, ch-hh
+	}
+	return dx, dy, dw, dh
 }

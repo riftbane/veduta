@@ -128,14 +128,15 @@ func Compile(name string, src *asset.TextureSource, loc *asset.Locator, opt Opti
 		wrap = gfx.WrapRepeat // frames tile one by one: the sheet does not repeat
 	}
 	return &asset.Texture{
-		Name:   name,
-		Data:   gfx.TextureData{Levels: levels, Wrap: wrap},
-		Tiling: s.tiling,
-		Layers: len(src.Layers),
-		Grid:   s.grid,
-		Clips:  s.clips,
-		Play:   s.play,
-		Edge:   s.edge,
+		Name:     name,
+		Data:     gfx.TextureData{Levels: levels, Wrap: wrap},
+		Tiling:   s.tiling,
+		Layers:   len(src.Layers),
+		Grid:     s.grid,
+		Clips:    s.clips,
+		Play:     s.play,
+		Edge:     s.edge,
+		Autotile: s.autotile,
 	}, nil
 }
 
@@ -185,15 +186,16 @@ func Deps(src *asset.TextureSource) []string {
 
 // spec is a validated texture source with every default resolved.
 type spec struct {
-	w, h    int // with frames, the size of one frame
-	tiling  bool
-	mipmaps bool
-	layers  []layerSpec
-	frames  [][]layerSpec // each frame's own layers, drawn over layers
-	grid    [2]int        // of the compiled image
-	clips   []asset.Clip
-	play    string
-	edge    *asset.Edge
+	w, h     int // with frames, the size of one frame
+	tiling   bool
+	mipmaps  bool
+	layers   []layerSpec
+	frames   [][]layerSpec // each frame's own layers, drawn over layers
+	grid     [2]int        // of the compiled image
+	clips    []asset.Clip
+	play     string
+	edge     *asset.Edge
+	autotile bool
 }
 
 // rgba is a straight-alpha color with components in [0, 1].
@@ -372,11 +374,20 @@ func validateSheet(c *asset.Checker, s *spec, src *asset.TextureSource, opt Opti
 	} else {
 		s.play = src.Play
 	}
-	if e := src.Edge; e != nil {
-		fw, fh := s.w, s.h
-		if s.grid[0] > 0 && src.Frames == nil {
-			fw, fh = s.w/s.grid[0], s.h/s.grid[1]
+	fw, fh := s.w, s.h // a frame's pixels
+	if s.grid[0] > 0 && src.Frames == nil {
+		fw, fh = s.w/s.grid[0], s.h/s.grid[1]
+	}
+	if src.Autotile {
+		switch {
+		case src.Edge != nil:
+			c.Errorf("autotile", "not with edge: an autotile draws its own borders")
+		case fw%6 != 0 || fh%3 != 0 || fw/6 != fh/3 || fw/6%2 != 0:
+			c.Errorf("autotile", "a frame must be 6 × 3 square tiles of an even size (the island's 3 × 3, then the lake's), got %d × %d", fw, fh)
 		}
+		s.autotile = true
+	}
+	if e := src.Edge; e != nil {
 		edge := &asset.Edge{Seed: e.Seed, Roughness: c.Float("edge.roughness", e.Roughness, 0, 1, 0.5)}
 		switch {
 		case e.Priority == nil:

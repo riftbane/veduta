@@ -54,6 +54,7 @@ type drawInfo struct {
 	priority int            // edge priority, 0 without an edge
 	tex      *asset.Texture // its texture, nil when unknown
 	merge    bool           // its texture repeats as one image: cells side by side make one quad
+	auto     int            // an autotile's tile size in pixels, 0 for a texture drawn whole
 }
 
 // New returns a map playing src, drawn with the textures and materials of lib.
@@ -99,7 +100,20 @@ func (m *Map) prepare() {
 			base = mat
 		}
 		tx := d.tex
-		d.merge = tx != nil && tx.Data.Wrap == gfx.WrapRepeat && tx.Grid == [2]int{} && base != nil && base.Grid == [2]int{}
+		d.merge = tx != nil && tx.Data.Wrap == gfx.WrapRepeat && tx.Grid == [2]int{} && base != nil && base.Grid == [2]int{} && !tx.Autotile
+		if tx != nil && tx.Autotile && base != nil && len(tx.Data.Levels) > 0 {
+			d.auto = tx.Data.Levels[0].W / max(tx.Grid[0], 1) / autoCols
+			atlas := "map:auto:" + tx.Name
+			if m.textures[atlas] == nil {
+				m.textures[atlas] = AutoAtlas(atlas, tx)
+			}
+			mat := *base
+			mat.Name = "map:auto:" + d.material
+			mat.Texture = atlas
+			mat.Grid = m.textures[atlas].Grid
+			d.material = mat.Name
+			m.materials[mat.Name] = &mat
+		}
 		if tx == nil || tx.Edge == nil || base == nil || len(tx.Data.Levels) == 0 {
 			continue
 		}
@@ -381,7 +395,22 @@ func (m *Map) build(l, cx, cy int, name string) *asset.Model {
 	}
 	for i := 0; i < nt; i++ {
 		first := len(md.Indices)
-		if m.draws[i].merge {
+		if ts := m.draws[i].auto; ts > 0 {
+			for _, c := range cellQuads[i] {
+				tiles, whole := autoPick(m.autoMask(l, c[0], c[1], i+1))
+				if whole {
+					u0, v0, u1, v1 := autoUV(tiles[0], -1, ts)
+					quad(&md, wx(c[0]), wy(c[1]), wx(c[0]+1), wy(c[1]+1), oz, u0, v0, u1, v1)
+					continue
+				}
+				for q, tile := range tiles {
+					qx := wx(c[0]) + float32(float32(q%2)*half)
+					qy := wy(c[1]) - float32(float32(q/2)*half)
+					u0, v0, u1, v1 := autoUV(tile, q, ts)
+					quad(&md, qx, qy, qx+half, qy-half, oz, u0, v0, u1, v1)
+				}
+			}
+		} else if m.draws[i].merge {
 			for _, r := range mergeCells(cellQuads[i]) {
 				quad(&md, wx(r[0]), wy(r[1]), wx(r[0]+r[2]), wy(r[1]+r[3]), oz, 0, 0, float32(r[2]), float32(r[3]))
 			}

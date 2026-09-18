@@ -92,6 +92,12 @@ func TestSheetErrors(t *testing.T) {
 			`grid[0]: 0 out of range [1, 256]`},
 		`"size": [8, 4], "grid": [4, 2], "frames": [], "layers": [{"type": "solid", "color": "#ffffff"}]`: {
 			`frames: not allowed with grid`},
+		`"size": [48, 24], "autotile": true, "layers": [{"type": "solid", "color": "#ffffff"}], "edge": {"priority": 1}`: {
+			`autotile: not with edge`},
+		`"size": [30, 15], "autotile": true, "layers": [{"type": "solid", "color": "#ffffff"}]`: {
+			`autotile: a frame must be 6 × 3 square tiles of an even size (the island's 3 × 3, then the lake's), got 30 × 15`},
+		`"size": [96, 24], "grid": [1, 1], "autotile": true, "layers": [{"type": "solid", "color": "#ffffff"}]`: {
+			`got 96 × 24`},
 		`"size": [2, 2], "frames": []`: {
 			`frames: 0 frames, want 1 to 256`},
 		`"size": [2048, 2], "frames": [{"layers": [{"type": "solid", "color": "#ffffff"}]}, {"layers": [{"type": "solid", "color": "#ffffff"}]}, {"layers": [{"type": "solid", "color": "#ffffff"}]}]`: {
@@ -140,6 +146,13 @@ func TestEdge(t *testing.T) {
 	tx := compile(t, `{"veduta": "texture/1", "size": [32, 16], "grid": [2, 1], "layers": [{"type": "solid", "color": "#ffffff"}], "edge": {"priority": 5, "seed": 3}}`, Options{})
 	if want := (asset.Edge{Priority: 5, Width: 4, Roughness: 0.5, Seed: 3}); tx.Edge == nil || *tx.Edge != want {
 		t.Errorf("edge %+v, want %+v (width a quarter of the 16 × 16 frame)", tx.Edge, want)
+	}
+}
+
+func TestAutotile(t *testing.T) {
+	tx := compile(t, `{"veduta": "texture/1", "size": [96, 24], "grid": [2, 1], "layers": [{"type": "solid", "color": "#ffffff"}], "autotile": true}`, Options{})
+	if !tx.Autotile {
+		t.Error("autotile not set")
 	}
 }
 

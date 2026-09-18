@@ -79,7 +79,7 @@ func TestDocsExamples(t *testing.T) {
 			}
 		}
 	}
-	for _, s := range append(append([]string{"opacity", "blend", "size", "tiling", "mipmaps", "layers", "grid", "frames", "clips", "play", "edge", "fps", "loop", "next", "priority", "width", "roughness", "seed"}, blendNames...), fitNames...) {
+	for _, s := range append(append([]string{"opacity", "blend", "size", "tiling", "mipmaps", "layers", "grid", "frames", "clips", "play", "edge", "autotile", "fps", "loop", "next", "priority", "width", "roughness", "seed"}, blendNames...), fitNames...) {
 		if !strings.Contains(doc, "`"+s+"`") {
 			t.Errorf("%q is not documented", s)
 		}

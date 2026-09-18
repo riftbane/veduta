@@ -46,12 +46,12 @@ escaping, `deps` sorted without duplicates and `[]` when empty. Readers reject M
 is not byte-for-byte canonical, so equal metadata always has equal bytes.
 
 ```json
-{"compiler":"veduta-asset/0.6.0","deps":[],"kind":"model","name":"crate","source":"models/crate.vmodel","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
+{"compiler":"veduta-asset/0.7.0","deps":[],"kind":"model","name":"crate","source":"models/crate.vmodel","source_hash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
 ```
 
 | Key | Meaning |
 |-----|---------|
-| `compiler` | Compiler version (`asset.CompilerVersion`: `veduta-asset/0.6.0` since texture frames, clips and edges, maps and entity clips, `veduta-asset/0.5.0` since material grids and entity frames, `veduta-asset/0.4.0` since model levels of detail and world terrain and vegetation, `veduta-asset/0.3.0` since prefabs and worlds, `veduta-asset/0.2.0` since scene entities carry a hitbox and a layer, `veduta-asset/0.1.0` before). A different version forces a recompile. |
+| `compiler` | Compiler version (`asset.CompilerVersion`: `veduta-asset/0.7.0` since texture autotiles, `veduta-asset/0.6.0` since texture frames, clips and edges, maps and entity clips, `veduta-asset/0.5.0` since material grids and entity frames, `veduta-asset/0.4.0` since model levels of detail and world terrain and vegetation, `veduta-asset/0.3.0` since prefabs and worlds, `veduta-asset/0.2.0` since scene entities carry a hitbox and a layer, `veduta-asset/0.1.0` before). A different version forces a recompile. |
 | `deps` | Other input files the compiled output depends on besides the source (for example the PNG of a texture `image` layer), as paths relative to the assets directory. |
 | `kind` | `model`, `texture`, `material`, `scene`, `prefab`, `world` or `map`. |
 | `name` | Asset name (the source file name without its suffix). |
@@ -127,6 +127,7 @@ as many mesh parts as the base mesh, or none and a model.
 | 10 | clips | `u32` count, then per clip | `str` name, `u32` count and that many `u32` frames, `f32` fps, `bool` loop, `str` next (`""` for none) |
 | 11 | play | `str` | the clip shown when nothing picks a frame, `""` for none |
 | 12 | edge | `bool`, then when true | `i64` priority, `f32` width, `f32` roughness, `i64` seed |
+| 13 | autotile | `bool` | every frame is 6 × 3 tiles, an island and a lake |
 
 Readers check: level i measures exactly max(1, width >> i) × max(1, height >> i); levels
 is at most 1 + ⌊log₂ max(width, height)⌋ (the chain stops at 1 × 1); width and height

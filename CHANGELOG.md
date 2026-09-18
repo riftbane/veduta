@@ -21,6 +21,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Autotiles: `"autotile": true` in a `.vtex` makes every frame 6 × 3 hand-drawn tiles, an
+  island (convex corners) and a lake (concave corners); a map picks each cell's tile, or
+  each quarter's, from its 8 neighbours, so 17 tiles draw every shape. Animated with
+  `grid`/`clips` like any sheet. Compiler `veduta-asset/0.7.0` (TEXR field 13). The VS Code
+  map editor draws them as the engine does (compared with `tilemap_cliffs_picture`).
 - The map editor in the VS Code extension (0.9.0): a `.vmap` opens painted, as the engine
   draws it (borders and play clips included: `editors/vscode/lib/tilemap.js` is compared
   pixel by pixel with `tilemap.Picture`'s goldens, and its checks give the compiler's

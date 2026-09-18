@@ -140,6 +140,15 @@ In a layer above the first, an empty cell counts as lower than any terrain: a pa
 `paths` layer gets a border over the ground below, and paths drawn one cell wide look
 like paths, not rows of squares. A terrain without an edge has square cells.
 
+## Autotiles
+
+A terrain whose texture is an autotile ([docs/texture.md](texture.md#autotiles)) is drawn
+with the tiles of its image, picked by each cell's 8 neighbours: its borders against
+anything else on its layer (another terrain, an empty cell) are the ones drawn by hand,
+an island's corners outside, a lake's inside. Put a terrain like a cliff or a hedge on a
+layer of its own above the ground, with the transparent parts of its tiles showing the
+ground below. A neighbour off the map counts as the terrain itself.
+
 ## In the game
 
 In Lua ([docs/lua.md](lua.md#map)):

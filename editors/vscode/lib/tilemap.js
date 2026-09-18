@@ -1119,7 +1119,7 @@
   // textureOf turns what lib/texture.js compiled into what a map draws with.
   function textureOf(name, compiled) {
     const s = compiled.spec;
-    return { name, image: compiled.image, grid: s.grid, clips: s.clips, play: s.play, edge: s.edge };
+    return { name, image: compiled.image, grid: s.grid, clips: s.clips, play: s.play, edge: s.edge, autotile: !!s.autotile };
   }
 
   // prepare works out how every terrain is drawn (tilemap.Map.prepare): its texture, and
@@ -1128,7 +1128,7 @@
   function prepare(m, lib) {
     const atlases = new Map();
     const draws = m.terrains.map((t) => {
-      const d = { tex: null, edge: null, priority: 0, rank: 0, frame: [0, 0], atlas: null };
+      const d = { tex: null, edge: null, priority: 0, rank: 0, frame: [0, 0], atlas: null, auto: 0 };
       let base = true;
       if (t.material) {
         base = Object.prototype.hasOwnProperty.call(lib.materials || {}, t.material);
@@ -1137,6 +1137,9 @@
         d.tex = lib.textures[t.texture] || null;
       }
       const tx = d.tex;
+      if (tx && tx.autotile && base && tx.image) {
+        d.auto = Math.trunc(Math.trunc(tx.image.w / Math.max(tx.grid[0], 1)) / AUTO_COLS);
+      }
       if (!tx || !tx.edge || !base || !tx.image) {
         return d;
       }
@@ -1157,12 +1160,16 @@
     return draws;
   }
 
-  // cellSize is the pixels of a cell: the largest frame of the terrains' textures.
+  // cellSize is the pixels of a cell: the largest frame of the terrains' textures, or tile
+  // of an autotile.
   function cellSize(draws) {
     let w = 1;
     let h = 1;
     for (const d of draws) {
-      if (d.tex && d.tex.image) {
+      if (d.auto > 0) {
+        w = Math.max(w, d.auto); // a tile of it
+        h = Math.max(h, d.auto);
+      } else if (d.tex && d.tex.image) {
         w = Math.max(w, Math.trunc(d.tex.image.w / Math.max(d.tex.grid[0], 1)));
         h = Math.max(h, Math.trunc(d.tex.image.h / Math.max(d.tex.grid[1], 1)));
       }
@@ -1217,6 +1224,103 @@
         }
       }
     }
+  }
+
+  // ---------------------------------------------------------------- autotiles (tilemap/autotile.go)
+  // A frame is 6 × 3 tiles: an island (0–2) and a lake (3–5, its middle unused). Each
+  // quarter of a cell falls in a class from its two sides and its corner; a cell whose four
+  // classes are a tile's, as it sits in its drawing, draws the whole tile, any other each
+  // quarter from the tile of its class.
+
+  const AUTO_COLS = 6;
+  const LAKE_EMPTY = 1 * AUTO_COLS + 4;
+  const FULL = 0;
+  const INNER = 1;
+  const CONVEX = 2;
+  const V_STRAIGHT = 3;
+  const V_CONCAVE = 4;
+  const H_STRAIGHT = 5;
+  const H_CONCAVE = 6;
+  const QUARTER_BITS = [[1, 64, 128], [1, 4, 2], [16, 64, 32], [16, 4, 8]]; // above or below, left or right, corner
+
+  // quarterClass is the class of quarter q of a cell whose same neighbours are mask (bit k
+  // for NEAR[k]).
+  function quarterClass(mask, q) {
+    const [a, b, c] = QUARTER_BITS[q];
+    const v = (mask & a) !== 0;
+    const h = (mask & b) !== 0;
+    const d = (mask & c) !== 0;
+    if (v && h) {
+      return d ? FULL : INNER;
+    }
+    if (!v && !h) {
+      return CONVEX;
+    }
+    if (!v) {
+      return d ? V_CONCAVE : V_STRAIGHT;
+    }
+    return d ? H_CONCAVE : H_STRAIGHT;
+  }
+
+  // CLASS_TILE is, per class and quarter, the tile a quarter of that class is cut from.
+  const CLASS_TILE = [[7, 7, 7, 7], [17, 15, 5, 3], [0, 2, 12, 14], [1, 1, 13, 13], [16, 16, 4, 4], [6, 8, 6, 8], [11, 9, 11, 9]];
+
+  // TILE_CLASSES is, per tile, its quarters' classes packed 4 bits each (-1: the lake's middle).
+  const TILE_CLASSES = (() => {
+    const out = [];
+    for (let t = 0; t < AUTO_COLS * 3; t++) {
+      const x = t % AUTO_COLS;
+      const y = Math.trunc(t / AUTO_COLS);
+      const same = (nx, ny) => (x < 3 ? nx >= 0 && nx < 3 && ny >= 0 && ny < 3 : nx !== 4 || ny !== 1);
+      let mask = 0;
+      for (let k = 0; k < 8; k++) {
+        if (same(x + NEAR[k][0], y + NEAR[k][1])) {
+          mask |= 1 << k;
+        }
+      }
+      let packed = 0;
+      for (let q = 0; q < 4; q++) {
+        packed |= quarterClass(mask, q) << (q * 4);
+      }
+      out.push(t === LAKE_EMPTY ? -1 : packed);
+    }
+    return out;
+  })();
+
+  // autoPick returns the tile of each quarter of a cell whose same neighbours are mask, and
+  // whether they are one whole tile.
+  function autoPick(mask) {
+    let packed = 0;
+    for (let q = 0; q < 4; q++) {
+      packed |= quarterClass(mask, q) << (q * 4);
+    }
+    const t = TILE_CLASSES.indexOf(packed);
+    if (t >= 0) {
+      return { tiles: [t, t, t, t], whole: true };
+    }
+    return { tiles: [0, 1, 2, 3].map((q) => CLASS_TILE[(packed >> (q * 4)) & 15][q]), whole: false };
+  }
+
+  // autoMask returns which neighbours of cell (x, y) of layer l are its terrain v; one off
+  // the map counts as v.
+  function autoMask(m, l, x, y, v) {
+    let mask = 0;
+    for (let k = 0; k < 8; k++) {
+      const nx = x + NEAR[k][0];
+      const ny = y + NEAR[k][1];
+      if (!inside(m, nx, ny) || get(m, l, nx, ny) === v) {
+        mask |= 1 << k;
+      }
+    }
+    return mask;
+  }
+
+  // quarterRect is quarter q of the cw × ch cell at (x, y): an odd cell's right and bottom
+  // quarters are a pixel larger.
+  function quarterRect(q, x, y, cw, ch) {
+    const hw = cw >> 1;
+    const hh = ch >> 1;
+    return [q % 2 === 1 ? x + hw : x, q >> 1 === 1 ? y + hh : y, q % 2 === 1 ? cw - hw : hw, q >> 1 === 1 ? ch - hh : hh];
   }
 
   // frameAt is the frame of its sheet a texture shows at tick: its play clip's, else 0.
@@ -1349,7 +1453,22 @@
           const fw = Math.trunc(t.image.w / gc);
           const fh = Math.trunc(t.image.h / gr);
           const fr = this.frames[v - 1][0];
-          blit(this, t.image, (fr % gc) * fw, Math.trunc(fr / gc) * fh, fw, fh, x * cw, y * ch, cw, ch);
+          const ts = draws[v - 1].auto;
+          if (ts > 0) {
+            const { tiles, whole } = autoPick(autoMask(m, l, x, y, v));
+            for (let q = 0; q < 4; q++) {
+              const sx = (fr % gc) * fw + (tiles[q] % AUTO_COLS) * ts;
+              const sy = Math.trunc(fr / gc) * fh + Math.trunc(tiles[q] / AUTO_COLS) * ts;
+              if (whole) {
+                blit(this, t.image, sx, sy, ts, ts, x * cw, y * ch, cw, ch);
+                break;
+              }
+              const [dx, dy, dw, dh] = quarterRect(q, x * cw, y * ch, cw, ch);
+              blit(this, t.image, sx + (q % 2) * (ts >> 1), sy + (q >> 1) * (ts >> 1), ts >> 1, ts >> 1, dx, dy, dw, dh);
+            }
+          } else {
+            blit(this, t.image, (fr % gc) * fw, Math.trunc(fr / gc) * fh, fw, fh, x * cw, y * ch, cw, ch);
+          }
         } else if (v > 0 && this.missing) {
           this.fillMissing(x, y, this.missing(v - 1));
         }
@@ -1377,21 +1496,7 @@
           const band = QUARTERS * (qh + 2);
           const sx = shape * (qw + 2) + 1;
           const sy = this.frames[u - 1][1] * band + quarter * (qh + 2) + 1;
-          // Quarters split the cell: an odd cell's right and bottom ones are a pixel larger.
-          const hw = cw >> 1;
-          const hh = ch >> 1;
-          let dx = x * cw;
-          let dy = y * ch;
-          let dw = hw;
-          let dh = hh;
-          if (quarter % 2 === 1) {
-            dx += hw;
-            dw = cw - hw;
-          }
-          if (quarter >> 1 === 1) {
-            dy += hh;
-            dh = ch - hh;
-          }
+          const [dx, dy, dw, dh] = quarterRect(quarter, x * cw, y * ch, cw, ch);
           blit(this, d.atlas, sx, sy, qw, qh, dx, dy, dw, dh);
         }
       }
@@ -1444,6 +1549,7 @@
     readJSON, load, compile, describe, format, clone, rows,
     inside, get, paint, brush, rect, flood, resize, freeKey, freeName, addTerrain, removeTerrain, uses,
     hash32, wander, inShape, edgeAtlas, textureOf, prepare, cellSize, cellEdges, frameAt, Picture, picture,
+    quarterClass, autoPick, autoMask, AUTO_COLS, LAKE_EMPTY,
   };
   // The webview loads this file with a script tag, after texture.js; Node with require.
   if (typeof module !== 'undefined' && module.exports) {

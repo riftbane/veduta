@@ -85,6 +85,38 @@ test('drawing some cells again gives the whole picture', { skip }, () => {
   assert.ok(Buffer.from(p.data).equals(Buffer.from(tm.picture(m, lib, 10, 20).data)));
 });
 
+// cliffs adds the autotile cliffs (tilemap_test.go cliffsLibrary) to the library.
+function cliffs() {
+  const lib = library();
+  const images = { 'cliff.png': png.decode(fs.readFileSync(path.join(dir, 'cliff.png'))) };
+  const out = tex.compile(tex.parse(fs.readFileSync(path.join(dir, 'cliff.vtex'), 'utf8')).src, images);
+  assert.deepStrictEqual(out.errors, []);
+  assert.strictEqual(out.spec.autotile, true);
+  lib.textures.cliff = tm.textureOf('cliff', out);
+  const m = tm.load(fs.readFileSync(path.join(dir, 'cliffs.vmap'), 'utf8'), 'cliffs.vmap');
+  assert.deepStrictEqual(m.errors, []);
+  return { lib, m: m.map };
+}
+
+test('autotiles are drawn as the engine draws them', { skip }, () => {
+  const { lib, m } = cliffs();
+  assert.deepStrictEqual(tm.cellSize(tm.prepare(m, lib)), [16, 16]);
+  same(tm.picture(m, lib, 0, 20), 'tilemap_cliffs_picture.png');
+  same(tm.picture(m, lib, 10, 20), 'tilemap_cliffs_picture_tick10.png');
+  // Painting redraws the cells around: an autotile cell looks at its neighbours.
+  const p = new tm.Picture(m, lib);
+  p.drawAll();
+  tm.paint(m, 1, 6, 4, 2);
+  p.drawRect(5, 3, 7, 5);
+  assert.ok(Buffer.from(p.data).equals(Buffer.from(tm.picture(m, lib, 0, 20).data)));
+});
+
+test('autoPick', () => {
+  assert.deepStrictEqual(tm.autoPick(255), { tiles: [7, 7, 7, 7], whole: true });
+  assert.deepStrictEqual(tm.autoPick(0), { tiles: [0, 2, 12, 14], whole: false });
+  assert.deepStrictEqual(tm.autoPick(255 & ~2), { tiles: [15, 15, 15, 15], whole: true }, 'only the NE corner missing: the lake\'s SW tile');
+});
+
 test('cellEdges', { skip }, () => {
   const lib = library();
   const m = farm();

@@ -211,3 +211,78 @@ func TestRebuild(t *testing.T) {
 		t.Errorf("%d statics, want 6", n)
 	}
 }
+
+// cliffsLibrary adds testdata/tilemap's cliffs to testLibrary: an autotile (from a PNG, its
+// second frame lighter) over grass, in islands, lakes, lines, lone cells and cells that
+// touch at a corner or the map's side.
+func cliffsLibrary(t testing.TB) *asset.Library {
+	t.Helper()
+	lib := testLibrary(t)
+	dir := filepath.Join("..", "testdata", "tilemap")
+	src, err := os.ReadFile(filepath.Join(dir, "cliff.vtex"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := texture.Parse("cliff.vtex", src, texture.Options{FS: os.DirFS(dir)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lib.Textures["cliff"] = tx
+	if src, err = os.ReadFile(filepath.Join(dir, "cliffs.vmap")); err != nil {
+		t.Fatal(err)
+	}
+	m, err := asset.ParseMap("cliffs.vmap", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lib.Maps["cliffs"] = m
+	return lib
+}
+
+// TestAutotileClasses: the tile each class of quarter is taken from has that class there,
+// and every tile but the lake's middle is drawn whole by the cell that looks like it.
+func TestAutotileClasses(t *testing.T) {
+	for c, tiles := range classTile {
+		for q, tile := range tiles {
+			if got := tileClasses[tile][q]; got != c {
+				t.Errorf("class %d quarter %d: tile %d has class %d there", c, q, tile, got)
+			}
+		}
+	}
+	seen := map[[quarters]int]int{}
+	for tile, cls := range tileClasses {
+		if tile == lakeEmpty {
+			continue
+		}
+		if other, ok := seen[cls]; ok {
+			t.Errorf("tiles %d and %d have the same classes %v", other, tile, cls)
+		}
+		seen[cls] = tile
+	}
+	if tiles, whole := autoPick(0xff); !whole || tiles[0] != 7 {
+		t.Errorf("a cell among its own: %v %v, want the island's middle whole", tiles, whole)
+	}
+	if tiles, whole := autoPick(0); whole || tiles != [quarters]int{0, 2, 12, 14} {
+		t.Errorf("a lone cell: %v %v, want the island's four corners", tiles, whole)
+	}
+}
+
+// TestAutotile: cliffs drawn by the renderer and composed by Picture, and the atlas.
+func TestAutotile(t *testing.T) {
+	lib := cliffsLibrary(t)
+	m := New(lib.Maps["cliffs"], lib)
+	if w, h := m.CellSize(); w != 16 || h != 16 {
+		t.Fatalf("cell %d × %d, want a tile", w, h)
+	}
+	a := m.Textures()["map:auto:cliff"]
+	if a == nil || a.Grid != [2]int{1, 2} || a.Play != "shine" {
+		t.Fatalf("atlas %+v: want a column of the 2 frames and the clips", a)
+	}
+	if img := a.Data.Levels[0]; img.W != 6*18 || img.H != 2*3*18 {
+		t.Fatalf("atlas %d × %d, want 108 × 108: 6 × 3 tiles padded to 18, per frame", img.W, img.H)
+	}
+	golden.Image(t, "tilemap_auto_atlas", a.Data.Levels[0])
+	golden.Image(t, "tilemap_cliffs", render(t, m, lib, 0, 0, 12, 320, 240, 0))
+	golden.Image(t, "tilemap_cliffs_picture", m.Picture(0, 20))
+	golden.Image(t, "tilemap_cliffs_picture_tick10", m.Picture(10, 20))
+}

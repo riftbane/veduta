@@ -345,7 +345,7 @@ func TestDecodeTextureValidation(t *testing.T) {
 	sheet := &Texture{Name: "hero", Data: gfx.TextureData{Levels: []*gfx.Image{img(8, 4)}, Wrap: gfx.WrapClamp}, Layers: 1,
 		Grid: [2]int{4, 2}, Play: "walk",
 		Clips: []Clip{{Name: "hit", Frames: []int{5, 6}, FPS: 12, Next: "walk"}, {Name: "walk", Frames: []int{0, 1, 2, 3}, FPS: 8, Loop: true}},
-		Edge:  &Edge{Priority: 20, Width: 1.5, Roughness: 0.25, Seed: -7}}
+		Edge:  &Edge{Priority: 20, Width: 1.5, Roughness: 0.25, Seed: -7}, Autotile: true}
 	back, err = DecodeTexture(EncodeTexture(sheet))
 	if err != nil || !reflect.DeepEqual(back, sheet) {
 		t.Fatalf("sheet round trip: %v\n%+v\n%+v", err, back, sheet)

@@ -1,0 +1,2 @@
+{"veduta": "texture/1", "size": [192, 48], "layers": [{"type": "image", "path": "cliff.png"}],
+  "grid": [2, 1], "clips": {"shine": {"frames": [0, 1], "fps": 2}}, "play": "shine", "autotile": true}

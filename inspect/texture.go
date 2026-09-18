@@ -155,6 +155,9 @@ func Texture(ir *Renderer, name string, src *TexSource, opt Options) (*Report, e
 	if tex.Edge != nil {
 		m["edge_priority"] = tex.Edge.Priority
 	}
+	if tex.Autotile {
+		m["autotile"] = true
+	}
 	m["mean_color"] = gfx.FormatColor(st.mean)
 	m["luminance_mean"] = round4(st.lumMean)
 	m["luminance_std"] = round4(st.lumStd)

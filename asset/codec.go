@@ -460,6 +460,7 @@ func EncodeTexture(t *Texture) Chunk {
 		w.f32(e.Roughness)
 		w.i64(int(e.Seed))
 	}
+	w.bool(t.Autotile)
 	return Chunk{Type: ChunkTexture, Data: w.b}
 }
 
@@ -558,6 +559,8 @@ func DecodeTexture(c Chunk) (*Texture, error) {
 		}
 		t.Edge = e
 	}
+	r.field = "autotile"
+	t.Autotile = r.bool()
 	if err := r.done(); err != nil {
 		return nil, err
 	}

@@ -24,7 +24,7 @@ import (
 
 // CompilerVersion is stored in every .vda META chunk; changing it invalidates cooked
 // assets.
-const CompilerVersion = "veduta-asset/0.6.0"
+const CompilerVersion = "veduta-asset/0.7.0"
 
 // Source format headers (the value of the "veduta" field).
 const (
@@ -254,6 +254,9 @@ type Texture struct {
 	Clips []Clip // by name
 	Play  string // the clip shown when nothing picks a frame; "" for none
 	Edge  *Edge  // nil: the texture draws no border in maps
+	// Autotile: every frame is a sheet of 6 × 3 tiles, an island and a lake, that a map
+	// picks from by a cell's neighbours (docs/texture.md#autotiles).
+	Autotile bool
 }
 
 // Frames returns the number of frames of the texture: 1 without a grid.

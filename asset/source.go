@@ -59,6 +59,8 @@ type TextureSource struct {
 	Clips  map[string]*ClipSource `json:"clips,omitempty"` // named sequences of frames
 	Play   string                 `json:"play,omitempty"`  // the clip shown when nothing picks a frame
 	Edge   *EdgeSource            `json:"edge,omitempty"`  // how the texture spills over lower terrains in a map
+	// Autotile: every frame is 6 × 3 tiles, an island and a lake, picked by a map's cells.
+	Autotile bool `json:"autotile,omitempty"`
 }
 
 // FrameSource is one frame of a texture drawn frame by frame.
