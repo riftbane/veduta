@@ -868,6 +868,11 @@ async function activate(ctx) {
 
   const isProject = !!(await projectRoot());
   vscode.commands.executeCommand('setContext', 'veduta.project', isProject);
+  // A tool installed after VS Code started is not on the PATH its terminals inherit.
+  const dir = v.terminalDir(veduta(), process.platform, process.env);
+  if (dir) {
+    context.environmentVariableCollection.append('PATH', (process.platform === 'win32' ? ';' : ':') + dir);
+  }
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   status.text = '$(play) Veduta';

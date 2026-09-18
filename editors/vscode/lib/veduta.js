@@ -21,6 +21,22 @@ function program(setting, platform, env, exists = fs.existsSync) {
   return 'veduta';
 }
 
+// terminalDir returns the folder of the veduta program found by program when the PATH VS
+// Code started with lacks it (installed after VS Code started), for VS Code's terminals to
+// get it too; '' when there is nothing to add.
+function terminalDir(prog, platform, env) {
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  if (!p.isAbsolute(prog)) {
+    return '';
+  }
+  const dir = p.dirname(prog);
+  const sep = platform === 'win32' ? ';' : ':';
+  const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH');
+  const norm = (d) => (platform === 'win32' ? d.replace(/[\\/]+$/, '').toLowerCase() : d.replace(/\/+$/, ''));
+  const onPath = (key ? env[key] : '').split(sep).some((d) => d && norm(d) === norm(dir));
+  return onPath ? '' : dir;
+}
+
 // playCommand is how a game is played here: the simulator window on Windows, the
 // framebuffer player elsewhere.
 function playCommand(platform) {
@@ -172,4 +188,4 @@ function older(a, b) {
   return false;
 }
 
-module.exports = { program, playCommand, diagnostics, isGameFile, isTextureFile, assetsDir, launchConfig, validName, toolProblem, older, extensionBehind, INSTALL_URL };
+module.exports = { program, terminalDir, playCommand, diagnostics, isGameFile, isTextureFile, assetsDir, launchConfig, validName, toolProblem, older, extensionBehind, INSTALL_URL };

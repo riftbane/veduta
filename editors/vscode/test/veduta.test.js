@@ -101,3 +101,14 @@ test('assetsDir', () => {
   assert.strictEqual(v.assetsDir('/x/game/assets/textures/panel.vtex', () => false), '/x/game/assets');
   assert.strictEqual(v.assetsDir('/x/loose/panel.vtex', () => false), '/x/loose');
 });
+
+test('terminals get the folder of a tool installed after VS Code started', () => {
+  const exe = 'C:\\Users\\me\\AppData\\Local\\Programs\\veduta\\veduta.exe';
+  const dir = 'C:\\Users\\me\\AppData\\Local\\Programs\\veduta';
+  assert.strictEqual(v.terminalDir(exe, 'win32', { Path: 'C:\\Windows;C:\\Windows\\System32' }), dir);
+  assert.strictEqual(v.terminalDir(exe, 'win32', { Path: 'C:\\Windows;c:\\users\\me\\appdata\\local\\programs\\veduta\\' }), '');
+  assert.strictEqual(v.terminalDir(exe, 'win32', {}), dir);
+  assert.strictEqual(v.terminalDir('veduta', 'win32', { Path: '' }), '');
+  assert.strictEqual(v.terminalDir('/opt/veduta/veduta', 'linux', { PATH: '/usr/bin:/opt/veduta/' }), '');
+  assert.strictEqual(v.terminalDir('/opt/veduta/veduta', 'linux', { PATH: '/usr/bin' }), '/opt/veduta');
+});

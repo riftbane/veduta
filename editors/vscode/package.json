@@ -2,7 +2,7 @@
   "name": "veduta",
   "displayName": "Veduta",
   "description": "Make Veduta console games: the project as a tree with new scenes, prefabs, models and scripts on right-click, play and debug (F5), test, build with errors in Problems, preview a texture while you write it, paint maps in the map editor, deploy to the console's card.",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "publisher": "riftbane",
   "license": "MIT",
   "repository": {

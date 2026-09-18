@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1
+
+- VS Code's terminals find `veduta` when it was installed after VS Code started: the
+  extension adds its folder to their PATH, so there is no need to restart VS Code.
+
 ## 0.9.0
 
 - **The map editor**: a `*.vmap` opens painted (**Veduta: Open as JSON** in its title bar

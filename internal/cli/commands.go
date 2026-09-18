@@ -114,7 +114,7 @@ func Diff(a, b, out string, threshold int) (*inspect.DiffReport, error) {
 // ExtensionVersion is the version of the VS Code extension released with this tool
 // (editors/vscode/package.json; a test keeps the two equal). The extension compares it
 // with its own and offers to update itself when it is older.
-const ExtensionVersion = "0.9.0"
+const ExtensionVersion = "0.9.1"
 
 // VersionInfo is printed by version.
 type VersionInfo struct {
