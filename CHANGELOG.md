@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A project set up by an older tool kept that tool's JSON schemas, so VS Code flagged new
+  fields (`"map"` in a scene: "Property map is not allowed") that the engine accepts.
+  `veduta build`, which the extension runs on every save, now refreshes `.veduta/` as
+  `veduta upgrade` does; a settings file that already says what the engine wants is left
+  in its own layout.
 - A source with an empty object key (`"props": {"": 1}`) crashed the tool instead of
   being reported.
 
