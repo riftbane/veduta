@@ -50,7 +50,9 @@ Fields:
 | `visible` | read/write | boolean |
 | `model`, `material` | read/write | asset name or `nil` |
 | `layer` | read/write | integer, draw order |
-| `frame` | read/write | integer, the frame of a sprite sheet material |
+| `frame` | read/write | integer, the frame of a sprite sheet |
+| `anim` | read/write | the clip it plays, or `nil`: another clip starts it, the same changes nothing, `nil` stops |
+| `anim_done` | read | `true` once a clip that does not loop has ended with no `next` |
 | `parent` | read/write | entity or `nil`; accepts an entity's name |
 | `hitbox` | read/write | `{{min x, y, z}, {max x, y, z}}` or `nil` |
 | `state` | read/write | table of the entity's own values |
@@ -74,6 +76,8 @@ Methods:
 | `e:bounds()` | min x, y, z, max x, y, z; or `nil` |
 | `e:children()` | list of live child entities, id order |
 | `e:despawn()` | removed at the end of the tick, with its children |
+| `e:play(clip)` | starts a clip from its first frame, even when it plays |
+| `e:clips()` | the clips its textures have, sorted |
 
 ## scene
 
@@ -85,7 +89,7 @@ Available from `game.init` on.
 | `scene.find(name)` | entity or `nil` |
 | `scene.tagged(tag)` | list of entities, id order |
 | `scene.entities()` | every live entity, id order |
-| `scene.spawn{...}` | the new entity; fields `kind` (default `static`), `name`, `model`, `material`, `position`, `rotation`, `scale` (each `{x, y, z}`), `tags` (list), `visible`, `layer`, `frame`, `parent` (entity or name), `hitbox` (`{{min}, {max}}`), `state` (table) |
+| `scene.spawn{...}` | the new entity; fields `kind` (default `static`), `name`, `model`, `material`, `position`, `rotation`, `scale` (each `{x, y, z}`), `tags` (list), `visible`, `layer`, `frame`, `anim`, `parent` (entity or name), `hitbox` (`{{min}, {max}}`), `state` (table) |
 | `scene.spawn_prefab(name, x, y, z [, rotation [, prefix]])` | a prefab's entities, footprint corner at (x, y, z), turned 0/90/180/270; the table lists them and holds each under its prefab name |
 | `scene.load(name)` | replaces the scene, as a reset |
 
@@ -131,6 +135,28 @@ Only inside `game.draw`. Pixels from the top left.
 | `world.focus(x, y, z)` | where chunks load; call every tick |
 | `world.height(x, z)` | ground height |
 | `world.water(x, z)` | water level or `nil` |
+
+## map
+
+The scene's tile map (see [Maps](Maps)). Cells are (x, y): columns right, rows down, from 0.
+`layer` is a layer's name.
+
+| Function | Returns / does |
+|----------|----------------|
+| `map.name()` | the scene's map or `nil` |
+| `map.load(name)` | another map, as its file describes it (`nil` removes it); entities stay |
+| `map.size()` | columns, rows |
+| `map.tile()` | meters per cell |
+| `map.layers()` | layer names, bottom first |
+| `map.cell(x, y)` | the cell under a point of the world |
+| `map.center(x, y)` | the point at the center of a cell |
+| `map.inside(x, y)` | whether the cell is on the map |
+| `map.get(x, y [, layer])` | the terrain there (default the first layer), or `nil` |
+| `map.set(x, y, terrain [, layer])` | paints a cell; `nil` empties it |
+| `map.has(x, y, tag [, layer])` | a terrain with the tag paints the cell (any layer unless named) |
+| `map.tags(x, y [, layer])` | the tags there, sorted |
+| `map.objects([tag])` | objects `{name, x, y, w, h, tags, props}`, file order |
+| `map.object(name)` | one object or `nil` |
 
 ## mesh
 

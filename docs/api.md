@@ -63,6 +63,9 @@ func RegisterKind(name string, ctor func(*scene.Entity) veduta.Behaviour)
 | `LoadScene(name)` | replace the scene (ids restart at 1), e.g. to reset a level |
 | `SetModel(name, m) error` | add or replace a model the game builds at runtime (a voxel chunk's mesh): entities name it like an asset model, with culling, `LODs` and `DrawDistance`; uploaded at the next frame. The name contains `:` and does not start with `world:`; pass a new `*asset.Model` to change it (the engine re-uploads when the pointer changes). Not saved in snapshots and kept across `LoadScene` |
 | `RemoveModel(name)`, `Model(name)` | forget a runtime model; look one up |
+| `Map() *tilemap.Map` | the scene's tile map ([docs/map.md](map.md)), nil without one: `Get(layer, x, y)`, `Set(layer, x, y, terrain) error` (a `map_set` event), `Has(layer, x, y, tag)` (layer −1: any), `CellAt(x, y)`, `Center(x, y)`, `Layer(name)`, `Size()`, `Source()` (its objects) |
+| `LoadMap(name) error` | replace the scene's tile map with a map as its file describes it (`""` removes it); the entities stay; a `map_load` event |
+| `Clip(e, name) *asset.Clip`, `Clips(e)` | a clip of the textures `e` draws with, and their names; play one with `e.SetAnim(name)` (unless it plays) or `e.Play(name)` (from the start): the engine sets `e.Frame` every tick |
 | `Overlapping(e)` | live entities whose AABB overlaps `e`'s (last tick's bounds) |
 | `Texture(name)` | a texture asset's handle and size in texels, for `Batch.Image` and `Batch.NineSlice` in `Draw` (`ok` false for an unknown texture) |
 | `ReadSave(name)`, `WriteSave(name, data)`, `RemoveSave(name)`, `SaveNames()` | the game's saves: JSON objects or arrays of at most 1 MiB under valid names. The player keeps them as files in `VEDUTA_SAVE_DIR` (default `out/saves` of the project; the console sets it to the card); headless runs keep them in memory, starting from the scenario's `saves`. Writes and removals are trace events `save_write` and `save_remove` |

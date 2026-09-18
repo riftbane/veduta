@@ -55,47 +55,60 @@ What covers what is decided by z, then by `layer`:
 
 ## Animation
 
-Draw the frames of an animation side by side in one texture, a **sprite sheet**, and give
-its material a `grid` of `[columns, rows]`. An entity's `frame` then picks the frame drawn,
-counted left to right and top to bottom from 0, wrapping around:
-
-```json
-{ "veduta": "material/1", "texture": "hero_sheet", "grid": [4, 2], "unlit": true, "alpha": "cutout", "filter": "nearest" }
-```
+Draw the frames of an animation side by side in one PNG, a **sprite sheet**, and let its
+texture cut it (`"grid"`) and name the animations (`"clips"`):
 
 ```json
 {
   "veduta": "texture/1",
   "size": [64, 32],
-  "mipmaps": false,
   "layers": [
     { "type": "image", "path": "sprites/hero_sheet.png" }
-  ]
+  ],
+  "grid": [4, 2],
+  "clips": {
+    "walk": { "frames": [0, 1, 2, 3], "fps": 8 },
+    "idle": { "frames": [4], "fps": 1 },
+    "hurt": { "frames": [5, 6], "fps": 12, "loop": false, "next": "idle" }
+  }
 }
 ```
 
-Here the sheet is 4 × 2 frames of 16 × 16 pixels: the top row walks, the bottom row stands.
+Here the sheet is 4 × 2 frames of 16 × 16 pixels, counted left to right and top to bottom
+from 0: the top row walks, the bottom row stands and flinches. The material stays a plain
+sprite material; it takes the grid from its texture:
+
+```json
+{ "veduta": "material/1", "texture": "hero_sheet", "unlit": true, "alpha": "cutout", "filter": "nearest" }
+```
+
+An entity plays a clip by name, and the engine turns the frames at the clip's speed:
 
 ```lua
-local WALK = {0, 1, 2, 3}   -- frames of the top row
-local IDLE = 4              -- the first frame of the bottom row
-
 kinds.hero = {
   update = function(e)
     local dx = input.dpad()
-    if dx ~= 0 then
+    if input.pressed("b") then
+      e:play("hurt")                        -- starts over, then goes on with idle
+    elseif dx ~= 0 then
       e.x = e.x + dx * 4 * engine.dt
-      e.frame = WALK[(engine.tick // 3) % #WALK + 1]   -- a frame every 3 ticks
-      e:set_scale(dx * 0.8, 0.8, 1)                     -- a negative x mirrors: face left
-    else
-      e.frame = IDLE
+      e.anim = "walk"                       -- already walking: nothing restarts
+      e:set_scale(dx * 0.8, 0.8, 1)         -- a negative x mirrors: face left
+    elseif e.anim ~= "hurt" then
+      e.anim = "idle"
     end
   end,
 }
 ```
 
-A negative scale mirrors the sprite, so one set of frames serves both directions. Give a
-sheet's texture `"mipmaps": false`, so frames never bleed into each other.
+A negative scale mirrors the sprite, so one set of frames serves both directions. Frames
+follow the tick count, so a run always shows the same frame at the same tick, and the
+trace records `anim` and `frame`: a scenario can check `{"entity": "hero", "path": "anim",
+"op": "==", "value": "walk"}`. `e.anim_done` tells when a clip that does not loop is over.
+To pick frames yourself, set `e.frame` instead.
+
+A texture's `"play"` clip runs by itself wherever nothing picks a frame: water that
+ripples, a torch that flickers, without a line of code.
 
 ## Collisions
 

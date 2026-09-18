@@ -99,6 +99,8 @@ func parseWikiAsset(kind, body string) error {
 		_, err = asset.ParsePrefab("x.vprefab", b)
 	case asset.TypeWorld:
 		_, err = asset.ParseWorld("x.vworld", b, nil)
+	case asset.TypeMap:
+		_, err = asset.ParseMap("x.vmap", b)
 	}
 	return err
 }
@@ -106,7 +108,7 @@ func parseWikiAsset(kind, body string) error {
 // wikiPNGs is an assets directory holding a small PNG at every path the example names.
 func wikiPNGs(body string) fs.FS {
 	var buf bytes.Buffer
-	png.Encode(&buf, image.NewNRGBA(image.Rect(0, 0, 16, 16)))
+	png.Encode(&buf, image.NewNRGBA(image.Rect(0, 0, 64, 64)))
 	files := fstest.MapFS{}
 	for _, m := range regexp.MustCompile(`"path": "([^"]+\.png)"`).FindAllStringSubmatch(body, -1) {
 		files[m[1]] = &fstest.MapFile{Data: buf.Bytes()}

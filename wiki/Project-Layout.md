@@ -26,7 +26,7 @@ by git and never need editing.
 
 In VS Code, the Veduta icon in the activity bar opens the game as a tree: **Game**
 (`veduta.json`, `card.json`, README, CHANGELOG), **Scripts**, **Scenes**, **Worlds**,
-**Prefabs**, **Models**, **Materials**, **Textures**, **Images** (the PNG files under
+**Maps**, **Prefabs**, **Models**, **Materials**, **Textures**, **Images** (the PNG files under
 `assets/`) and **Scenarios**, each with its folders. What the tool writes (`out/`,
 `assets/.cooked/`, the editor files) is not there.
 
@@ -38,6 +38,7 @@ file is written by `veduta new`, the same as in a terminal, so it builds as it i
 |-----|----|
 | scene | an empty scene with an orthographic camera |
 | world | a flat world of one biome; the first one also brings the `ground` material and its tiling texture |
+| map | a 16 × 12 map of one terrain, opened in the [map editor](Maps#drawing-it-with-the-editor); the first one also brings the `ground` texture |
 | prefab | an empty prefab, 1 × 1 m |
 | model | a 1 m box standing on its base |
 | material | a light grey material |
@@ -60,6 +61,7 @@ change what refers to it: the build that follows shows those places in Problems.
 | `assets/materials/<name>.vmat` | [materials](Graphics-Assets#materials) |
 | `assets/textures/<name>.vtex` | [textures](Graphics-Assets#textures); PNG files they use can sit anywhere under `assets/` |
 | `assets/worlds/<name>.vworld` | [worlds](3D-Worlds-and-Blocks#streamed-worlds) |
+| `assets/maps/<name>.vmap` | [tile maps](Maps) |
 | `assets/prefabs/<name>.vprefab` | groups of entities placed by worlds |
 | `tests/scenarios/<name>.vscenario` | [scenarios](Testing) |
 | `tests/golden/` | the recorded outcome of each scenario, written by `veduta test` |
@@ -72,7 +74,7 @@ must be unique across the folders; `tests/scenarios/` stays flat. See
 [Structuring a Large Game](Structuring-a-Large-Game).
 
 Every source is a JSON file with the extension of its format (`.vscene`, `.vmodel`,
-`.vmat`, `.vtex`, `.vworld`, `.vprefab`, `.vscenario`; VS Code opens them as JSON) and
+`.vmat`, `.vtex`, `.vworld`, `.vmap`, `.vprefab`, `.vscenario`; VS Code opens them as JSON) and
 starts with a `"veduta"` header naming its format (`"scene/1"`, `"material/1"`, …). A
 project made before v2.0.0-rc.8 has `crate.model.json` and so on: `veduta upgrade`
 renames them. Decoding is strict: an unknown field, a duplicate key or a wrong type is

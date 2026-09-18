@@ -18,7 +18,7 @@ kinds/npc.lua
 kinds/slime.lua
 data/items.lua         tables of numbers and text: items, enemies, shops
 data/dialogue.lua
-levels/town.lua        maps and what stands on them
+levels/town.lua        what stands on each map: its NPCs, doors, events
 lib/grid.lua           pure helpers: tiles, paths, collisions
 ui/menu.lua, ui/box.lua
 assets/

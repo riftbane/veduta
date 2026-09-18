@@ -135,6 +135,54 @@ An image exactly as large as the texture is copied pixel for pixel.
 `"tiling": true` makes a texture wrap around seamlessly: ground, walls, water. Worlds require
 it for their ground materials.
 
+### One PNG, many textures
+
+An image layer's `rect` takes a part of the PNG, `[x, y, width, height]` in its pixels, so
+one sheet of sprites drawn in any editor gives a texture per sprite:
+
+```json
+{
+  "veduta": "texture/1",
+  "size": [16, 16],
+  "layers": [
+    { "type": "image", "path": "sprites/items.png", "rect": [32, 0, 16, 16] }
+  ]
+}
+```
+
+A texture exists only while the game is built: the console loads the compiled pixels,
+never the PNG, so textures sharing a PNG cost nothing more.
+
+### Animations
+
+A texture can be a sheet of frames: `"grid": [columns, rows]` cuts its image into frames,
+and `"frames"` paints each frame with layers of its own. `"clips"` names animations of
+those frames, and `"play"` names one that runs by itself wherever the texture is drawn and
+nothing picks a frame (water, torches, the cells of a map):
+
+```json
+{
+  "veduta": "texture/1",
+  "size": [64, 32],
+  "layers": [
+    { "type": "image", "path": "sprites/hero.png" }
+  ],
+  "grid": [4, 2],
+  "clips": {
+    "walk": { "frames": [0, 1, 2, 3], "fps": 8 },
+    "idle": { "frames": [4], "fps": 1 },
+    "hit":  { "frames": [5, 6], "fps": 12, "loop": false, "next": "idle" }
+  }
+}
+```
+
+An entity plays a clip by name: `e.anim = "walk"` (see [2D Games](2D-Games#animation)).
+
+### Terrain borders
+
+`"edge"` makes a texture a terrain that spills over lower terrains on a map, with a
+wandering border instead of square cells: see [Maps](Maps#terrains-with-borders).
+
 The full format, with the exact maths of every layer and blend mode, is in the
 [texture reference](https://riftbane.github.io/veduta/texture.html).
 
