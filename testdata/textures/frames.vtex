@@ -1,0 +1,16 @@
+{
+  "veduta": "texture/1",
+  "size": [16, 16],
+  "tiling": true,
+  "layers": [
+    { "type": "solid", "color": "#2a6fdb" }
+  ],
+  "frames": [
+    { "layers": [ { "type": "noise", "seed": 1, "scale": 4, "octaves": 2, "color": "#bfe0ff", "opacity": 0.5 } ] },
+    { "layers": [ { "type": "noise", "seed": 2, "scale": 4, "octaves": 2, "color": "#bfe0ff", "opacity": 0.5 } ] },
+    { "layers": [ { "type": "circle", "center": [8, 8], "radius": 5, "color": "#ffffff80", "outline": 1 } ] }
+  ],
+  "clips": { "flow": { "frames": [0, 1, 2, 1], "fps": 4 } },
+  "play": "flow",
+  "edge": { "priority": 20, "width": 4, "roughness": 0.6, "seed": 1 }
+}

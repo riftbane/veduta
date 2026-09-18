@@ -155,6 +155,8 @@ var baseSamples = []struct {
 	{"image_stretch", "image", "stretch"},
 	{"example", "example", ""},
 	{"crate_wood", "crate_wood", ""},
+	{"frames", "frames", ""},
+	{"atlas_part", "atlas_part", ""},
 }
 
 // TestGoldenBase writes the base level of every sample texture as it is, with no backdrop
