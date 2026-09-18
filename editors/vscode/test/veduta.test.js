@@ -54,12 +54,24 @@ test('launchConfig', () => {
 });
 
 test('toolProblem', () => {
-  assert.strictEqual(v.toolProblem(null, '{"version":"v2.0.0-rc.4","commit":"x"}'), null);
+  assert.strictEqual(v.toolProblem(null, '{"version":"v2.0.0-rc.9","commit":"x"}'), null);
+  assert.strictEqual(v.toolProblem(null, '{"version":"v2.0.0"}'), null);
+  assert.match(v.toolProblem(null, '{"version":"v2.0.0-rc.8"}'), /needs v2\.0\.0-rc\.9 or later/);
   assert.strictEqual(v.toolProblem(null, '{"version":"dev"}'), null);
   assert.strictEqual(v.toolProblem(null, '{"version":"v10.1.0"}'), null);
   assert.match(v.toolProblem(null, '{"version":"v1.4.1"}'), /v1\.4\.1, which makes Go games/);
   assert.match(v.toolProblem({ code: 'ENOENT' }, ''), /not installed/);
   assert.match(v.toolProblem({ message: 'exit 2' }, 'usage'), /failed: exit 2/);
+});
+
+test('older', () => {
+  assert.ok(v.older('v2.0.0-rc.8', 'v2.0.0-rc.9'));
+  assert.ok(v.older('v2.0.0-rc.9', 'v2.0.0'));
+  assert.ok(v.older('v1.9.9', 'v2.0.0-rc.1'));
+  assert.ok(!v.older('v2.0.0', 'v2.0.0-rc.9'));
+  assert.ok(!v.older('v2.0.0-rc.10', 'v2.0.0-rc.9'));
+  assert.ok(!v.older('v2.1.0-rc.1', 'v2.0.0'));
+  assert.ok(!v.older('v2.0.0-rc.9', 'v2.0.0-rc.9'));
 });
 
 test('isTextureFile', () => {

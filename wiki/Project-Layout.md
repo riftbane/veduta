@@ -22,6 +22,34 @@ A `.git` repository is created too. The tool writes what it produces (test runs,
 fuzz results, and the simulator's [saves](Saves)) under `out/`, and compiled assets under `assets/.cooked/`: both are ignored
 by git and never need editing.
 
+## The Project view
+
+In VS Code, the Veduta icon in the activity bar opens the game as a tree: **Game**
+(`veduta.json`, `card.json`, README, CHANGELOG), **Scripts**, **Scenes**, **Worlds**,
+**Prefabs**, **Models**, **Materials**, **Textures**, **Images** (the PNG files under
+`assets/`) and **Scenarios**, each with its folders. What the tool writes (`out/`,
+`assets/.cooked/`, the editor files) is not there.
+
+Right-click a section or a folder to make something in it: **New Scene…**, **New
+Prefab…**, **New Script…** and so on, and **New Folder…**. You type the name only; the
+file is written by `veduta new`, the same as in a terminal, so it builds as it is:
+
+| New | Is |
+|-----|----|
+| scene | an empty scene with an orthographic camera |
+| world | a flat world of one biome; the first one also brings the `ground` material and its tiling texture |
+| prefab | an empty prefab, 1 × 1 m |
+| model | a 1 m box standing on its base |
+| material | a light grey material |
+| texture | a 32 × 32 grey texture |
+| scenario | a run of 20 ticks from the game's start (or, **New Scenario Starting Here…** on a scene or world, from there) that checks the invariants |
+| script | an empty Lua module, with the `require` that loads it |
+
+A scene or a world also has **Play from Here**, a scenario **Run Scenario** and **Debug
+Scenario**, a texture its preview; every file and folder can be renamed (an asset keeps its
+extension, and its name stays unique in its kind) and deleted. Renaming an asset does not
+change what refers to it: the build that follows shows those places in Problems.
+
 ## Where things go
 
 | Path | Holds |

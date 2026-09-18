@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0
+
+- The Project view, in the activity bar: the game's scripts, scenes, worlds, prefabs,
+  models, materials, textures, images and scenarios in their folders, and the project's
+  own files, without what the tool writes. Right-click to make a new one of each (with
+  `veduta new`, so it builds as it is) or a folder, rename, delete, play from a scene or a
+  world, run or debug a scenario, preview a texture. Needs veduta v2.0.0-rc.9 or later.
+
 ## 0.6.0
 
 - Sources have an extension per format (`.vmodel`, `.vtex`, `.vmat`, `.vscene`,

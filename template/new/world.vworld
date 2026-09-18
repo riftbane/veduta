@@ -1,0 +1,11 @@
+{
+  "veduta": "world/1",
+  "seed": 1,
+  "camera": { "type": "orthographic", "size": 14, "position": [0, 24, 10], "look_at": [0, 0, 0] },
+  "light": { "direction": [-0.4, -1, -0.3], "color": "#ffffff", "ambient": "#505862" },
+  "background": "#202830",
+  "biomes": [
+    { "name": "plain", "ground": "ground" }
+  ],
+  "entities": []
+}

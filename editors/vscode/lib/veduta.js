@@ -129,7 +129,30 @@ function toolProblem(err, stdout) {
   if (m && Number(m[1]) < 2) {
     return `Veduta: the veduta tool is ${version}, which makes Go games; this extension needs v2 (Lua games). Reinstall it from the beta channel.`;
   }
+  if (m && older(version, MIN_TOOL)) {
+    return `Veduta: the veduta tool is ${version}; this extension needs ${MIN_TOOL} or later (the Project view makes files with veduta new). Run veduta update.`;
+  }
   return null;
 }
 
-module.exports = { program, playCommand, diagnostics, isGameFile, isTextureFile, assetsDir, launchConfig, validName, toolProblem, INSTALL_URL };
+// MIN_TOOL is the oldest veduta this extension works with: the first with veduta new.
+const MIN_TOOL = 'v2.0.0-rc.9';
+
+// older reports whether version a comes before b; both are vX.Y.Z with an optional -rc.N,
+// and a release comes after its candidates.
+function older(a, b) {
+  const parse = (s) => {
+    const m = /^v(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?/.exec(s) || [];
+    return [Number(m[1]) || 0, Number(m[2]) || 0, Number(m[3]) || 0, m[4] === undefined ? Infinity : Number(m[4])];
+  };
+  const x = parse(a);
+  const y = parse(b);
+  for (let i = 0; i < 4; i++) {
+    if (x[i] !== y[i]) {
+      return x[i] < y[i];
+    }
+  }
+  return false;
+}
+
+module.exports = { program, playCommand, diagnostics, isGameFile, isTextureFile, assetsDir, launchConfig, validName, toolProblem, older, INSTALL_URL };

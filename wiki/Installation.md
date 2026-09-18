@@ -70,7 +70,9 @@ When you open a game, the extension recommends the **Lua** extension (`sumneko.l
 accept it. Scripts then get completion, hover help and checks against the Veduta API, and
 the JSON files of the game get completion from their schemas.
 
-What the extension adds:
+What the extension adds: the **Project view** (the Veduta icon in the activity bar), the
+game's files by what they are, where a right-click makes a new scene, prefab, script and so
+on (see [Project Layout](Project-Layout#the-project-view)), and these commands:
 
 | Command (Ctrl+Shift+P) | Does |
 |------------------------|------|

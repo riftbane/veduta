@@ -1,0 +1,7 @@
+{
+  "veduta": "texture/1",
+  "size": [32, 32],
+  "layers": [
+    { "type": "solid", "color": "#808080" }
+  ]
+}

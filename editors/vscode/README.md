@@ -4,6 +4,18 @@ Make games for the Veduta console in VS Code. The extension runs the `veduta` to
 project for you; install the tool first (on Windows, in PowerShell:
 `irm https://raw.githubusercontent.com/riftbane/veduta/main/install.ps1 | iex`).
 
+**The Project view** (the Veduta icon in the activity bar) shows the game as you work on
+it: Game (`veduta.json`, `card.json`, README, CHANGELOG), Scripts, Scenes, Worlds, Prefabs,
+Models, Materials, Textures, Images and Scenarios, each in its own folders, without what
+the tool writes (`out/`, cooked assets, editor files). Right-click a section or one of its
+folders for **New Scene…**, **New Prefab…**, **New Script…** and so on, or **New Folder…**:
+`veduta new` writes a file the engine accepts as it is (a world comes with the ground it
+stands on) and it opens. A name is checked as you type it: the engine's rule, and free in
+every folder of its kind. On a scene or a world, **Play from Here** and **New Scenario
+Starting Here…**; on a scenario **Run** and **Debug**; on a texture the preview; on any
+file or folder **Rename…** (an asset keeps its extension) and **Delete** (to the trash).
+The view follows files made or removed anywhere else.
+
 | Command | Does |
 |---|---|
 | **Veduta: New Game** | `veduta init`: an empty Lua game (or a Go one), opened in a new window |
@@ -22,7 +34,7 @@ shows a tiling texture repeated. A source the engine would refuse is not drawn: 
 names the field that is wrong.
 
 The same commands are tasks of type `veduta` (`"command": "sim"`, `"test"`, `"build"`,
-`"deploy"`) for `tasks.json`, and `$veduta` is a problem matcher for their output.
+`"deploy"`, with `"args"` such as `["--scene", "level1"]`) for `tasks.json`, and `$veduta` is a problem matcher for their output.
 
 A project made by `veduta init` also recommends the Lua extension (`sumneko.lua`) and points
 it at the API's definitions, and maps the JSON Schemas of `veduta.json`, scenes, scenarios

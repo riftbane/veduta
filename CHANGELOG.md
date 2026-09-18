@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `veduta new KIND NAME [--in FOLDER]`: a new scene, world, prefab, model, material,
+  texture, scenario (`--scene`/`--world`: where it starts) or Lua module, written from
+  `template/new` so that it builds as it is; a first world also gets the `ground` material
+  and tiling texture it stands on. It refuses a name the engine would, one taken in any
+  folder of its kind, a folder out of place, and never overwrites.
+- The Project view in the VS Code extension (0.7.0): the game by what its files are
+  (scripts, scenes, worlds, prefabs, models, materials, textures, images, scenarios, and
+  the project's own files) in their folders, without what the tool writes; right-click to
+  make a new source with `veduta new` or a folder, rename, delete, play from a scene or a
+  world, run or debug a scenario, preview a texture. The extension now needs the tool at
+  v2.0.0-rc.9 or later.
 - A texture preview in the VS Code extension: **Veduta: Preview the Texture** (the eye in
   the title bar of a `*.vtex`) opens a panel beside the source and draws it while it is
   written, with nothing saved and no engine running. Over the picture a grid and a ruler

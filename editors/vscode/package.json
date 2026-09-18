@@ -1,8 +1,8 @@
 {
   "name": "veduta",
   "displayName": "Veduta",
-  "description": "Make Veduta console games: new game, play and debug (F5), test, build with errors in Problems, preview a texture while you write it, deploy to the console's card.",
-  "version": "0.6.0",
+  "description": "Make Veduta console games: the project as a tree with new scenes, prefabs, models and scripts on right-click, play and debug (F5), test, build with errors in Problems, preview a texture while you write it, deploy to the console's card.",
+  "version": "0.7.0",
   "publisher": "riftbane",
   "license": "MIT",
   "repository": {
@@ -76,6 +76,110 @@
         "title": "Preview the Texture",
         "category": "Veduta",
         "icon": "$(eye)"
+      },
+      {
+        "command": "veduta.view.new",
+        "title": "New…",
+        "category": "Veduta",
+        "icon": "$(add)"
+      },
+      {
+        "command": "veduta.view.refresh",
+        "title": "Refresh the Project View",
+        "category": "Veduta",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "veduta.view.newScene",
+        "title": "New Scene…",
+        "category": "Veduta",
+        "icon": "$(add)"
+      },
+      {
+        "command": "veduta.view.newWorld",
+        "title": "New World…",
+        "category": "Veduta",
+        "icon": "$(add)"
+      },
+      {
+        "command": "veduta.view.newPrefab",
+        "title": "New Prefab…",
+        "category": "Veduta",
+        "icon": "$(add)"
+      },
+      {
+        "command": "veduta.view.newModel",
+        "title": "New Model…",
+        "category": "Veduta",
+        "icon": "$(add)"
+      },
+      {
+        "command": "veduta.view.newMaterial",
+        "title": "New Material…",
+        "category": "Veduta",
+        "icon": "$(add)"
+      },
+      {
+        "command": "veduta.view.newTexture",
+        "title": "New Texture…",
+        "category": "Veduta",
+        "icon": "$(add)"
+      },
+      {
+        "command": "veduta.view.newScenario",
+        "title": "New Scenario…",
+        "category": "Veduta",
+        "icon": "$(add)"
+      },
+      {
+        "command": "veduta.view.newScript",
+        "title": "New Script…",
+        "category": "Veduta",
+        "icon": "$(add)"
+      },
+      {
+        "command": "veduta.view.newFolder",
+        "title": "New Folder…",
+        "category": "Veduta",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "veduta.view.newScenarioHere",
+        "title": "New Scenario Starting Here…",
+        "category": "Veduta"
+      },
+      {
+        "command": "veduta.view.play",
+        "title": "Play from Here",
+        "category": "Veduta",
+        "icon": "$(play)"
+      },
+      {
+        "command": "veduta.view.runScenario",
+        "title": "Run Scenario",
+        "category": "Veduta",
+        "icon": "$(run)"
+      },
+      {
+        "command": "veduta.view.debugScenario",
+        "title": "Debug Scenario",
+        "category": "Veduta",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "veduta.view.rename",
+        "title": "Rename…",
+        "category": "Veduta"
+      },
+      {
+        "command": "veduta.view.delete",
+        "title": "Delete",
+        "category": "Veduta"
+      },
+      {
+        "command": "veduta.view.reveal",
+        "title": "Reveal in File Explorer",
+        "category": "Veduta"
       }
     ],
     "menus": {
@@ -90,6 +194,233 @@
         {
           "command": "veduta.previewTexture",
           "when": "resourceFilename =~ /\\.vtex$/"
+        },
+        {
+          "command": "veduta.view.new",
+          "when": "veduta.project"
+        },
+        {
+          "command": "veduta.view.newFolder",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.newScenarioHere",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.play",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.runScenario",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.debugScenario",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.rename",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.delete",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.reveal",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.newScene",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.newWorld",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.newPrefab",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.newModel",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.newMaterial",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.newTexture",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.newScenario",
+          "when": "false"
+        },
+        {
+          "command": "veduta.view.newScript",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "veduta.view.new",
+          "when": "view == veduta.project && veduta.project",
+          "group": "navigation@1"
+        },
+        {
+          "command": "veduta.play",
+          "when": "view == veduta.project && veduta.project",
+          "group": "navigation@2"
+        },
+        {
+          "command": "veduta.view.refresh",
+          "when": "view == veduta.project",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "veduta.view.newScene",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.scene$/",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.newScene",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.scene$/",
+          "group": "1_new@1"
+        },
+        {
+          "command": "veduta.view.newWorld",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.world$/",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.newWorld",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.world$/",
+          "group": "1_new@1"
+        },
+        {
+          "command": "veduta.view.newPrefab",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.prefab$/",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.newPrefab",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.prefab$/",
+          "group": "1_new@1"
+        },
+        {
+          "command": "veduta.view.newModel",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.model$/",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.newModel",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.model$/",
+          "group": "1_new@1"
+        },
+        {
+          "command": "veduta.view.newMaterial",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.material$/",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.newMaterial",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.material$/",
+          "group": "1_new@1"
+        },
+        {
+          "command": "veduta.view.newTexture",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.texture$/",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.newTexture",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.texture$/",
+          "group": "1_new@1"
+        },
+        {
+          "command": "veduta.view.newScenario",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.scenario$/",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.newScenario",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.scenario$/",
+          "group": "1_new@1"
+        },
+        {
+          "command": "veduta.view.newScript",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.script$/",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.newScript",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.script$/",
+          "group": "1_new@1"
+        },
+        {
+          "command": "veduta.view.newFolder",
+          "when": "view == veduta.project && viewItem =~ /^(section|folder)\\.(script|scene|world|prefab|model|material|texture)$/",
+          "group": "1_new@2"
+        },
+        {
+          "command": "veduta.view.play",
+          "when": "view == veduta.project && viewItem =~ /^file\\.(scene|world)$/",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.play",
+          "when": "view == veduta.project && viewItem =~ /^file\\.(scene|world)$/",
+          "group": "0_run@1"
+        },
+        {
+          "command": "veduta.view.newScenarioHere",
+          "when": "view == veduta.project && viewItem =~ /^file\\.(scene|world)$/",
+          "group": "1_new@1"
+        },
+        {
+          "command": "veduta.view.runScenario",
+          "when": "view == veduta.project && viewItem == file.scenario",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.view.runScenario",
+          "when": "view == veduta.project && viewItem == file.scenario",
+          "group": "0_run@1"
+        },
+        {
+          "command": "veduta.view.debugScenario",
+          "when": "view == veduta.project && viewItem == file.scenario",
+          "group": "0_run@2"
+        },
+        {
+          "command": "veduta.previewTexture",
+          "when": "view == veduta.project && viewItem == file.texture",
+          "group": "inline"
+        },
+        {
+          "command": "veduta.previewTexture",
+          "when": "view == veduta.project && viewItem == file.texture",
+          "group": "0_run@1"
+        },
+        {
+          "command": "veduta.view.rename",
+          "when": "view == veduta.project && viewItem =~ /^(file|folder)\\.(script|scene|world|prefab|model|material|texture|image|scenario)$/",
+          "group": "7_modify@1"
+        },
+        {
+          "command": "veduta.view.delete",
+          "when": "view == veduta.project && viewItem =~ /^(file|folder)\\.(script|scene|world|prefab|model|material|texture|image|scenario)$/",
+          "group": "7_modify@2"
+        },
+        {
+          "command": "veduta.view.reveal",
+          "when": "view == veduta.project && viewItem =~ /^(file|folder)\\./",
+          "group": "9_reveal@1"
         }
       ]
     },
@@ -124,9 +455,17 @@
               "build",
               "deploy",
               "fuzz",
-              "bench"
+              "bench",
+              "simulate"
             ],
             "description": "The veduta command to run in the project."
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Its arguments, such as --scene level1."
           }
         }
       }
@@ -254,6 +593,32 @@
             }
           }
         ]
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "veduta",
+          "title": "Veduta",
+          "icon": "media/veduta.svg"
+        }
+      ]
+    },
+    "views": {
+      "veduta": [
+        {
+          "id": "veduta.project",
+          "name": "Project",
+          "icon": "media/veduta.svg",
+          "contextualTitle": "Veduta"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "veduta.project",
+        "contents": "This window has no Veduta game: open the folder of one (the folder with veduta.json), or make a new one.\n[New Game](command:veduta.newGame)",
+        "when": "!veduta.project"
       }
     ]
   },

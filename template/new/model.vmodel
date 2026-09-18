@@ -1,0 +1,7 @@
+{
+  "veduta": "model/1",
+  "pivot": "bottom-center",
+  "parts": [
+    { "shape": "box", "size": [1, 1, 1] }
+  ]
+}

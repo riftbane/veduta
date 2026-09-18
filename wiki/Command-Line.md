@@ -9,6 +9,7 @@ well in a terminal. Run commands inside a project folder (or pass `--project DIR
 | Command | Does |
 |---------|------|
 | `veduta init NAME` | creates a Lua game project in a new folder |
+| `veduta new KIND NAME [--in FOLDER]` | writes a new scene, world, prefab, model, material, texture, scenario (`--scene S` or `--world W`: where it starts) or script that builds as it is; `--in` puts it in a folder of its kind |
 | `veduta sim [--scene S \| --world W --at x,z] [--seed N]` | plays the game in the simulator window (Windows), from the scene given or the project's default; saving a file reloads it in place |
 | `veduta run [--scene S \| --world W --at x,z] [--seed N]` | plays the game on a Linux framebuffer (the console, a text console) |
 | `veduta build` | checks every script and compiles the assets; errors with file, line and column |

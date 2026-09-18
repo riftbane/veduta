@@ -11,12 +11,14 @@ const fs = require('fs');
 const path = require('path');
 const v = require('./lib/veduta');
 const texture = require('./lib/texture');
+const tree = require('./lib/tree');
 
 let problems;
 let context; // the extension's own folder, for the files the preview panel loads
 let preview = null; // the one texture preview: its panel, the file it shows, its timer
 let building = null; // the running build, so saves in a row do not start builds in parallel
 let again = false;
+let project = null; // the project view (ProjectTree)
 
 function veduta() {
   const setting = vscode.workspace.getConfiguration('veduta').get('path');
@@ -41,10 +43,10 @@ async function projectRoot() {
 
 // task is a veduta command run in the terminal panel, where its output shows and it can be
 // stopped.
-function task(folder, command) {
-  const definition = { type: 'veduta', command };
-  const t = new vscode.Task(definition, folder, command, 'veduta',
-    new vscode.ProcessExecution(veduta(), [command], { cwd: folder.uri.fsPath }), ['$veduta']);
+function task(folder, command, args = []) {
+  const definition = args.length > 0 ? { type: 'veduta', command, args } : { type: 'veduta', command };
+  const t = new vscode.Task(definition, folder, [command, ...args].join(' '), 'veduta',
+    new vscode.ProcessExecution(veduta(), [command, ...args], { cwd: folder.uri.fsPath }), ['$veduta']);
   if (command === 'build') {
     t.group = vscode.TaskGroup.Build;
   } else if (command === 'test') {
@@ -54,14 +56,14 @@ function task(folder, command) {
   return t;
 }
 
-async function runTask(command) {
+async function runTask(command, args = []) {
   const folder = await projectRoot();
   if (!folder) {
     vscode.window.showWarningMessage('Veduta: open a game project (a folder with veduta.json) first.');
     return;
   }
   await vscode.workspace.saveAll(false);
-  return vscode.tasks.executeTask(task(folder, command));
+  return vscode.tasks.executeTask(task(folder, command, args));
 }
 
 // build runs veduta --json build and puts its errors in Problems.
@@ -214,7 +216,13 @@ function previewDoc() {
   return undefined;
 }
 
-function openPreview() {
+// openPreview previews the active texture source, or the one given (a file of the project
+// view, or its URI).
+async function openPreview(target) {
+  const uri = target instanceof vscode.Uri ? target : target && target.rel && project && project.uri(target);
+  if (uri) {
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri), { preview: false });
+  }
   const doc = previewDoc();
   if (!doc) {
     vscode.window.showWarningMessage('Veduta: open a texture source (a .vtex file) to preview it.');
@@ -255,6 +263,314 @@ function previewChanged(doc) {
   preview.timer = setTimeout(() => sendSource(doc), 120);
 }
 
+// --------------------------------------------------------------- the project view
+// The Veduta view in the activity bar: the project as lib/tree.js groups it (the files a
+// person works on, by what they are, in their folders), rebuilt as files come and go. Its
+// menus make new sources with veduta new, so a new file is one the engine accepts.
+
+const KINDS = [
+  ['scene', 'Scene'], ['world', 'World'], ['prefab', 'Prefab'], ['model', 'Model'],
+  ['material', 'Material'], ['texture', 'Texture'], ['scenario', 'Scenario'], ['script', 'Script'],
+];
+
+class ProjectTree {
+  constructor() {
+    this.changed = new vscode.EventEmitter();
+    this.onDidChangeTreeData = this.changed.event;
+    this.root = null;
+    this.info = null;
+    this.nodes = [];
+    this.parents = new Map();
+    this.byId = new Map();
+    this.files = new Map(); // file rel → node
+    this.timer = null;
+  }
+
+  async refresh() {
+    const folder = await projectRoot();
+    this.root = folder ? folder.uri.fsPath : null;
+    this.nodes = [];
+    if (this.root) {
+      this.info = tree.project(this.root);
+      this.nodes = tree.build(tree.scan(this.root, this.info), this.info);
+    }
+    this.parents = new Map();
+    this.byId = new Map();
+    this.files = new Map();
+    const walk = (n, parent) => {
+      this.parents.set(n.id, parent);
+      this.byId.set(n.id, n);
+      if (n.type === 'file') {
+        this.files.set(n.rel, n);
+      }
+      n.children.forEach((c) => walk(c, n));
+    };
+    this.nodes.forEach((n) => walk(n, undefined));
+    this.changed.fire();
+  }
+
+  // later rebuilds the tree once a burst of file events is over.
+  later() {
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.refresh(), 200);
+  }
+
+  uri(node) {
+    return vscode.Uri.file(path.join(this.root, ...node.rel.split('/')));
+  }
+
+  getTreeItem(node) {
+    if (node.type === 'section') {
+      const item = new vscode.TreeItem(node.label, node.children.length > 0
+        ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None);
+      item.id = node.id;
+      item.iconPath = new vscode.ThemeIcon(node.section.icon);
+      item.contextValue = tree.contextValue(node);
+      item.tooltip = node.rel ? `${node.label}: ${node.rel}` : node.label;
+      return item;
+    }
+    const item = new vscode.TreeItem(node.label, node.type === 'folder'
+      ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
+    item.id = node.id;
+    item.resourceUri = this.uri(node);
+    item.contextValue = tree.contextValue(node);
+    item.tooltip = node.rel;
+    if (node.description) {
+      item.description = node.description;
+    }
+    if (node.type === 'folder') {
+      item.iconPath = vscode.ThemeIcon.Folder;
+    } else {
+      item.iconPath = vscode.ThemeIcon.File;
+      item.command = { command: 'vscode.open', title: 'Open', arguments: [item.resourceUri] };
+    }
+    return item;
+  }
+
+  getChildren(node) {
+    return node ? node.children : this.nodes;
+  }
+
+  getParent(node) {
+    return this.parents.get(node.id);
+  }
+}
+
+// vedutaJSON runs veduta --json in the project and returns its report, or shows the error
+// and returns null.
+function vedutaJSON(root, args) {
+  return new Promise((resolve) => {
+    cp.execFile(veduta(), ['--json', ...args], { cwd: root, maxBuffer: 16 << 20 }, (err, stdout, stderr) => {
+      let r;
+      try {
+        r = JSON.parse(stdout);
+      } catch (_) {
+        const why = err && err.code === 'ENOENT'
+          ? 'veduta was not found: install it (install.ps1), or set veduta.path'
+          : (stderr || stdout || String(err)).trim();
+        vscode.window.showErrorMessage('Veduta: ' + why);
+        resolve(null);
+        return;
+      }
+      if (r.ok === false) {
+        vscode.window.showErrorMessage('Veduta: ' + r.error);
+        resolve(null);
+        return;
+      }
+      resolve(r);
+    });
+  });
+}
+
+// newSource asks for a name and makes a source of the kind with veduta new, in the folder
+// of node, then opens it. start is {scene} or {world} for a scenario.
+async function newSource(kind, node, start = {}) {
+  await project.refresh();
+  if (!project.root) {
+    vscode.window.showWarningMessage('Veduta: open a game project (a folder with veduta.json) first.');
+    return;
+  }
+  const label = KINDS.find((k) => k[0] === kind)[1];
+  const section = tree.SECTIONS.find((s) => s.id === kind);
+  // The folder of the node it was asked on (a section, a folder, a file beside which it
+  // goes), relative to the kind's own: veduta new's --in.
+  const inFolder = node && node.section.id === kind ? tree.relIn(node, project.info) : '';
+  const dir = [tree.sectionRoot(section, project.info), inFolder].filter(Boolean).join('/');
+  const index = tree.names(project.nodes);
+  const name = await vscode.window.showInputBox({
+    title: `Veduta: new ${kind}` + (start.scene ? ` starting in scene ${start.scene}` : start.world ? ` starting in world ${start.world}` : ''),
+    prompt: `Its name, which is also its file name, in ${dir || 'the project folder'}/`,
+    validateInput: (s) => {
+      const bad = tree.checkName(s, kind, index);
+      if (bad) {
+        return bad;
+      }
+      const file = path.join(project.root, ...dir.split('/').filter(Boolean), s + section.ext);
+      return fs.existsSync(file) ? `${path.basename(file)} is there already` : undefined;
+    },
+  });
+  if (!name) {
+    return;
+  }
+  const args = ['new', kind, name];
+  if (inFolder) {
+    args.push('--in', inFolder);
+  }
+  if (start.scene) {
+    args.push('--scene', start.scene);
+  } else if (start.world) {
+    args.push('--world', start.world);
+  }
+  const r = await vedutaJSON(project.root, args);
+  if (!r) {
+    return;
+  }
+  await project.refresh();
+  const made = project.files.get(r.file);
+  await vscode.window.showTextDocument(vscode.Uri.file(path.join(project.root, ...r.file.split('/'))), { preview: false });
+  if (made && project.view.visible) {
+    project.view.reveal(made, { select: true, focus: false }).then(undefined, () => {});
+  }
+  if (r.files.length > 1) {
+    vscode.window.showInformationMessage(`Veduta: ${label.toLowerCase()} ${name} made, with ${r.files.slice(1).join(' and ')} it stands on.`);
+  }
+}
+
+// pickKind asks which kind of source to make, for the + of the view's title.
+async function pickKind() {
+  const pick = await vscode.window.showQuickPick(KINDS.map(([kind, label]) => ({ label, kind })), { title: 'Veduta: new', placeHolder: 'What to make' });
+  if (pick) {
+    await newSource(pick.kind, undefined);
+  }
+}
+
+async function newFolder(node) {
+  const base = node.rel;
+  const name = await vscode.window.showInputBox({
+    title: 'Veduta: new folder',
+    prompt: `In ${base || 'the project folder'}/`,
+    validateInput: (s) => {
+      if (!tree.NAME.test(s)) {
+        return 'a-z, 0-9, - and _, starting with a letter or digit';
+      }
+      return fs.existsSync(path.join(project.root, ...base.split('/').filter(Boolean), s)) ? `${s} is there already` : undefined;
+    },
+  });
+  if (!name) {
+    return;
+  }
+  const rel = [base, name].filter(Boolean).join('/');
+  await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.join(project.root, ...rel.split('/'))));
+  await project.refresh();
+  const made = project.byId.get(node.section.id + ':' + rel);
+  if (made) {
+    project.view.reveal(made, { select: true, focus: false, expand: true }).then(undefined, () => {});
+  }
+}
+
+// rename gives a file or a folder a new name: an asset keeps its extension and its name
+// stays free in its kind. What refers to the old name is not changed: the build that
+// follows lists it in Problems.
+async function rename(node) {
+  const file = node.type === 'file';
+  const ext = file ? path.extname(node.label) : '';
+  const old = file ? node.label.slice(0, node.label.length - ext.length) : node.label;
+  const kind = node.section.kind;
+  const index = tree.names(project.nodes);
+  if (file && index[kind]) {
+    delete index[kind][old];
+  }
+  const dir = node.rel.slice(0, Math.max(0, node.rel.lastIndexOf('/')));
+  const name = await vscode.window.showInputBox({
+    title: `Veduta: rename ${node.label}`,
+    value: old,
+    valueSelection: [0, old.length],
+    validateInput: (s) => {
+      const bad = file && kind ? tree.checkName(s, kind, index) : (tree.NAME.test(s) ? '' : 'a-z, 0-9, - and _, starting with a letter or digit');
+      if (bad) {
+        return bad;
+      }
+      return s !== old && fs.existsSync(path.join(project.root, ...dir.split('/').filter(Boolean), s + ext)) ? `${s + ext} is there already` : undefined;
+    },
+  });
+  if (!name || name === old) {
+    return;
+  }
+  const to = vscode.Uri.file(path.join(project.root, ...dir.split('/').filter(Boolean), name + ext));
+  const edit = new vscode.WorkspaceEdit();
+  edit.renameFile(project.uri(node), to, { overwrite: false });
+  if (!await vscode.workspace.applyEdit(edit)) {
+    vscode.window.showErrorMessage(`Veduta: ${node.rel} was not renamed.`);
+    return;
+  }
+  await project.refresh();
+  if (vscode.workspace.getConfiguration('veduta').get('buildOnSave')) {
+    build(true);
+  }
+}
+
+async function remove(node) {
+  const what = node.type === 'folder' ? `${node.rel} and everything in it` : node.rel;
+  const ok = await vscode.window.showWarningMessage(`Delete ${what}?`, { modal: true }, 'Move to Trash');
+  if (ok !== 'Move to Trash') {
+    return;
+  }
+  try {
+    await vscode.workspace.fs.delete(project.uri(node), { recursive: true, useTrash: true });
+  } catch (e) {
+    vscode.window.showErrorMessage(`Veduta: ${node.rel} was not deleted: ${e.message}`);
+    return;
+  }
+  await project.refresh();
+  if (vscode.workspace.getConfiguration('veduta').get('buildOnSave')) {
+    build(true);
+  }
+}
+
+function playNode(node) {
+  return runTask(v.playCommand(process.platform), [node.section.id === 'world' ? '--world' : '--scene', node.name]);
+}
+
+async function debugScenario(node) {
+  const folder = await projectRoot();
+  return vscode.debug.startDebugging(folder, { type: 'veduta', request: 'launch', name: `Scenario ${node.name}`, mode: 'scenario', scenario: node.name });
+}
+
+function registerProjectView() {
+  project = new ProjectTree();
+  project.view = vscode.window.createTreeView('veduta.project', { treeDataProvider: project, showCollapseAll: true });
+  const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+  const changed = (uri) => {
+    if (project.root && uri.fsPath.startsWith(project.root)) {
+      project.later();
+    }
+  };
+  context.subscriptions.push(
+    project.view,
+    watcher,
+    watcher.onDidCreate(changed),
+    watcher.onDidDelete(changed),
+    watcher.onDidChange((uri) => {
+      if (path.basename(uri.fsPath) === 'veduta.json') {
+        changed(uri);
+      }
+    }),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => project.later()),
+    vscode.commands.registerCommand('veduta.view.refresh', () => project.refresh()),
+    vscode.commands.registerCommand('veduta.view.new', pickKind),
+    vscode.commands.registerCommand('veduta.view.newFolder', newFolder),
+    vscode.commands.registerCommand('veduta.view.rename', rename),
+    vscode.commands.registerCommand('veduta.view.delete', remove),
+    vscode.commands.registerCommand('veduta.view.play', playNode),
+    vscode.commands.registerCommand('veduta.view.newScenarioHere', (node) => newSource('scenario', undefined, { [node.section.id]: node.name })),
+    vscode.commands.registerCommand('veduta.view.runScenario', (node) => runTask('simulate', ['--scenario', node.name])),
+    vscode.commands.registerCommand('veduta.view.debugScenario', debugScenario),
+    vscode.commands.registerCommand('veduta.view.reveal', (node) => vscode.commands.executeCommand('revealFileInOS', project.uri(node))),
+    ...KINDS.map(([kind, label]) => vscode.commands.registerCommand('veduta.view.new' + label, (node) => newSource(kind, node))),
+  );
+  project.refresh();
+}
+
 async function activate(ctx) {
   context = ctx;
   problems = vscode.languages.createDiagnosticCollection('veduta');
@@ -289,7 +605,7 @@ async function activate(ctx) {
       },
       resolveTask: async (t) => {
         const folder = t.scope && t.scope.uri ? t.scope : await projectRoot();
-        return folder && t.definition.command ? task(folder, t.definition.command) : undefined;
+        return folder && t.definition.command ? task(folder, t.definition.command, t.definition.args || []) : undefined;
       },
     }),
     // F5 with no launch.json plays the game under the debugger; veduta dap is the adapter.
@@ -321,10 +637,13 @@ async function activate(ctx) {
       }
     }),
   );
+  registerProjectView();
   if (isProject && vscode.workspace.getConfiguration('veduta').get('buildOnSave')) {
     build(true);
   }
   checkTool();
+  // For the integration tests: the project view's tree.
+  return { project: () => project };
 }
 
 // checkTool warns once per window when the veduta tool is missing or too old for this

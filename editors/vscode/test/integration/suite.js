@@ -31,9 +31,51 @@ async function run() {
   assert.ok(ext, 'the extension is installed');
   await ext.activate();
   const commands = await vscode.commands.getCommands(true);
-  for (const c of ['veduta.newGame', 'veduta.play', 'veduta.test', 'veduta.build', 'veduta.deploy', 'veduta.previewTexture']) {
+  for (const c of ['veduta.newGame', 'veduta.play', 'veduta.test', 'veduta.build', 'veduta.deploy', 'veduta.previewTexture',
+    'veduta.view.new', 'veduta.view.newPrefab', 'veduta.view.newFolder', 'veduta.view.rename', 'veduta.view.delete', 'veduta.view.play']) {
     assert.ok(commands.includes(c), c + ' is registered');
   }
+
+  // The Project view: the game veduta init made, by section; a folder and a prefab made
+  // from its menus (the input boxes answered here) are on disk, open, and in the view.
+  const project = ext.exports.project();
+  await vscode.commands.executeCommand('veduta.view.refresh');
+  assert.deepStrictEqual(project.nodes.map((n) => n.label),
+    ['Game', 'Scripts', 'Scenes', 'Worlds', 'Prefabs', 'Models', 'Materials', 'Textures', 'Scenarios']);
+  const node = (id) => project.byId.get(id);
+  assert.strictEqual(node('scene:assets/scenes/main.vscene').description, 'start');
+  const input = vscode.window.showInputBox;
+  const answers = [];
+  vscode.window.showInputBox = async (o) => {
+    const [value, check] = answers.shift();
+    assert.strictEqual(o.validateInput(value) || '', '', `${value} is refused: ${o.validateInput(value)}`);
+    if (check) {
+      assert.match(o.validateInput(check[0]), check[1]);
+    }
+    return value;
+  };
+  try {
+    answers.push(['nature', ['Nature', /a-z/]]);
+    await vscode.commands.executeCommand('veduta.view.newFolder', node('prefab'));
+    assert.ok(node('prefab:assets/prefabs/nature'), 'the folder is in the view');
+    answers.push(['tree']);
+    await vscode.commands.executeCommand('veduta.view.newPrefab', node('prefab:assets/prefabs/nature'));
+    const prefab = path.join(root, 'assets', 'prefabs', 'nature', 'tree.vprefab');
+    assert.ok(fs.readFileSync(prefab, 'utf8').includes('"prefab/1"'), 'veduta new wrote the prefab');
+    assert.strictEqual(vscode.window.activeTextEditor.document.uri.fsPath, prefab);
+    assert.strictEqual(vscode.window.activeTextEditor.document.languageId, 'json');
+    assert.ok(node('prefab:assets/prefabs/nature/tree.vprefab'), 'the prefab is in the view');
+    answers.push(['oak', ['start', /taken by/]]);
+    await vscode.commands.executeCommand('veduta.view.newScenarioHere', node('scene:assets/scenes/main.vscene'));
+    assert.ok(fs.readFileSync(path.join(root, 'tests', 'scenarios', 'oak.vscenario'), 'utf8').includes('"scene": "main"'));
+    answers.push(['pine']);
+    await vscode.commands.executeCommand('veduta.view.rename', node('prefab:assets/prefabs/nature/tree.vprefab'));
+    assert.ok(fs.existsSync(path.join(root, 'assets', 'prefabs', 'nature', 'pine.vprefab')), 'renamed');
+    await until('the renamed prefab in the view', () => node('prefab:assets/prefabs/nature/pine.vprefab'));
+  } finally {
+    vscode.window.showInputBox = input;
+  }
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
 
   // A broken script: Build puts the error in Problems, at its line.
   const lines = good.split('\n').length;
