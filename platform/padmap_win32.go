@@ -5,7 +5,7 @@ import "github.com/riftbane/veduta/v2/sim"
 // Pads on Windows, read by the simulator: XInput for Xbox controllers, WinMM's joystick API
 // for any other pad (the SNES-style USB pads among them). The tables below turn what each
 // API reports into the console's buttons, the same buttons a pad presses on the console:
-// the D-pad, A, B, Select, and Start as Cancel; Select and Start held together leave the
+// the D-pad, A and B, Start as the game's menu (Select), and a pad's own Select to leave the
 // game, as Home does. They are in a file every GOOS builds, so they are tested everywhere.
 
 // XInput gamepad buttons (XINPUT_GAMEPAD.wButtons).
@@ -20,20 +20,20 @@ const (
 	xinputB         = 0x2000
 )
 
-// xinputButtons maps an XInput button mask to the console's buttons, and whether Back and
-// Start are held together (Home).
+// xinputButtons maps an XInput button mask to the console's buttons, and whether Back
+// (Home) is held.
 func xinputButtons(mask uint16) (sim.Buttons, bool) {
 	var b sim.Buttons
 	for bit, button := range map[uint16]sim.Button{
 		xinputDPadUp: sim.ButtonUp, xinputDPadDown: sim.ButtonDown, xinputDPadLeft: sim.ButtonLeft,
 		xinputDPadRight: sim.ButtonRight, xinputA: sim.ButtonA, xinputB: sim.ButtonB,
-		xinputBack: sim.ButtonSelect, xinputStart: sim.ButtonCancel,
+		xinputStart: sim.ButtonSelect,
 	} {
 		if mask&bit != 0 {
 			b |= sim.Of(button)
 		}
 	}
-	return b, mask&(xinputBack|xinputStart) == xinputBack|xinputStart
+	return b, mask&xinputBack != 0
 }
 
 // joystick is what joyGetPosEx reports: the button bits (button 1 is bit 0, the order HID
@@ -45,23 +45,24 @@ type joystick struct {
 	pov     uint32
 }
 
-// The buttons of a pad read through WinMM, by bit: the order the Linux joystick-style pads
-// use (padmap_linux.go), which is the HID order, so a pad plays the same on both.
+// The buttons of a pad read through WinMM, by bit, and of a Linux joystick-style pad, from
+// BTN_TRIGGER (padmap_linux.go): the HID order, so a pad plays the same on both. It is the
+// order of the cheap SNES-style USB pads: X, A, B, Y, L, R, then Select and Start.
 const (
-	joyA      = 0
-	joyB      = 1
-	joySelect = 6
-	joyStart  = 7
+	joyA      = 1
+	joyB      = 2
+	joySelect = 8
+	joyStart  = 9
 )
 
-// joystickButtons maps a WinMM report to the console's buttons, and whether Select and Start
-// are held together. The D-pad is the hat when it points somewhere, else the X and Y axes,
+// joystickButtons maps a WinMM report to the console's buttons, and whether Select (Home) is
+// held. The D-pad is the hat when it points somewhere, else the X and Y axes,
 // which many cheap pads use for it: an axis counts as a direction a quarter of the way from
 // the middle to an end.
 func joystickButtons(j joystick) (sim.Buttons, bool) {
 	var b sim.Buttons
-	for bit, button := range [...]sim.Button{joyA: sim.ButtonA, joyB: sim.ButtonB, joySelect: sim.ButtonSelect, joyStart: sim.ButtonCancel} {
-		if (bit == joyA || bit == joyB || bit == joySelect || bit == joyStart) && j.buttons&(1<<bit) != 0 {
+	for bit, button := range map[uint32]sim.Button{joyA: sim.ButtonA, joyB: sim.ButtonB, joyStart: sim.ButtonSelect} {
+		if j.buttons&(1<<bit) != 0 {
 			b |= sim.Of(button)
 		}
 	}
@@ -100,12 +101,11 @@ func joystickButtons(j joystick) (sim.Buttons, bool) {
 			b |= sim.Of(sim.ButtonDown)
 		}
 	}
-	chord := uint32(1<<joySelect | 1<<joyStart)
-	return b, j.buttons&chord == chord
+	return b, j.buttons&(1<<joySelect) != 0
 }
 
 // padTracker turns successive reports of one pad into events: a button reported down that
-// was up is pressed, and the other way round; the Home chord closes, once per press, after
+// was up is pressed, and the other way round; Home closes, once per press, after
 // releasing what the pad held.
 type padTracker struct {
 	held sim.Buttons
@@ -119,7 +119,7 @@ func (t *padTracker) update(out []Event, now sim.Buttons, home bool) []Event {
 	}
 	t.home = home
 	if home {
-		now = 0 // the chord's buttons never reach the game
+		now = 0 // nothing held with Home reaches the game
 	}
 	for b := sim.Button(0); b < sim.NumButtons; b++ {
 		switch was, is := t.held.Has(b), now.Has(b); {

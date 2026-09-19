@@ -43,11 +43,11 @@ func (d *padDecoder) setRange(code uint16, lo, hi int32) {
 	}
 }
 
-// exitChords close the player: Select and Start on either kind of pad, Home (BTN_MODE or
-// KEY_HOMEPAGE), and a keyboard's Ctrl (either one) and Q. A console has no other way back,
+// exitChords close the player: Home (BTN_MODE or KEY_HOMEPAGE), a pad's Select, and a
+// keyboard's Ctrl (either one) and Q. A console has no other way back,
 // and a game must not be able to swallow it. The array is as long as its contents, and so
 // is the state kept for it.
-var exitChords = [...][2]uint16{padExitChords[0], padExitChords[1], padHome[0], padHome[1], keyboardExit[0], keyboardExit[1]}
+var exitChords = [...][2]uint16{padHome[0], padHome[1], padHome[2], padHome[3], keyboardExit[0], keyboardExit[1]}
 
 // newPadDecoder returns a decoder whose ABS_X and ABS_Y are the D-pad, as they may be on a
 // pad whose D-pad is not four buttons.

@@ -102,13 +102,14 @@ returns to the console's home, and no game can see or swallow it.
 | D-pad | `veduta.ButtonUp`, `ButtonDown`, `ButtonLeft`, `ButtonRight` | `up`, `down`, `left`, `right` | moving, choosing | arrows, W A S D | D-pad, hat, or a stick where the D-pad is not four buttons |
 | A | `veduta.ButtonA` | `a` | the main action, confirm | Space, Z | A (`BTN_SOUTH`) |
 | B | `veduta.ButtonB` | `b` | the second action | X, Shift | B (`BTN_EAST`) |
-| Select | `veduta.ButtonSelect` | `select` | the game's menu | Enter, Tab | Select |
-| Cancel | `veduta.ButtonCancel` | `cancel` | back, close a menu | Escape, Backspace | Start, or `KEY_BACK` |
-| Home | none | none | leave the game | Ctrl+Q | Home (`BTN_MODE`, `KEY_HOMEPAGE`), or Select and Start held together |
+| Select | `veduta.ButtonSelect` | `select` | the game's menu | Enter, Tab | Start |
+| Cancel | `veduta.ButtonCancel` | `cancel` | back, close a menu | Escape, Backspace | `KEY_BACK` (the handheld's Cancel) |
+| Home | none | none | leave the game | Ctrl+Q | Home (`BTN_MODE`, `KEY_HOMEPAGE`), or the pad's Select |
 
-A pad without a Home button leaves the game with Select and Start (Cancel) held together,
-so do not give that pair a meaning. A pad's other buttons (X, Y, shoulders) and sticks
-beside a four-button D-pad are ignored.
+A USB pad has no Home button, so its Select leaves the game and its Start is the game's
+menu. It has no Cancel either: a menu has to close with Select (Start on the pad) or B as
+well. A pad's other buttons (X, Y, shoulders) and sticks beside a four-button D-pad are
+ignored.
 
 ## Cameras
 

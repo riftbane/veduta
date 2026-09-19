@@ -51,12 +51,12 @@ The simulator maps the console's buttons to the keyboard, and any gamepad works 
 | D-pad | arrows, or W A S D | D-pad (or the stick, on a pad whose D-pad is not four buttons) |
 | A | Space or Z | A |
 | B | X or Shift | B |
-| Select | Enter or Tab | Select |
-| Cancel | Escape or Backspace | Start |
-| Home | Ctrl+Q | Home, or Select + Start together |
+| Select | Enter or Tab | Start |
+| Cancel | Escape or Backspace | none |
+| Home | Ctrl+Q | Home, or Select |
 
-On a pad without a Home button, Select and Start held together leave the game, so do not
-give that pair a meaning.
+A gamepad's Select leaves the game, as Home does, and its Start is the game's menu. A
+gamepad has no Cancel, so a menu should close with Select (Start on the pad) or B as well.
 
 ## Menus
 
@@ -79,7 +79,7 @@ function game.update()
     choice = choice % #entries + 1
   elseif input.pressed("up") then
     choice = (choice - 2) % #entries + 1
-  elseif input.pressed("cancel") then
+  elseif input.pressed("cancel") or input.pressed("b") then
     menu_open = false
   elseif input.pressed("a") then
     menu_open = false

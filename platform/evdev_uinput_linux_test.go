@@ -74,12 +74,12 @@ var (
 		keys: []uintptr{btnSouth, btnEast, btnSelect, btnStart},
 		axes: []axisSpec{{absHat0X, -1, 1}, {absHat0Y, -1, 1}},
 	}
-	// joystickPad is the other kind the table knows: buttons from BTN_TRIGGER, Select and
-	// Start among them, a stick from 0 to 255 as many cheap pads report their D-pad, and a
+	// joystickPad is the other kind the table knows: ten buttons from BTN_TRIGGER, as a
+	// SNES-style USB pad has them (X, A, B, Y, L, R, two unused, Select, Start), a stick from 0 to 255 as many cheap pads report their D-pad, and a
 	// hat as well.
 	joystickPad = padSpec{
 		kind: "joystick-style pad",
-		keys: []uintptr{btnTrigger, btnTrigger + 1, btnTrigger + 2, btnTrigger + 3, btnTrigger + 4, btnTrigger + 5, btnTrigger + 6, btnTrigger + 7},
+		keys: []uintptr{btnTrigger, btnTrigger + 1, btnTrigger + 2, btnTrigger + 3, btnTrigger + 4, btnTrigger + 5, btnTrigger + 6, btnTrigger + 7, btnTrigger + 8, btnTrigger + 9},
 		axes: []axisSpec{{absX, 0, 255}, {absY, 0, 255}, {absHat0X, -1, 1}},
 	}
 	// consolePad is a full gamepad: A, B, X, Y, Select, Start, Home, a D-pad of four
@@ -354,10 +354,10 @@ func TestEvdevUinput(t *testing.T) {
 			pad.emit(evAbs, absHat0Y, 1)
 			pad.emit(evAbs, absHat0Y, 0)
 		}, "down up,up up,down down,up down"},
-		{"Start alone", func() { pad.emit(evKey, btnStart, 1); pad.emit(evKey, btnStart, 0) }, "down cancel,up cancel"},
-		{"Select+Start", func() { pad.emit(evKey, btnSelect, 1); pad.emit(evKey, btnStart, 1) }, "down select,up select,close"},
-		{"letting go of the chord", func() { pad.emit(evKey, btnStart, 0); pad.emit(evKey, btnSelect, 0) }, ""},
-		{"A after the chord", func() { pad.emit(evKey, btnSouth, 1) }, "down a"},
+		{"Start: the game's menu", func() { pad.emit(evKey, btnStart, 1); pad.emit(evKey, btnStart, 0) }, "down select,up select"},
+		{"Select leaves, with Start held", func() { pad.emit(evKey, btnStart, 1); pad.emit(evKey, btnSelect, 1) }, "down select,up select,close"},
+		{"letting go", func() { pad.emit(evKey, btnSelect, 0); pad.emit(evKey, btnStart, 0) }, ""},
+		{"A after leaving", func() { pad.emit(evKey, btnSouth, 1) }, "down a"},
 	} {
 		step.send()
 		if got := collect(t, src, step.want); got != step.want {
@@ -379,7 +379,7 @@ func TestEvdevUinput(t *testing.T) {
 // TestEvdevUinputJoystick drives a joystick-style pad the kernel made: its buttons start at
 // BTN_TRIGGER and its stick reports 0 to 255, resting in the middle. The source has to ask
 // the device for that range, or left and right are dead and a push nearly full left comes
-// out as right; and Select+Start has to close the player on this kind of pad too.
+// out as right; and Select has to close the player on this kind of pad too.
 func TestEvdevUinputJoystick(t *testing.T) {
 	old := sysRoot
 	sysRoot = "/"
@@ -433,10 +433,11 @@ func TestEvdevUinputJoystick(t *testing.T) {
 			pad.emit(evAbs, absX, 127)
 		}, "down left"},
 		{"hat back", func() { pad.emit(evAbs, absHat0X, 0) }, "up left"},
-		{"first button", func() { pad.emit(evKey, btnTrigger, 1); pad.emit(evKey, btnTrigger, 0) }, "down a,up a"},
-		{"Start alone", func() { pad.emit(evKey, btnTrigger+7, 1); pad.emit(evKey, btnTrigger+7, 0) }, "down cancel,up cancel"},
-		{"Select+Start", func() { pad.emit(evKey, btnTrigger+6, 1); pad.emit(evKey, btnTrigger+7, 1) }, "down select,up select,close"},
-		{"letting go of the chord", func() { pad.emit(evKey, btnTrigger+7, 0); pad.emit(evKey, btnTrigger+6, 0) }, ""},
+		{"X: nothing", func() { pad.emit(evKey, btnTrigger, 1); pad.emit(evKey, btnTrigger, 0) }, ""},
+		{"A", func() { pad.emit(evKey, btnTrigger+joyA, 1); pad.emit(evKey, btnTrigger+joyA, 0) }, "down a,up a"},
+		{"Start: the game's menu", func() { pad.emit(evKey, btnTrigger+joyStart, 1); pad.emit(evKey, btnTrigger+joyStart, 0) }, "down select,up select"},
+		{"Select leaves", func() { pad.emit(evKey, btnTrigger+joyA, 1); pad.emit(evKey, btnTrigger+joySelect, 1) }, "down a,up a,close"},
+		{"letting go", func() { pad.emit(evKey, btnTrigger+joySelect, 0); pad.emit(evKey, btnTrigger+joyA, 0) }, ""},
 	} {
 		step.send()
 		if got := collect(t, src, step.want); got != step.want {
@@ -447,8 +448,8 @@ func TestEvdevUinputJoystick(t *testing.T) {
 	// While the player reads the pad it has the pad to itself (EVIOCGRAB): another reader
 	// of the same node, as the text console is of a keyboard, gets nothing.
 	other := otherReader(t, dev.Dev)
-	pad.emit(evKey, btnTrigger+1, 1)
-	pad.emit(evKey, btnTrigger+1, 0)
+	pad.emit(evKey, btnTrigger+joyB, 1)
+	pad.emit(evKey, btnTrigger+joyB, 0)
 	if got := collect(t, src, "down b,up b"); got != "down b,up b" {
 		t.Fatalf("B while taken: got %q", got)
 	}
@@ -464,16 +465,16 @@ func TestEvdevUinputJoystick(t *testing.T) {
 	}
 	time.Sleep(500 * time.Millisecond)
 	grabStall = oldStall
-	pad.emit(evKey, btnTrigger+1, 1)
-	pad.emit(evKey, btnTrigger+1, 0)
+	pad.emit(evKey, btnTrigger+joyB, 1)
+	pad.emit(evKey, btnTrigger+joyB, 0)
 	if n := other(); n == 0 {
 		t.Fatal("the player stopped polling, but the pad was not given back")
 	}
 	if got := collect(t, src, "down b,up b"); got != "down b,up b" {
 		t.Fatalf("B while given back: got %q", got)
 	}
-	pad.emit(evKey, btnTrigger+1, 1)
-	pad.emit(evKey, btnTrigger+1, 0)
+	pad.emit(evKey, btnTrigger+joyB, 1)
+	pad.emit(evKey, btnTrigger+joyB, 0)
 	if got := collect(t, src, "down b,up b"); got != "down b,up b" {
 		t.Fatalf("B once taken again: got %q", got)
 	}
@@ -482,7 +483,7 @@ func TestEvdevUinputJoystick(t *testing.T) {
 	}
 	// Closed, the pad belongs to everyone again.
 	src.close()
-	pad.emit(evKey, btnTrigger+1, 1)
+	pad.emit(evKey, btnTrigger+joyB, 1)
 	if n := other(); n == 0 {
 		t.Fatal("the player closed, but the pad was not given back")
 	}

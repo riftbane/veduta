@@ -7,12 +7,12 @@ import (
 )
 
 func TestXInputButtons(t *testing.T) {
-	b, home := xinputButtons(xinputDPadUp | xinputA | xinputBack | 0x4000 /* X: nothing */)
+	b, home := xinputButtons(xinputDPadUp | xinputA | xinputStart | 0x4000 /* X: nothing */)
 	if b != sim.Of(sim.ButtonUp, sim.ButtonA, sim.ButtonSelect) || home {
 		t.Fatalf("buttons %v home %v", b.Names(), home)
 	}
-	if _, home := xinputButtons(xinputBack | xinputStart); !home {
-		t.Fatal("Back+Start is not Home")
+	if _, home := xinputButtons(xinputBack); !home {
+		t.Fatal("Back is not Home")
 	}
 }
 
@@ -29,10 +29,9 @@ func TestJoystickButtons(t *testing.T) {
 		{"hat right", joystick{x: 32767, y: 32767, pov: 9000}, sim.Of(sim.ButtonRight), false},
 		{"hat down-left", joystick{x: 32767, y: 32767, pov: 22500}, sim.Of(sim.ButtonDown, sim.ButtonLeft), false},
 		{"hat beats the axes", joystick{x: 0, y: 32767, pov: 0}, sim.Of(sim.ButtonUp), false},
-		{"A, B, Select, Start", joystick{buttons: 1<<joyA | 1<<joyB | 1<<2 | 1<<joySelect, x: 32767, y: 32767, pov: 0xFFFF},
+		{"A, B, X, Start", joystick{buttons: 1<<joyA | 1<<joyB | 1<<0 | 1<<joyStart, x: 32767, y: 32767, pov: 0xFFFF},
 			sim.Of(sim.ButtonA, sim.ButtonB, sim.ButtonSelect), false},
-		{"Select+Start", joystick{buttons: 1<<joySelect | 1<<joyStart, x: 32767, y: 32767, pov: 0xFFFF},
-			sim.Of(sim.ButtonSelect, sim.ButtonCancel), true},
+		{"Select", joystick{buttons: 1 << joySelect, x: 32767, y: 32767, pov: 0xFFFF}, 0, true},
 	} {
 		if b, home := joystickButtons(c.j); b != c.want || home != c.home {
 			t.Errorf("%s: %v home %v, want %v home %v", c.name, b.Names(), home, c.want.Names(), c.home)

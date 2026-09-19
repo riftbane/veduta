@@ -26,7 +26,7 @@ const (
 	Press     EventKind = iota + 1 // Button went down (auto-repeat is filtered out)
 	Release                        // Button went up
 	FocusLost                      // input was lost: release everything; not produced by the framebuffer backend
-	Close                          // the player asked to leave: Home, Select and Start held together on a pad, Ctrl+Q on a keyboard
+	Close                          // the player asked to leave: Home or Select on a pad, Ctrl+Q on a keyboard
 	Tool                           // a keyboard's tool key went down: the player's own functions, never the game's
 )
 

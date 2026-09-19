@@ -21,7 +21,7 @@ import (
 // (VEDUTA_SCALE, 3 by default, then the largest that fits when the window is resized),
 // centered on black, in the panel's 16-bit colors (VEDUTA_PANEL=0 shows the frame's own).
 // The keyboard (sim.go) and any pad (pad_windows.go) press the console's buttons, and
-// closing the window, Ctrl+Q or a pad's Select+Start leave the game as Home does.
+// closing the window, Ctrl+Q or a pad's Select leave the game as Home does.
 //
 // One window class and one window procedure; messages are pumped only by Poll, on the
 // thread that created the window (the main thread, see init). Calls made per message or

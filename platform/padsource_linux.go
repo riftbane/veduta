@@ -279,7 +279,7 @@ func (p *inputSource) poll() ([]Event, error) {
 }
 
 // settle keeps reading, for at most d, until nothing is held. The player closes while the
-// keys that closed it (Select and Start, Ctrl and Q) are still down; letting go of the
+// keys that closed it (Select, Ctrl and Q) are still down; letting go of the
 // devices then would hand those keys, and the kernel's repeats of them, to the text console
 // and the shell behind it. Waiting for their release while the devices are still taken
 // keeps them away.

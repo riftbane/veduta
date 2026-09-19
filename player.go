@@ -129,8 +129,8 @@ func (o playOptions) resolve(p *asset.Project) (runOptions, error) {
 	return opt, nil
 }
 
-// runPlayer puts the game on the screen and runs it until the player leaves (Home,
-// Select+Start, Ctrl+Q, or closing the simulator window).
+// runPlayer puts the game on the screen and runs it until the player leaves (Home, a pad's
+// Select, Ctrl+Q, or closing the simulator window).
 func runPlayer(g Game, p *asset.Project, a *Assets, dir string, stderr io.Writer, o playOptions) error {
 	start, err := o.resolve(p)
 	if err != nil {

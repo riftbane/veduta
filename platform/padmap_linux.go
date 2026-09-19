@@ -2,15 +2,21 @@ package platform
 
 import "github.com/riftbane/veduta/v2/sim"
 
-// The pad becomes the console's buttons: the D-pad, A, B, Select and Cancel go to the game
-// as sim.Button, and Home closes the player. A gamepad has more buttons than that (X, Y,
-// shoulders, sticks); they mean nothing on the console and are ignored.
+// The pad becomes the console's buttons: the D-pad, A and B go to the game as themselves,
+// Start is the game's menu (sim.ButtonSelect), and Select leaves the game, as Home does. A
+// gamepad has more buttons than that (X, Y, shoulders, sticks); they mean nothing on the
+// console and are ignored, and so is a pad's lack of Cancel.
 //
-// This table is provisional. Clone pads permute their button order freely, and no kernel
-// call reports which silkscreen letter a code belongs to, so it has to be corrected against
-// the real pad with cmd/padprobe before it can be trusted. The handheld's own buttons, wired
-// to gpio-keys, report the codes this table names first: BTN_DPAD_*, BTN_SOUTH, BTN_EAST,
-// BTN_SELECT, KEY_BACK and BTN_MODE.
+// Leaving on Select alone, rather than on a chord, is what a USB pad with no Home button
+// needs: one button no game can swallow. Games therefore never see a pad's Select; their
+// menu is on Start.
+//
+// Joystick-style pads (buttons from BTN_TRIGGER) follow the order the cheap SNES-style USB
+// pads report, DragonRise 0079:0011 and 081f:e401 among them: X, A, B, Y, L, R, then
+// Select and Start ninth and tenth (SDL's game controller database agrees). The numbers are
+// in padmap_win32.go, which WinMM reads in the same order. The handheld's
+// own buttons, wired to gpio-keys, report BTN_DPAD_*, BTN_SOUTH, BTN_EAST, BTN_START for
+// its menu button, KEY_BACK and BTN_MODE.
 
 // evdev event types and the codes this file cares about (linux/input-event-codes.h).
 const (
@@ -38,29 +44,22 @@ const (
 )
 
 // padButtons maps a button code to a game button. Both bases are listed because both occur
-// on pads of this kind. A pad without a Cancel button uses Start for it.
+// on pads of this kind.
 var padButtons = map[uint16]sim.Button{
 	btnSouth:     sim.ButtonA,
 	btnSouth + 1: sim.ButtonB,
-	btnSelect:    sim.ButtonSelect,
-	btnStart:     sim.ButtonCancel,
+	btnStart:     sim.ButtonSelect,
 	keyBack:      sim.ButtonCancel,
 
-	btnTrigger:     sim.ButtonA,
-	btnTrigger + 1: sim.ButtonB,
-	btnTrigger + 6: sim.ButtonSelect,
-	btnTrigger + 7: sim.ButtonCancel,
+	btnTrigger + joyA:     sim.ButtonA,
+	btnTrigger + joyB:     sim.ButtonB,
+	btnTrigger + joyStart: sim.ButtonSelect,
 }
 
-// padExitChords close the player when both buttons of one are held: Select and Start, on a
-// gamepad and on a joystick-style pad. A pad with no Home button has to have a way back to
-// the console's home that no game can swallow, so no game can use Select and Cancel (Start)
-// together.
-var padExitChords = [...][2]uint16{{btnSelect, btnStart}, {btnTrigger + 6, btnTrigger + 7}}
-
-// padHome is the Home button, which closes the player on its own: chords of one button, so
-// that they are forgotten after lost events and waited for on closing as the others are.
-var padHome = [...][2]uint16{{btnMode, btnMode}, {keyHomePage, keyHomePage}}
+// padHome closes the player on its own: Home (BTN_MODE, or KEY_HOMEPAGE) and a pad's Select
+// on either kind of pad. Each is a chord of one button, so that it is forgotten after lost
+// events and waited for on closing as the keyboard's are.
+var padHome = [...][2]uint16{{btnMode, btnMode}, {keyHomePage, keyHomePage}, {btnSelect, btnSelect}, {btnTrigger + joySelect, btnTrigger + joySelect}}
 
 // padDPad maps the D-pad-as-buttons encoding some pads use, and the handheld's.
 var padDPad = map[uint16]sim.Button{

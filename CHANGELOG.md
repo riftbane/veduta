@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Changed
+
+- A USB pad's Select leaves the game, as Home does, and its Start is the game's menu
+  (Select); Select+Start is gone, and a pad has no Cancel. A console with only a USB pad
+  had no reliable way back to the dashboard.
+- Joystick-style pads (buttons from `BTN_TRIGGER`) follow the order of the cheap
+  SNES-style USB pads (DragonRise `0079:0011`, `081f:e401`, the Rii GP100): A is the
+  second button, B the third, Select the ninth, Start the tenth. The old table read X as
+  A, A as B, and never saw Select or Start. The same on Windows through WinMM; on XInput
+  Back leaves and Start is the menu.
+
 ### Fixed
 
 - `veduta` was not found in VS Code's terminals when VS Code had started before the

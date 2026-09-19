@@ -8,8 +8,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
-	"github.com/riftbane/veduta/v2/sim"
 )
 
 // record builds one evdev record of the given size, as the kernel writes them.
@@ -47,10 +45,11 @@ func TestPadDecoder(t *testing.T) {
 				record(size, evKey, btnSouth, 1),   // already down: ignored
 				record(size, evKey, btnSouth, 0),   // A up
 				record(size, evKey, btnSouth+1, 1), // B
-				record(size, evKey, btnSelect, 1),  // Select
+				record(size, evKey, btnStart, 1),   // Start: the game's menu
 				record(size, evKey, btnSouth+3, 1), // X: not a console button, ignored
-				record(size, evKey, btnTrigger, 1), // a joystick-style pad's first button
-				record(size, evKey, keyBack, 1),    // the handheld's Cancel
+				record(size, evKey, btnTrigger, 1), // a joystick-style pad's X: ignored
+				record(size, evKey, btnTrigger+joyA, 1),
+				record(size, evKey, keyBack, 1), // the handheld's Cancel
 			))
 			want := "down a,up a,down b,down select,down a,down cancel"
 			if got != want {
@@ -174,7 +173,6 @@ func TestPadDroppedEvents(t *testing.T) {
 		then  uint16
 		want  string
 	}{
-		{"Select, then Start", padExitChords[0][0], padExitChords[0][1], "down select,up select,down cancel"},
 		{"Ctrl, then Q", keyLeftCtrl, keyQ, ""},
 	} {
 		got := describePad(decodeAll(t, size,
@@ -199,44 +197,35 @@ func TestPadDroppedEvents(t *testing.T) {
 	}
 }
 
-// TestPadExitChord: Select and Start together close the window, which is the only way off
-// a pad with no Home button, and it releases what was held first. It has to work on both
-// kinds of pad the table knows: a gamepad, whose buttons start at BTN_SOUTH, and a
-// joystick-style pad, whose buttons start at BTN_TRIGGER.
-func TestPadExitChord(t *testing.T) {
+// TestPadSelectLeaves: a pad's Select closes the window on its own, which is the only way
+// off a pad with no Home button, and it releases what was held first; Start is the game's
+// menu. It has to work on both kinds of pad the table knows: a gamepad, whose buttons start
+// at BTN_SOUTH, and a joystick-style pad, whose buttons start at BTN_TRIGGER.
+func TestPadSelectLeaves(t *testing.T) {
 	const size = 24
 	for _, c := range []struct {
 		name          string
 		a, sel, start uint16
 	}{
 		{"gamepad", btnSouth, btnSelect, btnStart},
-		{"joystick-style pad", btnTrigger, btnTrigger + 6, btnTrigger + 7},
+		{"joystick-style pad", btnTrigger + joyA, btnTrigger + joySelect, btnTrigger + joyStart},
 	} {
 		got := describePad(decodeAll(t, size,
 			record(size, evKey, c.a, 1),
-			record(size, evKey, c.sel, 1),
 			record(size, evKey, c.start, 1),
+			record(size, evKey, c.sel, 1),
 		))
 		if want := "down a,down select,up a,up select,close"; got != want {
-			t.Errorf("%s chord: %s\n want: %s", c.name, got, want)
-		}
-		// One of the two alone is an ordinary button: Start is Cancel.
-		got = describePad(decodeAll(t, size, record(size, evKey, c.start, 1)))
-		if want := "down cancel"; got != want {
-			t.Errorf("%s start alone: %s, want %s", c.name, got, want)
+			t.Errorf("%s: %s\n want: %s", c.name, got, want)
 		}
 	}
 }
 
-// TestPadExitChordsFollowTheTable: the chords are the buttons the table calls Select and
-// Start (Cancel), and every chord is two real buttons.
-func TestPadExitChordsFollowTheTable(t *testing.T) {
-	for _, c := range padExitChords {
-		if c[0] == 0 || c[1] == 0 || c[0] == c[1] {
-			t.Errorf("exit chord %#x is not two buttons", c)
-		}
-		if b0, b1 := padButtons[c[0]], padButtons[c[1]]; b0 != sim.ButtonSelect || b1 != sim.ButtonCancel {
-			t.Errorf("exit chord %#x is %v+%v, want select+cancel", c, b0, b1)
+// TestPadHomeNeverReachesAGame: no button that leaves is also a game button.
+func TestPadHomeNeverReachesAGame(t *testing.T) {
+	for _, c := range padHome {
+		if b, ok := padButtons[c[0]]; ok {
+			t.Errorf("Home %#x is also the game's %v", c[0], b)
 		}
 	}
 }
@@ -266,11 +255,11 @@ func TestKeyboardKeys(t *testing.T) {
 	}
 }
 
-// TestPadHome: Home closes the player on its own, as Select and Start do together, and
-// never reaches the game: BTN_MODE on a gamepad, KEY_HOMEPAGE on the handheld.
+// TestPadHome: Home closes the player on its own and never reaches the game: BTN_MODE on a
+// gamepad, KEY_HOMEPAGE on the handheld, and a pad's Select.
 func TestPadHome(t *testing.T) {
 	const size = 24
-	for _, home := range []uint16{btnMode, keyHomePage} {
+	for _, home := range []uint16{btnMode, keyHomePage, btnSelect, btnTrigger + joySelect} {
 		got := describePad(decodeAll(t, size,
 			record(size, evKey, btnSouth, 1),
 			record(size, evKey, home, 1),
